@@ -67,10 +67,8 @@ def cmp_dicts(dict1, dict2):
     for key, val in dict1.items():
         if key not in dict2:
             result = False
-            #print 'Key ''%s'' is not in dict2.' % key
         elif dict2[key] != val:
             result = False
-            #print 'Key ''%s'' value is ''%s'' in dict1, but ''%s'' in dict2.' % (key, val, dict2[key])
     return result
 
 

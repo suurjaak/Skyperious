@@ -60,17 +60,22 @@ class SkypeWindowsHandler(object):
         # From Skype4Py.api.windows
         key = ctypes.c_long()
         # try to find Skype in HKEY_CURRENT_USER registry tree
-        if ctypes.windll.advapi32.RegOpenKeyA(0x80000001, "Software\\Skype\\Phone", ctypes.byref(key)) != 0:
+        if 0 != ctypes.windll.advapi32.RegOpenKeyA(
+        0x80000001, "Software\\Skype\\Phone", ctypes.byref(key)):
             # try to find Skype in HKEY_LOCAL_MACHINE registry tree
-            if ctypes.windll.advapi32.RegOpenKeyA(0x80000002, "Software\\Skype\\Phone", ctypes.byref(key)) != 0:
+            if 0 != ctypes.windll.advapi32.RegOpenKeyA(
+            0x80000002, "Software\\Skype\\Phone", ctypes.byref(key)):
                 raise Exception("Skype not installed")
         pathlen = ctypes.c_long(512)
         path = ctypes.create_string_buffer(pathlen.value)
-        if ctypes.windll.advapi32.RegQueryValueExA(key, "SkypePath", None, None, path, ctypes.byref(pathlen)) != 0:
+        if 0 != ctypes.windll.advapi32.RegQueryValueExA(
+        key, "SkypePath", None, None, path, ctypes.byref(pathlen)):
             ctypes.windll.advapi32.RegCloseKey(key)
             raise SkypeAPIError("Cannot find Skype path")
         ctypes.windll.advapi32.RegCloseKey(key)
-        exec_result = ctypes.windll.shell32.ShellExecuteA(None, "open", path.value, "", None, 0)
+        exec_result = ctypes.windll.shell32.ShellExecuteA(
+            None, "open", path.value, "", None, 0
+        )
         return exec_result > 32
 
 

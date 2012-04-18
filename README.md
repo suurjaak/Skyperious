@@ -26,7 +26,7 @@ Using The Program
 -----------------
 
 Run skyperious.bat under Windows, or skyperious.sh where shell scripts are
-supported, or execute 'python main.py'. Or launch skyperious_0.9.3a.exe if
+supported, or execute 'python main.py'. Or launch skyperious_latest.exe if
 using the precompiled Windows executable.
 
 Skyperious can look through user directories and detect Skype databases

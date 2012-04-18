@@ -76,7 +76,8 @@ def create_py(target):
     f.write("\n\n%s%s%s\ndef get_appicons():\n\ticons = wx.IconBundle()\n\t"
             "[icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) "
             "for i in [\n\t\t%s\n\t]]\n\treturn icons\n" % (Q3,
-        "Returns the application icon bundle, several sizes and colour depths.",
+        "Returns the application icon bundle, "
+        "for several sizes and colour depths.",
         Q3, str(icons).replace("'", "").replace("[", "").replace("]", "")
     ))
     for filename, desc in sorted(APPICONS.items()):

@@ -16,7 +16,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.03.2012
+@modified    14.03.2012
 """
 import datetime
 import sys
@@ -93,10 +93,4 @@ def logstatus(text, *args):
 
 
 if "__main__" == __name__:
-    try:
-        run()
-    except Exception, e:
-        #with open("errors.log", "a") as f:
-        #    f.write("\n%s %s %s\n" % ("-" * 30, datetime.datetime.now(), "-" * 30))
-        #    traceback.print_exc(file=f)
-        raise
+    run()

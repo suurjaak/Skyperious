@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2012
+@modified    17.04.2012
 """
 import copy
 import datetime
@@ -81,15 +81,20 @@ class SkypeDatabase(object):
 
 
 
-    def __init__(self, filename):
-        """Initializes a new Skype database object from the file."""
+    def __init__(self, filename, log_error=True):
+        """
+        Initializes a new Skype database object from the file.
+
+        @param   log_error  if False, exceptions on opening the database
+                            are not written to log (written by default)
+        """
         self.filename = filename
         self.basefilename = os.path.basename(self.filename)
         self.backup_created = False
         self.consumers = set() # Registered objects, notified on clearing cache
         self.account = None # Row from table Accounts
         self.id = None      # Accounts.skypename
-        self.tables = None # {"tablename1": {"name": "TableName1", "rows": 0, "columns": []}, }.
+        self.tables = None # {"name": {"Name":str, "rows": 0, "columns": []}, }
         self.tables_list = None # Ordered list of table items
         self.table_rows = {}    # {"tablename1": [..], }
         self.table_objects = {} # {"tablename1": {id1: {rowdata1}, }, }
@@ -107,9 +112,10 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception, e:
-            main.log("Error when opening database %s (%s).", filename,
-                traceback.format_exc()
-            )
+            if log_error:
+                main.log("Error opening database %s (%s).", filename,
+                    traceback.format_exc()
+                )
             self.close()
             raise
 
@@ -120,14 +126,10 @@ class SkypeDatabase(object):
             ).fetchone()
             self.id = self.account["skypename"]
         except Exception, e:
-            main.log("Error when getting account information from %s (%s).",
-                filename, e
-            )
-
-
-    def __del__(self):
-        if self and hasattr(self, "close"):
-            self.close()
+            if log_error:
+                main.log("Error getting account information from %s (%s).",
+                    filename, e
+                )
 
 
     def __str__(self):
@@ -277,7 +279,8 @@ class SkypeDatabase(object):
         return self.tables_list
 
 
-    def get_messages(self, chat=None, ascending=True, timestamp_from=None, body_like=None):
+    def get_messages(self, chat=None, ascending=True,
+                     timestamp_from=None, body_like=None):
         """
         Yields all the messages (or messages for the specified chat), as
         {"datetime": datetime, ..}, ordered from earliest to latest.
@@ -399,7 +402,8 @@ class SkypeDatabase(object):
                     "SELECT *, COALESCE(displayname, meta_topic) AS title, "
                     "NULL AS created_datetime, "
                     "NULL AS last_activity_datetime "
-                    "FROM conversations ORDER BY last_activity_timestamp DESC"
+                    "FROM conversations WHERE displayname IS NOT NULL "
+                    "ORDER BY last_activity_timestamp DESC"
                 ).fetchall()
                 conversations = []
                 for chat in rows:
@@ -408,14 +412,11 @@ class SkypeDatabase(object):
                         else "Group chat \"%s\"") % chat["title"]
                     chat["title_long_lc"] = \
                         chat["title_long"][0].lower() + chat["title_long"][1:]
-                    if chat["creation_timestamp"]:
-                        chat["created_datetime"] = datetime.datetime.fromtimestamp(
-                            chat["creation_timestamp"]
-                    )
-                    if chat["last_activity_timestamp"]:
-                        chat["last_activity_datetime"] = datetime.datetime.fromtimestamp(
-                            chat["last_activity_timestamp"]
-                    )
+                    for k, v in [("creation_timestamp", "created_datetime"),
+                    ("last_activity_timestamp", "last_activity_datetime")]:
+                        if chat[k]:
+                            chat[v] = datetime.datetime.fromtimestamp(chat[k])
+                        
                     chat["type_name"] = CHATS_TYPENAMES.get(chat["type"],
                         "Unknown (%d)" % chat["type"])
                     # Set stats attributes presence
@@ -518,9 +519,9 @@ class SkypeDatabase(object):
                     "COALESCE(fullname, displayname, skypename, pstnnumber) "
                     "AS name FROM contacts ORDER BY name").fetchall()
                 self.table_objects["contacts"] = {}
-                for contact in rows:
-                    contacts.append(contact)
-                    self.table_objects["contacts"][contact["identity"]] = contact
+                for c in rows:
+                    contacts.append(c)
+                    self.table_objects["contacts"][c["identity"]] = c
                 self.table_rows["contacts"] = contacts
             else:
                 contacts = self.table_rows["contacts"]
@@ -590,8 +591,8 @@ class SkypeDatabase(object):
 
     def get_videos(self, chat=None):
         """
-        Returns all valid video rows in the database (with a matching row in Calls).
-        Uses already retrieved cached values if possible.
+        Returns all valid video rows in the database (with a matching row in
+        Calls). Uses already retrieved cached values if possible.
 
         @param   chat  if a row from get_conversations, returns only videos
                        under this chat
@@ -904,8 +905,9 @@ class SkypeDatabase(object):
                                 t.append(chat["id"])
                             else:
                                 t.append(transfer[col])
-                        # pk_id and nodeid are troublesome, because their meaning is unknown,
-                        # maybe something will go out of sync if their values can differ?
+                        # pk_id and nodeid are troublesome, because their
+                        # meaning is unknown, maybe something will go out of
+                        # sync if their values can differ?
                         self.execute(
                             "INSERT INTO transfers (%s) VALUES (%s)" % (
                                 transfer_cols, transfer_vals
@@ -920,15 +922,17 @@ class SkypeDatabase(object):
                         t = [(sms[col] if col in sms else "")
                             for col in sms_fields
                         ]
-                        # pk_id and nodeid are troublesome, because their meaning is unknown,
-                        # maybe something will go out of sync if their values can differ?
+                        # pk_id and nodeid are troublesome, because their
+                        # meaning is unknown, maybe something will go out of
+                        # sync if their values can differ?
                         self.execute(
                             "INSERT INTO smses (%s) VALUES (%s)" % (
                                 sms_cols, sms_vals
                             )
                         , t)
                 timestamp_earliest = min(timestamp_earliest, m["timestamp"])
-            if timestamp_earliest and chat["creation_timestamp"] > timestamp_earliest:
+            if (timestamp_earliest
+            and chat["creation_timestamp"] > timestamp_earliest):
                 # Conversations.creation_timestamp must not be later than the
                 # oldest message, Skype will not show messages older than that.
                 chat["creation_timestamp"] = timestamp_earliest
@@ -979,7 +983,9 @@ class SkypeDatabase(object):
         if self.is_open() and self.tables and "contacts" not in self.tables:
             self.create_table("contacts")
         if self.is_open() and self.tables and "contacts" in self.tables:
-            main.log("Merging %d contacts into %s.", len(contacts), self.filename)
+            main.log(
+                "Merging %d contacts into %s.", len(contacts), self.filename
+            )
             self.ensure_backup()
             col_data = self.get_table_columns("contacts")
             fields = [col["name"] for col in col_data if col["name"] != "id"]
@@ -1244,7 +1250,8 @@ class TableBase(wx.grid.PyGridTableBase):
         self.idx_new = [] # Unsaved added row indices
         self.rows_deleted = {} # Uncommitted deleted rows {id: deleted_row, }
         self.row_iterator = db.execute(
-            "SELECT * FROM %s %s %s" % (table, "WHERE %s" % where if where else "", order)
+            "SELECT * FROM %s %s %s"
+            % (table, "WHERE %s" % where if where else "", order)
         )
         self.iterator_index = -1
         self.sort_ascending = False
@@ -1257,7 +1264,7 @@ class TableBase(wx.grid.PyGridTableBase):
     def GetColLabelValue(self, col):
         label = self.columns[col]["name"]
         if col == self.sort_column:
-            label += " ↑" if self.sort_ascending else " ↓"
+            label += u" ↑" if self.sort_ascending else u" ↓"
         if col in self.filters:
             if "TEXT" == self.columns[col]["type"]:
                 label += "\nlike \"%s\"" % self.filters[col]
@@ -1374,8 +1381,8 @@ class TableBase(wx.grid.PyGridTableBase):
                 idx = data["__id__"]
                 if not data["__new__"]:
                     if idx not in self.rows_backup:
-                        # Backup only existing rows, new rows will be dropped on
-                        # rollback anyway.
+                        # Backup only existing rows, new rows will be dropped
+                        # on rollback anyway.
                         self.rows_backup[idx] = data.copy()
                     data["__changed__"] = True
                     self.idx_changed.add(idx)
@@ -1401,30 +1408,25 @@ class TableBase(wx.grid.PyGridTableBase):
         }
         for label, count in values.items():
             if count:
-                infolist.append("%s %s row%s" % (count, label, "s" if count != 1 else ""))
+                infolist.append("%s %s row%s"
+                    % (count, label, "s" if count != 1 else ""))
         return ", ".join(infolist)
 
 
     def GetAttr(self, row, col, kind):
         if not self.attrs:
-            self.attrs["new"] = wx.grid.GridCellAttr()
-            self.attrs["default"] = wx.grid.GridCellAttr()
-            self.attrs["row_changed"] = wx.grid.GridCellAttr()
-            self.attrs["cell_changed"] = wx.grid.GridCellAttr()
-            self.attrs["new"].SetBackgroundColour(conf.GridRowInsertedColour)
-            self.attrs["row_changed"].SetBackgroundColour(conf.GridRowChangedColour)
-            self.attrs["cell_changed"].SetBackgroundColour(conf.GridCellChangedColour)
-            self.attrs["newblob"] = wx.grid.GridCellAttr()
-            self.attrs["defaultblob"] = wx.grid.GridCellAttr()
-            self.attrs["row_changedblob"] = wx.grid.GridCellAttr()
-            self.attrs["cell_changedblob"] = wx.grid.GridCellAttr()
-            self.attrs["newblob"].SetBackgroundColour(conf.GridRowInsertedColour)
-            self.attrs["row_changedblob"].SetBackgroundColour(conf.GridRowChangedColour)
-            self.attrs["cell_changedblob"].SetBackgroundColour(conf.GridCellChangedColour)
-            self.attrs["newblob"].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
-            self.attrs["defaultblob"].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
-            self.attrs["row_changedblob"].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
-            self.attrs["cell_changedblob"].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
+            for n in ["new", "default", "row_changed", "cell_changed",
+            "newblob", "defaultblob", "row_changedblob", "cell_changedblob"]:
+                self.attrs[n] = wx.grid.GridCellAttr()
+            for n in ["new", "newblob"]:
+                self.attrs[n].SetBackgroundColour(conf.GridRowInsertedColour)
+            for n in ["row_changed", "row_changedblob"]:
+                self.attrs[n].SetBackgroundColour(conf.GridRowChangedColour)
+            for n in ["cell_changed", "cell_changedblob"]:
+                self.attrs[n].SetBackgroundColour(conf.GridCellChangedColour)
+            for n in ["newblob", "defaultblob",
+            "row_changedblob", "cell_changedblob"]:
+                self.attrs[n].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
 
         blob = "blob" if (self.columns[col]["type"].lower() == "blob") else ""
 
@@ -1562,7 +1564,9 @@ class TableBase(wx.grid.PyGridTableBase):
         """Clears current sort."""
         self.sort_column = None
         if refresh:
-            self.rows_current[:].sort(key=lambda x: self.idx_all.index(x["__id__"]))
+            self.rows_current[:].sort(
+                key=lambda x: self.idx_all.index(x["__id__"])
+            )
             if self.View:
                 self.View.ForceRefresh()
 
@@ -1838,19 +1842,25 @@ class MessageParser(object):
 
             for entity, value in self.ENTITIES.items():
                 body = body.replace(entity, value)
-            # Stripping out emoticon tags with regex works 100% and is easier than
-            # replacing them in the DOM.
-            body = self.EMOTICON_RGX.sub((self.EMOTICON_REPL), (body.encode("utf-8")))
+            # Stripping out emoticon tags with regex works 100% reliably and is
+            # easier than replacing them in the DOM.
+            body = self.EMOTICON_RGX.sub(
+                (self.EMOTICON_REPL), (body.encode("utf-8"))
+            )
             #print message["body_xml"], body
             try:
-                dom = xml.etree.cElementTree.fromstring("<xml>%s</xml>" % body)
+                dom = xml.etree.cElementTree.fromstring(
+                    "<xml>%s</xml>" % body
+                )
             except Exception, e:
                 body = self.SAFEBYTE_RGX.sub(self.SAFEBYTE_REPL, body)
                 try:
-                    dom = xml.etree.cElementTree.fromstring("<xml>%s</xml>" % body)
+                    dom = xml.etree.cElementTree.fromstring(
+                        "<xml>%s</xml>" % body
+                    )
                 except Exception, e:
                     dom = xml.etree.cElementTree.fromstring("<xml></xml>")
-                    main.log("Failed to parse message %s with body \"%s\" (%s).", 
+                    main.log("Error parsing message %s, body \"%s\" (%s).", 
                         message["id"], body, e
                     )
 
@@ -1946,7 +1956,8 @@ class MessageParser(object):
                 elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
                 elm_stat.text = " Call ended"
             elif MESSAGES_TYPE_LEAVE == message["type"]:
-                dom.text = "%s has left the conversation." % message["from_dispname"]
+                dom.text = "%s has left the conversation." \
+                            % message["from_dispname"]
             elif MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
                 names_to = [self.db.get_contact_name(i)
                     for i in message["identities"].split(" ")
@@ -2004,7 +2015,8 @@ class MessageParser(object):
                     continue
                 for j, t in [(0, i.text), (1, i.tail)]:
                     if t:
-                        highlighted = rgx_highlight.sub(lambda x: "<b>%s<b>" % x.group(0), t)
+                        highlighted = rgx_highlight.sub(
+                            lambda x: "<b>%s<b>" % x.group(0), t)
                         parts = rgx_highlight_split.split(highlighted)
                         if len(parts) > 1:
                             if j:
@@ -2030,7 +2042,7 @@ class MessageParser(object):
                                         if b is not None: #
                                             b.tail = part
                                         else:
-                                            i.tail = (i.tail if i.tail else "") + part
+                                            i.tail = (i.tail or "") + part
                                     else: # Processing i.text
                                         if b is not None: #
                                             b.tail = part
@@ -2187,7 +2199,7 @@ def find_databases(folder):
 
 
 """
-Information on Skype database tables (empirical and unreliable):
+Information on Skype database tables (unreliable, mostly empirical):
 
 Accounts       - one row with user profile information
 Alerts         - alerts from Skype payments, Facebook etc

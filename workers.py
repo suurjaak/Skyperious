@@ -4,7 +4,7 @@ Background workers for searching and diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    14.04.2012
+@modified    18.04.2012
 """
 import cStringIO
 import datetime
@@ -401,20 +401,12 @@ class DiffThread(WorkerThread):
                                     len(diff["messages"][i])
                                 )
                            )
-                        if diff["participants"][i]:
-                            # Add to contacts those that are new
-                            new = [p for p in diff["participants"][i]  
-                                if p["identity"] not in skypenames_other
-                            ]
-                            if new:
-                                info += ", %s" % util.plural("new contact",
-                                    len(new)
+                        if diff["participants"][i] and newstr:
+                                info += ", %s" % (
+                                    util.plural("%sparticipant" % newstr,
+                                        len(diff["participants"][i])
+                                    )
                                 )
-                            info += ", %s" % (
-                                util.plural("%sparticipant" % newstr,
-                                    len(diff["participants"][i])
-                                )
-                            )
                         if diff["messages"][i] or diff["participants"][i]:
                             info += ".<br />"
                             result["htmls"][i] += info
@@ -459,6 +451,7 @@ class DiffThread(WorkerThread):
         m2_no_remote_ids = [] # [message, ] with a NULL remote_id
         m1bodymap = {} # {author+type+body: [message, ], }
         m2bodymap = {} # {author+type+body: [message, ], }
+        difftexts = {} # {id(message): text, }
 
         # Skip comparing messages if one side is completely empty
         parser1, parser2 = None, None
@@ -491,17 +484,17 @@ class DiffThread(WorkerThread):
                 else:
                     t = parser.parse(m, text={"wrap": False})
                 t = t if type(t) is str else t.encode("utf-8")
-                m["__difftext"] = "%s-%s-%s" % (
+                difftext = difftexts[id(m)] = "%s-%s-%s" % (
                     m["author"].encode("utf-8"), m["type"], t
                 )
-                if m["__difftext"] not in bodymap: bodymap[m["__difftext"]] = []
-                bodymap[m["__difftext"]].append(m)
+                if difftext not in bodymap: bodymap[difftext] = []
+                bodymap[difftext].append(m)
 
         # Compare assembled remote_id maps between databases and see if there
         # are no messages with matching body in the other database.
         for remote_id, m in [(r, j) for r, i in m1map.items() for j in i]:
             if remote_id in m2map:
-                if not filter(lambda x: m["__difftext"] == x["__difftext"],
+                if not filter(lambda x: difftexts[id(m)] == difftexts[id(x)],
                     m2map[remote_id]
                 ):
                     # No message with same remote_id has same body
@@ -510,7 +503,7 @@ class DiffThread(WorkerThread):
                 c1m_diff.append(m)
         for remote_id, m in [(r, j) for r, i in m2map.items() for j in i]:
             if remote_id in m1map:
-                if not filter(lambda x: m["__difftext"] == x["__difftext"],
+                if not filter(lambda x: difftexts[id(m)] == difftexts[id(x)],
                     m1map[remote_id]
                 ):
                     # No message with same remote_id has same body
@@ -521,13 +514,13 @@ class DiffThread(WorkerThread):
         # For messages with no remote_id-s, compare by author-type-body key
         # and see if there are no matching messages sufficiently close in time.
         for m in m1_no_remote_ids:
-            potential_matches = m2bodymap.get(m["__difftext"], [])
+            potential_matches = m2bodymap.get(difftexts[id(m)], [])
             # Allow a 3-minute leeway between timestamps of duplicated messages
             if not [i for i in potential_matches if 
             (abs(i["timestamp"] - m["timestamp"]) < 3 * 60)]:
                 c1m_diff.append(m)
         for m in m2_no_remote_ids:
-            potential_matches = m1bodymap.get(m["__difftext"], [])
+            potential_matches = m1bodymap.get(difftexts[id(m)], [])
             # Allow a 3-minute leeway between timestamps of duplicated messages
             if not [i for i in potential_matches if 
             (abs(i["timestamp"] - m["timestamp"]) < 180)]:
@@ -541,11 +534,6 @@ class DiffThread(WorkerThread):
 
         c1m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
         c2m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
-
-        for m in messages1:
-            del m["__difftext"]
-        for m in messages2:
-            del m["__difftext"]
 
         result = {
             "messages": [c1m_diff, c2m_diff],

@@ -261,8 +261,10 @@ CHAT_HTML_HEADER = """<!DOCTYPE HTML><html>
         <td class="header_left">%%(header_left)s</td>
         <td>
             <div class="header">%%(title)s.</div><br />
-            Showing %%(count)s messages from <b>%%(date1)s</b> to <b>%%(date2)s</b>.<br />
-            Chat created on <b>%%(chat_created)s</b>, <b>%%(messages_total)s</b> in total.<br />
+            Showing %%(count)s messages from
+            <b>%%(date1)s</b> to <b>%%(date2)s</b>.<br />
+            Chat created on <b>%%(chat_created)s</b>,
+            <b>%%(messages_total)s</b> in total.<br />
             Source: <b>%%(db)s</b>.<br /><br />%%(header_link)s
         </td>
         <td class="header_right">%%(header_right)s</td>

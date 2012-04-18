@@ -65,8 +65,9 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         for row in rows:
             col_name = column_map[0][0]
             col_value = "" if row[col_name] is None else unicode(row[col_name])
-            # Keep space for the mysterious 0 column, to decrease display changes.
-            col_lengths[col_name] = max(col_lengths[col_name], len(col_value) + 3)
+            # Keep space for the 0 (icon) column, to decrease display changes.
+            col_lengths[col_name] = \
+                max(col_lengths[col_name], len(col_value) + 3)
             self.InsertStringItem(row_index, col_value)
             row_id = id(row)
             self.SetItemData(row_index, row_id)
@@ -85,10 +86,10 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 col_value = "" if (col_name not in row
                                    or row[col_name] is None
                             ) else unicode(row[col_name])
-                col_lengths[col_name] = max(col_lengths[col_name], len(col_value))
+                col_lengths[col_name] = \
+                    max(col_lengths[col_name], len(col_value))
                 self.SetStringItem(row_index, col_index, col_value)
-                item_data_map[row_id][col_index] = row[col_name] \
-                                                   if col_name in row else None
+                item_data_map[row_id][col_index] = row.get(col_name, None)
                 col_index += 1
             self.SetItemColumnImage(row_index, 0, -1)
             row_index += 1
@@ -136,7 +137,8 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 col_value = "" if (col_name not in row
                                    or row[col_name] is None
                             ) else unicode(row[col_name])
-                col_lengths[col_name] = max(col_lengths[col_name], len(col_value))
+                col_lengths[col_name] = \
+                    max(col_lengths[col_name], len(col_value))
                 self.SetStringItem(row_index, col_index, col_value)
                 self.itemDataMap[self.GetItemData(row_index)][col_index] = \
                     row[col_name] if col_name in row else None
@@ -199,8 +201,8 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
     def GetColumnSorter(self):
         """
-        Override ColumnSorterMixin.GetColumnSorter to specify our sorting, which
-        accounts for None values.
+        Override ColumnSorterMixin.GetColumnSorter to specify our sorting,
+        which accounts for None values.
         """
         sorter = self.__ColumnSorter if hasattr(self, "_data_map") \
             else wx.lib.mixins.listctrl.ColumnSorterMixin.GetColumnSorter(self)
@@ -231,7 +233,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             else:
                 cmpVal = cmp(item1, item2)
 
-        # If the items are equal then pick something else to make the sort value unique
+        # If items are equal, pick something else to make the sort value unique
         if cmpVal == 0:
             cmpVal = apply(cmp, self.GetSecondarySortValues(col, key1, key2))
 
@@ -246,21 +248,22 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
     """SQLite reserved keywords."""
     KEYWORDS = [
         u"ABORT", u"ACTION", u"ADD", u"AFTER", u"ALL", u"ALTER", u"ANALYZE",
-        u"AND", u"AS", u"ASC", u"ATTACH", u"AUTOINCREMENT", u"BEFORE", u"BEGIN",
-        u"BETWEEN", u"BY", u"CASCADE", u"CASE", u"CAST", u"CHECK", u"COLLATE",
-        u"COLUMN", u"COMMIT", u"CONFLICT", u"CONSTRAINT", u"CREATE", u"CROSS",
-        u"CURRENT_DATE", u"CURRENT_TIME", u"CURRENT_TIMESTAMP", u"DATABASE",
-        u"DEFAULT", u"DEFERRABLE", u"DEFERRED", u"DELETE", u"DESC", u"DETACH",
-        u"DISTINCT", u"DROP", u"EACH", u"ELSE", u"END", u"ESCAPE", u"EXCEPT",
-        u"EXCLUSIVE", u"EXISTS", u"EXPLAIN", u"FAIL", u"FOR", u"FOREIGN", u"FROM",
-        u"FULL", u"GLOB", u"GROUP", u"HAVING", u"IF", u"IGNORE", u"IMMEDIATE",
-        u"IN", u"INDEX", u"INDEXED", u"INITIALLY", u"INNER", u"INSERT",
-        u"INSTEAD", u"INTERSECT", u"INTO", u"IS", u"ISNULL", u"JOIN", u"KEY",
-        u"LEFT", u"LIKE", u"LIMIT", u"MATCH", u"NATURAL", u"NO", u"NOT",
-        u"NOTNULL", u"NULL", u"OF", u"OFFSET", u"ON", u"OR", u"ORDER", u"OUTER",
-        u"PLAN", u"PRAGMA", u"PRIMARY", u"QUERY", u"RAISE", u"REFERENCES",
-        u"REGEXP", u"REINDEX", u"RELEASE", u"RENAME", u"REPLACE", u"RESTRICT",
-        u"RIGHT", u"ROLLBACK", u"ROW", u"SAVEPOINT", u"SELECT", u"SET", u"TABLE",
+        u"AND", u"AS", u"ASC", u"ATTACH", u"AUTOINCREMENT", u"BEFORE",
+        u"BEGIN", u"BETWEEN", u"BY", u"CASCADE", u"CASE", u"CAST", u"CHECK",
+        u"COLLATE", u"COLUMN", u"COMMIT", u"CONFLICT", u"CONSTRAINT",
+        u"CREATE", u"CROSS", u"CURRENT_DATE", u"CURRENT_TIME",
+        u"CURRENT_TIMESTAMP", u"DATABASE", u"DEFAULT", u"DEFERRABLE",
+        u"DEFERRED", u"DELETE", u"DESC", u"DETACH", u"DISTINCT", u"DROP",
+        u"EACH", u"ELSE", u"END", u"ESCAPE", u"EXCEPT", u"EXCLUSIVE",
+        u"EXISTS", u"EXPLAIN", u"FAIL", u"FOR", u"FOREIGN", u"FROM", u"FULL",
+        u"GLOB", u"GROUP", u"HAVING", u"IF", u"IGNORE", u"IMMEDIATE", u"IN",
+        u"INDEX", u"INDEXED", u"INITIALLY", u"INNER", u"INSERT", u"INSTEAD",
+        u"INTERSECT", u"INTO", u"IS", u"ISNULL", u"JOIN", u"KEY", u"LEFT",
+        u"LIKE", u"LIMIT", u"MATCH", u"NATURAL", u"NO", u"NOT", u"NOTNULL",
+        u"NULL", u"OF", u"OFFSET", u"ON", u"OR", u"ORDER", u"OUTER", u"PLAN",
+        u"PRAGMA", u"PRIMARY", u"QUERY", u"RAISE", u"REFERENCES", u"REGEXP",
+        u"REINDEX", u"RELEASE", u"RENAME", u"REPLACE", u"RESTRICT", u"RIGHT",
+        u"ROLLBACK", u"ROW", u"SAVEPOINT", u"SELECT", u"SET", u"TABLE",
         u"TEMP", u"TEMPORARY", u"THEN", u"TO", u"TRANSACTION", u"TRIGGER",
         u"UNION", u"UNIQUE", u"UPDATE", u"USING", u"VACUUM", u"VALUES", u"VIEW",
         u"VIRTUAL", u"WHEN", u"WHERE"
@@ -275,7 +278,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         self.autocomps_added = set()
         # All autocomps: added + KEYWORDS
         self.autocomps_total = self.KEYWORDS
-        self.autocomps_subwords = {} # {word.upper(): set(words filled in after word+dot), }
+        # {word.upper(): set(words filled in after word+dot), }
+        self.autocomps_subwords = {}
 
         self.SetLexer(wx.stc.STC_LEX_SQL)
         self.SetMarginWidth(1, 0) # Get rid of left margin
@@ -383,8 +387,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
             elif not event.CmdDown():
                 # Check if we have enough valid text to start autocomplete
                 char = None
-                try:
-                    char = chr(key_code).decode("latin1") # Not all keycodes can be chars
+                try: # Not all keycodes can be chars
+                    char = chr(key_code).decode("latin1")
                 except:
                     pass
                 if char not in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, 10, 13] \
@@ -582,7 +586,7 @@ class RangeSlider(wx.PyPanel):
                     try:    # Confine value between range edge and other marker
                         former_value = value
                         value = confine(value, limit)
-                    except: # Comparison fails if a value of new type is being set
+                    except: # Fails if a value of new type is being set
                         self._vals[i] = None
             self._vals_prev[i] = self._vals[i]
             self._vals[i] = value
@@ -654,9 +658,9 @@ class RangeSlider(wx.PyPanel):
         # 2.3 provides a bit of space between 2 labels
         best.width  = 2.3 * extent[0]
         # 1 for upper gap, plus all set positions plus 2 * label height
-        best.height = 1 + 2 * (extent[1] + extent[2]) + self.RANGE_TOP \
-                      + self.RANGE_LABEL_TOP_GAP + self.RANGE_LABEL_BOTTOM_GAP \
-                      + self.TICK_HEIGHT + self.BAR_HEIGHT
+        best.height = (1 + 2 * (extent[1] + extent[2]) + self.RANGE_TOP
+                      + self.RANGE_LABEL_TOP_GAP + self.RANGE_LABEL_BOTTOM_GAP
+                      + self.TICK_HEIGHT + self.BAR_HEIGHT)
         return best
 
 
@@ -695,7 +699,9 @@ class RangeSlider(wx.PyPanel):
         if self.IsEnabled():
             dc.SetTextForeground(self.LABEL_COLOUR)
         else:
-            dc.SetTextForeground(wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT))
+            dc.SetTextForeground(
+                wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+            )
         if not filter(None, self._rng):
             return
 
@@ -704,13 +710,15 @@ class RangeSlider(wx.PyPanel):
         # GetFullTextExtent returns (width, height, descent, leading)
         left_extent  = self.GetFullTextExtent(left_label)
         right_extent = self.GetFullTextExtent(right_label)
-        max_extent = right_extent if (right_extent > left_extent) else left_extent
+        max_extent = right_extent if (right_extent > left_extent) \
+                     else left_extent
         range_delta = self._rng[1] - self._rng[0]
         box_top = (max_extent[1] + max_extent[2]) + 2 # 1 for border, 1 for gap
         selection_top = box_top + self.RANGE_TOP
         selection_height = height - selection_top - self.RANGE_BOTTOM
         self._box_area = wx.Rect(self.BAR_BUTTON_WIDTH, box_top,
-            width - 2 * self.BAR_BUTTON_WIDTH, height - box_top - self.BAR_HEIGHT
+            width - 2 * self.BAR_BUTTON_WIDTH,
+            height - box_top - self.BAR_HEIGHT
         )
         dc.SetFont(self.GetFont())
 
@@ -1150,7 +1158,8 @@ class RangeSlider(wx.PyPanel):
                         dlt = abs(self._marker_xs[i] - event.Position.x)
                         if dlt < x_i_delta:
                             closest_i, x_i_delta = i, dlt
-                    outwards = (x_direction > 0) if closest_i else (x_direction < 0)
+                    outwards = (x_direction > 0) if closest_i \
+                               else (x_direction < 0)
                     if in_area or not outwards:
                         step = 0
                     if step:
@@ -1300,27 +1309,27 @@ class SearchableStyledTextCtrl(wx.PyPanel):
 
     """Image for the close button."""
     IMG_CLOSE = wx.lib.embeddedimage.PyEmbeddedImage(
-        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAARnQU1B"
-        "AACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAA"
-        "ABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAUklEQVQoU2NYu2nLf7eg"
-        "8P9AwICMQWIgOQYQA4ZhCpDFwLpgAhWNLf9BGFkD3FhkCRAbZhpcQXlDM1wniI2iAGYkSAJZ"
-        "IUgRYUcuX7MOpzdBcgBnRZ25rvtD2gAAAABJRU5ErkJggg==")
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAARnQ"
+        "U1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnL"
+        "pRPAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAUklEQVQoU2N"
+        "Yu2nLf7eg8P9AwICMQWIgOQYQA4ZhCpDFwLpgAhWNLf9BGFkD3FhkCRAbZhpcQXlDM1wn"
+        "iI2iAGYkSAJZIUgRYUcuX7MOpzdBcgBnRZ25rvtD2gAAAABJRU5ErkJggg==")
 
     """Image for the Previous button."""
     IMG_PREV = wx.lib.embeddedimage.PyEmbeddedImage(
-        "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAAXNSR0IArs4c6QAAAARnQU1B"
-        "AACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAA"
-        "ABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAQklEQVQYV2P4//8/Aww/"
-        "efr0f3v/JCD3PwNccPmadf/9o+L/uwWFQySOnjj5PzWvCCwAw/glYOaDjPIOi0YYhctyAJvW"
-        "YR0gpxhPAAAAAElFTkSuQmCC")
+        "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAAXNSR0IArs4c6QAAAARnQ"
+        "U1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnL"
+        "pRPAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAQklEQVQYV2P"
+        "4//8/Aww/efr0f3v/JCD3PwNccPmadf/9o+L/uwWFQySOnjj5PzWvCCwAw/glYOaDjPIO"
+        "i0YYhctyAJvWYR0gpxhPAAAAAElFTkSuQmCC")
 
     """Image for the Next button."""
     IMG_NEXT = wx.lib.embeddedimage.PyEmbeddedImage(
-        "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAAXNSR0IArs4c6QAAAARnQU1B"
-        "AACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAA"
-        "ABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAARElEQVQYV2P4//8/Q3v/"
-        "pP9Pnj4FMv8zwDCY4RYU/t8/Kv7/8jXr4JJwCZAkCKfmFf0/euIkRCtMEKuEd1g0plHYLAcA"
-        "YhZhHfMXUEMAAAAASUVORK5CYII=")
+        "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAAXNSR0IArs4c6QAAAARnQ"
+        "U1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnL"
+        "pRPAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAARElEQVQYV2P"
+        "4//8/Q3v/pP9Pnj4FMv8zwDCY4RYU/t8/Kv7/8jXr4JJwCZAkCKfmFf0/euIkRCtMEKuE"
+        "d1g0plHYLAcAYhZhHfMXUEMAAAAASUVORK5CYII=")
 
 
 
@@ -1814,7 +1823,9 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
                 self._last_scroll_pos[i] = ratio * self.GetScrollRange(orient)
             # Execute scroll later as something resets it after this handler
             try:
-                wx.CallLater(50, lambda: self.Scroll(*self._last_scroll_pos))
+                wx.CallLater(50, lambda:
+                    self.Scroll(*self._last_scroll_pos) if self else None
+                )
             except:
                 pass # CallLater fails if not called from the main thread
         event.Skip() # Allow event to propagate wx handler

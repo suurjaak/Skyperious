@@ -3,14 +3,14 @@ Contains embedded image and icon resources for Skyperious. Auto-generated.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  27.03.2012
+@modified  18.04.2012
 """
 from base64 import b64decode
 from cStringIO import StringIO
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx
 
-"""Returns the application icon bundle, several sizes and colour depths."""
+"""Returns the application icon bundle, for several sizes and colour depths."""
 def get_appicons():
 	icons = wx.IconBundle()
 	[icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) for i in [

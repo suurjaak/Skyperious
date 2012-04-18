@@ -4,7 +4,7 @@ GUI for Skyperious, contains most application and user interface logic.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2012
+@modified    18.04.2012
 """
 import BeautifulSoup
 import collections
@@ -216,7 +216,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         button_compare.Enabled = False
         button_open.Enabled = False
         button_detect = self.button_detect = wx.Button(
-            parent=page, label="&Detect databases", size=(150, -1)
+            parent=page, label="Detect databases", size=(150, -1)
         )
         button_detect.Bind(wx.EVT_BUTTON, self.on_detect_databases)
         button_detect.SetToolTipString(
@@ -230,7 +230,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         )
         button_find.Bind(wx.EVT_BUTTON, self.on_add_from_folder)
         button_remove = self.button_remove = wx.Button(
-            parent=page, label="&Remove selected", size=(150, -1)
+            parent=page, label="Remove selected", size=(150, -1)
         )
         button_remove.SetToolTipString(
             "Removes the selected items from the database list."
@@ -246,7 +246,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         button_copy.Bind(wx.EVT_BUTTON, self.on_copy_database)
         button_copy.Enabled = False
         button_clear = self.button_clear = wx.Button(
-            parent=page, label="C&lear list", size=(150, -1)
+            parent=page, label="Clear list", size=(150, -1)
         )
         button_clear.SetToolTipString("Empties the database list.")
         button_clear.Bind(wx.EVT_BUTTON, self.on_clear_databases)
@@ -299,7 +299,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
 
         button_clear = self.button_clear_log = wx.Button(
-            parent=page, label="C&lear log", size=(100, -1)
+            parent=page, label="Clear log", size=(100, -1)
         )
         button_clear.Bind(wx.EVT_BUTTON, lambda event: self.log.Clear())
         edit_log = self.log = wx.TextCtrl(page, -1, style=wx.TE_MULTILINE)
@@ -482,20 +482,16 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                     )
                     if wx.OK == response:
                         os_handler.shutdown_skype()
-                        count = 3
-                        while os_handler.is_skype_running() and count > 0:
-                            time.sleep(1)
-                            count -= 1
-                        try:
-                            shutil.copyfile(original, newpath)
-                        except:
+                        success, _ = self.try_until(
+                            lambda: shutil.copyfile(original, newpath)
+                        )
+                        if not success:
                             wx.MessageBox(
                                 "Still could not copy \"%s\" to \"%s\"." % (
                                     original, newpath
                                 ), conf.Title,
                                 wx.OK | wx.ICON_WARNING
                             )
-                        os_handler.launch_skype()
                 else:
                     wx.MessageBox(
                         "Failed to copy \"%s\" to \"%s\"." % (original, newpath),
@@ -817,6 +813,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         self.update_database_list()
         self.SendSizeEvent() # Multiline wx.Notebooks need redrawing
         self.notebook.RemoveChild(page)
+        page.Destroy()
         self.UpdateAccelerators() # Remove page accelerators
 
 
@@ -876,13 +873,10 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                         )
                         if wx.OK == response:
                             os_handler.shutdown_skype()
-                            count = 3
-                            while os_handler.is_skype_running() and count > 0:
-                                time.sleep(1)
-                                count -= 1
-                            try:
-                                db = skypedata.SkypeDatabase(filename)
-                            except:
+                            try_result, db = self.try_until(lambda:
+                                skypedata.SkypeDatabase(filename, False)
+                            )
+                            if not try_result:
                                 wx.MessageBox(
                                     "Still could not open %s." % filename,
                                     conf.Title, wx.OK | wx.ICON_WARNING
@@ -919,6 +913,29 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                     conf.Title, wx.OK | wx.ICON_WARNING
                 )
         return db
+
+
+    def try_until(self, func, tries=10, sleep=0.5):
+        """
+        Tries to execute the specified function a number of times.
+
+        @param    func   callable to execute
+        @param    tries  number of times to try (default 10)
+        @param    sleep  seconds to sleep after failed attempts (default 0.5)
+        @return          (True if success else False, func_result)
+        """
+        count = 0
+        result = False
+        func_result = None
+        while count < tries:
+            count += 1
+            try:
+                func_result = func()
+                result = True
+            except Exception, e:
+                if count < tries:
+                    time.sleep(sleep)
+        return result, func_result
 
 
     def load_database_page(self, filename):
@@ -1387,6 +1404,7 @@ class DatabasePage(wx.Panel):
         )
         tree.AddColumn("Table")
         tree.AddColumn("Info")
+        tree.AddRoot("Loading data..")
         tree.SetMainColumn(0)
         tree.SetColumnAlignment(1, wx.ALIGN_RIGHT)
         self.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_change_list_tables, tree)
@@ -2768,6 +2786,7 @@ class DatabasePage(wx.Panel):
         try:
             tables = self.db.get_tables()
             # Fill table tree with information on row counts and columns
+            self.tree_tables.DeleteAllItems()
             root = self.tree_tables.AddRoot("SQLITE")
             for table in tables:
                 child = self.tree_tables.AppendItem(root, table["name"])
@@ -2814,11 +2833,13 @@ class DatabasePage(wx.Panel):
         except Exception, e:
             # Database access can easily fail if the user closes the tab before
             # the later data has been loaded.
-            main.log("Error accessing database %s.\n%s",
-                self.db, traceback.format_exc()
-            )
-        self.button_close.Enabled = True
-        main.status("Opened Skype database %s.", self.db)
+            if self:
+                main.log("Error accessing database %s.\n%s",
+                    self.db, traceback.format_exc()
+                )
+        if self:
+            self.button_close.Enabled = True
+            main.status("Opened Skype database %s.", self.db)
 
 
     def on_close(self, event):
@@ -3001,7 +3022,7 @@ class MergerPage(wx.Panel):
             label="%s\n\nAnalyzing..%s" % (self.db1.filename, "\n" * 7)
         )
         label2 = self.label_all2 = wx.StaticText(page,
-            label="%s\n\nAnalyzing..%s" % (self.db1.filename, "\n" * 7)
+            label="%s\n\nAnalyzing..%s" % (self.db2.filename, "\n" * 7)
         )
         button_scan = self.button_scan_all = wx.Button(
             page, label="Scan differences between left and right"
@@ -3567,7 +3588,9 @@ class MergerPage(wx.Panel):
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ) == wx.OK
         if proceed:
-            busy = controls.ProgressPanel(self, "Merging %s\nfrom %s\nto %s." % (info, db1, db2))
+            busy = controls.ProgressPanel(
+                self, "Merging %s\nfrom %s\nto %s." % (info, db1, db2)
+            )
             wx.GetApp().Yield(True) # Allow UI to refresh
             main.logstatus("Merging %s from %s to %s.", info, db1, db2)
             event.EventObject.Enabled = False
@@ -3658,8 +3681,8 @@ class MergerPage(wx.Panel):
             if participants:
                 # Add to contacts those that are new
                 cc2 = [i["identity"] for i in db2.get_contacts()] + [db2.id]
-                contacts2 = [i for i in participants 
-                             if i["identity"] not in cc2]
+                contacts2 = [i for i in participants if ("id" in i["contact"]
+                             and i["identity"] not in cc2)]
                 if contacts2:
                     parts.append(util.plural("new contact", len(contacts2)))
                 parts.append(util.plural("%sparticipant" % newstr,
@@ -3917,18 +3940,20 @@ class MergerPage(wx.Panel):
         except Exception, e:
             # Database access can easily fail if the user closes the tab before
             # the later data has been loaded.
-            main.log("Error accessing database %s or %s.\n%s",
-                self.db1, self.db2, traceback.format_exc()
+            if self:
+                main.log("Error accessing database %s or %s.\n%s",
+                    self.db1, self.db2, traceback.format_exc()
+                )
+        if self:
+            self.page_merge_all.Layout()
+            self.button_swap.Enabled = True
+            self.button_close.Enabled = True
+            if self.chats_differing is None:
+                self.button_scan_all.Enabled = True
+            main.status("Opened Skype databases %s and %s.",
+                self.db1, self.db2
             )
-        self.page_merge_all.Layout()
-        self.button_swap.Enabled = True
-        self.button_close.Enabled = True
-        if self.chats_differing is None:
-            self.button_scan_all.Enabled = True
-        main.status("Opened Skype databases %s and %s.",
-            self.db1, self.db2
-        )
-        self.Refresh()
+            self.Refresh()
 
 
     def on_close(self, event):
@@ -4582,8 +4607,8 @@ class DayHourDialog(wx.Dialog):
 
         vbox = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.text_days = wx.SpinCtrl(parent=self, value=str(days),
-            size=(200, -1), style=wx.ALIGN_LEFT, min=-sys.maxint, max=sys.maxint
+        self.text_days = wx.SpinCtrl(parent=self, style=wx.ALIGN_LEFT,
+            size=(200, -1), value=str(days), min=-sys.maxint, max=sys.maxint
         )
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
         hbox1.AddStretchSpacer()

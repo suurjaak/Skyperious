@@ -26,9 +26,9 @@ FileDirectives = ["DBDoBackup", "RecentFiles", "DBFiles", "LastSelectedFiles"]
 """Program title."""
 Title = "Skyperious"
 
-Version = "0.9.4a"
+Version = "0.9.6a"
 
-VersionDate = "15.04.2012"
+VersionDate = "18.04.2012"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
