@@ -4,7 +4,7 @@ GUI for Skyperious, contains most application and user interface logic.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.04.2012
+@modified    30.04.2012
 """
 import BeautifulSoup
 import collections
@@ -388,18 +388,17 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         """
         result = False
         # Insert into database lists, if not already there
-        if filename and os.path.exists(filename):
+        if filename:
             if filename not in conf.DBFiles:
                 conf.DBFiles.append(filename)
                 conf.save()
             if filename not in self.db_filenames:
-                data = {
-                    "name": filename,
-                    "size": os.path.getsize(filename),
-                    "last_modified": datetime.datetime.fromtimestamp(
+                data = {"name": filename, "size": None, "last_modified": None}
+                if os.path.exists(filename):
+                    data["size"] = os.path.getsize(filename)
+                    data["last_modified"] = datetime.datetime.fromtimestamp(
                         os.path.getmtime(filename)
                     )
-                }
                 self.list_db.InsertStringItem(
                     self.list_db.GetItemCount(), filename
                 )
@@ -408,12 +407,14 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                 )
                 self.list_db.itemDataMap[id(filename)] = \
                     [filename, data["size"], data["last_modified"]]
-                self.list_db.SetStringItem(self.list_db.GetItemCount() - 1, 1,
-                    util.format_bytes(data["size"])
-                )
-                self.list_db.SetStringItem(self.list_db.GetItemCount() - 1, 2,
-                    data["last_modified"].strftime("%Y-%m-%d %H:%M:%S")
-                )
+                if data["last_modified"] is not None:
+                    self.list_db.SetStringItem(self.list_db.GetItemCount() - 1,
+                        1, util.format_bytes(data["size"])
+                    )
+                if data["last_modified"] is not None:
+                    self.list_db.SetStringItem(self.list_db.GetItemCount() - 1,
+                        2, data["last_modified"].strftime("%Y-%m-%d %H:%M:%S")
+                    )
                 for i in range(3):
                     self.list_db.SetColumnWidth(i, wx.LIST_AUTOSIZE)
                 self.db_filenames[filename] = data
@@ -2788,6 +2789,7 @@ class DatabasePage(wx.Panel):
             # Fill table tree with information on row counts and columns
             self.tree_tables.DeleteAllItems()
             root = self.tree_tables.AddRoot("SQLITE")
+            child = None
             for table in tables:
                 child = self.tree_tables.AppendItem(root, table["name"])
                 self.tree_tables.SetItemText(child, "%d row%s" % (
@@ -2799,10 +2801,11 @@ class DatabasePage(wx.Panel):
                     grandchld = self.tree_tables.AppendItem(child, col["name"])
                     self.tree_tables.SetItemText(grandchld, col["type"], 1)
             self.tree_tables.Expand(root)
-            self.tree_tables.Expand(child)
-            self.tree_tables.SetColumnWidth(0, -1)
-            self.tree_tables.SetColumnWidth(1, -1)
-            self.tree_tables.Collapse(child)
+            if child:
+                self.tree_tables.Expand(child)
+                self.tree_tables.SetColumnWidth(0, -1)
+                self.tree_tables.SetColumnWidth(1, -1)
+                self.tree_tables.Collapse(child)
 
             # Add table and column names to SQL editor autocomplete
             self.stc_sql.AutoCompAddWords([t["name"] for t in tables])
@@ -3432,17 +3435,14 @@ class MergerPage(wx.Panel):
             )
 
             diff = self.worker_diff.get_chat_diff(c, self.db1, self.db2)
-            self.stc_diff1.Populate(c, self.db1, diff["messages"][0])
-            self.stc_diff2.Populate(c, self.db2, diff["messages"][1])
-
             self.chat_diff = c
             self.chat_diff_data = diff
             self.button_merge_chat_1.Enabled = len(diff["messages"][0])
             self.button_merge_chat_2.Enabled = len(diff["messages"][1])
-            self.stc_diff1.SetReadOnly(True)
-            self.stc_diff2.SetReadOnly(True)
-
             busy.Close()
+
+            self.stc_diff1.Populate(c, self.db1, diff["messages"][0])
+            self.stc_diff2.Populate(c, self.db2, diff["messages"][1])
 
 
     def on_merge_contacts(self, event):
@@ -3611,7 +3611,7 @@ class MergerPage(wx.Panel):
                 if not chat2:
                     chat2 = chat.copy()
                     chat_data["chat"]["c1" if source else "c2"] = chat2
-                    chat2["id"] = db2.insert_chat(chat2)
+                    chat2["id"] = db2.insert_chat(chat2, db1)
                 if (participants):
                     db2.insert_participants(chat2, participants)
                     count_participants += len(participants)
@@ -3673,16 +3673,17 @@ class MergerPage(wx.Panel):
             info = ""
             parts = []
             new_chat = not chat2
-            newstr = "" if new_chat else " new"
+            newstr = "" if new_chat else "new "
             if new_chat:
                 info += "new chat with "
             if messages:
-                parts.append("%d%s messages" % (len(messages), newstr))
+                parts.append(util.plural("%smessage" % newstr, len(messages)))
             if participants:
                 # Add to contacts those that are new
-                cc2 = [i["identity"] for i in db2.get_contacts()] + [db2.id]
-                contacts2 = [i for i in participants if ("id" in i["contact"]
-                             and i["identity"] not in cc2)]
+                cc2 = [db1.id, db2.id] + \
+                    [i["identity"] for i in db2.get_contacts()]
+                contacts2 = [i["contact"] for i in participants
+                    if "id" in i["contact"] and i["identity"] not in cc2]
                 if contacts2:
                     parts.append(util.plural("new contact", len(contacts2)))
                 parts.append(util.plural("%sparticipant" % newstr,
@@ -3701,7 +3702,7 @@ class MergerPage(wx.Panel):
                 if not chat2:
                     chat2 = chat.copy()
                     self.chat_diff["c1" if source else "c2"] = chat2
-                    chat2["id"] = db2.insert_chat(chat2)
+                    chat2["id"] = db2.insert_chat(chat2, db1)
                 if (participants):
                     if contacts2:
                         db2.insert_contacts(contacts2)
@@ -3910,15 +3911,14 @@ class MergerPage(wx.Panel):
                     )
                 chats = chats2 if i else chats1
                 if chats:
-                    count_messages = sum(
-                        filter(None, [c["message_count"] for c in chats])
-                    )
-                    datetime_first = min(filter(
-                        None, [c["first_message_datetime"] for c in chats]
-                    ))
-                    datetime_last = max(filter(
-                        None, [c["last_message_datetime"] for c in chats]
-                    ))
+                    t1 = filter(None, [c["message_count"] for c in chats])
+                    count_messages = sum(t1) if t1 else 0
+                    t2 = filter(
+                         None, [c["first_message_datetime"] for c in chats])
+                    datetime_first = min(t2) if t2 else None
+                    t3 = filter(
+                         None, [c["last_message_datetime"] for c in chats])
+                    datetime_last = max(t3) if t3 else None
                     datetext_first = "" if not datetime_first \
                         else datetime_first.strftime("%Y-%m-%d %H:%M:%S")
                     datetext_last = "" if not datetime_last \

@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.04.2012
+@modified    30.04.2012
 """
 import copy
 import datetime
@@ -92,9 +92,9 @@ class SkypeDatabase(object):
         self.basefilename = os.path.basename(self.filename)
         self.backup_created = False
         self.consumers = set() # Registered objects, notified on clearing cache
-        self.account = None # Row from table Accounts
-        self.id = None      # Accounts.skypename
-        self.tables = None # {"name": {"Name":str, "rows": 0, "columns": []}, }
+        self.account = None    # Row from table Accounts
+        self.id = None   # Accounts.skypename
+        self.tables = {} # {"name": {"Name":str, "rows": 0, "columns": []}, }
         self.tables_list = None # Ordered list of table items
         self.table_rows = {}    # {"tablename1": [..], }
         self.table_objects = {} # {"tablename1": {id1: {rowdata1}, }, }
@@ -108,7 +108,6 @@ class SkypeDatabase(object):
             rows = self.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
-            self.tables = {}
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception, e:
@@ -215,7 +214,7 @@ class SkypeDatabase(object):
         @return  (future message count, max future datetime)
         """
         result = (None, None)
-        if self.is_open() and self.tables and "messages" in self.tables:
+        if self.is_open() and "messages" in self.tables:
             now = self.future_check_timestamp = int(time.time())
             timestamp_max = self.execute(
                 "SELECT MAX(Timestamp) AS max FROM messages"
@@ -236,7 +235,7 @@ class SkypeDatabase(object):
         @param   days   days to move, positive or negative number
         @param   hours  hours to move, positive or negative number
         """
-        if self.is_open() and self.tables and "messages" in self.tables:
+        if self.is_open() and "messages" in self.tables:
             self.ensure_backup()
             seconds = (days * 24 + hours) * 3600
             self.execute(
@@ -252,16 +251,22 @@ class SkypeDatabase(object):
         return (self.connection is not None)
 
 
-    def get_tables(self, refresh=False):
+    def get_tables(self, refresh=False, this_table=None):
         """
         Returns the names and rowcounts of all tables in the database, as
         [{"name": "tablename", "rows": 0, "sql": CREATE SQL}, ].
         Uses already retrieved cached values if possible, unless refreshing.
+
+        @param   refresh        if True, information including rowcounts is
+                                refreshed
+        @param   this_table  if set, only information for this table is
+                                refreshed
         """
         if self.is_open() and (refresh or self.tables_list is None):
-            rows = self.execute("SELECT name, sql FROM sqlite_master "
-                                "WHERE type = 'table' ORDER BY name"
-            ).fetchall()
+            sql = "SELECT name, sql FROM sqlite_master WHERE type = 'table' " \
+                  "%sORDER BY name" % ("AND name = ? " if this_table else "")
+            params = [this_table] if this_table else []
+            rows = self.execute(sql, params).fetchall()
             tables = {}
             tables_list = []
             for row in rows:
@@ -273,8 +278,16 @@ class SkypeDatabase(object):
                 # lowercase when used as keys.
                 tables[table["name"].lower()] = table
                 tables_list.append(table)
-            self.tables = tables
-            self.tables_list = tables_list
+            if this_table:
+                self.tables.update(tables)
+                for t in self.tables_list:
+                    if t["name"] == this_table:
+                        self.tables_list.remove(t)
+                self.tables_list += tables_list
+                self.tables_list.sort(key=lambda x: x["name"])
+            else:
+                self.tables = tables
+                self.tables_list = tables_list
 
         return self.tables_list
 
@@ -292,7 +305,7 @@ class SkypeDatabase(object):
         @param   body_like       text to match in body with LIKE
         @param   timestamp_from  timestamp beyond which messages will start
         """
-        if self.is_open() and self.tables and "messages" in self.tables:
+        if self.is_open() and "messages" in self.tables:
             if "messages" not in self.table_rows:
                 self.table_rows["messages"] = {} # {convo_id: [{msg1},]}
             if not (chat and chat["id"] in self.table_rows["messages"]):
@@ -373,7 +386,7 @@ class SkypeDatabase(object):
         Uses already retrieved cached values if possible.
         """
         conversations = []
-        if self.is_open() and self.tables and "conversations" in self.tables:
+        if self.is_open() and "conversations" in self.tables:
             if "conversations" not in self.table_rows:
                 participants = {}
                 if "contacts" in self.tables and "participants" in self.tables:
@@ -454,7 +467,7 @@ class SkypeDatabase(object):
         main.log("Statistics collection starting (%s).", self.filename)
         stats = []
         participants = {}
-        if self.is_open() and self.tables and "messages" in self.tables:
+        if self.is_open() and "messages" in self.tables:
             and_str = " AND convo_id in (%s)" % ", ".join(["?"] * len(chats)) \
                       if chats else ""
             and_val = [c["id"] for c in chats] if chats else []
@@ -488,7 +501,7 @@ class SkypeDatabase(object):
         Uses already retrieved cached values if possible.
         """
         groups = []
-        if self.is_open() and self.tables and "contactgroups" in self.tables:
+        if self.is_open() and "contactgroups" in self.tables:
             if "contactgroups" not in self.table_rows:
                 rows = self.execute(
                     "SELECT *, given_displayname AS name FROM contactgroups "
@@ -512,7 +525,7 @@ class SkypeDatabase(object):
         Uses already retrieved cached values if possible.
         """
         contacts = []
-        if self.is_open() and self.tables and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables:
             if "contacts" not in self.table_rows:
                 rows = self.execute(
                     "SELECT *, COALESCE(skypename, pstnnumber) AS identity, "
@@ -575,7 +588,7 @@ class SkypeDatabase(object):
         Uses already retrieved cached values if possible.
         """
         transfers = []
-        if self.is_open() and self.tables and "transfers" in self.tables:
+        if self.is_open() and "transfers" in self.tables:
             if "transfers" not in self.table_rows:
                 rows = self.execute(
                     "SELECT * FROM transfers ORDER BY id").fetchall()
@@ -598,7 +611,7 @@ class SkypeDatabase(object):
                        under this chat
         """
         videos = []
-        if self.is_open() and self.tables and "videos" in self.tables:
+        if self.is_open() and "videos" in self.tables:
             if "videos" not in self.table_rows:
                 rows = self.execute(
                     "SELECT videos.* FROM videos "
@@ -628,7 +641,7 @@ class SkypeDatabase(object):
                        under this chat
         """
         calls = []
-        if self.is_open() and self.tables and "calls" in self.tables:
+        if self.is_open() and "calls" in self.tables:
             if "calls" not in self.table_rows:
                 rows = self.execute(
                     "SELECT * FROM calls ORDER BY calls.id"
@@ -654,7 +667,7 @@ class SkypeDatabase(object):
         (excluding database account owner).
         """
         participants = []
-        if self.is_open() and self.tables and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables:
             if "contacts" not in self.table_objects:
                 # Retrieve and cache all contacts
                 self.table_objects["contacts"] = {}
@@ -689,7 +702,7 @@ class SkypeDatabase(object):
         (skypename or pstnnumber).
         """
         contact = None
-        if self.is_open() and self.tables and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables:
             """Returns the specified contact row, using cache if possible."""
             if "contacts" not in self.table_objects:
                 self.table_objects["contacts"] = {}
@@ -714,7 +727,7 @@ class SkypeDatabase(object):
         """
         table = table.lower()
         table_columns = None
-        if self.is_open() and self.tables is None:
+        if self.is_open() and self.tables_list is None:
             self.get_tables()
         if self.is_open() and table in self.tables:
             if "columns" in self.tables[table]:
@@ -777,6 +790,26 @@ class SkypeDatabase(object):
                 self.backup_created = True
 
 
+    def blobs_to_binary(self, values, list_columns, col_data):
+        """
+        Converts blob columns in the list to sqlite3.Binary, suitable
+        for using as a query parameter.
+        """
+        result = []
+        is_dict = isinstance(values, dict)
+        list_values = [values[i] for i in list_columns] if is_dict else values
+        map_columns = dict([(i["name"], i) for i in col_data])
+        for i, val in enumerate(list_values):
+            if "blob" == map_columns[list_columns[i]]["type"].lower() and val:
+                if isinstance(val, unicode):
+                    val = val.encode("latin1")
+                val = sqlite3.Binary(val)
+            result.append(val)
+        if is_dict:
+            result = dict([(list_columns[i], x) for i, x in enumerate(result)])
+        return result
+
+
     def fill_missing_fields(self, data, fields):
         """Creates a copy of the data and adds any missing fields."""
         filled = data.copy()
@@ -794,23 +827,23 @@ class SkypeDatabase(object):
             row = self.execute("SELECT name, sql FROM sqlite_master "
                                 "WHERE type = 'table' "
                                 "AND LOWER(name) = ?", [table]).fetchone()
-            if not self.tables:
-                self.tables = {}
             self.tables[table] = row
 
 
-    def insert_chat(self, chat):
+    def insert_chat(self, chat, source_db):
         """Inserts the specified chat into the database and returns its ID."""
-        if (self.is_open() and self.tables
-        and "conversations" not in self.tables):
+        if self.is_open() and not self.account and source_db.account:
+            self.insert_account(source_db.account)
+        if self.is_open() and "conversations" not in self.tables:
             self.create_table("conversations")
-        if self.is_open() and self.tables and "conversations" in self.tables:
+        if self.is_open() and "conversations" in self.tables:
             self.ensure_backup()
             col_data = self.get_table_columns("conversations")
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
             chat_filled = self.fill_missing_fields(chat, fields)
+            chat_filled = self.blobs_to_binary(chat_filled, fields, col_data)
 
             cursor = self.execute(
                 "INSERT INTO conversations (%s) VALUES (%s)" % (
@@ -828,13 +861,17 @@ class SkypeDatabase(object):
         database, includes related rows in Calls, Videos, Transfers and
         SMSes.
         """
-        if self.is_open() and self.tables and "messages" not in self.tables:
+        if self.is_open() and not self.account and source_db.account:
+            self.insert_account(source_db.account)
+        if self.is_open() and "messages" not in self.tables:
             self.create_table("messages")
-        if self.is_open() and self.tables and "transfers" not in self.tables:
+        if self.is_open() and "transfers" not in self.tables:
             self.create_table("transfers")
-        if self.is_open() and self.tables and "smses" not in self.tables:
+        if self.is_open() and "smses" not in self.tables:
             self.create_table("smses")
-        if self.is_open() and self.tables and "messages" in self.tables:
+        if self.is_open() and "chats" not in self.tables:
+            self.create_table("chats")
+        if self.is_open() and "messages" in self.tables:
             main.log("Merging %d chat messages (%s) into %s.", len(messages),
                 chat["title_long_lc"], self.filename
             )
@@ -882,6 +919,9 @@ class SkypeDatabase(object):
                     chatrow = [(chatrow[col] if col in chatrow else "")
                         for col in chat_fields
                     ]
+                    chatrow = self.blobs_to_binary(
+                        chatrow, chat_fields, chat_col_data
+                    )
                     self.execute(
                         "INSERT INTO chats (%s) VALUES (%s)" % (
                             chat_cols, chat_vals
@@ -890,6 +930,7 @@ class SkypeDatabase(object):
                     chatrows_present[m["chatname"]] = 1
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
+                m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 self.execute("INSERT INTO messages (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), m_filled)
@@ -908,6 +949,9 @@ class SkypeDatabase(object):
                         # pk_id and nodeid are troublesome, because their
                         # meaning is unknown, maybe something will go out of
                         # sync if their values can differ?
+                        t = self.blobs_to_binary(
+                            t, transfer_fields, transfer_col_data
+                        )
                         self.execute(
                             "INSERT INTO transfers (%s) VALUES (%s)" % (
                                 transfer_cols, transfer_vals
@@ -925,6 +969,7 @@ class SkypeDatabase(object):
                         # pk_id and nodeid are troublesome, because their
                         # meaning is unknown, maybe something will go out of
                         # sync if their values can differ?
+                        t = self.blobs_to_binary(t, sms_fields, sms_col_data)
                         self.execute(
                             "INSERT INTO smses (%s) VALUES (%s)" % (
                                 sms_cols, sms_vals
@@ -950,12 +995,13 @@ class SkypeDatabase(object):
         Inserts the specified messages under the specified chat in this
         database.
         """
-        if (self.is_open() and self.tables
-        and "participants" not in self.tables):
+        if self.is_open() and not self.account and source_db.account:
+            self.insert_account(source_db.account)
+        if self.is_open() and "participants" not in self.tables:
             self.create_table("participants")
-        if self.is_open() and self.tables and "contacts" not in self.tables:
+        if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
-        if self.is_open() and self.tables and "participants" in self.tables:
+        if self.is_open() and "participants" in self.tables:
             main.log("Merging %d chat participants (%s) into %s.",
                 len(participants), chat["title_long_lc"], self.filename
             )
@@ -967,6 +1013,7 @@ class SkypeDatabase(object):
 
             for p in participants:
                 p_filled = self.fill_missing_fields(p, fields)
+                p_filled = self.blobs_to_binary(p_filled, fields, col_data)
                 p_filled["convo_id"] = chat["id"]
                 self.execute("INSERT INTO participants (%s) VALUES (%s)" % (
                     str_cols, str_vals
@@ -976,13 +1023,45 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
 
 
+    def insert_account(self, account):
+        """
+        Inserts the specified account into this database and sets it as the
+        current account.
+        """
+        if self.is_open() and "accounts" not in self.tables:
+            self.create_table("accounts")
+            self.get_tables(True, "accounts")
+        if self.is_open() and "accounts" in self.tables:
+            main.log("Inserting account \"%s\" into %s.",
+                account["skypename"], self.filename
+            )
+            self.ensure_backup()
+            col_data = self.get_table_columns("accounts")
+            fields = [col["name"] for col in col_data if col["name"] != "id"]
+            str_cols = ", ".join(fields)
+            str_vals = ":" + ", :".join(fields)
+
+            a_filled = self.fill_missing_fields(account, fields)
+            del a_filled["id"]
+            a_filled = self.blobs_to_binary(a_filled, fields, col_data)
+            self.execute("INSERT INTO accounts (%s) VALUES (%s)" % (
+                str_cols, str_vals
+            ), a_filled)
+            self.connection.commit()
+            self.last_modified = datetime.datetime.now()
+            self.account = a_filled
+            self.id = a_filled["skypename"]
+
+
     def insert_contacts(self, contacts):
         """
         Inserts the specified contacts into this database.
         """
-        if self.is_open() and self.tables and "contacts" not in self.tables:
+        if self.is_open() and not self.account and source_db.account:
+            self.insert_account(source_db.account)
+        if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
-        if self.is_open() and self.tables and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables:
             main.log(
                 "Merging %d contacts into %s.", len(contacts), self.filename
             )
@@ -993,6 +1072,7 @@ class SkypeDatabase(object):
             str_vals = ":" + ", :".join(fields)
             for c in contacts:
                 c_filled = self.fill_missing_fields(c, fields)
+                c_filled = self.blobs_to_binary(c_filled, fields, col_data)
                 self.execute("INSERT INTO contacts (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), c_filled)
@@ -1004,11 +1084,11 @@ class SkypeDatabase(object):
         """
         Inserts or updates the specified contact groups in this database.
         """
-        if (self.is_open() and self.tables
-        and "contactgroups" not in self.tables):
+        if self.is_open() and not self.account and source_db.account:
+            self.insert_account(source_db.account)
+        if self.is_open() and "contactgroups" not in self.tables:
             self.create_table("contactgroups")
-        if (self.is_open() and self.tables
-        and "contactgroups" in self.tables):
+        if self.is_open() and "contactgroups" in self.tables:
             main.log("Merging %d contact groups into %s.",
                 len(groups), self.filename
             )
@@ -1031,6 +1111,7 @@ class SkypeDatabase(object):
             str_vals = ":" + ", :".join(fields)
             for c in filter(lambda x: x["name"] not in existing, groups):
                 c_filled = self.fill_missing_fields(c, fields)
+                c_filled = self.blobs_to_binary(c_filled, fields, col_data)
                 self.execute("INSERT INTO contactgroups (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), c_filled)
@@ -1102,6 +1183,7 @@ class SkypeDatabase(object):
             fields = [col["name"] for col in col_data]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
+            row = self.blobs_to_binary(row, fields, col_data)
             cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)" % (
                 table, str_cols, str_vals
             ), row)
@@ -1138,7 +1220,7 @@ class SkypeDatabase(object):
         """
         if self.is_open():
             table = table.lower()
-            if self.tables and table in self.tables:
+            if table in self.tables:
                 paramstr = ""
                 orderstr = ""
                 values = {}
@@ -1891,7 +1973,7 @@ class MessageParser(object):
                 if not files:
                     # No rows in Transfers, try to find data from message body
                     # and create replacements for Transfers fields
-                    for f in dom.iterfind("*file"):
+                    for f in dom.findall("*/file"):
                         files[int(f.get("index"))] = {"filename": f.text,
                             "filepath": "", "filesize": f.get("size"),
                             "partner_handle": message["author"],
