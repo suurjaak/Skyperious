@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.04.2012
+@modified    28.05.2012
 """
 import copy
 import datetime
@@ -2183,7 +2183,7 @@ class MessageParser(object):
             result = self.dom_to_text(dom)
             if not isinstance(text, dict) or text.get("wrap", True):
                 linelists = map(self.textwrapper.wrap, result.split("\n"))
-                ll = "\n".join(i[0] if i else "" for i in linelists)
+                ll = "\n".join(j if j else "" for i in linelists for j in i)
                 # Force DOS linefeeds
                 result = re.sub("([^\r])\n", lambda m: m.group(1) + "\r\n", ll)
         else:

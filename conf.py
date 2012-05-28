@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2012
+@modified    28.05.2012
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -26,9 +26,9 @@ FileDirectives = ["DBDoBackup", "RecentFiles", "DBFiles", "LastSelectedFiles"]
 """Program title."""
 Title = "Skyperious"
 
-Version = "0.9.7a"
+Version = "0.9.8a"
 
-VersionDate = "30.04.2012"
+VersionDate = "28.05.2012"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())

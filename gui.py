@@ -4,7 +4,7 @@ GUI for Skyperious, contains most application and user interface logic.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.04.2012
+@modified    28.05.2012
 """
 import BeautifulSoup
 import collections
@@ -241,7 +241,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
             parent=page, label="Save &a copy..", size=(150, -1)
         )
         button_copy.SetToolTipString(
-            "Saves a copy of the selected database under a chosen name."
+            "Saves a copy of the selected database under another name."
         )
         button_copy.Bind(wx.EVT_BUTTON, self.on_copy_database)
         button_copy.Enabled = False
@@ -1148,6 +1148,11 @@ class DatabasePage(wx.Panel):
         list_chats = self.list_chats = controls.SortableListView(
             parent=panel1, style=wx.LC_REPORT | wx.LC_SINGLE_SEL
         )
+        button_export_allchats = self.button_export_allchats = wx.Button(
+            parent=panel1, label="Exp&ort all chats", size=(100, -1)
+        )
+        sizer_top.Add(button_export_allchats, border=45, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.RIGHT)
+        self.Bind(wx.EVT_BUTTON, self.on_export_allchats, button_export_allchats)
         edit_search = self.edit_searchall_chats = wx.TextCtrl(parent=panel1,
             value=conf.HistorySearchDescription, size=(100, -1),
             style=wx.TE_PROCESS_ENTER
@@ -1159,7 +1164,6 @@ class DatabasePage(wx.Panel):
         button_search = self.button_searchall_chats = wx.Button(
             parent=panel1, label="Search &all", size=(100, -1)
         )
-        self.Bind(wx.EVT_BUTTON, self.on_searchall_chats, button_search)
         self.Bind(wx.EVT_BUTTON, self.on_searchall_chats, button_search)
         sizer_top.Add(edit_search, border=5, flag=wx.RIGHT | wx.ALIGN_RIGHT)
         sizer_top.Add(button_search, flag=wx.ALIGN_RIGHT)
@@ -1633,6 +1637,65 @@ class DatabasePage(wx.Panel):
                     conf.Title, wx.OK | wx.ICON_WARNING
                 )
                 main.logstatus("Cannot access %s.", filename)
+
+
+    def on_export_allchats(self, event):
+        """
+        Handler for clicking to export all chats, displays a select folder
+        dialog and exports all chats to individual files.
+        """
+        self.dialog_savefile.Filename = "Filename will be ignored"
+        self.dialog_savefile.Message = "Choose folder where to save all chats"
+        self.dialog_savefile.Wildcard = \
+            "HTML document (*.html)|*.html|" \
+            "Text document (*.txt)|*.txt|" \
+            "CSV spreadsheet (*.csv)|*.csv"
+        if wx.ID_OK == self.dialog_savefile.ShowModal():
+            dirname = os.path.dirname(self.dialog_savefile.GetPath())
+            extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
+            busy = controls.ProgressPanel(
+                self, "Exporting all %s from \"%s\"\nas %s under %s." % 
+                (util.plural("chat", len(self.chats)), self.db.filename,
+                extname.upper(), dirname)
+            )
+            main.logstatus("Exporting all %s from %s as %s under %s.",
+                util.plural("chat", len(self.chats)),
+                self.db.filename, extname.upper(), dirname
+            )
+            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
+            errormsg = False
+            try:
+                for chat in self.chats:
+                    filename = os.path.join(dirname, util.safe_filename(
+                        "Skype %s.%s" % (chat["title_long_lc"], extname)
+                    ))
+                    export_result = export.export_chat(chat,
+                        list(self.db.get_messages(chat)), filename, self.db
+                    )
+                    if not export_result:
+                        errormsg = "An error occurred when saving \"%s\"." % filename
+                        break # break for chat in self.chats
+            except Exception, e:
+                errormsg = "An unexpected error occurred when saving all " \
+                           "%s from \"%s\" as %s under %s: %s" % (
+                           util.plural("chat", len(self.chats)),
+                           extname.upper(), dirname, e)
+            busy.Close()
+            if not errormsg:
+                main.logstatus("Exported all %s from %s as %s under %s.",
+                    util.plural("chat", len(self.chats)), self.db.filename,
+                    extname.upper(), dirname
+                )
+                os_handler.start_file(dirname)
+            else:
+                main.logstatus(
+                    "Failed to export all %s from %s as %s under %s.",
+                    util.plural("chat", len(self.chats)), self.db.filename,
+                    extname.upper(), dirname
+                )
+                wx.MessageBox(errormsg,
+                    conf.Title, wx.OK | wx.ICON_WARNING
+                )
 
 
     def on_filterexport_chat(self, event):

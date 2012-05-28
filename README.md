@@ -21,6 +21,8 @@ Currently released in alpha status: browsing is seemingly stable, merging
 has not been extensively tested and might have issues. It is recommended to
 make a backup of the database file before making any changes.
 
+Screenshots at http://suurjaak.github.com/Skyperious/screens.html.
+
 
 Using The Program
 -----------------

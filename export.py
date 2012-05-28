@@ -4,7 +4,7 @@ Functionality for exporting Skype data to external files.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    15.04.2012
+@modified    28.05.2012
 """
 
 import base64
@@ -315,15 +315,19 @@ def export_chat(chat, messages, filename, db):
         parser = skypedata.MessageParser(db)
         chat_title = chat["title_long_lc"]
         main_data = {
-            "title": chat_title,
-            "date1": messages[0]["datetime"].strftime("%d.%m.%Y"),
-            "date2": messages[-1]["datetime"].strftime("%d.%m.%Y"),
+            "title":          chat_title,
+            "date1":          messages[0]["datetime"].strftime("%d.%m.%Y") \
+                              if len(messages) else "",
+            "date2":          messages[-1]["datetime"].strftime("%d.%m.%Y") \
+                              if len(messages) else "",
             "messages_total": util.plural("message", chat["message_count"]),
-            "chat_created": chat["created_datetime"].strftime("%d.%m.%Y"),
-            "app": conf.Title,
-            "now": datetime.datetime.now().strftime("%d.%m.%Y %H:%M"),
-            "db": db.filename,
-            "count": str(len(messages)),
+            "chat_created":   chat["created_datetime"].strftime("%d.%m.%Y") \
+                              if chat["created_datetime"] else "",
+            "app":            conf.Title,
+            "now":            datetime.datetime.now() \
+                              .strftime("%d.%m.%Y %H:%M"),
+            "db":             db.filename,
+            "count":          str(len(messages)),
         }
         if is_html:
             # Write HTML header and table header
@@ -486,16 +490,27 @@ def export_chat(chat, messages, filename, db):
                         "name": escape(m["from_dispname"]),
                         "text": body
                 })
-            elif is_txt:
+            else:
+                parsed_text = parser.parse(m, text=True)
+                try:
+                    parsed_text = parsed_text.decode("utf-8")
+                except Exception, e:
+                    pass
+            if is_txt:
                 f.write("%(datetime)s %(name)s:\r\n%(text)s\r\n\r\n" % {
                     "datetime": m["datetime"].strftime("%H:%S"),
                     "name": m["from_dispname"],
-                    "text": parser.parse(m, text=True)
+                    "text": parsed_text
                 })
             elif is_csv:
+                try:
+                    parsed_text = parser.parse(m, text=True)
+                    parsed_text = parsed_text.decode("utf-8")
+                except Exception, e:
+                    pass
                 values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
                     m["from_dispname"].encode("utf-8"),
-                    parser.parse(m, text=True).encode("utf-8")
+                    parsed_text.encode("utf-8")
                 ]
                 csv_writer.writerow(values)
         if is_html:
