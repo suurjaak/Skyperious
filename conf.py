@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.05.2012
+@modified    29.05.2012
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -21,14 +21,22 @@ else:
     ApplicationDirectory = os.path.dirname(__file__)
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
-FileDirectives = ["DBDoBackup", "RecentFiles", "DBFiles", "LastSelectedFiles"]
+FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup", "RecentFiles",
+    "DBFiles", "LastSelectedFiles"
+]
+
+"""Whether logging is enabled."""
+LogEnabled = True
 
 """Program title."""
 Title = "Skyperious"
 
-Version = "0.9.8a"
+"""Module containing application main window class."""
+MainWindowModule = "skyperious"
 
-VersionDate = "28.05.2012"
+Version = "0.10.0a"
+
+VersionDate = "29.05.2012"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -38,6 +46,12 @@ WindowSize = (1080, 640)
 
 """Console window size in pixels, (w, h)."""
 ConsoleSize = (800, 300)
+
+"""Maximum number of commands to store for console history."""
+ConsoleHistoryMax = 1000
+
+"""History of commands entered in console."""
+ConsoleHistoryCommands = []
 
 """Files selected in the database lists on last run."""
 LastSelectedFiles = ["", ""]

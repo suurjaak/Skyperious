@@ -23,7 +23,7 @@ Uses primitive heuristic analysis to detect connected label-control pairs:
 
 @author    Erki Suurjaak
 @created   19.11.2011
-@modified  08.02.2011
+@modified  16.05.2012
 """
 import functools
 import re
@@ -32,10 +32,10 @@ import wx
 DEBUG = False
 
 
-class AutoAcceleratorFrame(wx.Frame):
+class AutoAcceleratorMixIn(object):
     """
-    A frame that assigns global keyboard shortcuts to all its controls
-    that have a shortcut key defined in their label (e.g. a button'
+    A windowed control that assigns global keyboard shortcuts to all its
+    controls that have a shortcut key defined in their label (e.g. a button'
     labeled "E&xit" gets assigned the shortcut Alt-X).
     Accelerator table is autocreated on first showing; if changing controls
     afterwards, call UpdateAccelerators().
@@ -43,15 +43,11 @@ class AutoAcceleratorFrame(wx.Frame):
     @param   use_heuristics  whether to use heuristic analysis to detect
                              connected label-control pairs
     """
-    def __init__(self, parent, id=-1, title=wx.EmptyString,
-                 pos=wx.DefaultPosition, size=wx.DefaultSize,
-                 style=wx.DEFAULT_FRAME_STYLE, name=wx.FrameNameStr,
-                 use_heuristics=True):
+    def __init__(self, use_heuristics=True):
         """
         @param   use_heuristics  whether to use heuristic analysis to detect
                                  connected label-control pairs
         """
-        wx.Frame.__init__(self, parent, id, title, pos, size, style, name)
         self.__use_heuristics = use_heuristics
         self.__shortcuts = None # {shortcut char: target control, }
 
@@ -61,9 +57,11 @@ class AutoAcceleratorFrame(wx.Frame):
         Initializes the shortcut keys from child controls, if not already
         created, and calls parent.Show.
         """
+        if not hasattr(self, "__shortcuts"):
+            self.__shortcuts = None # {shortcut char: target control, }
         if self.__shortcuts is None:
             self.UpdateAccelerators()
-        wx.Frame.Show(self, *args, **kwargs)
+        super(AutoAcceleratorMixIn, self).Show(*args, **kwargs)
 
 
     def UpdateAccelerators(self, use_heuristics=True):
@@ -71,8 +69,10 @@ class AutoAcceleratorFrame(wx.Frame):
         Rebuilds the control shortcut keys in this frame.
 
         @param   use_heuristics  whether to use heuristic analysis to detect
-                                 connected label-control pairs
+                                 connected label-control pairs (sticky)
         """
+        if not hasattr(self, "__shortcuts"):
+            self.__shortcuts = None # {shortcut char: target control, }
         self.__use_heuristics = use_heuristics
         self.__shortcuts = accelerate(self, self.__use_heuristics)
 

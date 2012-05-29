@@ -1,10 +1,23 @@
 #-*- coding: utf-8 -*-
 """
-GUI for Skyperious, contains most application and user interface logic.
+All Skyperious user interface and most application logic.
+
+Skyperious is a simple tool for accessing Skype database files, with the
+primary aim of merging chat history from another Skype database file.
+
+In addition, Skyperious allows to:
+- read, search, filter and export chats
+- see chat statistics
+- browse and modify all database tables
+- execute arbitrary queries on the database
+- fix chat history messages that have been saved with a future timestamp
+  (can happen if the computer's clock has been in the future when receiving
+  messages)
+
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.05.2012
+@modified    29.05.2012
 """
 import BeautifulSoup
 import collections
@@ -45,6 +58,7 @@ import wx.stc
 import conf
 import controls
 import export
+import guibase
 import images
 import main
 import os_handler
@@ -55,21 +69,17 @@ import workers
 import wx_accel
 
 
-"""Custom application event for adding to log window."""
-LogEvent,    EVT_LOG =    wx.lib.newevent.NewEvent()
 """Custom application event for worker results."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
-"""Custom application event for setting main window status."""
-StatusEvent, EVT_STATUS = wx.lib.newevent.NewEvent()
 
 
-class MainWindow(wx_accel.AutoAcceleratorFrame):
-    """Application main window."""
+
+class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
+    """Skyperious main window."""
 
     def __init__(self):
-        wx_accel.AutoAcceleratorFrame.__init__(
-            self, parent=None, title=conf.Title, size=conf.WindowSize
-        )
+        wx.Frame.__init__(self, parent=None, title=conf.Title, size=conf.WindowSize)
+        guibase.TemplateFrameMixIn.__init__(self)
 
         self.db_filenames = {} # added DBs {filename: {size, last_modified}, }
         self.dbs = {}          # Open databases {filename: SkypeDatabase, }
@@ -80,25 +90,18 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         # List of Notebook pages user has visited, used for choosing page to
         # show when closing one.
         self.pages_visited = []
-        self.Bind(EVT_LOG,    self.on_log_message)
-        self.Bind(EVT_STATUS, self.on_set_status)
 
-        conf.load()
         icons = images.get_appicons()
         self.SetIcons(icons)
 
         panel = self.panel_main = wx.Panel(self)
         sizer = panel.Sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.frame_console = wx.py.shell.ShellFrame(parent=self,
-            title="%s Console" % conf.Title, size=conf.ConsoleSize
-        )
         self.frame_console.SetIcons(icons)
-        self.frame_console.Bind(
-            wx.EVT_CLOSE, lambda evt: self.frame_console.Hide()
+        self.console.run("# Additional Skyperious modules:")
+        self.console.run("import controls, export, images, os_handler, "
+            "skypedata, wordcloud, workers"
         )
-        self.frame_console_shown = False # Init flag
-        console = self.console = self.frame_console.shell
 
         notebook = self.notebook = wx.Notebook(
             parent=panel, style=wx.NB_TOP | wx.NB_MULTILINE
@@ -112,7 +115,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         )
 
         self.create_menu()
-        self.CreateStatusBar()
 
         self.dialog_selectfolder = wx.DirDialog(
             parent=self,
@@ -120,7 +122,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
             defaultPath=os.getcwd(),
             style=wx.DD_DIR_MUST_EXIST | wx.RESIZE_BORDER
         )
-        self.widget_inspector = wx.lib.inspection.InspectionTool()
 
         # Memory file system for feeding avatar images to HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
@@ -290,27 +291,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
 
         for filename in conf.DBFiles:
             self.update_database_list(filename)
-
-
-    def create_page_log(self, notebook):
-        """Creates a page with log box."""
-        page = self.page_log = wx.Panel(notebook)
-        notebook.AddPage(page, "Log")
-        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
-
-        button_clear = self.button_clear_log = wx.Button(
-            parent=page, label="Clear log", size=(100, -1)
-        )
-        button_clear.Bind(wx.EVT_BUTTON, lambda event: self.log.Clear())
-        edit_log = self.log = wx.TextCtrl(page, -1, style=wx.TE_MULTILINE)
-        edit_log.SetEditable(False)
-        # Read-only controls tend to be made grey by default
-        edit_log.BackgroundColour = "white"
-
-        sizer.Add(
-            button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP | wx.RIGHT
-        )
-        sizer.Add(edit_log, border=5, proportion=1, flag=wx.GROW | wx.ALL)
 
 
     def create_menu(self):
@@ -483,7 +463,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                     )
                     if wx.OK == response:
                         os_handler.shutdown_skype()
-                        success, _ = self.try_until(
+                        success, _ = util.try_until(
                             lambda: shutil.copyfile(original, newpath)
                         )
                         if not success:
@@ -653,64 +633,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
             )
 
 
-    def on_showhide_console(self, event):
-        """Toggles the console shown/hidden."""
-        show = not self.frame_console.IsShown()
-        if show:
-            if not self.frame_console_shown:
-                # First showing of console, set height to a fraction of main
-                # form, and position it immediately under the main form, or
-                # covering its bottom if no room.
-                self.frame_console_shown = True
-                size = wx.Size(self.Size.width, self.Size.height / 3)
-                self.frame_console.Size = size
-                display = wx.GetDisplaySize()
-                y = 0
-                min_bottom_space = 130 # Leave space for autocomplete dropdown
-                if size.height > display.height - self.Size.height \
-                - self.Position.y - min_bottom_space:
-                    y = display.height - self.Size.height - self.Position.y \
-                        - size.height - min_bottom_space
-                self.frame_console.Position = (
-                    self.Position.x, self.Position.y + self.Size.height + y
-                )
-            # Scroll to the last line
-            self.console.ScrollToLine(self.console.LineCount + 3 - (
-                self.console.Size.height / self.console.GetTextExtent(" ")[1]
-            ))
-        self.frame_console.Show(show)
-        self.menu_console.Text = "%s &console\tCtrl-W" % (
-            "Hide" if show else "Show"
-        )
-
-
-    def on_open_widget_inspector(self, event):
-        """Toggles the widget inspection tool shown/hidden."""
-        visible = not (self.widget_inspector.initialized \
-                       and isinstance(self.widget_inspector._frame, wx.Frame))
-        if visible:
-            self.widget_inspector.Init()
-            self.widget_inspector.Show(selectObj=self, refreshTree=True)
-            self.widget_inspector._frame.Bind(
-                wx.EVT_CLOSE,
-                lambda e: (
-                    e.Skip(),
-                    self.menu_inspect.SetText("Show &widget inspector")
-                )
-            )
-        else:
-            self.widget_inspector._frame.Close()
-        self.menu_inspect.Text = "%s &widget inspector" % (
-            "Hide" if visible else "Show"
-        )
-
-
-    def on_recent_file(self, event):
-        """ Handler for clicking an entry in Recent Files. """
-        filename = self.file_history.GetHistoryFile(event.Id - wx.ID_FILE1)
-        self.load_database_page(filename)
-
-
     def on_sort_dblist(self, event):
         """Handler for clicking to sort the database list, saves new o"""
         event.Skip()
@@ -874,7 +796,7 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
                         )
                         if wx.OK == response:
                             os_handler.shutdown_skype()
-                            try_result, db = self.try_until(lambda:
+                            try_result, db = util.try_until(lambda:
                                 skypedata.SkypeDatabase(filename, False)
                             )
                             if not try_result:
@@ -916,29 +838,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
         return db
 
 
-    def try_until(self, func, tries=10, sleep=0.5):
-        """
-        Tries to execute the specified function a number of times.
-
-        @param    func   callable to execute
-        @param    tries  number of times to try (default 10)
-        @param    sleep  seconds to sleep after failed attempts (default 0.5)
-        @return          (True if success else False, func_result)
-        """
-        count = 0
-        result = False
-        func_result = None
-        while count < tries:
-            count += 1
-            try:
-                func_result = func()
-                result = True
-            except Exception, e:
-                if count < tries:
-                    time.sleep(sleep)
-        return result, func_result
-
-
     def load_database_page(self, filename):
         """
         Tries to load the specified database, if not already open, create a
@@ -965,19 +864,6 @@ class MainWindow(wx_accel.AutoAcceleratorFrame):
             for i in range(self.notebook.GetPageCount()):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)
-
-
-    def on_set_status(self, event):
-        """Event handler for adding a message to the log window."""
-        self.SetStatusText(event.text)
-
-
-    def on_log_message(self, event):
-        """Event handler for adding a message to the log window."""
-        try:
-            self.log.AppendText(event.text + "\n")
-        except Exception, e:
-            print "Exception %s in on_log_message" % e
 
 
     def check_future_dates(self, db):
@@ -1619,11 +1505,11 @@ class DatabasePage(wx.Panel):
             "CSV spreadsheet (*.csv)|*.csv"
         if wx.ID_OK == self.dialog_savefile.ShowModal():
             filename = self.dialog_savefile.GetPath()
-            #wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
             busy = controls.ProgressPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
             main.logstatus("Exporting to %s.", filename)
+            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
             export_result = export.export_chat(
                 self.chat, self.stc_history.GetMessages(), filename, self.db
             )
@@ -1666,6 +1552,8 @@ class DatabasePage(wx.Panel):
             errormsg = False
             try:
                 for chat in self.chats:
+                    main.logstatus("Exporting %s", chat["title_long_lc"])
+                    wx.GetApp().Yield(True) # Allow status to refresh
                     filename = os.path.join(dirname, util.safe_filename(
                         "Skype %s.%s" % (chat["title_long_lc"], extname)
                     ))
@@ -1712,10 +1600,10 @@ class DatabasePage(wx.Panel):
             "CSV spreadsheet (*.csv)|*.csv"
         if wx.ID_OK == self.dialog_savefile.ShowModal():
             filename = self.dialog_savefile.GetPath()
-            #wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
             busy = controls.ProgressPanel(
                 self, "Filtering and exporting \"%s\"." % self.chat["title"]
             )
+            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
 
             filter_new = self.build_filter()
             filter_backup = self.stc_history.GetFilter()
@@ -2183,11 +2071,11 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.Message = "Save table as"
             if wx.ID_OK == self.dialog_savefile.ShowModal():
                 filename = self.dialog_savefile.GetPath()
-                #wx.GetApp().Yield(True) # Allow file dialog to close
                 busy = controls.ProgressPanel(
                     self, "Exporting \"%s\"." % filename
                 )
                 main.status("Exporting \"%s\".", filename)
+                wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
                 export_result = export.export_grid(grid_source,
                     filename, default, self.db, sql=sql, table=table
                 )
@@ -4160,20 +4048,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     ascending=False,
                     timestamp_from=self._messages[0]["timestamp"]
                 )
-            m = None
-            notice_added = False
             while m_iter:
                 try:
-                    if m and not notice_added:
-                        self.SetReadOnly(False) # Can't modify while read-only
-                        self.AppendTextUTF8("Retrieving more messages..\n")
-                        self.SetReadOnly(True)
-                        #main.log(
-                        #    "Conversation \"%s\": retrieving more messages.",
-                        #    self._chat["title_long"]
-                        #)
-                        #wx.GetApp().Yield(True) # Allow UI to refresh
-                        notice_added = True
                     m = m_iter.next()
                     self._messages.appendleft(m)
                     if m["datetime"].date() < self._filter["daterange"][0]:
@@ -4492,7 +4368,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             message_show_limit = len(messages)
 
         self.ClearAll()
-        self.AppendTextUTF8("Loading messages..\n")
         self.Refresh()
         #wx.GetApp().Yield(True) # Allow UI to refresh
         self._center_message_index = -1

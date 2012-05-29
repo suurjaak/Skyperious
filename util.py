@@ -4,11 +4,12 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    16.02.2012
+@modified    29.05.2012
 """
 import math
 import re
 import string
+import time
 
 
 def m(o, name, case_insensitive=True):
@@ -94,3 +95,29 @@ def cmp_dictlists(list1, list2):
         if not match:
             result[1].append(d2)
     return result
+
+
+def try_until(func, tries=10, sleep=0.5):
+    """
+    Tries to execute the specified function a number of times.
+
+    @param    func   callable to execute
+    @param    tries  number of times to try (default 10)
+    @param    sleep  seconds to sleep after failed attempts, if any
+                     (default 0.5)
+    @return          (True, func_result) if success else (False, None)
+    """
+    count = 0
+    result = False
+    func_result = None
+    while count < tries:
+        count += 1
+        try:
+            func_result = func()
+            result = True
+        except Exception, e:
+            if count < tries and sleep:
+                time.sleep(sleep)
+    return result, func_result
+
+

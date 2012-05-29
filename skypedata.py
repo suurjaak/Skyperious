@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.05.2012
+@modified    29.05.2012
 """
 import copy
 import datetime
@@ -26,7 +26,6 @@ import xml.etree.cElementTree
 import xml.parsers.expat
 
 import conf
-import gui
 import main
 
 
@@ -2171,14 +2170,35 @@ class MessageParser(object):
                           else self.BREAKLONG_RGX.sub("\\1 ", value)
                         setattr(elem, name, value_new)
             try:
-                # Discard <?xml ..?><xml> tags from start and </xml> from end
+                # Discard <?xml ..?><xml> tags from start, </xml> from end
                 result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
-                # emdash workaround, cElementTree won't handle unknown entities
-                result = result.replace("{EMDASH}", "&mdash;") \
-                               .replace("\n", "<br />")
             except Exception, e:
-                self.db.sota = dom
-                raise e
+                # If ElementTree.tostring fails, try converting all text
+                # content from UTF-8 to Unicode.
+                main.log("Exception for %s: %s", message["body_xml"], e)
+                for elem in dom.findall("*"):
+                    for attr in ["text", "tail"]:
+                        val = getattr(elem, attr)
+                        if val and isinstance(val, str):
+                            try:
+                                val = val.decode("utf-8")
+                                setattr(elem, attr, val)
+                            except Exception, e:
+                                main.log("Error decoding %s value \"%s\" (type "
+                                    "%s) of %s for \"%s\": %s", attr, val,
+                                    type(val), elem, message["body_xml"], e
+                                )
+                try:
+                    result = \
+                        xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
+                except Exception, e:
+                    main.log("Failed to parse the message \"%s\" from %s.",
+                        message["body_xml"], message["author"]
+                    )
+                    raise e
+            # emdash workaround, cElementTree won't handle unknown entities
+            result = result.replace("{EMDASH}", "&mdash;") \
+                           .replace("\n", "<br />")
         elif dom is not None and text is not None:
             result = self.dom_to_text(dom)
             if not isinstance(text, dict) or text.get("wrap", True):
