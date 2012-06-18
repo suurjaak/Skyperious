@@ -4,7 +4,7 @@ Functionality for exporting Skype data to external files.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    28.05.2012
+@modified    14.06.2012
 """
 
 import base64
@@ -238,7 +238,7 @@ CHAT_HTML_HEADER = """<!DOCTYPE HTML><html>
         table.content_table .local { color: %(localcolour)s; }
         table.content_table .t1 { width: 50px; }
         table.content_table .t2 { width: 40px; }
-        table.content_table .t3 { width: 15px; }
+        table.content_table .t3 { width: 15px; min-width: 15px; }
         table.content_table .day.t3 {
             padding: 5px;
             background: url(data:image/png;base64,%(imageclock)s)
@@ -261,10 +261,7 @@ CHAT_HTML_HEADER = """<!DOCTYPE HTML><html>
         <td class="header_left">%%(header_left)s</td>
         <td>
             <div class="header">%%(title)s.</div><br />
-            Showing %%(count)s messages from
-            <b>%%(date1)s</b> to <b>%%(date2)s</b>.<br />
-            Chat created on <b>%%(chat_created)s</b>,
-            <b>%%(messages_total)s</b> in total.<br />
+            %%(chat_info)s
             Source: <b>%%(db)s</b>.<br /><br />%%(header_link)s
         </td>
         <td class="header_right">%%(header_right)s</td>
@@ -328,12 +325,27 @@ def export_chat(chat, messages, filename, db):
                               .strftime("%d.%m.%Y %H:%M"),
             "db":             db.filename,
             "count":          str(len(messages)),
+            "chat_info":      "Showing %s" \
+                              % util.plural("message", len(messages)),
         }
         if is_html:
             # Write HTML header and table header
             header_data = dict([
                 (k, escape(v)) for k, v in main_data.items()
             ])
+            if header_data["date1"] and header_data["date2"]:
+                header_data["chat_info"] += \
+                    " from <b>%(date1)s</b> to <b>%(date2)s</b>" % header_data
+            header_data["chat_info"] += ".<br />"
+            if header_data["chat_created"]:
+                header_data["chat_info"] += \
+                    "Chat created on <b>%(chat_created)s</b>" % header_data
+            if header_data["messages_total"]:
+                header_data["chat_info"] += \
+                    ("," if header_data["chat_created"] else "Chat has") +\
+                    " <b>%(messages_total)s</b> in total" % header_data
+            if header_data["chat_created"] or header_data["messages_total"]:
+                header_data["chat_info"] += ".<br />"
             header_data.update({
                 "title": "History of Skype " + header_data["title"],
                 "css_avatars": "", "css_chat_picture": "",
@@ -431,10 +443,19 @@ def export_chat(chat, messages, filename, db):
         elif is_txt:
             main_data["hr"] = "-" * 79
             f.write("History of Skype %(title)s.\r\n" \
-                    "Showing %(count)s messages from " \
-                    "%(date1)s to %(date2)s.\r\n" \
-                    "Chat created on %(chat_created)s, " \
-                    "%(messages_total)s total messages.\r\n" \
+                    "Showing %(count)s messages" % main_data)
+            if main_data["date1"] and main_data["date2"]:
+                f.write(" from %(date1)s to %(date2)s" % main_data)
+            f.write(".\r\n")
+            if main_data["chat_created"]:
+                f.write("Chat created on %(chat_created)s" % main_data)
+            else:
+                f.write("Chat has")
+            if main_data["messages_total"]:
+                f.write(("," if main_data["chat_created"] else "") + 
+                        " %(messages_total)s in total" % main_data)
+            f.write(".\r\n")
+            f.write(
                     "Source: %(db)s.\r\n" \
                     "Exported with %(app)s on %(now)s." \
                     "\r\n%(hr)s\r\n" % main_data

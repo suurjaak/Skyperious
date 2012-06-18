@@ -17,7 +17,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.05.2012
+@modified    14.06.2012
 """
 import BeautifulSoup
 import collections
@@ -122,6 +122,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             defaultPath=os.getcwd(),
             style=wx.DD_DIR_MUST_EXIST | wx.RESIZE_BORDER
         )
+        self.dialog_savefile = wx.FileDialog(
+            parent=self,
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
 
         # Memory file system for feeding avatar images to HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
@@ -206,6 +212,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         )
         button_open.SetToolTipString("Opens first selected database.")
         button_open.Bind(wx.EVT_BUTTON, self.on_open_from_dblist)
+        button_open.Enabled = False
 
         button_compare = self.button_compare = wx.Button(
             parent=page, label="Compare &two databases", size=(150, -1)
@@ -215,7 +222,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         )
         button_compare.Bind(wx.EVT_BUTTON, self.on_compare_databases)
         button_compare.Enabled = False
-        button_open.Enabled = False
+        button_export_multi = self.button_export_multi = wx.Button(
+            parent=page, label="&Export selected databases", size=(150, -1)
+        )
+        button_export_multi.SetToolTipString(
+            "Exports all chats from selected databases."
+        )
+        button_export_multi.Bind(wx.EVT_BUTTON, self.on_export_multi)
+        button_export_multi.Enabled = False
         button_detect = self.button_detect = wx.Button(
             parent=page, label="Detect databases", size=(150, -1)
         )
@@ -261,6 +275,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             button_open, border=5, flag=wx.LEFT | wx.RIGHT | wx.BOTTOM
         )
         sizer_buttons.Add(button_compare, border=5, flag=wx.ALL)
+        sizer_buttons.Add(button_export_multi, border=5, flag=wx.ALL)
         sizer_buttons.AddStretchSpacer()
         sizer_buttons.Add(button_detect, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_find, border=5, flag=wx.ALL)
@@ -543,6 +558,114 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         threading.Thread(target=self.detect_databases).start()
 
 
+    def on_export_multi(self, event):
+        """
+        Handler for clicking to export multiple databases, lets the user
+        specify a directory where to save chat files and exports all chats.
+        """
+        self.dialog_savefile.Filename = "Filename will be ignored"
+        self.dialog_savefile.Message = "Choose where to save all chats, " \
+            "a separate folder is created for each database"
+        self.dialog_savefile.Wildcard = \
+            "HTML document (*.html)|*.html|" \
+            "Text document (*.txt)|*.txt|" \
+            "CSV spreadsheet (*.csv)|*.csv"
+        if wx.ID_OK == self.dialog_savefile.ShowModal():
+            dirname = os.path.dirname(self.dialog_savefile.GetPath())
+            extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
+            selected, selecteds = self.list_db.GetFirstSelected(), []
+            while selected >= 0:
+                selecteds.append(self.list_db.GetItemText(selected))
+                selected = self.list_db.GetNextSelected(selected)
+            dbs = filter(None, map(self.load_database, selecteds))
+            if dbs:
+                busy = controls.ProgressPanel(
+                    self, "Exporting all chats from %s as %s\ninto separate" \
+                    "folders under %s." % (util.plural("database", len(dbs)),
+                    extname.upper(), dirname)
+                )
+                main.logstatus("Exporting all chats from %s as %s " \
+                    "into separate folders under %s.",
+                    util.plural("database", len(dbs)), extname.upper(), dirname
+                )
+                wx.GetApp().Yield(True) # Allow UI to refresh
+                errormsg = False
+            for i, db in enumerate(dbs):
+                db_dirname = db_basedir = os.path.join(dirname,
+                    util.safe_filename(
+                        "Export from %s" % os.path.basename(db.id)
+                ))
+                counter = 2
+                while os.path.exists(db_dirname):
+                    db_dirname = \
+                        "%s (%s)" % (db_basedir, counter)
+                    counter += 1
+                if not i:
+                    busy.Close() # Close the initial busy panel
+                try:
+                    os.mkdir(db_dirname)
+                except Exception, e:
+                    msg = "Failed to create directory %s: %s" % (db_dirname, e)
+                    wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                    main.log(msg)
+                    continue # continue for i, db in enumerate(dbs)
+                chats = db.get_conversations()
+                busy = controls.ProgressPanel(
+                    self, "Exporting all %s from \"%s\"\nas %s\nunder %s." %
+                    (util.plural("chat", len(chats)), db.filename,
+                    extname.upper(), db_dirname)
+                )
+                main.logstatus("Exporting all %s from %s as %s under %s.",
+                    util.plural("chat", len(chats)),
+                    db.filename, extname.upper(), db_dirname
+                )
+                wx.GetApp().Yield(True) # Allow UI to refresh
+                if not db.has_consumers():
+                    db.get_conversations_stats(chats)
+                errormsg = False
+                try:
+                    for chat in chats:
+                        #main.logstatus("Exporting %s", chat["title_long_lc"])
+                        wx.GetApp().Yield(True) # Allow status to refresh
+                        filename = os.path.join(db_dirname, util.safe_filename(
+                            "Skype %s.%s" % (chat["title_long_lc"], extname)
+                        ))
+                        export_result = export.export_chat(chat,
+                            list(db.get_messages(chat)), filename, db
+                        )
+                        if not export_result:
+                            errormsg = "An error occurred when saving " \
+                                       "\"%s\"." % filename
+                            break # break for chat in chats
+                except Exception, e:
+                    errormsg = "An unexpected error occurred when saving " \
+                               "all %s from \"%s\" as %s under %s: %s" % (
+                               util.plural("chat", len(chats)),
+                               extname.upper(), db_dirname, e)
+                busy.Close()
+                if not errormsg:
+                    main.logstatus("Exported all %s from %s as %s under %s.",
+                        util.plural("chat", len(chats)), db.filename,
+                        extname.upper(), db_dirname
+                    )
+                else:
+                    main.logstatus(
+                        "Failed to export all %s from %s as %s under %s.",
+                        util.plural("chat", len(chats)), db.filename,
+                        extname.upper(), db_dirname
+                    )
+                    wx.MessageBox(errormsg,
+                        conf.Title, wx.OK | wx.ICON_WARNING
+                    )
+                    break # break for db in dbs
+            for db in [d for d in dbs if not d.has_consumers()]:
+                del self.dbs[db.filename]
+                db.close()
+            if dbs and not errormsg:
+                os_handler.start_file(dirname if len(dbs) > 1 else db_dirname)
+            self.update_database_list()
+
+
     def on_compare_databases(self, event):
         """
         Handler for clicking to compare two selected databases in the database
@@ -655,6 +778,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_copy.Enabled = (count == 1)
         self.button_remove.Enabled = (count > 0)
         self.button_compare.Enabled = (count == 2)
+        self.button_export_multi.Enabled = (count > 0)
 
 
     def on_exit(self, event):
@@ -1552,7 +1676,7 @@ class DatabasePage(wx.Panel):
             errormsg = False
             try:
                 for chat in self.chats:
-                    main.logstatus("Exporting %s", chat["title_long_lc"])
+                    #main.logstatus("Exporting %s", chat["title_long_lc"])
                     wx.GetApp().Yield(True) # Allow status to refresh
                     filename = os.path.join(dirname, util.safe_filename(
                         "Skype %s.%s" % (chat["title_long_lc"], extname)

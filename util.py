@@ -4,7 +4,7 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    29.05.2012
+@modified    14.06.2012
 """
 import math
 import re
@@ -57,7 +57,7 @@ def format_bytes(size, precision=2):
 
 def plural(word, count):
     """Returns the word as 'count words', or '1 word' if count is 1."""
-    return "%s %s%s" % (count, word, "" if 1 == count else "s")
+    return "%s %s%s" % (count or 0, word, "" if 1 == count else "s")
 
 
 
