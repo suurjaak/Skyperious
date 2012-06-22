@@ -580,7 +580,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             dbs = filter(None, map(self.load_database, selecteds))
             if dbs:
                 busy = controls.ProgressPanel(
-                    self, "Exporting all chats from %s as %s\ninto separate" \
+                    self, "Exporting all chats from %s as %s\ninto separate " \
                     "folders under %s." % (util.plural("database", len(dbs)),
                     extname.upper(), dirname)
                 )
@@ -591,15 +591,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 wx.GetApp().Yield(True) # Allow UI to refresh
                 errormsg = False
             for i, db in enumerate(dbs):
-                db_dirname = db_basedir = os.path.join(dirname,
+                db_dirname = util.unique_path(os.path.join(dirname,
                     util.safe_filename(
                         "Export from %s" % os.path.basename(db.id)
-                ))
-                counter = 2
-                while os.path.exists(db_dirname):
-                    db_dirname = \
-                        "%s (%s)" % (db_basedir, counter)
-                    counter += 1
+                )))
                 if not i:
                     busy.Close() # Close the initial busy panel
                 try:
@@ -625,11 +620,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 errormsg = False
                 try:
                     for chat in chats:
-                        #main.logstatus("Exporting %s", chat["title_long_lc"])
+                        main.status("Exporting %s", chat["title_long_lc"])
                         wx.GetApp().Yield(True) # Allow status to refresh
                         filename = os.path.join(db_dirname, util.safe_filename(
                             "Skype %s.%s" % (chat["title_long_lc"], extname)
                         ))
+                        filename = util.unique_path(filename)
                         export_result = export.export_chat(chat,
                             list(db.get_messages(chat)), filename, db
                         )
@@ -1676,11 +1672,12 @@ class DatabasePage(wx.Panel):
             errormsg = False
             try:
                 for chat in self.chats:
-                    #main.logstatus("Exporting %s", chat["title_long_lc"])
+                    main.status("Exporting %s", chat["title_long_lc"])
                     wx.GetApp().Yield(True) # Allow status to refresh
                     filename = os.path.join(dirname, util.safe_filename(
                         "Skype %s.%s" % (chat["title_long_lc"], extname)
                     ))
+                    filename = util.unique_path(filename)
                     export_result = export.export_chat(chat,
                         list(self.db.get_messages(chat)), filename, self.db
                     )

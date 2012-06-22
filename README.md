@@ -7,7 +7,7 @@ It can open local Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
 - browse, filter and export chat histories, see chat statistics
-- view any database table and and export their data
+- view any database table and export their data
 - change, add or delete data in any table
 - execute direct SQL queries
 

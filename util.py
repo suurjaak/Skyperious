@@ -4,9 +4,10 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    14.06.2012
+@modified    22.06.2012
 """
 import math
+import os
 import re
 import string
 import time
@@ -121,3 +122,16 @@ def try_until(func, tries=10, sleep=0.5):
     return result, func_result
 
 
+def unique_path(pathname):
+    """
+    Returns a unique version of the path. If a file or directory with the
+    same name already exists, returns a unique version
+    (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
+    """
+    result = pathname
+    base, ext = os.path.splitext(result)
+    counter = 2
+    while os.path.exists(result):
+        result = "%s (%s)%s" % (base, counter, ext)
+        counter += 1
+    return result
