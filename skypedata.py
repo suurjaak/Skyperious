@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.05.2012
+@modified    20.08.2012
 """
 import copy
 import datetime
@@ -37,6 +37,7 @@ CHATS_TYPENAMES = {
     CHATS_TYPE_GROUP     : "Group",
     CHATS_TYPE_CONFERENCE: "Conference"
 }
+MESSAGE_REMOVED_TEXT = "This message has been removed."
 MESSAGES_TYPE_TOPIC        =   2 # Changed chat topic or picture
 MESSAGES_TYPE_GROUP        =   4 # Created group conversation
 MESSAGES_TYPE_PARTICIPANTS =  10 # Added participants to chat
@@ -909,7 +910,7 @@ class SkypeDatabase(object):
             chat_cols = ", ".join(chat_fields)
             chat_vals = ", ".join(["?"] * len(chat_fields))
             timestamp_earliest = source_chat["creation_timestamp"] \
-                                 or sys.maxint
+                                 or sys.maxsize
             for m in messages:
                 # Insert corresponding Chats entry, if not present
                 if (m["chatname"] not in chatrows_present
@@ -1373,7 +1374,7 @@ class TableBase(wx.grid.PyGridTableBase):
         """
         seek_count = self.row_count + self.SEEK_CHUNK_LENGTH - 1
         if to_end:
-            seek_count = sys.maxint
+            seek_count = sys.maxsize
         self.SeekToRow(seek_count)
 
 
@@ -1911,7 +1912,7 @@ class MessageParser(object):
         @return                 xml.etree.cElementTree.Element containing
                                 message body, with "xml" as the root tag and
                                 any number of subtags:
-                                (a|b|quote|quotefrom|msgstatus)
+                                (a|b|quote|quotefrom|msgstatus|bodystatus)
                                 , or an HTML string if html specified
         """
         result = None
@@ -1928,7 +1929,6 @@ class MessageParser(object):
             body = self.EMOTICON_RGX.sub(
                 (self.EMOTICON_REPL), (body.encode("utf-8"))
             )
-            #print message["body_xml"], body
             try:
                 dom = xml.etree.cElementTree.fromstring(
                     "<xml>%s</xml>" % body
@@ -2051,14 +2051,14 @@ class MessageParser(object):
                     b.text = i
                 b.tail = "."
             elif MESSAGES_TYPE_MESSAGE == message["type"]:
-                pass
+                if message["edited_timestamp"] and not message["body_xml"]:
+                    elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
+                    elm_sub.text = MESSAGE_REMOVED_TEXT
 
             # Process Skype message quotation tags, assembling a simple
             # <quote>text<special>footer</special></quote> element.
             # element
-            #print "b4 quotez"
             for quote in dom.findall("quote"):
-                #print "DOING QUOTE"
                 quote.text = quote.text or ""
                 for i in quote.findall("legacyquote"):
                     # <legacyquote> contains preformatted timestamp and author
@@ -2154,7 +2154,7 @@ class MessageParser(object):
                         [cell.insert(len(cell) - len_orig, i) for i in subelem]
                         table.tail = subelem.tail
                         elem[index] = table # Replace quote element in parent
-                    elif "msgstatus" == subelem.tag:
+                    elif subelem.tag in ["msgstatus", "bodystatus"]:
                         subelem.tag = greytag
                         subelem.set(greyattr, greyval)
                         # Add whitespace before next content
@@ -2255,7 +2255,7 @@ def detect_databases():
     @yield   a list of detected database paths
     """
 
-    # First, search local directory.
+    # First, search current working directory for *.db files.
     search_paths = [os.getcwd()]
     for search_path in search_paths:
         main.log("Looking for Skype databases under %s.", search_path)
@@ -2264,28 +2264,29 @@ def detect_databases():
                 if f.lower().endswith(".db"):
                     yield os.path.join(root, f)
 
-    # Then search user home directories, starting from current user's home.
-    c = os.getenv("SystemDrive") or "C:"
-    home_folder = os.getenv("USERPROFILE") or os.getenv("HOME") or ""
-    search_paths = [
-        home_folder,
-        "%s\\Documents and Settings" % c, # Windows 2000, XP, 2003
-        "%s\\Users" % c,                  # Windows Vista, 7
-        "/Users",                         # MacOSX
-        "/home"                           # Linux
-    ]
+    # Then search system directories for main.db files.
+    search_paths = filter(None, [os.getenv("HOME")])
+    if os.name in ["mac", "posix"]:
+        search_paths.append(["/Users", "/home"][os.name])
+    elif "nt" == os.name:
+        c = os.getenv("SystemDrive") or "C:"
+        for path in ["%s\\Users" % c, "%s\\Documents and Settings" % c]:
+            if os.path.exists(path):
+                search_paths.append(path)
+                break # break for path in [..]
+    WINDOWS_APPDIRS = ["application data", "roaming"]
     for search_path in filter(os.path.exists, search_paths):
         main.log("Looking for Skype databases under %s.", search_path)
         for root, dirs, files in os.walk(search_path):
-            if "application data" == os.path.basename(root).lower():
-                # Prune other applications from dirlist if we're under
-                # "Application Data" in Windows, to lessen time overhead.
+            if os.path.basename(root).lower() in WINDOWS_APPDIRS:
+                # Prune other applications from list to lessen overhead if we
+                # are under "Application Data" or "AppData\Roaming" in Windows.
                 filtered = filter(lambda x: "skype" == x.lower(), dirs)
                 del dirs[:]
                 dirs.extend(filtered)
             for f in files:
                 if "main.db" == f.lower():
-                    yield os.path.join(root, f)
+                    yield os.path.realpath(os.path.join(root, f))
 
 
 
@@ -2405,6 +2406,8 @@ Messages:
                   68:   file transfer (chatmsg_type 7)
                   100:  file sending and accepting (chatmsg_type 2, 6)
                   110:  birthday alert (chatmsg_type NULL)
+  edited_timestamp      if set, message has been edited; if body_xml is empty,
+                        message has been deleted
 
 SMSes:
   chatmsg_id      if set, refers to the Messages.id entry showing this SMS
@@ -2438,5 +2441,4 @@ Transfers:
 
 Videos:
   convo_id        foreign key on Calls.id
-
 """

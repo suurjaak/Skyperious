@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.04.2012
+@modified    02.08.2012
 """
 import datetime
 import locale
@@ -849,7 +849,7 @@ class RangeSlider(wx.PyPanel):
         label_coords = [(2, selection_top + self.RANGE_LABEL_TOP_GAP)]
         if isinstance(self._rng[0], (datetime.date, datetime.time)):
             # Cannot use floats to divide timedeltas
-            value_step = range_delta / (label_count or sys.maxint)
+            value_step = range_delta / (label_count or sys.maxsize)
             # Tickid on major ja minor. Valime siin, kuhu me mida paneme.
             # variandid: aasta-kuu, aastakuu-päev, päev-tund, tund-minut jne
         else:
@@ -1153,7 +1153,7 @@ class RangeSlider(wx.PyPanel):
                     in_area = self._grip_area.ContainsXY(
                         event.Position.x, self._grip_area.Top
                     )
-                    closest_i, x_i_delta = 0, sys.maxint
+                    closest_i, x_i_delta = 0, sys.maxsize
                     for i in range(2):
                         dlt = abs(self._marker_xs[i] - event.Position.x)
                         if dlt < x_i_delta:

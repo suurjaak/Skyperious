@@ -17,7 +17,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.06.2012
+@modified    02.08.2012
 """
 import BeautifulSoup
 import collections
@@ -338,7 +338,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_shutdown_skype, menu_shutdown_skype)
         menu_file.AppendSeparator()
         menu_console = self.menu_console = menu_file.Append(id=wx.NewId(),
-            text="Show Python &console\tCtrl-W", help="Shows/hides the console window"
+            text="Show Python &console\tCtrl-W",
+            help="Shows/hides the console window"
         )
         self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
         menu_inspect = self.menu_inspect = menu_file.Append(id=wx.NewId(),
@@ -4239,10 +4240,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 @param   dom        xml.etree.cElementTree.Element instance
                 @param   data       {"links": [], "cloud": str, "message": str}
                 @param   tails_new  internal use, {element: modified tail str}
-
                 """
                 tagstyle_map = {
-                    "a": "link", "b": "bold", "quotefrom": "special"
+                    "a": "link", "b": "bold", "quotefrom": "special",
+                    "bodystatus": "special",
                 }
                 to_skip = {} # {element to skip: True, }
                 parent_map = dict(
@@ -4250,8 +4251,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 )
                 tails_new = {} if tails_new is None else tails_new
                 linefeed_final = "\n\n" # Decreased if quotefrom is last
+
                 for e in dom.getiterator():
-                    # Possible tags: a|b|quote|quotefrom|msgstatus|special|xml
+                    # Possible tags: a|b|bodystatus|quote|quotefrom|msgstatus|special|xml
                     if e in to_skip:
                         continue
                     style = tagstyle_map.get(e.tag, "default")
@@ -4286,6 +4288,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         linefeed_final = "\n"
                     elif "quotefrom" == e.tag:
                         text = "\n%s\n" % text
+                        data["message"] += text + " "
+                    elif "bodystatus" == e.tag:
                         data["message"] += text + " "
                     elif e.tag in ["xml", "b"]:
                         data["cloud"] += text + " "
@@ -4667,7 +4671,7 @@ class DayHourDialog(wx.Dialog):
         vbox = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
         self.text_days = wx.SpinCtrl(parent=self, style=wx.ALIGN_LEFT,
-            size=(200, -1), value=str(days), min=-sys.maxint, max=sys.maxint
+            size=(200, -1), value=str(days), min=-sys.maxsize, max=sys.maxsize
         )
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
         hbox1.AddStretchSpacer()
@@ -4677,7 +4681,7 @@ class DayHourDialog(wx.Dialog):
         hbox1.Add(self.text_days, border=5, flag=wx.LEFT | wx.ALIGN_RIGHT)
 
         self.text_hours = wx.SpinCtrl(parent=self, style=wx.ALIGN_LEFT,
-            size=(200, -1), value=str(hours), min=-sys.maxint, max=sys.maxint
+            size=(200, -1), value=str(hours), min=-sys.maxsize, max=sys.maxsize
         )
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         hbox2.AddStretchSpacer()
