@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.08.2012
+@modified    01.11.2012
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -34,9 +34,9 @@ Title = "Skyperious"
 """Module containing application main window class."""
 MainWindowModule = "skyperious"
 
-Version = "0.10.4a"
+Version = "0.10.5a"
 
-VersionDate = "20.08.2012"
+VersionDate = "01.11.2012"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -141,7 +141,7 @@ GridCellChangedColour = "#FF7777"
 DiffIdenticalColour = "#666666"
 
 """Copyright symbol and year string."""
-Copyright = "\xA9 2011-2012"
+Copyright = u"\xA9 2011-2012"
 
 """Large information text shown on the first page."""
 InfoText = """
