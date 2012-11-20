@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.08.2012
+@modified    20.11.2012
 """
 import datetime
 import locale
@@ -204,7 +204,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         Override ColumnSorterMixin.GetColumnSorter to specify our sorting,
         which accounts for None values.
         """
-        sorter = self.__ColumnSorter if hasattr(self, "_data_map") \
+        sorter = self.__ColumnSorter if hasattr(self, "itemDataMap") \
             else wx.lib.mixins.listctrl.ColumnSorterMixin.GetColumnSorter(self)
         return sorter
             

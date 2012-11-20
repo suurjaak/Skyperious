@@ -17,7 +17,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.08.2012
+@modified    20.11.2012
 """
 import BeautifulSoup
 import collections
@@ -380,7 +380,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         highlights opened databases in the list.
 
         @param   filename  possibly new filename, if any
-        @return            True if was file was new, False otherwise
+        @return            True if was file was new or changed, False otherwise
         """
         result = False
         # Insert into database lists, if not already there
@@ -388,28 +388,32 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if filename not in conf.DBFiles:
                 conf.DBFiles.append(filename)
                 conf.save()
-            if filename not in self.db_filenames:
-                data = {"name": filename, "size": None, "last_modified": None}
-                if os.path.exists(filename):
-                    data["size"] = os.path.getsize(filename)
-                    data["last_modified"] = datetime.datetime.fromtimestamp(
-                        os.path.getmtime(filename)
+            data = {"name": filename, "size": None, "last_modified": None}
+            if os.path.exists(filename):
+                data["size"] = os.path.getsize(filename)
+                data["last_modified"] = datetime.datetime.fromtimestamp(
+                    os.path.getmtime(filename)
+                )
+            if self.db_filenames.get(filename, None) != data:
+                if filename not in self.db_filenames:
+                    self.list_db.InsertStringItem(
+                        self.list_db.GetItemCount(), filename
                     )
-                self.list_db.InsertStringItem(
-                    self.list_db.GetItemCount(), filename
-                )
-                self.list_db.SetItemData(
-                    self.list_db.GetItemCount() - 1, id(filename)
-                )
-                self.list_db.itemDataMap[id(filename)] = \
+                else:
+                    filename = [ # Get the same string instance for same ID
+                        f for f in self.db_filenames if f == filename][0]
+                item_id = id(filename)
+                index = self.list_db.FindItem(0, filename)
+                self.list_db.SetItemData(index, item_id)
+                self.list_db.itemDataMap[item_id] = \
                     [filename, data["size"], data["last_modified"]]
                 if data["last_modified"] is not None:
-                    self.list_db.SetStringItem(self.list_db.GetItemCount() - 1,
-                        1, util.format_bytes(data["size"])
+                    self.list_db.SetStringItem(index, 1,
+                        util.format_bytes(data["size"])
                     )
                 if data["last_modified"] is not None:
-                    self.list_db.SetStringItem(self.list_db.GetItemCount() - 1,
-                        2, data["last_modified"].strftime("%Y-%m-%d %H:%M:%S")
+                    self.list_db.SetStringItem(index, 2,
+                        data["last_modified"].strftime("%Y-%m-%d %H:%M:%S")
                     )
                 for i in range(3):
                     self.list_db.SetColumnWidth(i, wx.LIST_AUTOSIZE)
@@ -854,9 +858,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 # Using DeletePage freezes app for some reason
                 self.notebook.RemovePage(i)
                 break
-        self.update_database_list()
         self.SendSizeEvent() # Multiline wx.Notebooks need redrawing
         self.notebook.RemoveChild(page)
+        if isinstance(page, DatabasePage):
+            self.update_database_list(page.db.filename)
+        else:
+            self.update_database_list(page.db1.filename)
+            self.update_database_list(page.db2.filename)
         page.Destroy()
         self.UpdateAccelerators() # Remove page accelerators
 
@@ -2470,36 +2478,47 @@ class DatabasePage(wx.Panel):
                     il = wx.ImageList(*conf.AvatarImageSize)
                     il.Add(avatar_default)
                     index = 0
+                    # wx will open a warning dialog on image error otherwise
+                    nolog = wx.LogNull()
                     for p in chat["participants"]:
                         b = 0
                         if "avatar_image" in p["contact"] \
                         and "avatar_bitmap" not in p["contact"] \
                         and p["contact"]["avatar_image"]:
-                            raw = p["contact"]["avatar_image"].encode(
-                                "latin1"
-                            )
-                            if raw.startswith("\0"):
-                                # For some reason, Skype avatar image blobs
-                                # start with a null byte, unsupported by wx.
-                                raw = raw[1:]
-                            img = wx.ImageFromStream(cStringIO.StringIO(raw))
-                            size = list(conf.AvatarImageSize)
-                            pos = None
-                            if img.Width != img.Height:
-                                ratio = util.safedivf(img.Width, img.Height)
-                                i = 0 if ratio < 1 else 1
-                                size[i] = size[i] / ratio if i \
-                                          else size[i] * ratio
-                                pos = ((conf.AvatarImageSize[0] - size[0]) / 2,
-                                    (conf.AvatarImageSize[1] - size[1]) / 2
+                            try:
+                                raw = p["contact"]["avatar_image"].encode(
+                                    "latin1"
                                 )
-                            img = img.ResampleBox(*size)
-                            if pos:
-                                bgcolor = (255, 255, 255)
-                                img.Resize(conf.AvatarImageSize, pos, *bgcolor)
-                            p["contact"]["avatar_bitmap"] = wx.BitmapFromImage(
-                                img
-                            )
+                                if raw.startswith("\0"):
+                                    # For some reason, Skype avatar image blobs
+                                    # start with a null byte, unsupported by wx
+                                    raw = raw[1:]
+                                img = wx.ImageFromStream(
+                                    cStringIO.StringIO(raw)
+                                )
+                                sz = list(conf.AvatarImageSize)
+                                pos = None
+                                if img.Width != img.Height:
+                                    ratio = util.safedivf(img.Width,img.Height)
+                                    i = 0 if ratio < 1 else 1
+                                    sz[i] = sz[i] / ratio if i \
+                                            else sz[i] * ratio
+                                    pos = (
+                                        (conf.AvatarImageSize[0] - sz[0]) / 2,
+                                        (conf.AvatarImageSize[1] - sz[1]) / 2
+                                    )
+                                img = img.ResampleBox(*sz)
+                                if pos:
+                                    bg = (255, 255, 255)
+                                    img.Resize(conf.AvatarImageSize, pos, *bg)
+                                p["contact"]["avatar_bitmap"] = \
+                                    wx.BitmapFromImage(img)
+                            except Exception, e:
+                                main.log("Error loading avatar image of %s "
+                                    "bytes for user '%s' (%s).",
+                                    len(p["contact"]["avatar_image"]),
+                                    p["identity"], e
+                                )
                         if "avatar_bitmap" in p["contact"]:
                             b = il.Add(p["contact"]["avatar_bitmap"])
                         self.list_participants.InsertImageStringItem(index,
@@ -2510,6 +2529,7 @@ class DatabasePage(wx.Panel):
                         self.list_participants.SetItem(c)
                         self.list_participants.SetItemData(index, p)
                         index += 1
+                    del nolog # Restore default wx message logger
                     self.list_participants.AssignImageList(
                         il, wx.IMAGE_LIST_SMALL
                     )
@@ -2848,7 +2868,7 @@ class DatabasePage(wx.Panel):
         self.list_chats.SortListItems(4, 0) # Sort by last activity timestamp
         self.list_chats.OnSortOrderChanged()
 
-        threading.Thread(target=self.load_later_data).start()
+        wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
 
 
     def load_later_data(self):
@@ -2894,7 +2914,7 @@ class DatabasePage(wx.Panel):
                 if skypedata.CHATS_TYPE_SINGLE != c["type"]:
                     for p in c["participants"]:
                         people.append(p["contact"]["name"])
-                c["people"] = ", ".join(people)
+                    c["people"] = "%s (%s)" % (len(people), ", ".join(people))
             self.list_chats.RefreshItems()
             if self.chat:
                 # If the user already opened a chat while later data
@@ -3503,6 +3523,7 @@ class MergerPage(wx.Panel):
                 if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
                     nudge = -self.list_chats.CountPerPage / 2
                     self.list_chats.ScrollLines(delta + nudge)
+            # @todo cache diffs and use cached if available
             busy = controls.ProgressPanel(self,
                 "Diffing messages for %s." % c["title_long_lc"]
             )
@@ -3853,7 +3874,7 @@ class MergerPage(wx.Panel):
         self.list_chats.SortListItems(3, 0) # Sort by last message in left
         self.list_chats.OnSortOrderChanged()
         self.compared = compared
-        wx.CallLater(50, threading.Thread(target=self.load_later_data).start)
+        wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
 
 
     def load_later_data(self):

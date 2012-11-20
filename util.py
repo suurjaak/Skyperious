@@ -4,13 +4,14 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    22.06.2012
+@modified    12.11.2012
 """
 import math
 import os
 import re
 import string
 import time
+import unicodedata
 
 
 def m(o, name, case_insensitive=True):
@@ -126,7 +127,7 @@ def unique_path(pathname):
     """
     Returns a unique version of the path. If a file or directory with the
     same name already exists, returns a unique version
-    (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
+    (e.g. "C:\config (2).sys" if "C:\config.sys" already exists).
     """
     result = pathname
     base, ext = os.path.splitext(result)

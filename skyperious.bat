@@ -1,1 +1,1 @@
-@python main.py
+@start pythonw main.py
