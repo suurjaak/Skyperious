@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.08.2012
+@modified    30.12.2012
 """
 import copy
 import datetime
@@ -2269,6 +2269,7 @@ def detect_databases():
     if os.name in ["mac", "posix"]:
         search_paths.append(["/Users", "/home"][os.name])
     elif "nt" == os.name:
+        search_paths.append(os.path.join(os.getenv("APPDATA"), "Skype"))
         c = os.getenv("SystemDrive") or "C:"
         for path in ["%s\\Users" % c, "%s\\Documents and Settings" % c]:
             if os.path.exists(path):

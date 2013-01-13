@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    20.11.2012
+@modified    13.01.2013
 """
 import datetime
 import locale
@@ -221,10 +221,11 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         item2 = self.itemDataMap[key2][col]
 
         #--- Internationalization of string sorting with locale module
-        if type(item1) == unicode and type(item2) == unicode:
-            cmpVal = locale.strcoll(item1, item2)
-        elif type(item1) == str or type(item2) == str:
-            cmpVal = locale.strcoll(unicode(item1), unicode(item2))
+        if isinstance(item1, unicode) and isinstance(item2, unicode):
+            cmpVal = locale.strcoll(item1.lower(), item2.lower())
+        elif isinstance(item1, str) or isinstance(item2, str):
+            items = item1.lower(), item2.lower()
+            cmpVal = locale.strcoll(map(unicode, items))
         else:
             if item1 is None:
                 cmpVal = -1
@@ -454,6 +455,7 @@ class RangeSlider(wx.PyPanel):
     MARKER_BUTTON_COLOUR    = wx.Colour(102, 102, 102) # Drag button border
     MARKER_BUTTON_BG_COLOUR = wx.Colour(227, 227, 227) # Drag button background
     RANGE_COLOUR            = wx.Colour(185, 185, 255, 128)
+    RANGE_DISABLED_COLOUR   = wx.Colour(185, 185, 185, 128)
     TICK_COLOUR             = wx.Colour(190, 190, 190)
     BAR_BUTTON_WIDTH        = 11 # Width of scrollbar arrow buttons
     BAR_HEIGHT              = 11 # Height of scrollbar
@@ -696,7 +698,7 @@ class RangeSlider(wx.PyPanel):
             return
 
         dc.Clear()
-        if self.IsEnabled():
+        if self.Enabled:
             dc.SetTextForeground(self.LABEL_COLOUR)
         else:
             dc.SetTextForeground(
@@ -704,6 +706,9 @@ class RangeSlider(wx.PyPanel):
             )
         if not filter(None, self._rng):
             return
+
+        timedelta_micros = lambda delta: delta.days * 86400 * 1000000 \
+                               + delta.seconds * 1000000 + delta.microseconds
 
         # Clear area and init data
         left_label, right_label = map(self.FormatLabel, self._rng)
@@ -721,6 +726,8 @@ class RangeSlider(wx.PyPanel):
             height - box_top - self.BAR_HEIGHT
         )
         dc.SetFont(self.GetFont())
+        range_colour = self.RANGE_COLOUR if self.Enabled \
+                       else self.RANGE_DISABLED_COLOUR
 
         # Fill background
         dc.SetBrush(wx.Brush(self.BACKGROUND_COLOUR, wx.SOLID))
@@ -737,21 +744,19 @@ class RangeSlider(wx.PyPanel):
             for i in range(2):
                 marker_delta = self._vals[i] - self._rng[0]
                 range_delta_local = range_delta
-                if isinstance(self._vals[i], (datetime.date, datetime.time)):
+                if i and not range_delta \
+                and isinstance(self._rng[0], datetime.date):
+                    # If date selection and only single day, fill entire area
+                    marker_delta = range_delta_local = 1
+                elif isinstance(self._vals[i], (datetime.date, datetime.time)):
                     # Cannot divide by timedeltas: convert to microseconds
-                    marker_delta = marker_delta.days * 86400000000 \
-                        + marker_delta.seconds * 1000000 \
-                        + marker_delta.microseconds
-                    range_delta_local = range_delta.days * 86400000000 \
-                        + range_delta.seconds * 1000000 \
-                        + range_delta.microseconds
-                    if not range_delta_local:
-                        range_delta_local = 1 # One-value range, set x at left
+                    marker_delta = timedelta_micros(marker_delta)
+                    range_delta_local = timedelta_micros(range_delta) or 1
                 x = self._box_area.x \
                     + self._box_area.width * marker_delta / range_delta_local
                 value_rect[2 if i else 0] = (x - value_rect[0]) if i else x
-            dc.SetBrush(wx.Brush(self.RANGE_COLOUR, wx.SOLID))
-            dc.SetPen(wx.Pen(self.RANGE_COLOUR))
+            dc.SetBrush(wx.Brush(range_colour, wx.SOLID))
+            dc.SetPen(wx.Pen(range_colour))
             dc.DrawRectangle(*value_rect)
             # Draw scrollbar arrow buttons
             self._bar_area = wx.Rect(
@@ -875,16 +880,14 @@ class RangeSlider(wx.PyPanel):
         for i in marker_draw_order:
             marker_delta = self._vals[i] - self._rng[0]
             range_delta_local = range_delta
-            if isinstance(self._vals[i], (datetime.date, datetime.time)):
+            if i and not range_delta \
+            and isinstance(self._rng[0], datetime.date):
+                # If date selection and only single day, fill entire area
+                marker_delta = range_delta_local = 1
+            elif isinstance(self._vals[i], (datetime.date, datetime.time)):
                 # Cannot divide by timedeltas: convert to microseconds
-                marker_delta = marker_delta.days * 86400000000 \
-                    + marker_delta.seconds * 1000000 \
-                    + marker_delta.microseconds
-                range_delta_local = range_delta.days * 86400000000 \
-                    + range_delta.seconds * 1000000 \
-                    + range_delta.microseconds
-                if not range_delta_local:
-                    range_delta_local = 1 # One-value range, set x at left
+                marker_delta = timedelta_micros(marker_delta)
+                range_delta_local = timedelta_micros(range_delta) or 1
             x = self._box_area.x \
                 + self._box_area.width * marker_delta / range_delta_local
             self._marker_xs[i] = x
@@ -1369,10 +1372,11 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         )
 
         self._button_toggle = wx.lib.agw.shapedbutton.SBitmapButton(
-            parent=self._stc, id=wx.ID_ANY, size=(16, 16),
-            bitmap=wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(8, 8))
+            parent=self._stc, id=wx.ID_ANY, size=(20, 20),
+            bitmap=wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(16, 16))
         )
         self._button_toggle.SetUseFocusIndicator(False) # Hide focus marquee
+        self._button_toggle.SetToolTipString("Show search bar (Ctrl-F)")
 
         panel = self._panel_bar = wx.Panel(parent=self)
         sizer_bar = panel.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -1409,7 +1413,6 @@ class SearchableStyledTextCtrl(wx.PyPanel):
             parent=panel, id=wx.ID_ANY, size=(16, 16),
             bitmap=self.IMG_CLOSE.GetBitmap()
         )
-        self._button_close.SetToolTipString("Show or hide the search bar.")
         self._button_close.SetUseFocusIndicator(False) # Hide focus marquee
         self._button_close.SetToolTipString("Hide search bar.")
         sizer_bar.Add(self._label_search, border=5,

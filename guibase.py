@@ -4,7 +4,7 @@ GUI frame templates.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    16.05.2012
+@modified    16.12.2012
 """
 import os
 import wx
@@ -37,9 +37,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
         self.frame_console = wx.py.shell.ShellFrame(parent=self,
             title=u"%s Console" % conf.Title, size=conf.ConsoleSize
         )
-        self.frame_console.Bind(
-            wx.EVT_CLOSE, lambda evt: self.frame_console.Hide()
-        )
+        self.frame_console.Bind(wx.EVT_CLOSE, self.on_showhide_console)
         self.frame_console_shown = False # Init flag
         console = self.console = self.frame_console.shell
         for cmd in conf.ConsoleHistoryCommands:

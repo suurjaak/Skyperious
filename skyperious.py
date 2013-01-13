@@ -17,7 +17,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.11.2012
+@modified    13.01.2013
 """
 import BeautifulSoup
 import collections
@@ -25,6 +25,7 @@ import copy
 import cStringIO
 import ctypes
 import datetime
+from dateutil.relativedelta import relativedelta
 import locale
 import htmlentitydefs
 import os
@@ -49,7 +50,6 @@ import wx.lib.agw.labelbook
 import wx.lib.agw.shapedbutton
 import wx.lib.agw.ultimatelistctrl
 import wx.lib.buttons
-import wx.lib.inspection
 import wx.lib.newevent
 import wx.lib.wordwrap
 import wx.py
@@ -136,8 +136,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
         notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_change_page)
-        self.Center(wx.HORIZONTAL)
-        self.Position.top = 50
+        if conf.WindowPosition and conf.WindowSize:
+            self.Position = conf.WindowPosition
+            self.Size = conf.WindowSize
+        else:
+            self.Center(wx.HORIZONTAL)
+            self.Position.top = 50
         self.list_db.SetFocus()
         self.Show(True)
 
@@ -186,16 +190,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         )
         sizer_left.Add(dblist, proportion=1, flag=wx.GROW)
 
-        class FileDrop(wx.FileDropTarget):
-            """A simple file drag-and-drop handler for database list."""
-            def __init__(self, window):
-                wx.FileDropTarget.__init__(self)
-                self.window = window
-
-            def OnDropFiles(self, x, y, filenames):
-                for filename in filenames:
-                    self.window.update_database_list(filename)
-
         dblist.SetColumnCount(3)
         dblist.InsertColumn(1, "Filename")
         dblist.InsertColumn(2, "Size")
@@ -204,13 +198,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dblist.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_select_dblist)
         dblist.Bind(wx.EVT_LIST_ITEM_ACTIVATED,  self.on_open_from_dblist)
         dblist.Bind(wx.EVT_LIST_COL_CLICK,       self.on_sort_dblist)
-        dblist.DropTarget = FileDrop(self)
 
         sizer_buttons = wx.BoxSizer(wx.VERTICAL)
         button_open = self.button_open = wx.Button(
             parent=page, label="&Open selected", size=(150, -1)
         )
-        button_open.SetToolTipString("Opens first selected database.")
+        button_open.SetToolTipString("Opens selected databases.")
         button_open.Bind(wx.EVT_BUTTON, self.on_open_from_dblist)
         button_open.Enabled = False
 
@@ -230,6 +223,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         )
         button_export_multi.Bind(wx.EVT_BUTTON, self.on_export_multi)
         button_export_multi.Enabled = False
+        button_opena = self.button_opena = wx.Button(
+            parent=page, label="Open &database..", size=(150, -1)
+        )
+        button_opena.Bind(wx.EVT_BUTTON, self.on_open_database)
+        button_opena.SetToolTipString(
+            "Chooses a Skype database file to open."
+        )
         button_detect = self.button_detect = wx.Button(
             parent=page, label="Detect databases", size=(150, -1)
         )
@@ -276,13 +276,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         )
         sizer_buttons.Add(button_compare, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_export_multi, border=5, flag=wx.ALL)
-        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.AddSpacer(10)
+        sizer_buttons.Add(button_opena, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_detect, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_find, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_copy, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_remove, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_clear, border=5, flag=wx.ALL)
-        sizer_buttons.AddSpacer(15)
+        sizer_buttons.AddSpacer(5)
         sizer_buttons.Add(
             button_exit, border=5, flag=wx.wx.LEFT | wx.RIGHT | wx.TOP
         )
@@ -296,6 +297,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             label=conf.InfoText,
             style=wx.ALIGN_CENTER
         )
+        infotext.font = wx.Font(6, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL, face="Tahoma")
         sizer.Add(label_list, border=5, flag=wx.TOP | wx.LEFT)
         sizer.Add(sizer_sides,
             border=5, proportion=1, flag=wx.LEFT | wx.RIGHT | wx.GROW
@@ -306,6 +309,19 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         for filename in conf.DBFiles:
             self.update_database_list(filename)
+
+
+        class FileDrop(wx.FileDropTarget):
+            """A simple file drag-and-drop handler for application window."""
+            def __init__(self, window):
+                wx.FileDropTarget.__init__(self)
+                self.window = window
+
+            def OnDropFiles(self, x, y, filenames):
+                for filename in filenames:
+                    self.window.update_database_list(filename)
+
+        self.DropTarget = FileDrop(self)
 
 
     def create_menu(self):
@@ -320,7 +336,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             id=wx.NewId(), text="&Open database...\tCtrl-O",
             help="Chooses a Skype database file to open."
         )
-        self.Bind(wx.EVT_MENU, self.on_menu_open_database, menu_open_database)
+        self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
         menu_recent = self.menu_recent = wx.Menu()
         menu_file.AppendMenu(id=wx.NewId(), text="&Recent databases",
             submenu=menu_recent, help="Recently opened databases."
@@ -342,11 +358,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             help="Shows/hides the console window"
         )
         self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
-        menu_inspect = self.menu_inspect = menu_file.Append(id=wx.NewId(),
-            text="Show &widget inspector",
-            help="Shows/hides the widget inspector"
-        )
-        self.Bind(wx.EVT_MENU, self.on_open_widget_inspector, menu_inspect)
 
         self.file_history = wx.FileHistory(conf.MaxRecentFiles)
         self.file_history.UseMenu(menu_recent)
@@ -443,11 +454,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_clear_databases(self, event):
         """Handler for clicking to clear the database list."""
-        while self.list_db.ItemCount:
-            self.list_db.DeleteItem(0)
-        del conf.DBFiles[:]
-        del conf.LastSelectedFiles[:]
-        self.db_filenames.clear()
+        if wx.OK == wx.MessageBox(
+            "Are you sure you want to clear the list of all databases?",
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ):
+            while self.list_db.ItemCount:
+                self.list_db.DeleteItem(0)
+            del conf.DBFiles[:]
+            del conf.LastSelectedFiles[:]
+            self.db_filenames.clear()
 
 
     def on_copy_database(self, event):
@@ -569,8 +584,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         specify a directory where to save chat files and exports all chats.
         """
         self.dialog_savefile.Filename = "Filename will be ignored"
-        self.dialog_savefile.Message = "Choose where to save all chats, " \
-            "a separate folder is created for each database"
+        self.dialog_savefile.Message = "Choose folder where to save all " \
+            "chats, a separate folder is created for each database"
         self.dialog_savefile.Wildcard = \
             "HTML document (*.html)|*.html|" \
             "Text document (*.txt)|*.txt|" \
@@ -713,10 +728,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     self.notebook.SetSelection(i)
 
 
-    def on_menu_open_database(self, event):
+    def on_open_database(self, event):
         """
-        Handler for open database menu, displays a file dialog and loads the
-        chosen database.
+        Handler for open database menu or button, displays a file dialog and
+        loads the chosen database.
         """
         dialog = wx.FileDialog(
             parent=self,
@@ -764,10 +779,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
     def on_open_from_dblist(self, event):
-        """Handler for clicking to open a database from a database list."""
-        selected = self.list_db.GetFirstSelected()
-        if selected >= 0:
-            self.load_database_page(self.list_db.GetItemText(selected))
+        """Handler for clicking to open selected files from database list."""
+        selected, selecteds = self.list_db.GetFirstSelected(), []
+        while selected >= 0:
+            selecteds.append(self.list_db.GetItemText(selected))
+            selected = self.list_db.GetNextSelected(selected)
+        for db in selecteds:
+            self.load_database_page(db)
 
 
     def on_select_dblist(self, event):
@@ -811,6 +829,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 filename = self.list_db.GetItemText(selected)
                 conf.LastSelectedFiles.append(filename)
                 selected = self.list_db.GetNextSelected(selected)
+            conf.WindowPosition = tuple(self.Position)
+            conf.WindowSize = tuple(self.Size)
             conf.save()
             self.Destroy()
 
@@ -1141,6 +1161,7 @@ class DatabasePage(wx.Panel):
         # 2nd Layout() seems also required
         self.Layout()
         busy.Close()
+        self.toggle_filter(True)
 
 
     def create_page_chats(self, notebook):
@@ -1231,6 +1252,7 @@ class DatabasePage(wx.Panel):
         stc = self.stc_history = ChatContentSTC(
             parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history"
         )
+        stc.SetDatabasePage(self)
         html_stats = self.html_stats = wx.html.HtmlWindow(parent=panel_stc1)
         html_stats.Bind(
             wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_stats
@@ -1255,6 +1277,7 @@ class DatabasePage(wx.Panel):
         range_date = self.range_date = controls.RangeSlider(
             parent=panel_stc2, fmt="%Y-%m-%d"
         )
+        range_date.SetRange(None, None)
         label_list = wx.StaticText(
             parent=panel_stc2, label="Sho&w messages from:"
         )
@@ -1268,6 +1291,7 @@ class DatabasePage(wx.Panel):
             wx.lib.agw.ultimatelistctrl.UltimateListCtrl(
                 parent=panel_stc2, agwStyle=agw_style
             )
+        list_participants.InsertColumn(0, "")
         self.Bind(wx.EVT_LIST_ITEM_SELECTED,
             self.on_select_participant, list_participants
         )
@@ -1322,6 +1346,7 @@ class DatabasePage(wx.Panel):
         )
 
         splitter_stc.SplitVertically(panel_stc1, panel_stc2, sashPosition=0)
+        panel_stc2.Enabled = False
         splitter_stc.Unsplit(panel_stc2) # Hide filter panel
         sizer2.Add(
             splitter_stc, proportion=1, border=5, flag=wx.GROW | wx.ALL
@@ -1638,7 +1663,6 @@ class DatabasePage(wx.Panel):
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
             main.logstatus("Exporting to %s.", filename)
-            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
             export_result = export.export_chat(
                 self.chat, self.stc_history.GetMessages(), filename, self.db
             )
@@ -1677,12 +1701,11 @@ class DatabasePage(wx.Panel):
                 util.plural("chat", len(self.chats)),
                 self.db.filename, extname.upper(), dirname
             )
-            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
             errormsg = False
             try:
                 for chat in self.chats:
                     main.status("Exporting %s", chat["title_long_lc"])
-                    wx.GetApp().Yield(True) # Allow status to refresh
+                    #wx.GetApp().Yield(True) # Allow status to refresh
                     filename = os.path.join(dirname, util.safe_filename(
                         "Skype %s.%s" % (chat["title_long_lc"], extname)
                     ))
@@ -1691,7 +1714,8 @@ class DatabasePage(wx.Panel):
                         list(self.db.get_messages(chat)), filename, self.db
                     )
                     if not export_result:
-                        errormsg = "An error occurred when saving \"%s\"." % filename
+                        errormsg = "An error occurred when saving \"%s\"." \
+                                   % filename
                         break # break for chat in self.chats
             except Exception, e:
                 errormsg = "An unexpected error occurred when saving all " \
@@ -1733,7 +1757,7 @@ class DatabasePage(wx.Panel):
             busy = controls.ProgressPanel(
                 self, "Filtering and exporting \"%s\"." % self.chat["title"]
             )
-            wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
+            #wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
 
             filter_new = self.build_filter()
             filter_backup = self.stc_history.GetFilter()
@@ -2053,8 +2077,8 @@ class DatabasePage(wx.Panel):
         Handler for clicking to filter current chat history, applies the
         current filter to the chat messages.
         """
-        new_filter = self.build_filter()
-        current_filter = dict((t, self.chat_filter[t]) for t in new_filter)
+        new_filter, old_filter = self.build_filter(), self.stc_history.Filter
+        current_filter = dict((t, old_filter) for t in new_filter)
         self.current_filter = current_filter
         self.new_filter = new_filter
         if new_filter != current_filter:
@@ -2111,16 +2135,7 @@ class DatabasePage(wx.Panel):
 
     def on_toggle_filter(self, event):
         """Handler for clicking to show/hide chat filter."""
-        if self.splitter_stc.IsSplit():
-            self.splitter_stc.Unsplit(self.panel_stc2)
-        else:
-            p = self.splitter_stc.Size.width - self.panel_stc2.BestSize.width
-            self.splitter_stc.SplitVertically(
-                self.panel_stc1, self.panel_stc2, sashPosition=p
-            )
-            self.list_participants.SetColumnWidth(
-                0, self.list_participants.Size.width
-            )
+        self.toggle_filter(not self.splitter_stc.IsSplit())
 
 
     def on_toggle_stats(self, event):
@@ -2129,6 +2144,22 @@ class DatabasePage(wx.Panel):
         between chat history window and statistics window.
         """
         self.show_stats(not self.html_stats.Shown)
+
+
+    def toggle_filter(self, on):
+        """Toggles the chat filter panel on/off."""
+        if self.splitter_stc.IsSplit() and not on:
+            self.splitter_stc._sashPosition = self.splitter_stc.SashPosition
+            self.splitter_stc.Unsplit(self.panel_stc2)
+        elif not self.splitter_stc.IsSplit() and on:
+            p = getattr(self.splitter_stc, "_sashPosition",
+                self.splitter_stc.Size.width - self.panel_stc2.BestSize.width)
+            self.splitter_stc.SplitVertically(
+                self.panel_stc1, self.panel_stc2, sashPosition=p
+            )
+            self.list_participants.SetColumnWidth(
+                0, self.list_participants.Size.width
+            )
 
 
     def show_stats(self, show=True):
@@ -2205,7 +2236,7 @@ class DatabasePage(wx.Panel):
                     self, "Exporting \"%s\"." % filename
                 )
                 main.status("Exporting \"%s\".", filename)
-                wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
+                #wx.GetApp().Yield(True) # Allow dialog to close, status to refresh
                 export_result = export.export_grid(grid_source,
                     filename, default, self.db, sql=sql, table=table
                 )
@@ -2417,7 +2448,7 @@ class DatabasePage(wx.Panel):
             busy.Close()
 
 
-    def on_change_list_chats(self, event,):
+    def on_change_list_chats(self, event):
         """
         Handler for selecting an item in the chats list, loads the
         messages into the message log.
@@ -2566,6 +2597,7 @@ class DatabasePage(wx.Panel):
             if self.chat != chat:
                 self.chat = chat
                 busy.Close()
+            self.panel_stc2.Enabled = True
             self.populate_chat_statistics()
             if self.html_stats.Shown:
                 self.show_stats(True) # To restore scroll position
@@ -2624,8 +2656,8 @@ class DatabasePage(wx.Panel):
                         width = util.safedivf(value, total) * conf.PlotWidth
                         # Set at least a width of 1 pixel for very small values
                         width = int(width) if (width > 1 or not value) else 1
-                        tbl = BeautifulSoup.Tag(h, "table",
-                            {"cellpadding": "0", "cellspacing": "0"}
+                        tbl = BeautifulSoup.Tag(h, "table", {"width": "100%",
+                            "cellpadding": "0", "cellspacing": "0"}
                         )
                         tr = BeautifulSoup.Tag(h, "tr")
                         if width:
@@ -2637,6 +2669,14 @@ class DatabasePage(wx.Panel):
                                 "bgcolor": conf.PlotBgColour,
                                 "width": str(conf.PlotWidth - width)
                             }))
+                        percent = util.safedivf(value * 100, total)
+                        valuestr = "<b>&nbsp;%d%%&nbsp;</b>" % percent
+                        td_i = 0 if width > 30 else 1
+                        e = BeautifulSoup.Tag(h, "font", {"size": "2", "color":
+                            conf.PlotMessagesColour if td_i else "#FFFFFF"})
+                        e.append(valuestr)
+                        tr.contents[td_i].append(e)
+                        tr.contents[td_i]["align"] = "center"
                         dl = BeautifulSoup.Tag(h, "td")
                         if "bytes" == label:
                             dl.append("&nbsp;%s" % util.format_bytes(value))
@@ -4072,6 +4112,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
         self._chat = None       # Currently shown chat
         self._db = None         # Database for currently shown messages
+        self._page = None # DatabasePage instance for action callbacks, if any
         self._messages = None   # All retrieved messages (collections.deque)
         self._messages_current = None  # Currently shown (collections.deque)
         self._message_positions = {} # {msg id: (start index, end index)}
@@ -4083,6 +4124,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._wordcloud = []
         self._stats = {}     # Statistics assembled for current content
         self._filelinks = {} # {link end position: file path}
+        self._actionlinks = {} # {link end position: callable or two dates}
+        self._actionlink_last = None # Title of clicked action link, if any
         # Currently set message filter {"daterange": (datetime, datetime),
         # "text": text in message, "participants": [skypename1, ],
         # "message_id": message ID to show, range shown will be centered
@@ -4135,6 +4178,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self.SetCaretWidth(0)
 
 
+    def SetDatabasePage(self, page):
+        self._page = page
+
+
     def OnUrl(self, event):
         """
         Handler for clicking a link in chat history, opens the link in system
@@ -4166,6 +4213,20 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 # Launching an external program here will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
                 wx.CallAfter(start_file, url)
+            elif url_range[-1] in self._actionlinks:
+                mapping = self._actionlinks[url_range[-1]]
+                if callable(mapping):
+                    mapping()
+                else:
+                    busy = controls.ProgressPanel(self._page, "Filtering messages.")
+                    self._actionlink_last = url
+                    self._page.chat_filter["daterange"] = mapping
+                    self._page.range_date.SetValues(*mapping)
+                    self.Filter = self._page.chat_filter
+                    self.RefreshMessages()
+                    self.ScrollToLine(0)
+                    self._page.populate_chat_statistics()
+                    busy.Close()
             elif url:
                 # Launching an external program here will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
@@ -4243,6 +4304,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             focus_message_id = None
             transfers = self._db.get_transfers()
             self._filelinks.clear()
+            self._actionlinks.clear()
             # For accumulating various statistics
             texts = {"cloud": "", "links": [], "message": ""}
             stats = {"smses": 0, "transfers": [], "calls": 0, "messages": 0,
@@ -4331,6 +4393,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 if "xml" == dom.tag:
                     self._append_text(linefeed_final)
 
+            # Assemble messages to show
             for m in self._messages:
                 count += 1
                 if self.IsMessageFilteredOut(m):
@@ -4347,11 +4410,71 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     break # break for m in self._messages
 
                 self._messages_current.append(m)
-                #if not stats["total"] % 100:
-                #    main.log("Conversation "%s": display at %s.",
-                #        self._chat["title_long"], stats["total"]
-                #    )
 
+            # Add date and count information, links like "6 months"
+            self._append_text("\n")
+            if self._messages_current:
+                m1, m2 = self._messages_current[0], self._messages_current[-1]
+                self._append_text("History of  ")
+                self._append_text(m1["datetime"].strftime("%d.%m.%Y"), "bold")
+                if m1["datetime"].date() != m2["datetime"].date():
+                    self._append_text(" to ")
+                    self._append_text(
+                        m2["datetime"].strftime("%d.%m.%Y"), "bold")
+                self._append_text("  (%s).  " % util.plural(
+                                  "message", len(self._messages_current)))
+            if self._chat["message_count"]:
+                #self._actionlinks[self._stc.Length] = \
+                #    lambda: self._page.on_toggle_filter(None)
+                #self._append_text("Toggle filter panel", "link")
+                self._append_text("\nShow from:  ")
+                date_first = self._chat["first_message_datetime"].date()
+                date_last = self._chat["last_message_datetime"].date()
+                date_until = datetime.date.today()
+                dates_filter = self._filter.get("daterange", None)
+                DATELINKS = [("day", 7), ("week", 2), ("day", 30),
+                    ("month", 3), ("month", 6), ("year", 1), ("year", 2)]
+                for unit, count in DATELINKS:
+                    date_start = date_until - relativedelta(
+                        **{util.plural(unit): count})
+                    if date_start >= date_first and date_start <= date_last:
+                        title = util.plural(unit, count)
+                        daterange = [date_start, date_last]
+                        active = (title == self._actionlink_last) or \
+                            (daterange == dates_filter)
+                        if not active:
+                            self._actionlinks[self._stc.Length] = daterange
+                        self._append_text(title, "bold" if active else "link")
+                        self._append_text(u"  \u2022  ", "special") # bullet
+                if date_until - relativedelta(years=2) > date_first:
+                    title = "2 to 4 years"
+                    daterange = [date_until - relativedelta(years=4),
+                                 date_until - relativedelta(years=2)]
+                    # @warning: possible mis-showing here if chat < 4 years
+                    active = (title == self._actionlink_last) or \
+                        (daterange == dates_filter)
+                    self._actionlinks[self._stc.Length] = daterange
+                    self._append_text(title, "bold" if active else "link")
+                    self._append_text(u"  \u2022  ", "special") # bullet
+                if date_until - relativedelta(years=4) > date_first:
+                    title = "4 years and older"
+                    daterange = [date_first,
+                                 date_until - relativedelta(years=4)]
+                    active = (title == self._actionlink_last) or \
+                        (daterange == dates_filter)
+                    self._actionlinks[self._stc.Length] = daterange
+                    self._append_text(title, "bold" if active else "link")
+                    self._append_text(u"  \u2022  ", "special") # bullet
+                daterange = [date_first, date_last]
+                title = "From the beginning"
+                self._actionlinks[self._stc.Length] = daterange
+                active = (title == self._actionlink_last) or \
+                    (daterange == dates_filter)
+                self._append_text(title, "bold" if active else "link")
+            self._actionlink_last = None
+            self._append_text("\n\n")
+
+            for m in self._messages_current:
                 if m["datetime"].date() != previous_day:
                     # Day has changed: insert a date header
                     previous_day = m["datetime"].date()
@@ -4440,6 +4563,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             self._wordcloud = wordcloud.get_cloud(
                 texts["cloud"], texts["links"]
             )
+
 
             # Reset the centered message data, as filtering should override it
             self._center_message_index = -1
@@ -4750,9 +4874,12 @@ class DayHourDialog(wx.Dialog):
 
 
 def messageBox(message, title, style):
-    """Shows a non-native message box, with no bell sound for any style."""
+    """
+    Shows a non-native message box, with no bell sound for any style, returning
+    the message box result code."""
     dlg = wx.lib.agw.genericmessagedialog.GenericMessageDialog(
         None, message, title, style
     )
-    dlg.ShowModal()
+    result = dlg.ShowModal()
     dlg.Destroy()
+    return result

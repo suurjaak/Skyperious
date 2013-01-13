@@ -4,7 +4,7 @@ Functionality for exporting Skype data to external files.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    14.06.2012
+@modified    05.01.2013
 """
 
 import base64
@@ -281,10 +281,9 @@ CHAT_HTML_HEADER = """<!DOCTYPE HTML><html>
     "favicon"     : images.Icon8bit16x16.data,
 }
 """Toggle show/hide link for the participants section."""
-PARTICIPANTS_LINK = "<div class='header'>" \
-    "<a title='Click to show/hide participants'" \
-    " href='javascript:void()' onclick='return toggle_participants()'>" \
-    "Participants</a></div>"
+PARTICIPANTS_LINK = \
+    "<div class='header'><a title='Click to show/hide participants' href='#'" \
+    " onclick='return toggle_participants()'>Participants</a></div>"
 
 
 def export_chat(chat, messages, filename, db):
@@ -505,9 +504,11 @@ def export_chat(chat, messages, filename, db):
                     "<td class='author %(authorclass)s' colspan='2'>" \
                     "%(name)s</td>\r\n\t" \
                     "<td class='t3'></td>\r\n\t<td>%(text)s</td>\r\n\t" \
-                    "<td class='timestamp'>%(time)s</td>\r\n</tr>\r\n" % {
+                    "<td class='timestamp' title='%(stamp)s'>" \
+                    "%(time)s</td>\r\n</tr>\r\n" % {
                         "authorclass": colourmap[m["author"]],
                         "time": m["datetime"].strftime("%H:%S"),
+                        "stamp": m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
                         "name": escape(m["from_dispname"]),
                         "text": body
                 })

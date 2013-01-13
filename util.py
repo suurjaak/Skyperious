@@ -4,14 +4,13 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    12.11.2012
+@modified    10.01.2013
 """
 import math
 import os
 import re
 import string
 import time
-import unicodedata
 
 
 def m(o, name, case_insensitive=True):
@@ -57,9 +56,18 @@ def format_bytes(size, precision=2):
 
 
 
-def plural(word, count):
-    """Returns the word as 'count words', or '1 word' if count is 1."""
-    return "%s %s%s" % (count or 0, word, "" if 1 == count else "s")
+def plural(word, count=None):
+    """
+    Returns the word as 'count words', or '1 word' if count is 1,
+    or 'words' if count omitted.
+
+    @param   word
+    @param   count  number, or None to omit the count from result
+    """
+    result = word + ("" if 1 == count else "s")
+    if count is not None:
+        result = "%s %s" % (count or 0, result)
+    return result
 
 
 
@@ -127,7 +135,7 @@ def unique_path(pathname):
     """
     Returns a unique version of the path. If a file or directory with the
     same name already exists, returns a unique version
-    (e.g. "C:\config (2).sys" if "C:\config.sys" already exists).
+    (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
     base, ext = os.path.splitext(result)

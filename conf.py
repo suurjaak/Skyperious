@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.11.2012
+@modified    13.01.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -22,7 +22,7 @@ else:
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup", "RecentFiles",
-    "DBFiles", "LastSelectedFiles"
+    "DBFiles", "LastSelectedFiles", "WindowPosition", "WindowSize",
 ]
 
 """Whether logging is enabled."""
@@ -34,12 +34,15 @@ Title = "Skyperious"
 """Module containing application main window class."""
 MainWindowModule = "skyperious"
 
-Version = "0.10.6a"
+Version = "1.0"
 
-VersionDate = "20.11.2012"
+VersionDate = "13.01.2013"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
+
+"""Main window position, (x, y)."""
+WindowPosition = None
 
 """Main window size in pixels, (w, h)."""
 WindowSize = (1080, 640)
@@ -141,15 +144,14 @@ GridCellChangedColour = "#FF7777"
 DiffIdenticalColour = "#666666"
 
 """Copyright symbol and year string."""
-Copyright = u"\xA9 2011-2012"
+Copyright = u"\xA9 2011-2013"
 
 """Large information text shown on the first page."""
 InfoText = """
 %(name)s can open local Skype SQLite databases and look at their contents:
 - search across all messages and contacts
 - browse, filter and export chat histories, see chat statistics
-- view any database table and and export their data
-- change, add or delete data in any table
+- view database tables and export their data, change table data
 - execute direct SQL queries
 
 %(name)s can also compare two Skype databases, show the differences in chat
