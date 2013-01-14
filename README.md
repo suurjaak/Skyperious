@@ -20,8 +20,7 @@ written to import old chat messages from such files.
 It is recommended to make a backup of the database file before making any
 changes, as merging has not been extensively tested and might have issues.
 
-Screenshots at http://suurjaak.github.com/Skyperious/screens.html.
-Windows binaries at http://suurjaak.github.com/Skyperious/downloads.html.
+Screenshots and Windows binaries at http://suurjaak.github.com/Skyperious.
 
 
 Using The Program
