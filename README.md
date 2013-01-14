@@ -17,11 +17,11 @@ Skype uses local database files to keep its chat history, and older messages
 tend to get lost as computers get upgraded or changed. Skyperious was initially
 written to import old chat messages from such files.
 
-Currently released in alpha status: browsing is seemingly stable, merging
-has not been extensively tested and might have issues. It is recommended to
-make a backup of the database file before making any changes.
+It is recommended to make a backup of the database file before making any
+changes, as merging has not been extensively tested and might have issues.
 
 Screenshots at http://suurjaak.github.com/Skyperious/screens.html.
+Windows binaries at http://suurjaak.github.com/Skyperious/downloads.html.
 
 
 Using The Program
