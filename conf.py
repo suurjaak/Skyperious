@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.01.2013
+@modified    08.03.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -34,9 +34,9 @@ Title = "Skyperious"
 """Module containing application main window class."""
 MainWindowModule = "skyperious"
 
-Version = "1.0"
+Version = "1.1"
 
-VersionDate = "13.01.2013"
+VersionDate = "08.03.2013"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -45,7 +45,7 @@ ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 WindowPosition = None
 
 """Main window size in pixels, (w, h)."""
-WindowSize = (1080, 640)
+WindowSize = (1080, 645)
 
 """Console window size in pixels, (w, h)."""
 ConsoleSize = (800, 300)
@@ -79,6 +79,12 @@ SearchResultsChunk = 50
 
 """How many diff results to yield in one chunk from diff thread."""
 DiffResultsChunk = 5
+
+"""
+How many contact search results to yield in one chunk from contacts search
+thread.
+"""
+ContactResultsChunk = 10
 
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"
@@ -151,16 +157,21 @@ InfoText = """
 %(name)s can open local Skype SQLite databases and look at their contents:
 - search across all messages and contacts
 - browse, filter and export chat histories, see chat statistics
+- import contacts from a CSV file to your Skype contacts
 - view database tables and export their data, change table data
 - execute direct SQL queries
 
 %(name)s can also compare two Skype databases, show the differences in chat
 histories, and copy any differences from one database to another.
 Skype uses local database files to keep its chat history, and older messages
-tend to get lost as computers get upgraded or changed.
+tend to get lost as computers get upgraded or changed.""" % {"name": Title}
 
-%(copy)s, Erki Suurjaak. Version %(ver)s, %(date)s.
-""" % {"copy": Copyright, "name": Title, "ver": Version, "date": VersionDate}
+"""Small version text shown on the first page."""
+VersionText = "%(copy)s, Erki Suurjaak. Version %(ver)s, %(date)s." % {
+    "copy": Copyright, "ver": Version, "date": VersionDate}
+
+"""Homepage hyperlink shown on the first page."""
+HomeUrl = "http://suurjaak.github.com/Skyperious/"
 
 """Width and height tuple of the avatar image, shown in chat data."""
 AvatarImageSize = (32, 32)

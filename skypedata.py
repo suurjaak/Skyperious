@@ -4,9 +4,10 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.12.2012
+@modified    07.03.2013
 """
 import copy
+import csv
 import datetime
 import os
 import Queue
@@ -2299,6 +2300,53 @@ def find_databases(folder):
         db_files = filter(lambda x: x.lower().endswith(".db"), files)
         for filename in db_files:
             yield os.path.join(root, filename)
+
+
+
+def import_contacts_file(filename):
+    """
+    Returns the contacts found in the specified CSV file,
+    as [{"name", "e-mail", "phone"}].
+    """
+    contacts = []
+    # GMail CSVs can contain mysterious NULL bytes
+    lines_raw = [line.replace('\x00', '') for line in open(filename, "rb")]
+    lines = list(csv.reader(lines_raw))
+    header, items = lines[0], lines[1:]
+    titlemap = dict((title, i) for i, title in enumerate(header))
+
+    # By default, assume MSN/Outlook type of values
+    FIRST, MIDDLE, LAST = "First Name", "Middle Name", "Last Name"
+    PHONE_FIELDS, EMAIL_FIELDS = ["Mobile Phone"], ["E-mail Address"]
+    if "Given Name" in titlemap: # Looks like GMail type of values
+        FIRST, MIDDLE, LAST = "Given Name", "Additional Name", "Family Name"
+        PHONE_FIELDS = [("Phone %s - Value" % i) for i in range(1, 5)]
+        EMAIL_FIELDS = [("E-mail %s - Value" % i) for i in range(1, 3)]
+
+    for row in filter(None, items):
+        row = [i.strip().decode("latin1") for i in row]
+        values = dict((t, row[i]) for t, i in titlemap.items())
+
+        # Assemble full name from partial fields
+        contact = {"name": values.get(FIRST, ""), "phone": "", "e-mail": ""}
+        for title in filter(lambda x: values.get(x, ""), [MIDDLE, LAST]):
+            contact["name"] += " " + values[title]
+
+        # Phone data can contain arbitrary whitespace: remove it
+        for title in filter(lambda x: values.get(x, ""), PHONE_FIELDS):
+            values[title] = re.sub(r"\s+", "", values[title])
+
+        # Gather phone and e-mail information
+        for t, fields in [("phone", PHONE_FIELDS), ("e-mail", EMAIL_FIELDS)]:
+            for title in filter(lambda x: values.get(x, ""), fields):
+                if contact[t]: # Value already filled: make new record
+                    contacts.append(contact)
+                    contact = contact.copy()
+                contact[t] = values[title]
+
+        if any(contact.values()):
+            contacts.append(contact)
+    return contacts
 
 
 

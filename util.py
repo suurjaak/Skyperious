@@ -4,7 +4,7 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    10.01.2013
+@modified    07.03.2013
 """
 import math
 import os
@@ -56,17 +56,21 @@ def format_bytes(size, precision=2):
 
 
 
-def plural(word, count=None):
+def plural(word, count_or_items=None):
     """
     Returns the word as 'count words', or '1 word' if count is 1,
     or 'words' if count omitted.
 
     @param   word
-    @param   count  number, or None to omit the count from result
+    @param   count_or_items  count, or item collection, or None to omit the
+                             count from result
     """
+    count = count_or_items or 0
+    if hasattr(count_or_items, "__len__"):
+            count = len(count_or_items)
     result = word + ("" if 1 == count else "s")
-    if count is not None:
-        result = "%s %s" % (count or 0, result)
+    if count_or_items is not None:
+        result = "%s %s" % (count, result)
     return result
 
 
@@ -144,3 +148,13 @@ def unique_path(pathname):
         result = "%s (%s)%s" % (base, counter, ext)
         counter += 1
     return result
+
+
+def start_file(filepath):
+    """Tries to open the specified file."""
+    if "nt" == os.name:
+        os.startfile(filepath)
+    elif "mac" == os.name:
+        subprocess.call(("open", filepath))
+    elif "posix" == os.name:
+        subprocess.call(("xdg-open", filepath))

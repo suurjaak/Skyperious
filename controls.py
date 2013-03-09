@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    13.01.2013
+@modified    05.03.2013
 """
 import datetime
 import locale
@@ -29,6 +29,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         wx.ListView.__init__(self, *args, **kwargs)
         wx.lib.mixins.listctrl.ColumnSorterMixin.__init__(self, 0)
         self.itemDataMap = {}
+        self._data_map = {}
 
 
     def Populate(self, column_map, rows):
@@ -109,6 +110,27 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         if selected_index >= 0:
             self.Select(selected_index)
         self.Thaw()
+
+
+
+    def PopulateRow(self, index, columns, data):
+        """
+        Populates the control row with specified data.
+
+        @param   index    row index
+        @param   columns  a list of values in column order
+        @param   data     item data dictionary
+        """
+        item_id = id(index)
+        value = columns[0]
+        strvalue = value if isinstance(value, basestring) else str(value)
+        self.InsertStringItem(index, strvalue)
+        for i, value in enumerate(columns[1:]):
+            strvalue = value if isinstance(value, basestring) else str(value)
+            self.SetStringItem(index, i + 1, strvalue)
+        self.SetItemData(index, item_id)
+        self.itemDataMap[item_id] = columns
+        self._data_map[item_id] = data
 
 
     def RefreshItems(self):
@@ -225,7 +247,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             cmpVal = locale.strcoll(item1.lower(), item2.lower())
         elif isinstance(item1, str) or isinstance(item2, str):
             items = item1.lower(), item2.lower()
-            cmpVal = locale.strcoll(map(unicode, items))
+            cmpVal = locale.strcoll(*map(unicode, items))
         else:
             if item1 is None:
                 cmpVal = -1
@@ -1763,38 +1785,25 @@ class SearchableStyledTextCtrl(wx.PyPanel):
 class ProgressPanel(wx.Window):
     FOREGROUND_COLOUR = wx.WHITE
     BACKGROUND_COLOUR = wx.Colour(110, 110, 110, 255)
-    #GAUGE_FOREGROUND_COLOUR = wx.GREEN
-    #GAUGE_BACKGROUND_COLOUR = wx.WHITE
 
     def __init__(self, parent, label):
         wx.Window.__init__(self, parent)
+        self.Hide()
         sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
         label = self._label = wx.StaticText(parent=self, label=label)
-        #gauge = self._gauge = wx.Gauge(parent=self, range=1500)
-        #gauge.MinSize = (parent.Size.width / 2, -1)
-        #gauge.Value = 1000
         self.BackgroundColour = self.BACKGROUND_COLOUR
         label.ForegroundColour = self.FOREGROUND_COLOUR
-        #gauge.ForegroundColour = self.GAUGE_FOREGROUND_COLOUR
-        #gauge.BackgroundColour = self.GAUGE_BACKGROUND_COLOUR
         sizer.Add(label, border=15, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
-        #self.Sizer.Add(gauge, proportion=1, border=15,
-        #    flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.ALIGN_CENTER_HORIZONTAL
-        #)
         self.Fit()
         self.CenterOnParent()
-        self.Bind(wx.EVT_PAINT, lambda e: self.Refresh())
-        #wx.CallLater(300, lambda: self.Pulse() if self else None)
-        #self._gauge.Pulse()
-        self.Layout()
-        self.Update()
+        self.Show()
         parent.Refresh()
+        wx.GetApp().Yield(True) # Allow display to refresh
 
 
     def Close(self):
         self.Hide()
         self.Parent.Refresh()
-        #wx.GetApp().Yield(True) # Allow display to refresh
         self.Destroy()
 
 

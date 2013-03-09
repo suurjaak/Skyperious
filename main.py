@@ -5,7 +5,7 @@ conf.MainWindowModule.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.05.2012
+@modified    25.02.2013
 """
 import datetime
 import sys
@@ -71,7 +71,8 @@ def status(text, *args):
     msg = text % args
     if window:
         process_deferreds()
-        wx.PostEvent(window, guibase.StatusEvent(text=msg))
+        #wx.PostEvent(window, guibase.StatusEvent(text=msg))
+        window.SetStatusText(msg)
     else:
         deferred_status[:] = [msg]
 

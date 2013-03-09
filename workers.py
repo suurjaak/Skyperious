@@ -4,7 +4,7 @@ Background workers for searching and diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    18.04.2012
+@modified    08.03.2013
 """
 import cStringIO
 import datetime
@@ -67,8 +67,6 @@ class WorkerThread(threading.Thread):
     def _postback(self, data):
         time.sleep(0.5) # Feeding results too fast makes GUI unresponsive
         self._callback(data)
-
-
 
 
 
@@ -540,3 +538,46 @@ class DiffThread(WorkerThread):
             "participants": [c1p_diff, c2p_diff]
         }
         return result
+
+
+
+class ContactSearchThread(WorkerThread):
+    """
+    Contact search background thread, uses a running Skype application to
+    search Skype userbase for contacts, yielding results back to main thread
+    in chunks.
+    """
+
+    def run(self):
+        self._is_running = True
+        while self._is_running:
+            search = self._queue.get()
+            self._stop_work = False
+            self._drop_results = False
+            found = {} # { Skype handle: 1, }
+            result = {"search": search, "results": []}
+            if search:
+                for i, value in enumerate(search["values"]):
+                    for user in search["handler"].search_users(value):
+                        if user.Handle not in found:
+                            result["results"].append(user)
+                            found[user.Handle] = 1
+
+                        if not (self._drop_results 
+                        or len(result["results"]) % conf.ContactResultsChunk):
+                            self._postback(result)
+                            result = {"search": search, "results": []}
+
+                        if self._stop_work:
+                            break # break for user in search["handler"].searc..
+
+                    if result["results"] and not self._drop_results:
+                        self._postback(result)
+                        result = {"search": search, "results": []}
+
+                    if self._stop_work:
+                        break # break for i, value in enumerate(search_values)
+
+                if not self._drop_results:
+                    result["done"] = True
+                    self._postback(result)

@@ -8,6 +8,7 @@ primary aim of merging chat history from another Skype database file.
 In addition, Skyperious allows to:
 - read, search, filter and export chats
 - see chat statistics
+- import contacts from a CSV file to your Skype contacts
 - browse and modify all database tables
 - execute arbitrary queries on the database
 - fix chat history messages that have been saved with a future timestamp
@@ -17,20 +18,23 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.01.2013
+@modified    08.03.2013
 """
 import BeautifulSoup
 import collections
 import copy
 import cStringIO
+import csv
 import ctypes
 import datetime
 from dateutil.relativedelta import relativedelta
-import locale
+import hashlib
 import htmlentitydefs
+import locale
 import os
 import re
 import shutil
+import Skype4Py
 import sys
 import textwrap
 import threading
@@ -61,7 +65,6 @@ import export
 import guibase
 import images
 import main
-import os_handler
 import skypedata
 import util
 import wordcloud
@@ -69,8 +72,9 @@ import workers
 import wx_accel
 
 
-"""Custom application event for worker results."""
+"""Custom application events for worker results."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
+ContactWorkerEvent, EVT_CONTACT_WORKER = wx.lib.newevent.NewEvent()
 
 
 
@@ -99,8 +103,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.frame_console.SetIcons(icons)
         self.console.run("# Additional Skyperious modules:")
-        self.console.run("import controls, export, images, os_handler, "
-            "skypedata, wordcloud, workers"
+        self.console.run("import controls, export, images, skypedata,"
+            "wordcloud, workers"
         )
 
         notebook = self.notebook = wx.Notebook(
@@ -129,6 +133,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
 
+        self.skype_handler = SkypeHandler()
         # Memory file system for feeding avatar images to HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
         wx.FileSystem_AddHandler(self.memoryfs["handler"])
@@ -142,6 +147,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         else:
             self.Center(wx.HORIZONTAL)
             self.Position.top = 50
+        i, n = self.list_db.GetFirstSelected(), self.list_db.CountPerPage
+        self.list_db.ScrollLines(i - n + 1)
         self.list_db.SetFocus()
         self.Show(True)
 
@@ -266,7 +273,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         button_clear.SetToolTipString("Empties the database list.")
         button_clear.Bind(wx.EVT_BUTTON, self.on_clear_databases)
         button_clear.Enabled = False
-        button_exit = self.button_find = wx.Button(
+        button_exit = self.button_exit = wx.Button(
             parent=page, label="Exit", size=(150, -1)
         )
         button_exit.SetToolTipString("Exits the application.")
@@ -283,7 +290,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         sizer_buttons.Add(button_copy, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_remove, border=5, flag=wx.ALL)
         sizer_buttons.Add(button_clear, border=5, flag=wx.ALL)
-        sizer_buttons.AddSpacer(5)
+        sizer_buttons.AddStretchSpacer()
         sizer_buttons.Add(
             button_exit, border=5, flag=wx.wx.LEFT | wx.RIGHT | wx.TOP
         )
@@ -298,18 +305,24 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             style=wx.ALIGN_CENTER
         )
         infotext.font = wx.Font(6, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
-            wx.FONTWEIGHT_NORMAL, face="Tahoma")
+            wx.FONTWEIGHT_NORMAL, face=self.Font.FaceName)
         sizer.Add(label_list, border=5, flag=wx.TOP | wx.LEFT)
         sizer.Add(sizer_sides,
             border=5, proportion=1, flag=wx.LEFT | wx.RIGHT | wx.GROW
         )
         sizer.Add(
-            infotext, border=5, flag=wx.ALL | wx.GROW | wx.ALIGN_CENTER
+            infotext, border=5, flag=wx.TOP | wx.GROW | wx.ALIGN_CENTER
         )
+        sizer_footer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_footer.Add(wx.StaticText(parent=page, label=conf.VersionText))
+        hyperlink = wx.HyperlinkCtrl(parent=page, id=wx.NewId(),
+                                     label="github", url=conf.HomeUrl)
+        hyperlink.SetToolTipString(conf.HomeUrl)
+        sizer_footer.Add(hyperlink, border=5, flag=wx.LEFT)
+        sizer.Add(sizer_footer, border=10, flag=wx.ALL | wx.ALIGN_CENTER)
 
         for filename in conf.DBFiles:
             self.update_database_list(filename)
-
 
         class FileDrop(wx.FileDropTarget):
             """A simple file drag-and-drop handler for application window."""
@@ -489,7 +502,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 main.log("%s when trying to copy %s to %s.",
                     e, original, newpath
                 )
-                if os_handler.is_skype_running():
+                if self.skype_handler.is_running():
                     response = wx.MessageBox(
                         "Could not save a copy of \"%s\" as \"%s\".\n\n" \
                         "Probably because Skype is running. "
@@ -497,7 +510,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
                     )
                     if wx.OK == response:
-                        os_handler.shutdown_skype()
+                        self.skype_handler.shutdown()
                         success, _ = util.try_until(
                             lambda: shutil.copyfile(original, newpath)
                         )
@@ -547,18 +560,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler on clicking to launch Skype, tries to determine Skype path and
         set the application running.
         """
-        if os_handler.handler:
-            if not os_handler.launch_skype():
-                wx.MessageBox(
-                    "Did not manage to launch Skype from inside %s, sorry." \
-                    % conf.Title,
-                    conf.Title, wx.OK | wx.ICON_INFORMATION
-                )
-        else:
-            wx.MessageBox(
-                "Launching only works in Windows, sorry.",
-                conf.Title, wx.OK | wx.ICON_INFORMATION
-            )
+        self.skype_handler.launch()
 
 
     def on_shutdown_skype(self, event):
@@ -566,7 +568,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler on clicking to shut down Skype, posts a message to the running
         Skype application to close itself.
         """
-        os_handler.shutdown_skype()
+        self.skype_handler.shutdown()
 
 
     def on_detect_databases(self, event):
@@ -601,12 +603,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if dbs:
                 busy = controls.ProgressPanel(
                     self, "Exporting all chats from %s as %s\ninto separate " \
-                    "folders under %s." % (util.plural("database", len(dbs)),
+                    "folders under %s." % (util.plural("database", dbs),
                     extname.upper(), dirname)
                 )
                 main.logstatus("Exporting all chats from %s as %s " \
                     "into separate folders under %s.",
-                    util.plural("database", len(dbs)), extname.upper(), dirname
+                    util.plural("database", dbs), extname.upper(), dirname
                 )
                 wx.GetApp().Yield(True) # Allow UI to refresh
                 errormsg = False
@@ -627,11 +629,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 chats = db.get_conversations()
                 busy = controls.ProgressPanel(
                     self, "Exporting all %s from \"%s\"\nas %s\nunder %s." %
-                    (util.plural("chat", len(chats)), db.filename,
+                    (util.plural("chat", chats), db.filename,
                     extname.upper(), db_dirname)
                 )
                 main.logstatus("Exporting all %s from %s as %s under %s.",
-                    util.plural("chat", len(chats)),
+                    util.plural("chat", chats),
                     db.filename, extname.upper(), db_dirname
                 )
                 wx.GetApp().Yield(True) # Allow UI to refresh
@@ -656,18 +658,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 except Exception, e:
                     errormsg = "An unexpected error occurred when saving " \
                                "all %s from \"%s\" as %s under %s: %s" % (
-                               util.plural("chat", len(chats)),
+                               util.plural("chat", chats),
                                extname.upper(), db_dirname, e)
                 busy.Close()
                 if not errormsg:
                     main.logstatus("Exported all %s from %s as %s under %s.",
-                        util.plural("chat", len(chats)), db.filename,
+                        util.plural("chat", chats), db.filename,
                         extname.upper(), db_dirname
                     )
                 else:
                     main.logstatus(
                         "Failed to export all %s from %s as %s under %s.",
-                        util.plural("chat", len(chats)), db.filename,
+                        util.plural("chat", chats), db.filename,
                         extname.upper(), db_dirname
                     )
                     wx.MessageBox(errormsg,
@@ -678,7 +680,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.dbs[db.filename]
                 db.close()
             if dbs and not errormsg:
-                os_handler.start_file(dirname if len(dbs) > 1 else db_dirname)
+                util.start_file(dirname if len(dbs) > 1 else db_dirname)
             self.update_database_list()
 
 
@@ -773,7 +775,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
     def on_sort_dblist(self, event):
-        """Handler for clicking to sort the database list, saves new o"""
+        """Handler for clicking to sort the database list, saves new order."""
         event.Skip()
         wx.CallAfter(self.save_dblist)
 
@@ -935,7 +937,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                             is_accessible = True
                     except Exception, e:
                         pass
-                    if not is_accessible and os_handler.is_skype_running():
+                    if not is_accessible and self.skype_handler.is_running():
                         #wx.GetApp().Yield(True) # Allow UI to refresh
                         response = wx.MessageBox(
                             "Could not open %s.\n\n"
@@ -944,7 +946,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                             conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
                         )
                         if wx.OK == response:
-                            os_handler.shutdown_skype()
+                            self.skype_handler.shutdown()
                             try_result, db = util.try_until(lambda:
                                 skypedata.SkypeDatabase(filename, False)
                             )
@@ -1005,7 +1007,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if db:
                 main.status("Opening Skype database file %s." % db)
                 tab_title = self.get_unique_tab_title(db.filename)
-                page = DatabasePage(self.notebook, db, self.memoryfs,tab_title)
+                page = DatabasePage(self.notebook, tab_title, db,
+                                    self.memoryfs, self.skype_handler)
                 page.Bind(wx.EVT_CLOSE, self.on_close_page)
                 self.db_pages[page] = db
                 self.UpdateAccelerators()
@@ -1058,13 +1061,14 @@ class DatabasePage(wx.Panel):
     viewing-changing tables.
     """
 
-    def __init__(self, parent_notebook, db, memoryfs, title):
+    def __init__(self, parent_notebook, title, db, memoryfs, skype_handler):
         wx.Panel.__init__(self, parent=parent_notebook)
         self.parent_notebook = parent_notebook
+        self.Label = title
         self.db = db
         self.db.register_consumer(self)
         self.memoryfs = memoryfs
-        self.Label = title
+        self.skype_handler = skype_handler
         parent_notebook.InsertPage(1, self, title)
         for i in range(parent_notebook.GetPageCount()):
             if parent_notebook.GetPage(i) == self:
@@ -1087,8 +1091,13 @@ class DatabasePage(wx.Panel):
         self.search_data = {"id": None} # Current search data {"text", "db", }
         self.results_html = "" # Partially assembled HTML for current results
         self.Bind(EVT_WORKER, self.on_searchall_result)
-        self.worker_search = workers.SearchThread(self.on_searchall_callback)
         self.searchall_map = {} # {Link ID: search data} for html_searchall
+
+        self.Bind(EVT_CONTACT_WORKER, self.on_search_contacts_result)
+        self.worker_search = workers.SearchThread(self.on_searchall_callback)
+        self.worker_search_contacts = \
+            workers.ContactSearchThread(self.on_search_contacts_callback)
+        self.search_data_contact = {"id": None} # Current contacts search data
 
         self.Bind(wx.EVT_CLOSE, self.on_close, self)
 
@@ -1121,17 +1130,23 @@ class DatabasePage(wx.Panel):
         idx2 = il.Add(images.IconSearch.GetBitmap())
         idx3 = il.Add(images.IconDatabase.GetBitmap())
         idx4 = il.Add(images.IconSQL.GetBitmap())
+        idx5 = il.Add(images.IconContacts.GetBitmap())
+        idx6 = il.Add(images.IconInfo.GetBitmap())
         notebook.AssignImageList(il)
 
         self.create_page_chats(notebook)
         self.create_page_search(notebook)
         self.create_page_tables(notebook)
         self.create_page_sql(notebook)
+        self.create_page_import_contacts(notebook)
+        self.create_page_info(notebook)
 
         notebook.SetPageImage(0, idx1)
         notebook.SetPageImage(1, idx2)
         notebook.SetPageImage(2, idx3)
         notebook.SetPageImage(3, idx4)
+        notebook.SetPageImage(4, idx5)
+        notebook.SetPageImage(5, idx6)
 
         sizer.Add(sizer_header,
             border=5, flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW
@@ -1143,6 +1158,13 @@ class DatabasePage(wx.Panel):
             defaultDir=os.getcwd(),
             defaultFile="",
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
+        self.dialog_importfile = wx.FileDialog(
+            parent=self,
+            message="Select contacts file",
+            defaultDir=os.getcwd(),
+            wildcard="CSV spreadsheet (*.csv)|*.csv|All files (*.*)|*.*",
+            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER
         )
 
         self.TopLevelParent.page_db_latest = self
@@ -1156,10 +1178,10 @@ class DatabasePage(wx.Panel):
         # Layout() required, otherwise sizers do not start working
         # automatically as it's late creation
         self.Layout()
-        #wx.GetApp().Yield(True) # Allow UI to refresh before loading data
+        # Hack to get info-page multiline TextCtrls to layout without quirks
+        notebook.Selection = notebook.PageCount - 1
+        notebook.Selection = 0
         self.load_data()
-        # 2nd Layout() seems also required
-        self.Layout()
         busy.Close()
         self.toggle_filter(True)
 
@@ -1622,6 +1644,280 @@ class DatabasePage(wx.Panel):
         )
 
 
+    def create_page_import_contacts(self, notebook):
+        """Creates a page for importing contacts from file."""
+        page = self.page_import_contacts = wx.Panel(parent=notebook)
+        notebook.AddPage(page, "Contacts+")
+        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
+        splitter = self.splitter_import = wx.SplitterWindow(
+            parent=page, style=wx.BORDER_NONE
+        )
+        splitter.SetMinimumPaneSize(50)
+
+        panel1 = wx.Panel(parent=splitter)
+        sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_header = wx.BoxSizer(wx.HORIZONTAL)
+
+        label_header = wx.StaticText(parent=panel1, 
+            label="Import people to your Skype contacts from a CSV file, "
+                  "like ones exported from MSN or GMail.\n\n"
+                  "For exporting your MSN contacts, log in to hotmail.com "
+                  "with your MSN account and find \"Export contacts\" under "
+                  "Options.\n"
+                  "For exporting your GMail contacts, log in to gmail.com and "
+                  "find \"Export...\" under \"Contacts\" -> \"More\"."
+        )
+        label_header.ForegroundColour = "grey"
+        button_import = self.button_import_file = \
+            wx.Button(panel1, label="Se&lect contacts file")
+        button_import.Bind(wx.EVT_BUTTON, self.on_choose_import_file)
+        sizer_header.Add(button_import, border=10,
+                         flag=wx.RIGHT | wx.ALIGN_CENTER_VERTICAL)
+        sizer_header.Add(label_header, border=60, flag=wx.LEFT)
+        label_source = self.label_import_source = \
+            wx.StaticText(parent=panel1, label="C&ontacts in source file:")
+        sourcelist = self.list_import_source = controls.SortableListView(
+            parent=panel1, style=wx.LC_REPORT
+        )
+        source_columns = ["Name", "E-mail", "Phone"]
+        sourcelist.SetColumnCount(len(source_columns))
+        for col, name in enumerate(source_columns):
+            sourcelist.InsertColumn(col + 1, name)
+        sourcelist.Bind(wx.EVT_LIST_ITEM_SELECTED,
+                        self.on_select_import_sourcelist)
+        sourcelist.Bind(wx.EVT_LIST_ITEM_DESELECTED,
+                        self.on_select_import_sourcelist)
+        sourcelist.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
+                        self.on_import_search)
+
+        sizer1.Add(sizer_header, border=5, flag=wx.ALL)
+        sizer1.Add(label_source, border=5, flag=wx.ALL)
+        sizer1.Add(sourcelist, border=5, proportion=1,
+                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
+
+        panel2 = wx.Panel(parent=splitter)
+        sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
+        button_search_selected = self.button_import_search_selected = \
+            wx.Button(panel2, label="&Search for selected contacts in Skype")
+        button_select_all = self.button_import_select_all = \
+            wx.Button(panel2, label="Select &all")
+        self.Bind(wx.EVT_BUTTON, self.on_import_search, button_search_selected)
+        self.Bind(wx.EVT_BUTTON, self.on_import_select_all, button_select_all)
+        button_search_selected.SetToolTipString("Search for the selected "
+            "contacts through the running Skype application."
+        )
+        button_search_selected.Enabled = button_select_all.Enabled = False
+        label_search = wx.StaticText(parent=panel2, label="F&ree search:")
+        edit_search = self.edit_import_search_free = wx.TextCtrl(
+            parent=panel2, size=(100, -1), style=wx.TE_PROCESS_ENTER
+        )
+        button_search_free = self.button_import_search_free = \
+            wx.Button(panel2, label="Search in Skype")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_import_search, edit_search)
+        self.Bind(wx.EVT_BUTTON, self.on_import_search, button_search_free)
+        for control in [label_search, edit_search, button_search_free]:
+            control.SetToolTipString("Search for the entered value in "
+                                     "Skype userbase.")
+
+        sizer_buttons.Add(button_search_selected, flag=wx.ALIGN_LEFT)
+        sizer_buttons.Add(button_select_all, border=5, flag=wx.LEFT)
+        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.Add(label_search, flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_buttons.Add(edit_search, border=5, flag=wx.LEFT)
+        sizer_buttons.Add(button_search_free, border=5, flag=wx.LEFT)
+
+        label_searchinfo = wx.StaticText(parent=panel2,
+            label="Skype will be launched if not already running. Might bring "
+                  "up a notification screen in Skype to allow access for "
+                  "Skyperious.\n"
+                  "Searching for many contacts at once can take a long time.")
+        label_searchinfo.ForegroundColour = "grey"
+
+        sizer_resultlabel = wx.BoxSizer(wx.HORIZONTAL)
+        label_result = self.label_import_result = \
+            wx.StaticText(parent=panel2, label="Contacts found in Sk&ype:")
+        resultlist = self.list_import_result = \
+            controls.SortableListView(parent=panel2, style=wx.LC_REPORT)
+        result_columns = ["#", "Name", "Skype handle", "Already added",
+            "Phone", "City", "Country", "Gender", "Birthday", "Language"]
+        resultlist.SetColumnCount(len(result_columns))
+        for col, name in enumerate(result_columns):
+            resultlist.InsertColumn(col + 1, name)
+
+        resultlist.Bind(
+            wx.EVT_LIST_ITEM_SELECTED,   self.on_select_import_resultlist)
+        resultlist.Bind(
+            wx.EVT_LIST_ITEM_DESELECTED, self.on_select_import_resultlist)
+        resultlist.Bind(wx.EVT_LIST_ITEM_ACTIVATED,self.on_import_add_contacts)
+
+        sizer_footer = wx.BoxSizer(wx.HORIZONTAL)
+        button_add = self.button_import_add = \
+            wx.Button(panel2, label="A&dd the selected to your Skype contacts")
+        button_clear = self.button_import_clear = \
+            wx.Button(panel2, label="Clear selected from list")
+        self.Bind(wx.EVT_BUTTON, self.on_import_add_contacts, button_add)
+        self.Bind(wx.EVT_BUTTON, self.on_import_clear_contacts, button_clear)
+        button_add.SetToolTipString("Opens an authorization request in Skype")
+        button_add.Enabled = button_clear.Enabled = False
+        sizer_footer.Add(button_add, flag=wx.ALIGN_LEFT)
+        sizer_footer.AddStretchSpacer()
+        sizer_footer.Add(button_clear, flag=wx.ALIGN_RIGHT)
+
+        sizer2.Add(sizer_buttons, border=5, flag=wx.GROW | wx.ALL)
+        sizer_resultlabel.Add(label_result, flag=wx.ALIGN_BOTTOM)
+        sizer_resultlabel.Add(label_searchinfo, border=60, flag=wx.LEFT)
+        sizer2.Add(sizer_resultlabel, border=5, flag=wx.ALL)
+        sizer2.Add(resultlist, border=5, proportion=1,
+                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
+        sizer2.Add(sizer_footer, border=5, flag=wx.GROW | wx.ALL)
+
+        sizer.Add(splitter, proportion=1, flag=wx.GROW)
+        splitter.SplitHorizontally(
+            panel1, panel2, sashPosition=self.Size[1] / 3
+        )
+
+
+    def create_page_info(self, notebook):
+        """Creates a page for seeing general database information."""
+        page = self.page_info = wx.Panel(parent=notebook)
+        notebook.AddPage(page, "Information")
+        sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        panel1 = wx.Panel(parent=page)
+        panel2 = wx.Panel(parent=page)
+        panel1.BackgroundColour = panel2.BackgroundColour = wx.WHITE
+        sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_account = wx.BoxSizer(wx.HORIZONTAL)
+        label_account = wx.StaticText(parent=panel1,
+                                      label="Main account information")
+        label_account.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
+            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, face=self.Font.FaceName)
+        sizer1.Add(label_account, border=5, flag=wx.ALL)
+
+        account = self.db.account or {}
+        bmp_panel = wx.Panel(parent=panel1)
+        bmp_panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        raw = account.get("avatar_image", "").encode("latin1")
+        if raw.startswith("\0"):
+            # For some reason, Skype avatar image blobs
+            # start with a null byte, unsupported by wx
+            raw = raw[1:]
+        if raw:
+            image = wx.ImageFromStream(cStringIO.StringIO(raw))
+            bmp = wx.BitmapFromImage(image)
+        else:
+            bmp = images.AvatarDefaultLarge.Bitmap
+        bmp_static = wx.StaticBitmap(bmp_panel, bitmap=bmp)
+        sizer_accountinfo = wx.FlexGridSizer(cols=2, hgap=10, vgap=3)
+        fields = ["fullname", "skypename", "mood_text", "phone_mobile",
+                  "phone_home", "phone_office", "emails", "country",
+                  "province", "city", "homepage", "gender", "birthday",
+                  "languages", "nrof_authed_buddies", "about",
+                  "skypeout_balance", ]
+        titles = ["Full name", "Skype name", "Mood", "Mobile phone",
+                  "Home phone", "Office phone", "E-mails", "Country",
+                  "Province", "City", "Website", "Gender", "Birth date",
+                  "Languages", "Contacts", "About me",
+                  "SkypeOut balance"]
+        for field, title in zip(fields, titles):
+            if field in account and self.db.account[field]:
+                value = account[field]
+                if "emails" == field:
+                    value = ", ".join(value.split(" "))
+                elif "gender" == field:
+                    value = {1: "male", 2: "female"}.get(value, "")
+                elif "birthday" == field:
+                    try:
+                        value = str(value)
+                        value = "-".join([value[:4], value[4:6], value[6:]])
+                    except Exception, e:
+                        pass
+                if value:
+                    if "skypeout_balance" == field:
+                        value = value / (
+                                10.0 ** account.get("skypeout_precision", 2))
+                        value = "%s %s" % (value,
+                                account.get("skypeout_balance_currency", ""))
+                    if not isinstance(value, basestring):
+                        value = str(value) 
+                    lbltext = wx.StaticText(parent=panel1, label="%s:" % title)
+                    valtext = wx.TextCtrl(parent=panel1, value=value,
+                        style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+                    valtext.BackgroundColour = panel1.BackgroundColour
+                    valtext.SetEditable(False)
+                    lbltext.ForegroundColour = wx.Colour(102, 102, 102)
+                    sizer_accountinfo.Add(lbltext, border=5, flag=wx.LEFT)
+                    sizer_accountinfo.Add(valtext, proportion=1, flag=wx.GROW)
+
+        sizer_accountinfo.AddGrowableCol(1, 1)
+        bmp_panel.Sizer.Add(bmp_static, border=2, flag=wx.GROW | wx.TOP)
+        sizer_account.Add(bmp_panel, border=10, flag=wx.LEFT | wx.RIGHT)
+        sizer_account.Add(sizer_accountinfo, proportion=1, flag=wx.GROW)
+        sizer1.Add(sizer_account, border=20, proportion=1,
+                   flag=wx.TOP | wx.GROW)
+
+        sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_file = wx.FlexGridSizer(cols=2, hgap=10, vgap=3)
+        label_file = wx.StaticText(parent=panel2,
+                                   label="Database file information")
+        label_file.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
+                                  wx.FONTWEIGHT_BOLD, face=self.Font.FaceName)
+        sizer2.Add(label_file, border=5, flag=wx.ALL)
+
+        names = ["edit_info_name", "edit_info_size", "edit_info_modified",
+                 "edit_info_sha1", "edit_info_md5"]
+        labels = ["Full path", "File size", "Last modified",
+                  "SHA-1 checksum", "MD5 checksum"]
+        for i, (name, label) in enumerate(zip(names, labels)):
+            labeltext = wx.StaticText(parent=panel2, label="%s:" % label)
+            labeltext.ForegroundColour = wx.Colour(102, 102, 102)
+            valuetext = wx.TextCtrl(parent=panel2, value="Analyzing..",
+                style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+            valuetext.BackgroundColour = panel2.BackgroundColour
+            valuetext.SetEditable(False)
+            sizer_file.Add(labeltext, border=5, flag=wx.LEFT)
+            sizer_file.Add(valuetext, proportion=1, flag=wx.GROW)
+            setattr(self, name, valuetext)
+        self.edit_info_name.Value = self.db.filename
+        sizer_file.AddSpacer(10)
+        button_refresh = self.button_refresh_fileinfo = \
+            wx.Button(parent=panel2, label="Refresh")
+        button_refresh.Enabled = False
+        sizer_file.Add(button_refresh)
+        self.Bind(wx.EVT_BUTTON, lambda e: self.update_file_info(),
+                  button_refresh)
+
+        sizer_file.AddGrowableCol(1, 1)
+        sizer2.Add(sizer_file, border=20, proportion=1, flag=wx.TOP | wx.GROW)
+
+        sizer.Add(panel1, proportion=1, border=5,
+                  flag=wx.LEFT  | wx.TOP | wx.BOTTOM | wx.GROW)
+        sizer.Add(panel2, proportion=1, border=5,
+                  flag=wx.RIGHT | wx.TOP | wx.BOTTOM | wx.GROW)
+
+
+    def update_file_info(self):
+        """Updates the file page with current data."""
+        self.edit_info_size.Value = "%s (%s bytes)" % \
+            (util.format_bytes(self.db.filesize), self.db.filesize)
+        self.edit_info_modified.Value = \
+            self.db.last_modified.strftime("%Y-%m-%d %H:%M:%S")
+        BLOCKSIZE = 1048576
+        sha1, md5 = hashlib.sha1(), hashlib.md5()
+        try:
+            with open(self.db.filename, "rb") as f:
+                buf = f.read(BLOCKSIZE)
+                while len(buf):
+                    sha1.update(buf), md5.update(buf)
+                    buf = f.read(BLOCKSIZE)
+            self.edit_info_sha1.Value = sha1.hexdigest()
+            self.edit_info_md5.Value = md5.hexdigest()
+        except Exception, e:
+            self.edit_info_sha1.Value = self.edit_info_md5.Value = u"%s" % e
+        self.button_refresh_fileinfo.Enabled = True
+
+
     def on_change_page(self, event):
         """
         Handler on changing notebook page, saves/restores the search
@@ -1643,6 +1939,202 @@ class DatabasePage(wx.Panel):
                 h.GetScrollPos(wx.HORIZONTAL), h.GetScrollPos(wx.VERTICAL)
             ]
         event.Skip() # Pass event along to next handler
+
+
+    def on_choose_import_file(self, event):
+        """Handler for clicking to choose a CSV file for contact import."""
+        contacts = None
+        if wx.ID_OK == self.dialog_importfile.ShowModal():
+            filename = self.dialog_importfile.GetPath()
+            try:
+                contacts = skypedata.import_contacts_file(filename)
+            except Exception, e:
+                wx.MessageBox(
+                    "Error reading \"%s\".\n\n%s" % (filename, e),
+                    conf.Title, wx.OK | wx.ICON_WARNING
+                )
+        if contacts is not None:
+            while self.list_import_source.ItemCount:
+                self.list_import_source.DeleteItem(0)
+            while self.list_import_result.ItemCount:
+                self.list_import_result.DeleteItem(0)
+            self.button_import_add.Enabled = False
+            self.button_import_clear.Enabled = False
+            self.button_import_search_selected.Enabled = False
+            for i, contact in enumerate(contacts):
+                cols = [contact[key] for key in ["name", "e-mail", "phone"]]
+                self.list_import_source.PopulateRow(i, cols, contact)
+            self.label_import_source.Label = \
+                "C&ontacts in source file %s [%s]:" % (filename, len(contacts))
+            self.label_import_result.Label = "Contacts found in Sk&ype:"
+            self.button_import_select_all.Enabled = len(contacts)
+            if self.list_import_source.ItemCount:
+                for i in range(self.list_import_source.ColumnCount):
+                    self.list_import_source.SetColumnWidth(i, wx.LIST_AUTOSIZE)
+            main.logstatus("Found %s in file %s.",
+                           util.plural("contact", contacts), filename)
+
+
+    def on_select_import_sourcelist(self, event):
+        """
+        Handler when a row is selected in the import contacts source list,
+        enables UI buttons.
+        """
+        count = self.list_import_source.GetSelectedItemCount()
+        self.button_import_search_selected.Enabled = (count > 0)
+
+
+    def on_select_import_resultlist(self, event):
+        """
+        Handler when a row is selected in the import contacts result list,
+        enables UI buttons.
+        """
+        count = self.list_import_result.GetSelectedItemCount()
+        self.button_import_add.Enabled = (count > 0)
+        self.button_import_clear.Enabled = (count > 0)
+
+
+    def on_import_select_all(self, event):
+        """Handler for clicking to select all imported contacts."""
+        map(self.list_import_source.Select,
+            range(self.list_import_source.ItemCount))
+        self.list_import_source.SetFocus()
+
+
+    def on_import_search(self, event):
+        """
+        Handler for choosing to search Skype for contacts in the import source
+        list.
+        """
+        search_values = []
+        lst, lst2 = self.list_import_source, self.list_import_result
+        if event.EventObject in [self.button_import_search_free,
+                                 self.edit_import_search_free]:
+            value = self.edit_import_search_free.Value.strip()
+            if value:
+                search_values.append(value)
+                infotext = "Searching Skype userbase for \"%s\"." % value
+        else:
+            values_unique, contacts_unique = set(), set()
+            selected = lst.GetFirstSelected()
+            while selected >= 0:
+                contact = lst.GetItemMappedData(selected)
+                for key in ["name", "phone", "e-mail"]:
+                    if contact[key] and contact[key] not in values_unique:
+                        search_values.append(contact[key])
+                        values_unique.add(contact[key])
+                        contacts_unique.add(id(contact))
+                selected = lst.GetNextSelected(selected)
+            info = "\"%s\"" % "\", \"".join(search_values)
+            if len(info) > 60:
+                info = info[:60] + ".."
+            infotext = "Searching Skype userbase for %s (%s)." \
+                        % (util.plural("contact", contacts_unique), info)
+        if search_values:
+            main.logstatus(infotext)
+            while lst2.ItemCount:
+                lst2.DeleteItem(0)
+            self.button_import_add.Enabled = False
+            self.button_import_clear.Enabled = False
+
+            found = {} # { Skype handle: user data, }
+            data = {"id": wx.NewId(), "handler": self.skype_handler,
+                    "values": search_values}
+            self.search_data_contact.update(data)
+            self.worker_search_contacts.work(data)
+            self.label_import_result.Label = "Contacts found in Sk&ype:"
+
+
+    def on_search_contacts_result(self, event):
+        """
+        Handler for getting results from contact search thread, adds the
+        results to the import list.
+        """
+        result = event.result
+        # If search ID is different, results are from the previous search still
+        lst2 = self.list_import_result
+        if result["search"]["id"] == self.search_data_contact["id"]:
+            lst2.Freeze()
+            scrollpos = lst2.GetScrollPos(wx.VERTICAL)
+
+            for user in result["results"]:
+                index = lst2.ItemCount + 1
+                cols, data = [index], {"user": user, "#": index}
+                for k in ["FullName", "Handle", "IsAuthorized", "PhoneMobile",
+                          "City", "Country", "Sex", "Birthday", "Language"]:
+                    val = getattr(user, k)
+                    if "IsAuthorized" == k:
+                        val = "Yes" if val else "No"
+                    elif "Sex" == k:
+                        val = "" if ("UNKNOWN" == val) else val.lower()
+                    cols.append(unicode(val) if val else "")
+                    data[k] = val
+                index = lst2.ItemCount
+                lst2.PopulateRow(index, cols, data)
+                if user.IsAuthorized:
+                    lst2.SetItemTextColour(index, "gray")
+            if lst2.ItemCount:
+                for i in range(lst2.ColumnCount):
+                    lst2.SetColumnWidth(i, wx.LIST_AUTOSIZE)
+                    if lst2.GetColumnWidth(i) < 60:
+                        lst2.SetColumnWidth(i, wx.LIST_AUTOSIZE_USEHEADER)
+
+            lst2.SetScrollPos(wx.VERTICAL, scrollpos)
+            lst2.Thaw()
+            self.label_import_result.Label = \
+                "Contacts found in Sk&ype [%s]:" % lst2.ItemCount
+            if "done" in result:
+                main.logstatus("Found %s in Skype userbase.",
+                               util.plural("contact", lst2.ItemCount))
+            lst2.Update()
+
+
+    def on_import_add_contacts(self, event):
+        """
+        Handler for adding an imported contact in Skype, opens an authorization
+        request window in Skype.
+        """
+        lst = self.list_import_result
+        selected, contacts = lst.GetFirstSelected(), []
+        while selected >= 0:
+            contacts.append(lst.GetItemMappedData(selected))
+            selected = lst.GetNextSelected(selected)
+        info = ", ".join([c["Handle"] for c in contacts])
+        if len(info) > 60:
+            info = info[:60] + ".."
+        msg = "Add %s to your Skype contacts (%s)?" % (
+              util.plural("person", contacts), info)
+        if wx.OK == wx.MessageBox(msg,
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ):
+            busy = controls.ProgressPanel(self,
+                "Adding %s to your Skype contacts." \
+                % util.plural("person", contacts)
+            )
+            self.skype_handler.add_to_contacts(c["user"] for c in contacts)
+            busy.Close()
+            main.logstatus("Added %s to your Skype contacts (%s).",
+                           util.plural("person", contacts), info)
+
+
+    def on_import_clear_contacts(self, event):
+        """
+        Handler for clicking to remove selected items from contact import
+        result list.
+        """
+        selected,selecteds = self.list_import_result.GetFirstSelected(), []
+        while selected >= 0:
+            selecteds.append(selected)
+            selected = self.list_import_result.GetNextSelected(selected)
+        for i in range(len(selecteds)):
+            # - i, as item count is getting smaller one by one
+            selected = selecteds[i] - i
+            data = self.list_import_result.GetItemMappedData(selected)
+            self.list_import_result.DeleteItem(selected)
+        self.label_import_result.Label = "Contacts found in Sk&ype [%s]:" \
+                                         % self.list_import_result.ItemCount
+        self.button_import_add.Enabled = False
+        self.button_import_clear.Enabled = False
 
 
     def on_export_chat(self, event):
@@ -1669,7 +2161,7 @@ class DatabasePage(wx.Panel):
             busy.Close()
             if export_result:
                 main.logstatus("Exported %s.", filename)
-                os_handler.start_file(filename)
+                util.start_file(filename)
             else:
                 wx.MessageBox(
                     "Cannot access \"%s\"." % filename,
@@ -1694,11 +2186,11 @@ class DatabasePage(wx.Panel):
             extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
             busy = controls.ProgressPanel(
                 self, "Exporting all %s from \"%s\"\nas %s under %s." % 
-                (util.plural("chat", len(self.chats)), self.db.filename,
+                (util.plural("chat", self.chats), self.db.filename,
                 extname.upper(), dirname)
             )
             main.logstatus("Exporting all %s from %s as %s under %s.",
-                util.plural("chat", len(self.chats)),
+                util.plural("chat", self.chats),
                 self.db.filename, extname.upper(), dirname
             )
             errormsg = False
@@ -1720,19 +2212,19 @@ class DatabasePage(wx.Panel):
             except Exception, e:
                 errormsg = "An unexpected error occurred when saving all " \
                            "%s from \"%s\" as %s under %s: %s" % (
-                           util.plural("chat", len(self.chats)),
+                           util.plural("chat", self.chats),
                            extname.upper(), dirname, e)
             busy.Close()
             if not errormsg:
                 main.logstatus("Exported all %s from %s as %s under %s.",
-                    util.plural("chat", len(self.chats)), self.db.filename,
+                    util.plural("chat", self.chats), self.db.filename,
                     extname.upper(), dirname
                 )
-                os_handler.start_file(dirname)
+                util.start_file(dirname)
             else:
                 main.logstatus(
                     "Failed to export all %s from %s as %s under %s.",
-                    util.plural("chat", len(self.chats)), self.db.filename,
+                    util.plural("chat", self.chats), self.db.filename,
                     extname.upper(), dirname
                 )
                 wx.MessageBox(errormsg,
@@ -1776,7 +2268,7 @@ class DatabasePage(wx.Panel):
                 busy.Close()
                 if export_result:
                     main.logstatus("Exported %s.", filename)
-                    os_handler.start_file(filename)
+                    util.start_file(filename)
                 else:
                     wx.MessageBox(
                         "Cannot access \"%s\"." % filename,
@@ -1884,7 +2376,7 @@ class DatabasePage(wx.Panel):
             filepath = urllib.url2pathname(href[5:])
             if filepath and os.path.exists(filepath):
                 #webbrowser.open("file://%s" % file["filepath"])
-                os_handler.start_file(filepath)
+                util.start_file(filepath)
             else:
                 messageBox(
                     "The file \"%s\" cannot be found on this computer." \
@@ -1912,7 +2404,7 @@ class DatabasePage(wx.Panel):
             if file:
                 if file["filepath"] and os.path.exists(file["filepath"]):
                     #webbrowser.open("file://%s" % file["filepath"])
-                    os_handler.start_file(file["filepath"])
+                    util.start_file(file["filepath"])
                 else:
                     messageBox(
                         "The file \"%s\" cannot be found on this computer." \
@@ -1965,6 +2457,11 @@ class DatabasePage(wx.Panel):
     def on_searchall_callback(self, result):
         """Callback function for SearchThread, posts the data to self."""
         wx.PostEvent(self, WorkerEvent(result=result))
+
+
+    def on_search_contacts_callback(self, result):
+        """Callback function for ContactSearchThread, posts the data to self."""
+        wx.PostEvent(self, ContactWorkerEvent(result=result))
 
 
     def on_searchall(self, event):
@@ -2243,7 +2740,7 @@ class DatabasePage(wx.Panel):
                 busy.Close()
                 if export_result:
                     main.logstatus("Exported %s.", filename)
-                    os_handler.start_file(filename)
+                    util.start_file(filename)
                 else:
                     wx.MessageBox(
                         "Cannot access \"%s\"." % filename,
@@ -2907,6 +3404,8 @@ class DatabasePage(wx.Panel):
         self.list_chats.Populate(column_map, self.chats)
         self.list_chats.SortListItems(4, 0) # Sort by last activity timestamp
         self.list_chats.OnSortOrderChanged()
+        # Chat name column can be really long, pushing all else out of view
+        self.list_chats.SetColumnWidth(0, 300)
 
         wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
 
@@ -2956,6 +3455,8 @@ class DatabasePage(wx.Panel):
                         people.append(p["contact"]["name"])
                     c["people"] = "%s (%s)" % (len(people), ", ".join(people))
             self.list_chats.RefreshItems()
+            # Chat name column can be really long, pushing all else out of view
+            self.list_chats.SetColumnWidth(0, 300)
             if self.chat:
                 # If the user already opened a chat while later data
                 # was loading, update the date range control values.
@@ -2966,6 +3467,7 @@ class DatabasePage(wx.Panel):
                     if self.chat["last_message_datetime"] else None
                 ]
                 self.range_date.SetRange(*date_range)
+            self.update_file_info()
         except Exception, e:
             # Database access can easily fail if the user closes the tab before
             # the later data has been loaded.
@@ -3108,7 +3610,7 @@ class MergerPage(wx.Panel):
 
         il = wx.ImageList(32, 32)
         idx1 = il.Add(images.IconMergeChats.GetBitmap())
-        idx2 = il.Add(images.IconMergeContacts.GetBitmap())
+        idx2 = il.Add(images.IconContacts.GetBitmap())
         idx3 = il.Add(images.IconMergeAll.GetBitmap())
         notebook.AssignImageList(il)
 
@@ -3394,9 +3896,9 @@ class MergerPage(wx.Panel):
             html.Thaw()
         if "done" in result:
             main.logstatus("Found %s in %s and %s in %s.",
-                util.plural("differing chat", len(self.chats_differing[0])),
+                util.plural("differing chat", self.chats_differing[0]),
                 self.db1,
-                util.plural("differing chat", len(self.chats_differing[1])),
+                util.plural("differing chat", self.chats_differing[1]),
                 self.db2
             )
             self.button_mergeall1.Enabled = \
@@ -3464,7 +3966,6 @@ class MergerPage(wx.Panel):
             for item in lst:
                 for t in ["c", "messages", "g"]:
                     # Swap left and right in data structures.
-                    # @todo make a better structure, allowing a single change.
                     if "%s1" % t in item and "%s2" % t in item:
                         item["%s1" % t], item["%s2" % t] = \
                             item["%s2" % t], item["%s1" % t]
@@ -3630,10 +4131,10 @@ class MergerPage(wx.Panel):
                 contacts.append(contacts_source[new])
         text_add = ""
         if contacts:
-            text_add += util.plural("contact", len(contacts))
+            text_add += util.plural("contact", contacts)
         if contactgroups:
             text_add += (" and " if contacts else "") \
-                       + util.plural("contact group", len(contactgroups))
+                       + util.plural("contact group", contactgroups)
         if (contacts or contactgroups) and wx.OK == wx.MessageBox(
                 "Copy %s\nfrom %s\ninto %s?" % (text_add, self.db1, self.db2),
                 conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION):
@@ -3675,7 +4176,7 @@ class MergerPage(wx.Panel):
             contacts = [self.con1diff, self.con2diff][i]
             if contacts:
                 text = "%s: %s.<br />" % (
-                    util.plural("new contact", len(contacts)),
+                    util.plural("new contact", contacts),
                     ", ".join(sorted([c["name"] for c in contacts]))
                 )
                 self.diffresults_html[i] += text
@@ -3710,13 +4211,13 @@ class MergerPage(wx.Panel):
                 contacts.append(contacts_source[new])
         info = ""
         if chats:
-            info += util.plural("chat", len(chats))
+            info += util.plural("chat", chats)
         if contacts:
             info += (" and " if info else "") \
-                 + util.plural("contact", len(contacts))
+                 + util.plural("contact", contacts)
         if contactgroups:
             info += (" and " if info else "") \
-                 + util.plural("contact group", len(contactgroups))
+                 + util.plural("contact group", contactgroups)
         proceed = wx.MessageBox(
             "Copy data of %s\nfrom %s\ninto %s?" % (info, db1, db2),
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
@@ -3811,7 +4312,7 @@ class MergerPage(wx.Panel):
             if new_chat:
                 info += "new chat with "
             if messages:
-                parts.append(util.plural("%smessage" % newstr, len(messages)))
+                parts.append(util.plural("%smessage" % newstr, messages))
             if participants:
                 # Add to contacts those that are new
                 cc2 = [db1.id, db2.id] + \
@@ -3819,9 +4320,9 @@ class MergerPage(wx.Panel):
                 contacts2 = [i["contact"] for i in participants
                     if "id" in i["contact"] and i["identity"] not in cc2]
                 if contacts2:
-                    parts.append(util.plural("new contact", len(contacts2)))
+                    parts.append(util.plural("new contact", contacts2))
                 parts.append(util.plural("%sparticipant" % newstr,
-                    len(participants)
+                    participants
                 ))
             for i in parts:
                 info += ("" if i == parts[0] else (
@@ -4059,10 +4560,10 @@ class MergerPage(wx.Panel):
                         else datetime_last.strftime("%Y-%m-%d %H:%M:%S")
                     label.Label += "%s.\n%s.\nFirst message at %s.\n" \
                         "Last message at %s.\n%s" % (
-                            util.plural("conversation", len(chats)),
+                            util.plural("conversation", chats),
                             util.plural("message", count_messages), 
                             datetext_first, datetext_last,
-                            util.plural("contact", len(contacts)), 
+                            util.plural("contact", contacts), 
                         )
                     if condiff:
                         label.Label += " (%d not present on the %s)" % (
@@ -4202,7 +4703,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             if url_range[-1] in self._filelinks:
                 def start_file(url):
                     if os.path.exists(url):
-                        os_handler.start_file(url)
+                        util.start_file(url)
                     else:
                         messageBox(
                             "The file \"%s\" cannot be found " \
@@ -4422,7 +4923,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     self._append_text(
                         m2["datetime"].strftime("%d.%m.%Y"), "bold")
                 self._append_text("  (%s).  " % util.plural(
-                                  "message", len(self._messages_current)))
+                                  "message", self._messages_current))
             if self._chat["message_count"]:
                 #self._actionlinks[self._stc.Length] = \
                 #    lambda: self._page.on_toggle_filter(None)
@@ -4679,7 +5180,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._center_message_index = \
                     len(message_range) - self._center_message_index
             #main.log("Conversation \"%s\": retrieved %s.",
-            #    chat["title_long"], util.plural("message", len(message_range))
+            #    chat["title_long"], util.plural("message", message_range)
             #)
 
         self._chat = chat
@@ -4871,6 +5372,54 @@ class DayHourDialog(wx.Dialog):
         days = self.text_days.Value
         hours = self.text_hours.Value
         return days, hours
+
+
+
+class SkypeHandler(Skype4Py.Skype):
+    """A convenience wrapper around Skype4Py functionality."""
+
+    def shutdown(self):
+        """Posts a message to the running Skype application to close itself."""
+        self.Client.Shutdown()
+
+
+    def is_running(self):
+        """Returns whether Skype is currently running."""
+        return self.Client.IsRunning
+
+
+    def launch(self):
+        """Tries to launch Skype."""
+        self.Client.Start()
+
+
+    def search_users(self, value):
+        """
+        Searches for users with the specified value (either name, phone or
+        e-mail) in the currently running Skype application.
+        """
+        if not self.is_running():
+            self.launch()
+        self.FriendlyName = conf.Title
+        self.Attach() # Should open a confirmation dialog in Skype
+
+        result = list(self.SearchForUsers(value))
+        return result
+
+
+    def add_to_contacts(self, users):
+        """
+        Adds the specified Skype4Py.User instances to Skype contacts in the
+        currently running Skype application.
+        """
+        if not self.is_running():
+            self.launch()
+        self.FriendlyName = conf.Title
+        self.Attach() # Should open a confirmation dialog in Skype
+        for user in users:
+            user.BuddyStatus = Skype4Py.enums.budPendingAuthorization
+        self.Client.Focus()
+
 
 
 def messageBox(message, title, style):

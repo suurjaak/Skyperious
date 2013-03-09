@@ -7,6 +7,7 @@ It can open local Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
 - browse, filter and export chat histories, see chat statistics
+- import contacts from a CSV file to your Skype contacts
 - view any database table and export their data
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -48,10 +49,9 @@ these 3rd-party Python packages:
 * Python Imaging Library, required by wxPython
   (http://www.pythonware.com/products/pil/)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
-* BeautifulSoup 3.2.0, already included
+* Skype4Py, (https://github.com/awahlig/skype4py)
+* BeautifulSoup 3.2.0, already included in source
   (http://www.crummy.com/software/BeautifulSoup)
-* pywin32, not required: used for launching/shutting down Skype
-  (https://sourceforge.net/projects/pywin32/)
 
 Skyperious also runs under Python 2.6 and wxPython 2.8, but with some quirks.
 

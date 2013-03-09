@@ -4,7 +4,7 @@ Functionality for exporting Skype data to external files.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.01.2013
+@modified    27.02.2013
 """
 
 import base64
@@ -32,7 +32,7 @@ GRID_HTML_HEADER = """<!DOCTYPE HTML><html>
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
     <meta name="Author" content="%(app)s">
     <title>%%(title)s</title>
-    <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,%(favicon)s"/>
+    <link rel="shortcut icon" type="image/png" href="data:image/png;base64,%(favicon)s"/>
     <style>
         * { font-family: %(font)s; font-size: 11px; }
         body {
