@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.03.2013
+@modified    26.03.2013
 """
 import datetime
 import locale
@@ -15,6 +15,7 @@ import sys
 import threading
 import wx
 import wx.html
+import wx.lib.agw.flatnotebook
 import wx.lib.embeddedimage
 import wx.lib.mixins.listctrl
 import wx.stc
@@ -1805,6 +1806,220 @@ class ProgressPanel(wx.Window):
         self.Hide()
         self.Parent.Refresh()
         self.Destroy()
+
+
+
+class TabbedHtmlWindow(wx.PyPanel):
+    """
+    HtmlWindow with tabs for different content pages.
+    """
+
+    def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
+                 size=wx.DefaultSize, style=wx.html.HW_DEFAULT_STYLE,
+                 name=wx.html.HtmlWindowNameStr):
+        wx.PyPanel.__init__(
+            self, parent=parent, pos=pos, size=size, style=style
+        )
+        # [{"title", "content", "id", "info", "scrollpos", "scrollrange"}]
+        self._tabs = []
+        self._delete_callback = None # Function called after deleting a tab
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
+            parent=self, size=(-1, 27),
+            agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
+                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
+                     wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
+                     wx.lib.agw.flatnotebook.FNB_VC8)
+        self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
+
+        self.Sizer.Add(self._notebook, flag=wx.GROW)
+        self.Sizer.Add(self._html, proportion=1, flag=wx.GROW)
+
+        # Monkey-patch object with contained HtmlWindow attributes
+        for name in ["Scroll", "GetScrollRange", "GetScrollPos"]:
+            setattr(self, name, getattr(self._html, name))
+
+        self._html.Bind(wx.EVT_SIZE, self._OnSize)
+        self._notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._OnChangeTab)
+        self._notebook.Bind(
+            wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CLOSING,
+            self._OnDeleteTab)
+        self._notebook.Bind(
+            wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_DROPPED,
+            self._OnDropTab)
+
+        self._html.Bind(wx.EVT_SCROLLWIN, self._OnScroll)
+
+        self._CreateTab(0, "") # Make default empty tab
+        self._notebook.Size = (self._notebook.Size[0], 27) # Room for tabs only
+
+        self.Layout()
+
+
+    def _OnSize(self, event):
+        """
+        Handler for sizing the HtmlWindow, sets new scroll position based
+        previously stored one (HtmlWindow loses its scroll position on resize).
+        """
+        if self._tabs:
+            tab = self._tabs[self._notebook.GetSelection()]
+            for i in range(2):
+                orient = wx.VERTICAL if i else wx.HORIZONTAL
+                # Division can be > 1 on first resizings, bound it to 1.
+                pos, rng = tab["scrollpos"][i], tab["scrollrange"][i]
+                ratio = pos / float(rng) if rng else 0.0
+                ratio = min(1, pos / float(rng) if rng else 0.0)
+                tab["scrollpos"][i] = ratio * self.GetScrollRange(orient)
+            # Execute scroll later as something resets it after this handler
+            try:
+                wx.CallLater(50, lambda:
+                    self.Scroll(*tab["scrollpos"]) if self else None
+                )
+            except:
+                pass # CallLater fails if not called from the main thread
+        event.Skip() # Allow event to propagate to wx handler
+
+
+
+    def _OnScroll(self, event):
+        """
+        Handler for scrolling the window, stores scroll position
+        (HtmlWindow loses it on resize).
+        """
+        event.Skip() # Propagate to wx handler and get updated results later
+        wx.CallAfter(self._StoreScrollPos)
+
+
+    def _StoreScrollPos(self):
+        """Stores the current scroll position for the current tab, if any."""
+        if self._tabs:
+            tab = self._tabs[self._notebook.GetSelection()]
+            tab["scrollpos"]   = [self.GetScrollPos(wx.HORIZONTAL),
+                                  self.GetScrollPos(wx.VERTICAL)]
+            tab["scrollrange"] = [self.GetScrollRange(wx.HORIZONTAL),
+                                  self.GetScrollRange(wx.VERTICAL)]
+        
+
+    def _OnChangeTab(self, event):
+        """Handler for selecting another tab in notebook, loads tab content."""
+        if self._tabs:
+            self.SetActiveTab(self._notebook.GetSelection())
+            # Forward event to TabbedHtmlWindow listeners
+            wx.PostEvent(self.GetEventHandler(), event)
+
+
+    def _OnDropTab(self, event):
+        """Handler for dropping a dragged tab."""
+        new, old = event.GetSelection(), event.GetOldSelection()
+        new = min(new, len(self._tabs) - 1) # Can go over the edge
+        if self._tabs and new != old and new >= 0:
+            self._tabs[old], self._tabs[new] = self._tabs[new], self._tabs[old]
+
+
+    def _OnDeleteTab(self, event):
+        """Handler for clicking in notebook to close a tab."""
+        if not self._tabs: 
+            event.Veto() # User clicked to delete the default page, cancel
+        else:
+            nb = self._notebook
+            tab = self._tabs[event.GetSelection()]
+            self._tabs.remove(tab)
+            if 1 == nb.GetPageCount(): # Was the only page,
+                nb.SetPageText(0, "")  # reuse as default empty tab
+                event.Veto()
+                self._html.SetPage("")
+                # Default empty tab has no closing X: remove X from tab style
+                style = nb.GetAGWWindowStyleFlag()
+                style ^= wx.lib.agw.flatnotebook.FNB_X_ON_TAB
+                nb.SetAGWWindowStyleFlag(style)
+            else:
+                index = min(nb.GetSelection(), nb.GetPageCount() - 2)
+                self.SetActiveTab(index)
+            if self._delete_callback:
+                self._delete_callback(tab)
+
+
+    def SetDeleteCallback(self, callback):
+        """Sets the function called after deleting a tab, with tab data."""
+        self._delete_callback = callback
+
+
+    def _CreateTab(self, index, title):
+        """Creates a new tab in the tab container at specified index."""
+        p = wx.Panel(parent=self, size=(0,0)) # Dummy empty window as notebook
+        p.Hide()                              # needs to have something to hold
+        self._notebook.InsertPage(index, page=p, text=title, select=True)
+        
+
+    def InsertTab(self, index, title, id, content, info):
+        """
+        Inserts a new tab with the specified title and content at the specified
+        index, and activates the new tab.
+        """
+        tab = {"title": title, "content": content, "id": id,
+               "scrollpos": [0, 0], "scrollrange": [0, 0], "info": info}
+        if self._tabs:
+            self._CreateTab(index, tab["title"])
+        else: # First real tab: fill the default empty one
+            self._notebook.SetPageText(0, tab["title"])
+            # Default empty tab had no closing X: add X to tab style
+            style = self._notebook.GetAGWWindowStyleFlag()
+            style |= wx.lib.agw.flatnotebook.FNB_X_ON_TAB
+            self._notebook.SetAGWWindowStyleFlag(style)
+
+        self._tabs.insert(index, tab)
+        self._html.Freeze()
+        self._html.SetPage(tab["content"])
+        self._html.Thaw()
+
+
+    def GetTabDataByID(self, id):
+        """Returns the data of the tab with the specified ID, or None."""
+        result = next((x for x in self._tabs if x["id"] == id), None)
+        return result
+
+
+    def SetTabDataByID(self, id, title, content, info, new_id=None):
+        """
+        Sets the title, content and info of the tab with the specified ID.
+
+        @param   info    additional info associated with the tab
+        @param   new_id  if set, tab ID is updated to this
+        """
+        tab = next((x for x in self._tabs if x["id"] == id), None)
+        if tab:
+            tab["title"], tab["content"], tab["info"] = title, content, info
+            if new_id is not None:
+                tab["id"] = new_id
+            self._notebook.SetPageText(self._tabs.index(tab), tab["title"])
+            self._notebook.Refresh()
+            if self._tabs[self._notebook.GetSelection()] == tab:
+                self._html.Freeze()
+                self._html.SetPage(tab["content"])
+                self._html.Scroll(*tab["scrollpos"])
+                self._html.Thaw()
+
+
+    def SetActiveTab(self, index):
+        """Sets active the tab at the specified index."""
+        tab = self._tabs[index]
+        self._notebook.SetSelection(index)
+        self._html.Freeze()
+        self._html.SetPage(tab["content"])
+        self._html.Scroll(*tab["scrollpos"])
+        self._html.Thaw()
+
+
+    def GetActiveTabData(self):
+        """Returns all the data for the active tab."""
+        if self._tabs:
+            return self._tabs[self._notebook.GetSelection()]
+
+
+    def GetTabCount(self):
+        """Returns the number of tabs (default empty tab is not counted)."""
+        return len(self._tabs)
 
 
 

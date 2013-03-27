@@ -5,7 +5,7 @@ conf.MainWindowModule.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.02.2013
+@modified    26.03.2013
 """
 import datetime
 import sys
@@ -28,8 +28,9 @@ def run():
     sys.modules["main"].deferred_status = deferred_status
 
     # Create application main window
-    app = wx.App()
+    app = wx.App(redirect=True) # stdout and stderr redirected to popup
     window = window_module.MainWindow()
+    app.SetTopWindow(window)    # stdout/stderr popup closes with MainWindow
     sys.modules["main"].window = window
 
     # Some debugging support

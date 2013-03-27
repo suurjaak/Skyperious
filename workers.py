@@ -4,7 +4,7 @@ Background workers for searching and diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    08.03.2013
+@modified    27.03.2013
 """
 import cStringIO
 import datetime
@@ -87,23 +87,43 @@ class SearchThread(WorkerThread):
                 parser = skypedata.MessageParser(search["db"])
                 # {"html": html with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
-                result = {"html": "", "map": {}, "search": search}
-                result_count = 0
                 counts = {"chats": 0, "contacts": 0, "messages": 0}
+                result = {"html": "", "map": {},
+                          "search": search, "counts": counts}
+                result_count = 0
+                search_text = search["text"]
+                # For matching chats with a name containing text
+                match_chatname = None
+                search_parts = re.split("(^|\s)chat\:([^\s]+)($|\s)",
+                    search_text, maxsplit=1, flags=re.IGNORECASE)
+                if len(search_parts) > 1:
+                    match_chatname = search_parts[2]
+                    search_parts[2:4] = []
+                    search_text = "".join(search_parts)
+                # For matching contacts with a name containing text
+                match_contact = None
+                search_parts = re.split("(^|\s)from\:([^\s]+)($|\s)",
+                    search_text, maxsplit=1, flags=re.IGNORECASE)
+                if len(search_parts) > 1:
+                    match_contact = search_parts[2]
+                    search_parts[2:4] = []
+                    search_text = "".join(search_parts)
+                search_text = search_text
                 # For finding matching items
-                pattern = re.compile(".*(%s)" % re.escape(search["text"]),
+                pattern = re.compile(".*(%s)" % re.escape(search_text),
                     re.IGNORECASE
                 )
                 # For replacing matching text with bolded text
                 pattern_replace = re.compile("(%s)+" % re.escape(
-                    search["text"]
+                    search_text
                 ), re.IGNORECASE)
                 chats = search["db"].get_conversations()
                 chats.sort(key=lambda x: x["title"])
                 chat_map = {} # {chat id: {chat data}}
                 for chat in chats:
                     chat_map[chat["id"]] = chat
-                    if "conversations" in search["tables"]:
+                    if "conversations" in search["tables"] \
+                    and not (match_chatname or match_contact):
                         title_matches = False
                         matching_authors = []
                         if pattern.match(chat["title"]):
@@ -155,18 +175,19 @@ class SearchThread(WorkerThread):
                             if not counts["chats"] % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 self._postback(result)
-                                result = {
-                                    "html": "", "map": {}, "search": search
-                                }
+                                result = {"html": "", "map": {},
+                                          "search": search, "counts": counts}
                     if self._stop_work:
                         break # break for chat in chats
                 if result["html"] and not self._drop_results:
                     self._postback(result)
-                    result = {"html": "", "map": {}, "search": search}
-                if not self._stop_work and "contacts" in search["tables"]:
+                    result = {"html": "", "map": {}, "search": search,
+                              "counts": counts}
+                if not self._stop_work and "contacts" in search["tables"] \
+                and not (match_chatname or match_contact):
                     contacts = search["db"].get_contacts()
-                    # Possibly more: country (ISO code, need map), birthday (base
-                    # has YYYYMMDD in integer field).
+                    # Possibly more: country (ISO code, need map), birthday
+                    # (base has YYYYMMDD in integer field).
                     match_fields = [
                         "displayname", "skypename", "province", "city",
                         "pstnnumber", "phone_home", "phone_office",
@@ -237,19 +258,21 @@ class SearchThread(WorkerThread):
                                 counts["contacts"] % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 self._postback(result)
-                                result = {
-                                    "html": "", "map": {}, "search": search
-                                }
+                                result = {"html": "", "map": {},
+                                          "search": search, "counts": counts}
                         if self._stop_work:
                             break # break for contact in contacts
                 if result["html"] and not self._drop_results:
                     self._postback(result)
-                    result = {"html": "", "map": {}, "search": search}
+                    result = {"html": "", "map": {}, "search": search,
+                              "counts": counts}
                 if not self._stop_work and "messages" in search["tables"]:
                     chat_messages = {} # {chat id: [message, ]}
                     chat_order = []    # [chat id, ]
                     messages = search["db"].get_messages(
-                        ascending=False, body_like=search["text"]
+                        ascending=False, body_like=search_text,
+                        author_like=match_contact, chat_like=match_chatname,
+                        use_cache=False
                     )
                     for m in messages:
                         chat = chat_map.get(m["convo_id"], None)
@@ -264,9 +287,9 @@ class SearchThread(WorkerThread):
                             m["timestamp"]).strftime("%d.%m.%Y %H:%M"
                         )
                         displayname = m["from_dispname"]
-                        body = parser.parse(m, pattern_replace, html={
-                            "w": search["window"].Size.width * 3 / 5
-                        })
+                        body = parser.parse(m,
+                            pattern_replace if search_text else None,
+                            html={"w": search["window"].Size.width * 5 / 9})
                         if type(body) is str:
                             body = body.decode("utf-8")
 
@@ -299,7 +322,8 @@ class SearchThread(WorkerThread):
                         if not counts["messages"] % conf.SearchResultsChunk \
                         and not self._drop_results:
                             self._postback(result)
-                            result = {"html": "", "map": {}, "search": search}
+                            result = {"html": "", "map": {}, "search": search,
+                                      "counts": counts}
                         if counts["messages"] >= conf.SearchMessagesMax:
                             break
                         if self._stop_work \
@@ -307,22 +331,24 @@ class SearchThread(WorkerThread):
                             break # break for c in chat_order
 
                 final_text = "No matches found."
-                if result_count:
+                if self._drop_results:
+                    result["html"] = ""
+                elif result_count:
                     final_text = ""
-                    for table, count in counts.items():
-                        if count:
-                            final_text += "%s%d %s" \
-                                % (", " if final_text else "", count, table)
+                    for table, count in filter(lambda x: x[1], counts.items()):
+                        text = util.plural(table[:-1], count)
+                        final_text += (", " if final_text else "") + text
                     final_text = "Found %s." % final_text
+
                 if self._stop_work:
                     final_text += " Search stopped by user."
-                if counts["messages"] >= conf.SearchMessagesMax:
+                elif counts["messages"] >= conf.SearchMessagesMax:
                     final_text += " Search stopped at message limit %s." \
-                        % conf.SearchMessagesMax
+                                  % conf.SearchMessagesMax
+
                 result["html"] += "</table><br />%s</font>" % final_text
                 result["done"] = True
-                if not self._drop_results:
-                    self._postback(result)
+                self._postback(result)
 
 
 

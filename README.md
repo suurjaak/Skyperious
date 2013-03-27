@@ -63,6 +63,10 @@ Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
   http://brandonmathis.com/projects/fancy-avatars/
 
+Several toolbar icons from:
+  Fugue Icons, (c) 2010 Yusuke Kamiyamane,
+  http://p.yusukekamiyamane.com/
+
 
 License
 -------

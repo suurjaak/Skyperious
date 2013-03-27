@@ -12,6 +12,8 @@ Supported controls:
 - wx.TextCtrl     control focused, all text selected
 - wx.RadioButton  control focused, value selected
 - wx.Control      control focused
+- wx.ToolBar      tool event is called, if the tool shorthelp includes a
+                  parseable shortcut key like (Alt-S)
 
 Uses primitive heuristic analysis to detect connected label-control pairs:
 - wx.StaticTexts whose next sibling is a focusable control
@@ -23,7 +25,7 @@ Uses primitive heuristic analysis to detect connected label-control pairs:
 
 @author    Erki Suurjaak
 @created   19.11.2011
-@modified  16.05.2012
+@modified  24.03.2013
 """
 import functools
 import re
@@ -96,22 +98,29 @@ def collect_shortcuts(control, use_heuristics=True):
     nameds  = {} # collected controls with Name {name: control, }
     statics = {} # collected StaticTexts with a shortcut {control: char, }
 
-    def parse_shortcut(ctrl):
+    def parse_shortcuts(ctrl):
         """
-        Parses the shortcut key from the control label, if any.
+        Parses the shortcut keys from the control label, if any.
 
-        @return    key or None
+        @return    [keys]
         """
-        result = None
+        result = []
         # wx.TextCtrl.Label is the same as its value, so must not use that
-        if hasattr(ctrl, 'Label') and not isinstance(ctrl, wx.TextCtrl):
+        if isinstance(ctrl, wx.ToolBar):
+            for i in range(ctrl.GetToolsCount()):
+                id = ctrl.GetToolByPos(i).GetId()
+                text = ctrl.GetToolShortHelp(id)
+                parts = re.split("\(Alt-(.)\)", text, maxsplit=1)
+                if len(parts) > 1:
+                    result.append(parts[1].lower())
+        elif hasattr(ctrl, 'Label') and not isinstance(ctrl, wx.TextCtrl):
             for part in filter(len, ctrl.Label.split('&')[1:]):
                 # Labels have potentially multiple ampersands - find one that
                 # is usable (preceding a valid character. 32 and lower are
                 # spaces, punctuation, control characters, etc).
                 key = part[0].lower()
                 if ord(key) > 32:
-                    result = key
+                    result.append(key)
                     if (DEBUG) and key:
                         print 'Parsed "%s" in label "%s".' % (key, ctrl.Label)
                     break # break for part in filter
@@ -129,8 +138,9 @@ def collect_shortcuts(control, use_heuristics=True):
             children = ctrl.GetChildren()
             for i in range(len(children)):
                 collect_recurse(children[i], result, nameds, statics)
-        key = parse_shortcut(ctrl)
-        if key:
+
+        keys = parse_shortcuts(ctrl)
+        for key in keys:
             if isinstance(ctrl, wx.StaticText):
                 statics[ctrl] = key
             else:
@@ -142,6 +152,7 @@ def collect_shortcuts(control, use_heuristics=True):
                       key, ctrl.Label, ctrl.ClassName, ctrl.GetId()
                     )
         if ctrl.Name:
+            if DEBUG: print "Found named control", (ctrl.Name, ctrl)
             nameds[ctrl.Name] = ctrl
 
 
@@ -153,28 +164,31 @@ def collect_shortcuts(control, use_heuristics=True):
             # next ID, or control sitting next in the sizer  is focusable -
             # shortcut will set focus to the control.
             chosen = None
-            next_sibling = hasattr(ctrl, 'GetNextSibling') and ctrl.GetNextSibling()
+            next_sibling = hasattr(ctrl, 'GetNextSibling') \
+                           and ctrl.GetNextSibling()
             # Do not include buttons, as buttons have their own shortcut keys.
             if next_sibling and not isinstance(next_sibling, wx.Button) \
-            and next_sibling.AcceptsFocus():
+            and (not next_sibling.Enabled or next_sibling.AcceptsFocus()
+            or next_sibling.CanAcceptFocus()):
                 chosen = next_sibling
                 if (DEBUG):
-                    print 'Selected "%s" ' \
-                          'by previous sibling wxStaticText "%s" (%s.ID=%s).' % (
-                        key, ctrl.Label, chosen.ClassName, chosen.Id
-                    )
+                    print 'Selected "%s" by previous sibling wxStaticText ' \
+                          '"%s" (%s.ID=%s).' % (
+                              key, ctrl.Label, chosen.ClassName, chosen.Id
+                          )
             if not chosen:
                 # Try to see if the item with the next ID is focusable.
                 next_ctrl = wx.FindWindowById(ctrl.Id - 1)
                 # Disabled controls might return False for AcceptsFocus).
                 if next_ctrl and not isinstance(next_ctrl, wx.Button) \
-                and (not next_ctrl.Enabled or next_ctrl.AcceptsFocus()):
+                and (not next_ctrl.Enabled or next_ctrl.AcceptsFocus()
+                or next_ctrl.CanAcceptFocus()):
                     chosen = next_ctrl
                     if (DEBUG):
-                        print 'Selected "%s" ' \
-                              'by previous ID wxStaticText "%s" (%s.ID=%s).' % (
-                            key, ctrl.Label, chosen.ClassName, chosen.Id
-                        )
+                        print 'Selected "%s" by previous ID wxStaticText ' \
+                              '"%s" (%s.ID=%s).' % (
+                                  key, ctrl.Label, chosen.ClassName, chosen.Id
+                              )
             if not chosen and ctrl.ContainingSizer:
                 # Try to see if the item next in the same sizer is focusable
                 sizer_items = []
@@ -189,13 +203,14 @@ def collect_shortcuts(control, use_heuristics=True):
                 if index < len(sizer_items) - 1:
                     next_ctrl = sizer_items[index + 1]
                     if next_ctrl and not isinstance(next_ctrl, wx.Button) \
-                    and next_ctrl.AcceptsFocus():
+                    and (not next_ctrl.Enabled or next_ctrl.AcceptsFocus()
+                    or next_sibling.CanAcceptFocus()):
                         chosen = next_ctrl
                         if (DEBUG):
-                            print 'Selected "%s" ' \
-                                  'by previous in sizer wxStaticText "%s" (%s.ID=%s).' % (
-                                key, ctrl.Label, chosen.ClassName, chosen.Id
-                            )
+                            print 'Selected "%s" by previous in sizer ' \
+                                  'wxStaticText "%s" (%s.ID=%s).' % (key,
+                                      ctrl.Label, chosen.ClassName, chosen.Id
+                                  )
             if chosen and chosen not in result_values:
                 if key not in result:
                     result[key] = []
@@ -213,24 +228,29 @@ def collect_shortcuts(control, use_heuristics=True):
             )
             for potential_name, potential in nameds.items():
                 if label_regex.match(potential_name):
-                    key = parse_shortcut(potential)
-                    if (DEBUG): print 'Name %s matches potential %s, key=%s.' % (name, potential_name, key)
-                    if key and (ctrl not in result_values):
-                        match_found = True
-                        if key not in result:
-                            result[key] = []
-                        if ctrl not in result[key]:
-                            result[key].append(ctrl)
-                        result_values.append(ctrl)
+                    keys = parse_shortcuts(potential)
+                    for key in keys:
                         if (DEBUG):
-                            print 'Selected "%s" ' \
-                                  'by named StaticText "%s" (%s.ID=%s, %s.Name=%s, wxStaticText.Name=%s).' % (
-                                key, potential.Label, ctrl.ClassName, ctrl.ClassName, ctrl.Id, ctrl.Name, potential.Name
-                            )
-                if match_found:
-                    break # break for potential_name, potential in nameds
-            if match_found:
-                break # break for name, ctrl in nameds
+                            print 'Name %s matches potential %s, key=%s.' % (
+                                  name, potential_name, key)
+                        if key and (ctrl not in result_values):
+                            match_found = True
+                            if key not in result:
+                                result[key] = []
+                            if ctrl not in result[key]:
+                                result[key].append(ctrl)
+                            result_values.append(ctrl)
+                            if (DEBUG):
+                                print 'Selected "%s" by named StaticText ' \
+                                      '"%s" (%s.ID=%s, %s.Name=%s, ' \
+                                      'wxStaticText.Name=%s).' % (
+                                      key, potential.Label, ctrl.ClassName,
+                                      ctrl.ClassName, ctrl.Id, ctrl.Name,
+                                      potential.Name
+                                )
+                            break # break for key in keys
+                    if match_found:
+                        break # break for potential_name, potential in nameds
     return result
 
 
@@ -250,30 +270,52 @@ def accelerate(window, use_heuristics=True):
                              controls
     """
 
-    def shortcut_handler(targets, shortcut_event):
+    def shortcut_handler(targets, key, shortcut_event):
         """
         Shortcut event handler, calls the appropriate event on the target.
 
         @param   targets         list of target controls. If there is more than
                                  one target control, the first non-disabled
                                  and visible is chosen.
+        @param   key             the event shortcut key, like 's'
         @param   shortcut_event  menu event generated by the accelerator table
         """
-        if (DEBUG): print 'Handling target %s' % [(type(t), t.Id, t.Label) for t in targets]
+        if (DEBUG):
+            print 'Handling target %s' % [
+                  (type(t), t.Id, t.Label) for t in targets]
         event = None
         for target in targets:
-            if (isinstance(target, wx.Control) # e.g. control has not been destroyed
-                and target.IsShownOnScreen()   # e.g. not in a hidden Notebook page.
-                and target.Enabled):
+            if (isinstance(target, wx.Control) # has not been destroyed
+            and target.IsShownOnScreen()       # visible on current panel
+            and target.Enabled):
                 if isinstance(target, wx.Button):
                     # Buttons do not get focus on shortcuts by convention
-                    event = wx.CommandEvent(wx.EVT_BUTTON.typeId, target.GetId())
+                    event = wx.CommandEvent(wx.EVT_BUTTON.typeId, target.Id)
                     event.SetEventObject(target)
+                elif isinstance(target, wx.ToggleButton):
+                    # Buttons do not get focus on shortcuts by convention
+                    event = wx.CommandEvent(wx.EVT_TOGGLEBUTTON.typeId,
+                                            target.Id)
+                    event.SetEventObject(target)
+                    # Need to change value, as event goes directly to handler
+                    target.Value = not target.Value
                 elif isinstance(target, wx.CheckBox):
-                    event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, target.GetId())
-                    # Need to change value ourselves, as event goes directly to handler
+                    event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, target.Id)
+                    # Need to change value, as event goes directly to handler
                     target.Value = not target.Value
                     target.SetFocus()
+                elif isinstance(target, wx.ToolBar):
+                    # Toolbar shortcuts are defined in their shorthelp texts
+                    for i in range(target.GetToolsCount()):
+                        id = target.GetToolByPos(i).GetId()
+                        text = target.GetToolShortHelp(id)
+                        parts = re.split("\(Alt-(%s)\)" % key, text,
+                                         maxsplit=1, flags=re.IGNORECASE)
+                        if len(parts) > 1:
+                            event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
+                            event.SetEventObject(target)
+                            target.ToggleTool(id, not target.GetToolState(id))
+                            break # break for i in range(target.GetToolsCount)
                 else:
                     target.SetFocus()
                     if isinstance(target, wx.TextCtrl):
@@ -303,7 +345,7 @@ def accelerate(window, use_heuristics=True):
             )
             menu_item = dummy_menu.Append(id=event_id, text='&%s' % key)
             window.Bind(wx.EVT_MENU,
-                        functools.partial(shortcut_handler, targets),
+                        functools.partial(shortcut_handler, targets, key),
                         menu_item)
             accelerators.append((wx.ACCEL_ALT, ord(key), event_id))
         window.SetAcceleratorTable(wx.AcceleratorTable(accelerators))

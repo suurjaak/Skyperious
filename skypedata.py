@@ -4,9 +4,10 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    07.03.2013
+@modified    27.03.2013
 """
 import copy
+import cStringIO
 import csv
 import datetime
 import os
@@ -28,6 +29,7 @@ import xml.parsers.expat
 
 import conf
 import main
+import util
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat
@@ -120,8 +122,11 @@ class SkypeDatabase(object):
             raise
 
         try:
+            # COALESCE() would return the first empty string as a not-NULL:
+            # NULLIF() will return the string or NULL if the string is empty.
             self.account = self.execute("SELECT *, "
-                "COALESCE(fullname, displayname, skypename) AS name, "
+                "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
+                "         NULLIF(skypename, '')) AS name, "
                 "skypename AS identity FROM accounts LIMIT 1"
             ).fetchone()
             self.id = self.account["skypename"]
@@ -294,38 +299,57 @@ class SkypeDatabase(object):
 
 
     def get_messages(self, chat=None, ascending=True,
-                     timestamp_from=None, body_like=None):
+                     timestamp_from=None, body_like=None, author_like=None,
+                     chat_like=None, use_cache=True):
         """
         Yields all the messages (or messages for the specified chat), as
         {"datetime": datetime, ..}, ordered from earliest to latest.
-        Uses already retrieved cached values if possible.
+        Uses already retrieved cached values if possible, unless additional
+        query parameters are used.
 
         @param   chat            as returned from get_conversations(), if any
         @param   ascending       can specify message order, earliest to latest
                                  or latest to earliest
         @param   body_like       text to match in body with LIKE
+        @param   author_like     text to match in author or from_dispname with
+                                 LIKE
+        @param   chat_like       text to match in chat name with LIKE
         @param   timestamp_from  timestamp beyond which messages will start
+        @param   use_cache       whether to use cached values if available
         """
         if self.is_open() and "messages" in self.tables:
             if "messages" not in self.table_rows:
                 self.table_rows["messages"] = {} # {convo_id: [{msg1},]}
-            if not (chat and chat["id"] in self.table_rows["messages"]):
-                # Cache messages
+            if not use_cache \
+            or not (chat and chat["id"] in self.table_rows["messages"]):
                 params = {}
                 # Take only message types we can handle
-                sql = "SELECT * FROM messages WHERE " \
-                      "type IN (2, 10, 12, 13, 30, 39, 51, 61, 63, 64, 68)"
+                sql = "SELECT m.* FROM messages m "
+                if chat_like:
+                    sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
+                sql += "WHERE m.type IN " \
+                       "(2, 10, 12, 13, 30, 39, 51, 61, 63, 64, 68)"
                 if chat:
-                    sql += " AND convo_id = :convo_id"
+                    sql += " AND m.convo_id = :convo_id"
                     params["convo_id"] = chat["id"]
                 if timestamp_from:
-                    sql += " AND timestamp %s :timestamp" % \
+                    sql += " AND m.timestamp %s :timestamp" % \
                            (">" if ascending else "<")
                     params["timestamp"] = timestamp_from
                 if body_like:
-                    sql += " AND body_xml LIKE :body_like"
+                    sql += " AND m.body_xml LIKE :body_like"
                     params["body_like"] = "%%%s%%" % body_like
-                sql += " ORDER BY timestamp %s" \
+                if author_like:
+                    sql += " AND (m.author LIKE :author_like " \
+                           "or m.from_dispname LIKE :author_like)"
+                    params["author_like"] = "%%%s%%" % author_like
+                if chat_like:
+                    sql += " AND (c.identity LIKE :chat_like " \
+                           "or c.displayname LIKE :chat_like " \
+                           "or c.given_displayname LIKE :chat_like " \
+                           "or c.meta_topic LIKE :chat_like)"
+                    params["chat_like"] = "%%%s%%" % chat_like
+                sql += " ORDER BY m.timestamp %s" \
                     % ("ASC" if ascending else "DESC")
                 res = self.execute(sql, params)
                 messages = []
@@ -339,7 +363,7 @@ class SkypeDatabase(object):
                     messages.append(message)
                     yield message
                     message = res.fetchone()
-                if chat:
+                if chat and use_cache:
                     self.table_rows["messages"][chat["id"]] = messages
             else:
                 messages_sorted = sorted(
@@ -413,7 +437,8 @@ class SkypeDatabase(object):
                 [i.sort(key=lambda x: (x["contact"]["name"] or "").lower())
                  for i in participants.values()]
                 rows = self.execute(
-                    "SELECT *, COALESCE(displayname, meta_topic) AS title, "
+                    "SELECT *, COALESCE(NULLIF(displayname, ''), "
+                                       "NULLIF(meta_topic, '')) AS title, "
                     "NULL AS created_datetime, "
                     "NULL AS last_activity_datetime "
                     "FROM conversations WHERE displayname IS NOT NULL "
@@ -485,13 +510,15 @@ class SkypeDatabase(object):
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
             if chat["id"] in stats:
+                stamptodate = datetime.datetime.fromtimestamp
                 data = stats[chat["id"]]
-                for n in ["first_message", "last_message"]:
-                    if data["%s_timestamp" % n]:
-                        data["%s_datetime" % n] = \
-                            datetime.datetime.fromtimestamp(
-                                data["%s_timestamp" % n]
-                            )
+                if data["first_message_timestamp"]:
+                    data["first_message_datetime"] = \
+                        stamptodate(data["first_message_timestamp"])
+                if data["last_message_timestamp"]:
+                    data["last_message_datetime"] = \
+                        stamptodate(data["last_message_timestamp"])
+                    
                 chat.update(data)
         main.log("Statistics collected (%s).", self.filename)
 
@@ -529,8 +556,10 @@ class SkypeDatabase(object):
         if self.is_open() and "contacts" in self.tables:
             if "contacts" not in self.table_rows:
                 rows = self.execute(
-                    "SELECT *, COALESCE(skypename, pstnnumber) AS identity, "
-                    "COALESCE(fullname, displayname, skypename, pstnnumber) "
+                    "SELECT *, COALESCE(NULLIF(skypename, ''), "
+                                       "NULLIF(pstnnumber, '')) AS identity, "
+                    "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
+                             "NULLIF(skypename, ''), NULLIF(pstnnumber, '')) "
                     "AS name FROM contacts ORDER BY name").fetchall()
                 self.table_objects["contacts"] = {}
                 for c in rows:
@@ -673,13 +702,17 @@ class SkypeDatabase(object):
                 # Retrieve and cache all contacts
                 self.table_objects["contacts"] = {}
                 rows = self.execute(
-                    "SELECT *, COALESCE(skypename, pstnnumber) AS identity "
+                    "SELECT *, COALESCE(NULLIF(skypename, ''), "
+                                       "NULLIF(pstnnumber, '')) AS identity "
                     "FROM contacts").fetchall()
                 for row in rows:
                     self.table_objects["contacts"][row["identity"]] = row
             rows = self.execute(
-                "SELECT COALESCE(c.fullname, c.displayname, c.skypename, "
-                "c.pstnnumber) AS name, c.skypename, p.* "
+                "SELECT COALESCE(NULLIF(c.fullname, ''), "
+                                "NULLIF(c.displayname, ''), "
+                                "NULLIF(c.skypename, ''), "
+                                "NULLIF(c.pstnnumber, '')) AS name, "
+                "c.skypename, p.* "
                 "FROM contacts AS c INNER JOIN participants AS p "
                 "ON p.identity = c.skypename "
                 "WHERE p.convo_id = :id AND c.skypename != :skypename "
@@ -710,8 +743,11 @@ class SkypeDatabase(object):
             contact = self.table_objects["contacts"].get(identity, None)
             if not contact:
                 contact = self.execute(
-                    "SELECT *, COALESCE(fullname, displayname, skypename, "
-                    "pstnnumber) AS name, COALESCE(skypename, pstnnumber) "
+                    "SELECT *, COALESCE(NULLIF(fullname, ''), "
+                                       "NULLIF(displayname, ''), "
+                                       "NULLIF(skypename, ''), "
+                                       "NULLIF(pstnnumber, '')) AS name, "
+                    "COALESCE(NULLIF(skypename, ''), NULLIF(pstnnumber, '')) "
                     "AS identity FROM contacts WHERE skypename = :identity "
                     "OR pstnnumber = :identity",
                     {"identity": identity}
@@ -2347,6 +2383,42 @@ def import_contacts_file(filename):
         if any(contact.values()):
             contacts.append(contact)
     return contacts
+
+
+
+def bitmap_from_raw(raw, size=None, keep_aspect_ratio=True):
+    """
+    Returns a wx.Bitmap from the raw data string.
+
+    @param   size               (width, height) to resize image to, if any
+    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
+                                resizing, filling the outside in white
+    """
+    result = None
+    if raw:
+        try:
+            data = raw.encode("latin1")
+            if data.startswith("\0"):
+                # For some reason, Skype avatar image blobs
+                # start with a null byte, unsupported by wx
+                data = data[1:]
+            img = wx.ImageFromStream(cStringIO.StringIO(data))
+
+            if size and size[:] != [img.Width, img.Height]:
+                pos, newsize = None, list(size)
+                if keep_aspect_ratio:
+                    ratio = util.safedivf(img.Width,img.Height)
+                    i = 0 if ratio < 1 else 1
+                    newsize[i] = newsize[i] / ratio if i \
+                                 else newsize[i] * ratio
+                    pos = ((size[0]-newsize[0]) / 2, (size[1]-newsize[1]) / 2)
+                img = img.ResampleBox(*newsize)
+                if pos:
+                    img.Resize(conf.AvatarImageSize, pos, 255, 255, 255)
+            result = wx.BitmapFromImage(img)
+        except Exception, e:
+            main.log("Error loading bitmap (%s)." % e)
+    return result
 
 
 

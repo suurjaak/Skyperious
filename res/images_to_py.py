@@ -4,7 +4,7 @@ embedded images and docstrings.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  15.04.2012
+@modified  22.03.2013
 """
 import base64
 import datetime
@@ -20,10 +20,10 @@ Q3 = '"""'
 """Application icons of different size and colour depth."""
 APPICONS = {
   #"Icon.ico": "Skyperious application iconset, with 16x16 and 32x32 icons.",
-  "Icon8bit16x16.ico": "Skyperious application 16x16 icon, 8-bit colour.",
-  "Icon8bit32x32.ico": "Skyperious application 16x16 icon, 8-bit colour.",
-  "Icon32bit16x16.ico": "Skyperious application 32x32 icon, 32-bit colour.",
-  "Icon32bit32x32.ico": "Skyperious application 32x32 icon, 32-bit colour.",
+  "Icon8bit16x16.png": "Skyperious application 16x16 icon, 8-bit colour.",
+  "Icon8bit32x32.png": "Skyperious application 16x16 icon, 8-bit colour.",
+  "Icon32bit16x16.png": "Skyperious application 32x32 icon, 32-bit colour.",
+  "Icon32bit32x32.png": "Skyperious application 32x32 icon, 32-bit colour.",
 }
 IMAGES = {
     "AvatarDefault.png":
@@ -34,26 +34,47 @@ IMAGES = {
         "Clock image icon for new days in exported chat HTML.",
     "IconChats.png":
         "Icon for the Chats page in a database tab.",
+    "IconContacts.png":
+        "Icon for the Contacts+ page in a database tab, and\n"
+        "Merge Contacts page in a merger tab.",
     "IconDatabase.png":
         "Icon for the Database page in a database tab.",
+    "IconInfo.png":
+        "Icon for the Info page in a database tab.",
     "IconMergeAll.png":
         "Icon for the Merge All page in a merger tab.",
     "IconMergeChats.png":
         "Icon for the Merge Chats page in a merger tab.",
-    "IconMergeContacts.png":
-        "Icon for the Merge Contacts page in a merger tab.",
     "IconSearch.png":
         "Icon for the Search page in a database tab.",
     "IconSQL.png":
         "Icon for the SQL Window page in a database tab.",
     "ToolbarCommit.png":
         "Toolbar icon for commit button in database table grids.",
+    "ToolbarContact.png":
+        "Toolbar icon for contacts button on search page.",
     "ToolbarDelete.png":
         "Toolbar icon for delete button in database table grids.",
+    "ToolbarFilter.png":
+        "Toolbar icon for filter chat button in chat page.",
     "ToolbarInsert.png":
         "Toolbar icon for insert button in database table grids.",
+    "ToolbarMaximize.png":
+        "Toolbar icon for maximize chat button in chat page.",
+    "ToolbarMessage.png":
+        "Toolbar icon for message toggle button on search page.",
     "ToolbarRollback.png":
         "Toolbar icon for rollback button in database table grids.",
+    "ToolbarStats.png":
+        "Toolbar icon for stats button in chat page.",
+    "ToolbarStop.png":
+        "Toolbar icon for stop button on search page.",
+    "ToolbarStopped.png":
+        "Toolbar icon for inactive stop button on search page.",
+    "ToolbarTabs.png":
+        "Toolbar icon for tabs toggle button on search page.",
+    "ToolbarTitle.png":
+        "Toolbar icon for title toggle button on search page.",
 }
 HEADER = """%s
 Contains embedded image and icon resources for Skyperious. Auto-generated.
@@ -73,9 +94,9 @@ def create_py(target):
     f = open(target, "w")
     f.write(HEADER)
     icons = [os.path.splitext(i)[0] for i in sorted(APPICONS.keys())]
-    f.write("\n\n%s%s%s\ndef get_appicons():\n\ticons = wx.IconBundle()\n\t"
-            "[icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) "
-            "for i in [\n\t\t%s\n\t]]\n\treturn icons\n" % (Q3,
+    f.write("\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
+            "    [icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) "
+            "for i in [\n        %s\n    ]]\n    return icons\n" % (Q3,
         "Returns the application icon bundle, "
         "for several sizes and colour depths.",
         Q3, str(icons).replace("'", "").replace("[", "").replace("]", "")

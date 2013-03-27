@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.03.2013
+@modified    27.03.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -23,6 +23,8 @@ else:
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup", "RecentFiles",
     "DBFiles", "LastSelectedFiles", "WindowPosition", "WindowSize",
+    "SearchInMessageBody", "SearchInChatInfo", "SearchInContacts",
+    "SearchInNewTab",
 ]
 
 """Whether logging is enabled."""
@@ -34,9 +36,9 @@ Title = "Skyperious"
 """Module containing application main window class."""
 MainWindowModule = "skyperious"
 
-Version = "1.1"
+Version = "1.2"
 
-VersionDate = "08.03.2013"
+VersionDate = "27.03.2013"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -58,6 +60,18 @@ ConsoleHistoryCommands = []
 
 """Files selected in the database lists on last run."""
 LastSelectedFiles = ["", ""]
+
+"""Whether to search in message body."""
+SearchInMessageBody = True
+
+"""Whether to search in chat title and participants."""
+SearchInChatInfo = False
+
+"""Whether to search in contact information."""
+SearchInContacts = False
+
+"""Whether to create a new tab for each search or reuse current."""
+SearchInNewTab = False
 
 """
 Maximum number of messages shown in the chat history initially, before user
