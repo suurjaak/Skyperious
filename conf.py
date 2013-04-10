@@ -65,10 +65,10 @@ LastSelectedFiles = ["", ""]
 SearchInMessageBody = True
 
 """Whether to search in chat title and participants."""
-SearchInChatInfo = True
+SearchInChatInfo = False
 
 """Whether to search in contact information."""
-SearchInContacts = True
+SearchInContacts = False
 
 """Whether to create a new tab for each search or reuse current."""
 SearchInNewTab = False
