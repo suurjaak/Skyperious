@@ -18,7 +18,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.03.2013
+@modified    10.04.2013
 """
 import BeautifulSoup
 import collections
@@ -112,6 +112,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             parent=panel, style=wx.NB_TOP,
             agwStyle=wx.lib.agw.flatnotebook.FNB_NODRAG |
                      wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
+                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
                      wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
                      wx.lib.agw.flatnotebook.FNB_FF2
         )
@@ -757,7 +758,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         page = None
         if db1 and db2:
             ds = set((db1, db2))
-            pp = filter(lambda i: set((i.db1, i.db2)) == ds, self.merger_pages)
+            pp = filter(lambda i: i and set((i.db1, i.db2)) == ds,
+                        self.merger_pages)
             page = pp[0] if pp else None
             if not page:
                 page = MergerPage(self.notebook, db1, db2,
@@ -922,11 +924,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 return event.Veto()
             [i.stop() for i in page.workers_search.values()]
 
-            del self.db_pages[page]
+            if page in self.db_pages:
+                del self.db_pages[page]
             page_dbs = [page.db]
             main.log("Closed database tab for %s." % page.db)
         else:
-            del self.merger_pages[page]
+            if page in self.merger_pages:
+                del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
             page.worker_diff.stop()
             page.worker_diff.join()
@@ -948,7 +952,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for db in page_dbs:
             db.unregister_consumer(page)
             if not db.has_consumers():
-                del self.dbs[db.filename]
+                if db.filename in self.dbs:
+                    del self.dbs[db.filename]
                 db.close()
                 main.log("Closed database %s." % db)
         # Remove any dangling references
@@ -1073,7 +1078,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if filename in self.dbs:
             db = self.dbs[filename]
         if db and db in self.db_pages.values():
-            pp = filter(lambda i: i.db == db, self.db_pages)
+            pp = filter(lambda i: i and (i.db == db), self.db_pages)
             page = pp[0] if pp else None
         if not page:
             if not db:
@@ -1162,6 +1167,7 @@ class DatabasePage(wx.Panel):
             "text": "",             # Text in message content
             "participants": None    # Messages from [skype name, ]
         }
+        self.stats_sort_field = "name"
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -1473,8 +1479,8 @@ class DatabasePage(wx.Panel):
         label_help = wx.StaticText(parent=page, label=\
             "Searches raw message body, so for example \"<sms\" finds SMS "
             "messages, \"<file\" finds transfers and \"<quote\" finds quoted "
-            "messages.\nFor searching from specific chats, add \"chat:name\", "
-            "and from specific contacts, add \"from:name\"."
+            "messages.\nFor searching messages from specific chats, add "
+            "\"chat:name\", and from specific contacts, add \"from:name\"."
         )
         label_help.ForegroundColour = "grey"
         tb = self.tb_search_settings = \
@@ -2382,6 +2388,15 @@ class DatabasePage(wx.Panel):
         Handler for scrolling the HTML stats, stores scroll position
         (HtmlWindow loses it on resize).
         """
+        wx.CallAfter(self.store_html_stats_scroll)
+        event.Skip() # Allow event to propagate wx handler
+
+
+    def store_html_stats_scroll(self):
+        """
+        Stores the statistics HTML scroll position, needed for getting around
+        its quirky scroll updating.
+        """
         self.html_stats._last_scroll_pos = [
             self.html_stats.GetScrollPos(wx.HORIZONTAL),
             self.html_stats.GetScrollPos(wx.VERTICAL)
@@ -2390,18 +2405,18 @@ class DatabasePage(wx.Panel):
             self.html_stats.GetScrollRange(wx.HORIZONTAL),
             self.html_stats.GetScrollRange(wx.VERTICAL)
         ]
-        event.Skip() # Allow event to propagate wx handler
-
+        
 
     def on_click_html_stats(self, event):
         """
         Handler for clicking a link in chat history statistics, scrolls to
-        anchor if anchor link, otherwise shows the history and finds the word
-        clicked in the word cloud.
+        anchor if anchor link, sorts the statistics if sort link, otherwise
+        shows the history and finds the word clicked in the word cloud.
         """
         href = event.GetLinkInfo().Href
         if href.startswith("#") and self.html_stats.HasAnchor(href[1:]):
             self.html_stats.ScrollToAnchor(href[1:])
+            wx.CallAfter(self.store_html_stats_scroll)
         elif href.startswith("file://"):
             filepath = urllib.url2pathname(href[5:])
             if filepath and os.path.exists(filepath):
@@ -2413,6 +2428,9 @@ class DatabasePage(wx.Panel):
                     % (filepath),
                     conf.Title, wx.OK | wx.ICON_INFORMATION
                 )
+        elif href.startswith("sort://"):
+            self.stats_sort_field = href[7:]
+            self.populate_chat_statistics()
         else:
             self.stc_history.SearchBarVisible = True
             self.show_stats(False)
@@ -2543,7 +2561,7 @@ class DatabasePage(wx.Panel):
         Handler for clicking to search all chats.
         """
         text = self.edit_searchall.Value
-        if text and text != conf.HistorySearchDescription:
+        if text.strip() and text != conf.HistorySearchDescription:
             main.status("Searching for \"%s\" in %s.", text, self.db.filename)
             html = self.html_searchall
             data = {"text": text, "db": self.db, "tables": [],
@@ -3123,6 +3141,8 @@ class DatabasePage(wx.Panel):
                 ]
                 self.chat_filter["daterange"] = date_range
                 self.chat_filter["startdaterange"] = date_range
+                if center_message_id: # No fixed date range if specific message
+                    del self.chat_filter["daterange"]
                 dates_range = dates_values = date_range
                 avatar_default = images.AvatarDefault.Bitmap
                 if chat != self.chat:
@@ -3332,9 +3352,14 @@ class DatabasePage(wx.Panel):
                 if msgs_per_day == int(msgs_per_day) \
                 else ("%.1f" % msgs_per_day)
             add_row("Messages per day", msgs_per_day)
+            contact_rows = [] # [(contact, plotvals, sortval)], for sorting
+            sortable_fields = set(["name"])
             for p in self.chat["participants"]:
                 id, name = p["identity"], p["contact"]["name"]
                 plotvals = [] # [(label, value, total), ]
+                sortval = 0 # The value contacts are sorted by
+                if "name" == self.stats_sort_field:
+                    sortval = name
                 if id in stats["counts"]:
                     msgs = stats["counts"][id]["messages"]
                     chars = stats["counts"][id]["chars"]
@@ -3342,6 +3367,14 @@ class DatabasePage(wx.Panel):
                     smschars = stats["counts"][id]["smschars"]
                     files = stats["counts"][id]["files"]
                     bytes = stats["counts"][id]["bytes"]
+                    if "messages" == self.stats_sort_field:
+                        sortval = -msgs
+                    elif "characters" == self.stats_sort_field:
+                        sortval = -chars
+                    elif "smses" == self.stats_sort_field:
+                        sortval = -smses
+                    elif "files" == self.stats_sort_field:
+                        sortval = -files
                     if msgs:
                         plotvals.append(("messages", msgs,
                             stats["messages"], conf.PlotMessagesColour
@@ -3349,6 +3382,8 @@ class DatabasePage(wx.Panel):
                         plotvals.append(("characters", chars,
                             chars_total, conf.PlotMessagesColour
                         ))
+                        sortable_fields.add("messages")
+                        sortable_fields.add("characters")
                     if smses:
                         plotvals.append(("SMSes", smses,
                             stats["smses"], conf.PlotSMSesColour
@@ -3356,6 +3391,7 @@ class DatabasePage(wx.Panel):
                         plotvals.append(("SMS characters", smschars,
                             smschars_total, conf.PlotSMSesColour
                         ))
+                        sortable_fields.add("smses")
                     if files:
                         plotvals.append(("files", files,
                             files_total, conf.PlotFilesColour
@@ -3363,8 +3399,32 @@ class DatabasePage(wx.Panel):
                         plotvals.append(("bytes", bytes,
                             bytes_total, conf.PlotFilesColour
                         ))
+                        sortable_fields.add("files")
                 if plotvals:
-                    add_contact_row(p["contact"], plotvals)
+                    contact_rows.append((p["contact"], plotvals, sortval))
+            sort_html = "<tr><td><br /><br /></td><td valign='bottom'>" \
+                        "<font size='2'>" \
+                        "<table cellpadding='0' cellspacing='0'><tr>" \
+                        "<td><b>Sort by:&nbsp;&nbsp;&nbsp;</b></td>"
+            sortby = "name" if self.stats_sort_field not in sortable_fields \
+                     else self.stats_sort_field
+            for field in ["Name", "Messages", "Characters", "SMSes", "Files"]:
+                if field.lower() not in sortable_fields:
+                    continue
+                if field.lower() == sortby:
+                    item = "<td><font color='gray'>%s</font>" \
+                           "&nbsp;&nbsp;&nbsp;&nbsp;</td>" % field
+                else:
+                    item = "<td><a href='sort://%s'>%s</a>" \
+                           "&nbsp;&nbsp;&nbsp;&nbsp;</td>" % (
+                           field.lower(), field)
+                sort_html += item
+            sort_html += "</tr></table></font></td></tr>"
+            if contact_rows:
+                t.append(sort_html)
+            contact_rows.sort(key=lambda x: x[2])
+            for contact, plotvals, _ in contact_rows:
+                add_contact_row(contact, plotvals)
             h.append(t)
         cloud = self.stc_history.GetWordCloud()
         if cloud:
@@ -3408,11 +3468,11 @@ class DatabasePage(wx.Panel):
                 c1 = BeautifulSoup.Tag(h, "td", {"align": "right",
                     "valign": "top", "nowrap": ""
                 })
-                c2 = BeautifulSoup.Tag(h, "td", {"valign": "top", "nowrap": ""})
+                c2 = BeautifulSoup.Tag(h, "td", {"valign": "top", "nowrap":""})
                 c3 = BeautifulSoup.Tag(h, "td", {
                     "align": "right", "valign": "top"
                 })
-                c4 = BeautifulSoup.Tag(h, "td", {"valign": "top", "nowrap": ""})
+                c4 = BeautifulSoup.Tag(h, "td", {"valign": "top", "nowrap":""})
                 a = BeautifulSoup.Tag(h, "a", {
                     "href": skypedata.MessageParser.path_to_url(
                         f["filepath"] or f["filename"]
@@ -3448,7 +3508,7 @@ class DatabasePage(wx.Panel):
 
     def on_sort_grid_column(self, event):
         """
-        Handler for clicking a table grid column, sorts the table by the column.
+        Handler for clicking a table grid column, sorts table by the column.
         """
         grid = event.GetEventObject()
         if grid.Table:
@@ -3580,12 +3640,9 @@ class DatabasePage(wx.Panel):
                 self.range_date.SetRange(*date_range)
             self.update_file_info()
         except Exception, e:
-            # Database access can easily fail if the user closes the tab before
-            # the later data has been loaded.
             if self:
-                main.log("Error accessing database %s.\n%s",
-                    self.db, traceback.format_exc()
-                )
+                print "Error loading additional data from %s.\n%s" % (
+                      self.db, traceback.format_exc())
         if self:
             self.ready_to_close = True
             main.status("Opened Skype database %s.", self.db)
@@ -4657,9 +4714,8 @@ class MergerPage(wx.Panel):
             # Database access can easily fail if the user closes the tab before
             # the later data has been loaded.
             if self:
-                main.log("Error accessing database %s or %s.\n%s",
-                    self.db1, self.db2, traceback.format_exc()
-                )
+                print "Error loading additional data from %s or %s.\n%s" % (
+                      self.db1, self.db2, traceback.format_exc())
         if self:
             self.page_merge_all.Layout()
             self.ready_to_close = True
@@ -4831,8 +4887,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                             m_iter = None
                     except StopIteration, e:
                         m_iter = None
-        if self._messages and (self._messages[-1]["datetime"] < 
-        self._chat.get("last_message_datetime", None)):
+        last_dt = self._chat.get("last_message_datetime", None)
+        if self._messages and last_dt \
+        and self._messages[-1]["datetime"] < last_dt:
             # Last message timestamp is earlier than chat's last message
             # timestamp: new messages have arrived
             m_iter = self._db.get_messages(self._chat,
@@ -5026,8 +5083,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     if date_start >= date_first and date_start <= date_last:
                         title = util.plural(unit, count)
                         daterange = [date_start, date_last]
-                        active = (title == self._actionlink_last) or \
-                            (daterange == dates_filter)
+                        active = (title == self._actionlink_last) \
+                                 or (daterange == dates_filter)
                         if not active:
                             self._actionlinks[self._stc.Length] = daterange
                         self._append_text(title, "bold" if active else "link")
@@ -5037,8 +5094,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     daterange = [date_until - relativedelta(years=4),
                                  date_until - relativedelta(years=2)]
                     # @warning: possible mis-showing here if chat < 4 years
-                    active = (title == self._actionlink_last) or \
-                        (daterange == dates_filter)
+                    active = (title == self._actionlink_last) \
+                             or (daterange == dates_filter)
                     self._actionlinks[self._stc.Length] = daterange
                     self._append_text(title, "bold" if active else "link")
                     self._append_text(u"  \u2022  ", "special") # bullet
@@ -5054,8 +5111,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 daterange = [date_first, date_last]
                 title = "From the beginning"
                 self._actionlinks[self._stc.Length] = daterange
-                active = (title == self._actionlink_last) or \
-                    (daterange == dates_filter)
+                active = (title == self._actionlink_last) \
+                         or (daterange == dates_filter)
                 self._append_text(title, "bold" if active else "link")
             self._actionlink_last = None
             self._append_text("\n\n")

@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.03.2013
+@modified    10.04.2013
 """
 import copy
 import cStringIO
@@ -173,14 +173,15 @@ class SkypeDatabase(object):
         if hasattr(self, "connection"):
             try:
                 self.connection.close()
-            finally:
-                del self.connection
-                self.connection = None
+            except:
+                pass
+            del self.connection
+            self.connection = None
         for attr in ["tables", "tables_list", "table_rows",
         "table_grids", "table_objects"]:
             if hasattr(self, attr):
                 delattr(self, attr)
-                setattr(self, attr, None)
+                setattr(self, attr, None if ("tables_list" == attr) else {})
 
 
     def execute(self, *args, **kwargs):
@@ -299,8 +300,8 @@ class SkypeDatabase(object):
 
 
     def get_messages(self, chat=None, ascending=True,
-                     timestamp_from=None, body_like=None, author_like=None,
-                     chat_like=None, use_cache=True):
+                     timestamp_from=None, body_likes=None, author_likes=None,
+                     chat_likes=None, use_cache=True):
         """
         Yields all the messages (or messages for the specified chat), as
         {"datetime": datetime, ..}, ordered from earliest to latest.
@@ -310,10 +311,12 @@ class SkypeDatabase(object):
         @param   chat            as returned from get_conversations(), if any
         @param   ascending       can specify message order, earliest to latest
                                  or latest to earliest
-        @param   body_like       text to match in body with LIKE
-        @param   author_like     text to match in author or from_dispname with
-                                 LIKE
-        @param   chat_like       text to match in chat name with LIKE
+        @param   body_likes      list of words to match in body with
+                                 (LIKE.. AND LIKE..)
+        @param   author_like     list of words to match in author or
+                                 from_dispname with (LIKE.. OR LIKE..)
+        @param   chat_likes      list of words to match in chat name fields
+                                 with (LIKE.. OR LIKE..)
         @param   timestamp_from  timestamp beyond which messages will start
         @param   use_cache       whether to use cached values if available
         """
@@ -325,7 +328,7 @@ class SkypeDatabase(object):
                 params = {}
                 # Take only message types we can handle
                 sql = "SELECT m.* FROM messages m "
-                if chat_like:
+                if chat_likes:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
                 sql += "WHERE m.type IN " \
                        "(2, 10, 12, 13, 30, 39, 51, 61, 63, 64, 68)"
@@ -336,19 +339,27 @@ class SkypeDatabase(object):
                     sql += " AND m.timestamp %s :timestamp" % \
                            (">" if ascending else "<")
                     params["timestamp"] = timestamp_from
-                if body_like:
-                    sql += " AND m.body_xml LIKE :body_like"
-                    params["body_like"] = "%%%s%%" % body_like
-                if author_like:
-                    sql += " AND (m.author LIKE :author_like " \
-                           "or m.from_dispname LIKE :author_like)"
-                    params["author_like"] = "%%%s%%" % author_like
-                if chat_like:
-                    sql += " AND (c.identity LIKE :chat_like " \
-                           "or c.displayname LIKE :chat_like " \
-                           "or c.given_displayname LIKE :chat_like " \
-                           "or c.meta_topic LIKE :chat_like)"
-                    params["chat_like"] = "%%%s%%" % chat_like
+                for i, word in enumerate(body_likes or []):
+                    sql += " AND m.body_xml LIKE :body_like%s" % i
+                    params["body_like%s" % i] = "%%%s%%" % word
+                if author_likes:
+                    sql += " AND ("
+                    for i, word in enumerate(author_likes):
+                        sql += "%(or)s(m.author LIKE :author_like%(i)s " \
+                               "OR m.from_dispname LIKE :author_like%(i)s)" \
+                               % {"i": i, "or": " OR " if i else ""}
+                        params["author_like%s" % i] = "%%%s%%" % word
+                    sql += ")"
+                if chat_likes:
+                    sql += " AND ("
+                    for i, word in enumerate(chat_likes):
+                        sql += "%(or)s(c.identity LIKE :chat_like%(i)s " \
+                               "OR c.displayname LIKE :chat_like%(i)s " \
+                               "OR c.given_displayname LIKE :chat_like%(i)s " \
+                               "OR c.meta_topic LIKE :chat_like%(i)s)" \
+                               % {"i": i, "or": " OR " if i else ""}
+                        params["chat_like%s" % i] = "%%%s%%" % word
+                    sql += ")"
                 sql += " ORDER BY m.timestamp %s" \
                     % ("ASC" if ascending else "DESC")
                 res = self.execute(sql, params)
@@ -494,9 +505,11 @@ class SkypeDatabase(object):
         stats = []
         participants = {}
         if self.is_open() and "messages" in self.tables:
-            and_str = " AND convo_id in (%s)" % ", ".join(["?"] * len(chats)) \
-                      if chats else ""
-            and_val = [c["id"] for c in chats] if chats else []
+            and_str, and_val = "", []
+            if chats and len(chats) == 1:
+                and_str = " AND convo_id in (%s)" % \
+                          ", ".join(["?"] * len(chats))
+                and_val = [c["id"] for c in chats]
             rows_stat = self.execute(
                 "SELECT convo_id AS id, COUNT(*) AS message_count, "
                 "MIN(timestamp) AS first_message_timestamp, "

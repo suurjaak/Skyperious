@@ -4,7 +4,7 @@ Background workers for searching and diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    27.03.2013
+@modified    07.04.2013
 """
 import cStringIO
 import datetime
@@ -77,63 +77,66 @@ class SearchThread(WorkerThread):
     results back to main thread in chunks.
     """
 
+
+    def match_all(self, text, words):
+        """Returns whether the text contains all the specified words."""
+        text_lower = text.lower()
+        result = all(w in text_lower for w in words)
+        return result
+
+
     def run(self):
         self._is_running = True
+        # For identifying "chat:xxx" and "from:xxx" keywords
+        pattern_chat    = re.compile("chat\:([^\s]+)")
+        pattern_contact = re.compile("from\:([^\s]+)")
         while self._is_running:
             search = self._queue.get()
             self._stop_work = False
             self._drop_results = False
             if search:
+                result_count = 0
                 parser = skypedata.MessageParser(search["db"])
                 # {"html": html with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
                 counts = {"chats": 0, "contacts": 0, "messages": 0}
                 result = {"html": "", "map": {},
                           "search": search, "counts": counts}
-                result_count = 0
-                search_text = search["text"]
-                # For matching chats with a name containing text
-                match_chatname = None
-                search_parts = re.split("(^|\s)chat\:([^\s]+)($|\s)",
-                    search_text, maxsplit=1, flags=re.IGNORECASE)
-                if len(search_parts) > 1:
-                    match_chatname = search_parts[2]
-                    search_parts[2:4] = []
-                    search_text = "".join(search_parts)
-                # For matching contacts with a name containing text
-                match_contact = None
-                search_parts = re.split("(^|\s)from\:([^\s]+)($|\s)",
-                    search_text, maxsplit=1, flags=re.IGNORECASE)
-                if len(search_parts) > 1:
-                    match_contact = search_parts[2]
-                    search_parts[2:4] = []
-                    search_text = "".join(search_parts)
-                search_text = search_text
-                # For finding matching items
-                pattern = re.compile(".*(%s)" % re.escape(search_text),
+                # Lists of words to find in either message body, chat title and
+                # participant name fields, or contact name fields.
+                match_words = filter(None, search["text"].lower().split(" "))
+                match_chats, match_contacts = [], []
+
+                for word in match_words[:]:
+                    if pattern_chat.match(word):
+                        match_chats.append(pattern_chat.split(word)[1])
+                        match_words.remove(word)
+                    elif pattern_contact.match(word):
+                        match_contacts.append(pattern_contact.split(word)[1])
+                        match_words.remove(word)
+                # For replacing matching words with <b>words</b>
+                pattern_replace = re.compile(
+                    "(%s)" % "|".join(map(re.escape, match_words)),
                     re.IGNORECASE
                 )
-                # For replacing matching text with bolded text
-                pattern_replace = re.compile("(%s)+" % re.escape(
-                    search_text
-                ), re.IGNORECASE)
+
+                # Find chats with a matching title or matching participants
                 chats = search["db"].get_conversations()
                 chats.sort(key=lambda x: x["title"])
                 chat_map = {} # {chat id: {chat data}}
                 for chat in chats:
                     chat_map[chat["id"]] = chat
-                    if "conversations" in search["tables"] \
-                    and not (match_chatname or match_contact):
+                    if "conversations" in search["tables"] and match_words:
                         title_matches = False
                         matching_authors = []
-                        if pattern.match(chat["title"]):
+                        if self.match_all(chat["title"], match_words):
                             title_matches = True
                         for participant in chat["participants"]:
                             c = participant["contact"]
                             if c:
-                                for n in [c["fullname"], c["displayname"],
-                                c["identity"]]:
-                                    if n and pattern.match(n) \
+                                for n in filter(None, [c["fullname"],
+                                c["displayname"], c["identity"]]):
+                                    if self.match_all(n, match_words) \
                                     and c not in matching_authors:
                                         matching_authors.append(c)
 
@@ -183,8 +186,10 @@ class SearchThread(WorkerThread):
                     self._postback(result)
                     result = {"html": "", "map": {}, "search": search,
                               "counts": counts}
+
+                # Find contacts with a matching name
                 if not self._stop_work and "contacts" in search["tables"] \
-                and not (match_chatname or match_contact):
+                and match_words:
                     contacts = search["db"].get_contacts()
                     # Possibly more: country (ISO code, need map), birthday
                     # (base has YYYYMMDD in integer field).
@@ -216,7 +221,7 @@ class SearchThread(WorkerThread):
                         for field in match_fields:
                             if contact[field]:
                                 value = contact[field]
-                                if pattern.match(contact[field]):
+                                if self.match_all(value, match_words):
                                     match = True
                                     value = pattern_replace.sub(
                                         lambda x: "<b>%s</b>" % x.group(0),
@@ -266,12 +271,14 @@ class SearchThread(WorkerThread):
                     self._postback(result)
                     result = {"html": "", "map": {}, "search": search,
                               "counts": counts}
+
+                # Find messages with a matching body
                 if not self._stop_work and "messages" in search["tables"]:
                     chat_messages = {} # {chat id: [message, ]}
                     chat_order = []    # [chat id, ]
                     messages = search["db"].get_messages(
-                        ascending=False, body_like=search_text,
-                        author_like=match_contact, chat_like=match_chatname,
+                        ascending=False, body_likes=match_words,
+                        author_likes=match_contacts, chat_likes=match_chats,
                         use_cache=False
                     )
                     for m in messages:
@@ -288,7 +295,7 @@ class SearchThread(WorkerThread):
                         )
                         displayname = m["from_dispname"]
                         body = parser.parse(m,
-                            pattern_replace if search_text else None,
+                            pattern_replace if match_words else None,
                             html={"w": search["window"].Size.width * 5 / 9})
                         if type(body) is str:
                             body = body.decode("utf-8")
