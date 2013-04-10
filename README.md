@@ -3,7 +3,7 @@ Skyperious
 
 Skyperious is a Skype database viewer and merger, written in Python.
 
-It can open local Skype SQLite databases and look at their contents:
+You can open local Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
 - browse, filter and export chat histories, see chat statistics
@@ -12,14 +12,14 @@ It can open local Skype SQLite databases and look at their contents:
 - change, add or delete data in any table
 - execute direct SQL queries
 
-Skyperious can also compare two Skype databases, show the differences in chats
-and contacts, and copy any spotted differences from one database to another.
-Skype uses local database files to keep its chat history, and older messages
-tend to get lost as computers get upgraded or changed. Skyperious was initially
-written to import old chat messages from such files.
+You can also compare two Skype databases, scan for differences in chats and 
+contacts, and copy them from one database to another. As Skype uses local files
+to store conversation history, older messages tend to be lost when computers
+get upgraded or changed; and message history can even differ on currently
+active computers. Skyperious can restore the missing conversations into your
+current message database.
 
-It is recommended to make a backup of the database file before making any
-changes, as merging has not been extensively tested and might have issues.
+Making a backup of the database file is recommended before making any changes.
 
 Screenshots and Windows binaries at http://suurjaak.github.com/Skyperious.
 
@@ -27,22 +27,21 @@ Screenshots and Windows binaries at http://suurjaak.github.com/Skyperious.
 Using The Program
 -----------------
 
-Run skyperious.bat under Windows, or skyperious.sh where shell scripts are
-supported, or execute 'python main.py'. Or launch skyperious.exe if
-using the precompiled Windows executable.
-
 Skyperious can look through user directories and detect Skype databases
-automatically, or you can select files yourself.
+automatically, or you can select files yourself from any folder.
 
-Skyperious has been tested under Windows XP, Windows Vista and Ubuntu Linux,
-its core functionality should work wherever Python and required Python
-packages are installed.
+If running from source code, launch skyperious.bat under Windows, or
+skyperious.sh where shell scripts are supported, or execute 'python main.py'
+
+Skyperious has been tested under Windows XP, Windows Vista, Windows 7 and
+Ubuntu Linux, its core functionality should work wherever Python and required
+Python packages are installed.
 
 
 Dependencies
 ------------
 
-If running as a Python script, Skyperious requires Python 2.7 and uses
+If running from source code, Skyperious requires Python 2.7 and uses
 these 3rd-party Python packages:
 
 * wxPython 2.9 (http://wxpython.org/)
