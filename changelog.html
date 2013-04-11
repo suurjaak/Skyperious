@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Skyperious</title>
+    
+    <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-30919338-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Skyperious</h1>
+        <p>Skype SQLite database viewer and merger</p>
+        <p class="view">
+          <a href="index.html">Index</a><br />
+          <a href="downloads.html">Downloads</a><br />
+          <a href="screens.html">Screenshots</a><br />
+          <a href="changelog.html">Changelog</a><br />
+          <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
+        </p>
+        <ul>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3-src.zip">Download <strong>Source</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h2>Changelog</h2>
+
+        <h4>v1.3, 2013-04-10:</h4>
+        <ul>
+          <li>added sorting options to statistics</li>
+          <li>search for all entered words instead of exact phrase</li>
+          <li>fixed opening databases with 1000+ conversations</li>
+          <li>fixed problems with search keyword order</li>
+          <li>middle button closes pages</li>
+          <li>better error handling on opening databases</li>
+          <li>fixed chat history showing wrong date range at the top</li>
+        </ul>
+        <br />
+
+        <h4>v1.2, 2013-03-27:</h4>
+        <ul>
+          <li>better search interface</li>
+          <li>option to search from specific chats and contacts</li>
+          <li>support for multiple tabs in search results</li>
+          <li>maximize chat button in chat page</li>
+          <li>changed icon</li>
+          <li>updated main notebook control to FlatNotebook</li>
+          <li>more toolbars in UI</li>
+          <li>rearranged tab order in database page</li>
+          <li>fixed a bug on opening a database with no account image</li>
+          <li>fixed showing contacts with no full name or display name</li>
+          <li>fixed a minor layout issue in chat statistics</li>
+          <li>fixed formatting very first search results</li>
+          <li>file drag-drop works on entire application window</li>
+        </ul>
+        <br />
+
+        <h4>v1.1, 2013-03-09:</h4>
+        <ul>
+          <li>added contacts import page and file info page</li>
+          <li>small changes in user interface and internal logic</li>
+        </ul>
+        <br />
+
+        <h4>v1.0, 2013-01-13:</h4>
+        <ul>
+          <li>added links like "Show: 30 days | 6 months | 2 years" etc to current chat history top</li>
+          <li>added percentages to chat statistics</li>
+          <li>started showing the chat filter panel from the start, in disabled state</li>
+          <li>added full message date-time as hovertext in HTML exports</li>
+          <li>made chat list ordering case-insensitive</li>
+          <li>small UI logic changes</li>
+          <li>started restoring previous window size and on position on load</li>
+          <li>upgraded RangeSlider logic for single-selection range and disabled state</li>
+          <li>enlarged the search icon in the lower right corner of chat history</li>
+          <li>removed the wx.inspection tool</li>
+          <li>added 64-bit installer script</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.7a, 2012-12-30:</h4>
+        <ul>
+          <li>made whole application window target for file drop</li>
+          <li>added "Open a database.." button</li>
+          <li>made "Open selected" button to open all selected instead of first</li>
+          <li>added a confirmation to "Clear list" button</li>
+          <li>fixed a small logic error in menu items when toggling console</li>
+          <li>changed infotext slightly</li>
+          <li>created an installer package</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.6a, 2012-11-20:</h4>
+        <ul>
+          <li>handle defective avatar images</li>
+          <li>fix database list date sort</li>
+          <li>refresh database list columns after change</li>
+          <li>added participant count to chat list</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.5a, 2012-11-01:</h4>
+        <ul>
+          <li>a minor Unicode issue</li>
+          <li>updated binaries to using PyInstaller 2</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.4a, 2012-08-20:</h4>
+        <ul>
+          <li>started showing "This message has been removed." for deleted messages</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.3a, 2012-06-28:</h4>
+        <ul>
+          <li>removed possible duplicate paths in database detection</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.2a, 2012-06-22:</h4>
+        <ul>
+          <li>fixed overwriting files in batch export for chats with identical names</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.1a, 2012-06-18:</h4>
+        <ul>
+          <li>added multiple database export functionality</li>
+          <li>tweaked export formatting</li>
+        </ul>
+        <br />
+
+        <h4>v0.10.0a, 2012-05-29:</h4>
+        <ul>
+          <li>refactored application modules</li>
+          <li>made message decoding more robust</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.8a, 2012-05-28:</h4>
+        <ul>
+          <li>added option to batch-export all database chats</li>
+          <li>fixed rare encoding errors in TXT export</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.7a, 2012-04-30:</h4>
+        <ul>
+          <li>fixed problems when using an empty database</li>
+          <li>fixed inserting BLOB fields during merge</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.6a, 2012-04-18:</h4>
+        <ul>
+          <li>fixed error messages on application exit under certain conditions</li>
+          <li>excluded conversations with no name from views and merging</li>
+          <li>changed results of diff scanning</li>
+          <li>cosmetic changes in code</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.5a, 2012-04-17:</h4>
+        <ul>
+          <li>increased number of tries to access a Skype database after closing Skype</li>
+          <li>fixed some concurrency issues when using one database in multiple diffs</li>
+          <li>fixed releasing memory for closed pages</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.4a, 2012-04-15:</h4>
+        <ul>
+          <li>added embedded favicons to HTML exports</li>
+          <li>added embedded application icon to precompiled exe</li>
+          <li>filenames assembled with os.path.join</li>
+          <li>converted images_to_py.py to using double quotation marks</li>
+          <li>started using Ultimate Packer for Executables</li>
+          <li>started sorting chat participants by name in lists</li>
+        </ul>
+        <br />
+
+        <h4>v0.9.3a, 2012-04-15:</h4>
+        <ul>
+          <li>first public release</li>
+        </ul>
+        <br />
+
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/suurjaak">Erki Suurjaak</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
