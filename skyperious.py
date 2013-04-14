@@ -1488,11 +1488,11 @@ class DatabasePage(wx.Panel):
         tb.MinSize = (175, -1)
         tb.SetToolBitmapSize((24, 24))
         tb.AddRadioTool(wx.ID_INFO, bitmap=images.ToolbarMessage.Bitmap,
-            shortHelp="Search in message body  (Alt-M)")
+            shortHelp="Search in message body")
         tb.AddRadioTool(wx.ID_ABOUT, bitmap=images.ToolbarTitle.Bitmap,
-            shortHelp="Search in chat title and participants  (Alt-T)")
+            shortHelp="Search in chat title and participants")
         tb.AddRadioTool(wx.ID_NETWORK, bitmap=images.ToolbarContact.Bitmap,
-            shortHelp="Search in contact information  (Alt-C)")
+            shortHelp="Search in contact information")
         tb.AddSeparator()
         tb.AddCheckTool(wx.ID_NEW, bitmap=images.ToolbarTabs.Bitmap,
             shortHelp="New tab for each search  (Alt-N)", longHelp="")
@@ -3141,8 +3141,6 @@ class DatabasePage(wx.Panel):
                 ]
                 self.chat_filter["daterange"] = date_range
                 self.chat_filter["startdaterange"] = date_range
-                if center_message_id: # No fixed date range if specific message
-                    del self.chat_filter["daterange"]
                 dates_range = dates_values = date_range
                 avatar_default = images.AvatarDefault.Bitmap
                 if chat != self.chat:
@@ -5067,53 +5065,41 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._append_text("  (%s).  " % util.plural(
                                   "message", self._messages_current))
             if self._chat["message_count"]:
-                #self._actionlinks[self._stc.Length] = \
-                #    lambda: self._page.on_toggle_filter(None)
-                #self._append_text("Toggle filter panel", "link")
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
                 date_last = self._chat["last_message_datetime"].date()
                 date_until = datetime.date.today()
                 dates_filter = self._filter.get("daterange", None)
-                DATELINKS = [("day", 7), ("week", 2), ("day", 30),
-                    ("month", 3), ("month", 6), ("year", 1), ("year", 2)]
-                for unit, count in DATELINKS:
+                from_items = [] # [(title, [date_first, date_last])]
+                for unit, count in [("day", 7), ("week", 2), ("day", 30),
+                ("month", 3), ("month", 6), ("year", 1), ("year", 2)]:
                     date_start = date_until - relativedelta(
                         **{util.plural(unit): count})
                     if date_start >= date_first and date_start <= date_last:
                         title = util.plural(unit, count)
-                        daterange = [date_start, date_last]
-                        active = (title == self._actionlink_last) \
-                                 or (daterange == dates_filter)
-                        if not active:
-                            self._actionlinks[self._stc.Length] = daterange
-                        self._append_text(title, "bold" if active else "link")
-                        self._append_text(u"  \u2022  ", "special") # bullet
+                        from_items.append((title, [date_start, date_last]))
                 if date_until - relativedelta(years=2) > date_first:
+                    # @warning: possible mis-showing here if chat < 4 years
                     title = "2 to 4 years"
                     daterange = [date_until - relativedelta(years=4),
                                  date_until - relativedelta(years=2)]
-                    # @warning: possible mis-showing here if chat < 4 years
-                    active = (title == self._actionlink_last) \
-                             or (daterange == dates_filter)
-                    self._actionlinks[self._stc.Length] = daterange
-                    self._append_text(title, "bold" if active else "link")
-                    self._append_text(u"  \u2022  ", "special") # bullet
+                    from_items.append((title, daterange))
                 if date_until - relativedelta(years=4) > date_first:
                     title = "4 years and older"
                     daterange = [date_first,
                                  date_until - relativedelta(years=4)]
-                    active = (title == self._actionlink_last) or \
-                        (daterange == dates_filter)
-                    self._actionlinks[self._stc.Length] = daterange
-                    self._append_text(title, "bold" if active else "link")
-                    self._append_text(u"  \u2022  ", "special") # bullet
+                    from_items.append((title, daterange))
                 daterange = [date_first, date_last]
-                title = "From the beginning"
-                self._actionlinks[self._stc.Length] = daterange
-                active = (title == self._actionlink_last) \
-                         or (daterange == dates_filter)
-                self._append_text(title, "bold" if active else "link")
+                from_items.append(("From the beginning", daterange))
+                for i, (title, daterange) in enumerate(from_items):
+                    is_active = center_message_id is None \
+                                and ((title == self._actionlink_last) 
+                                     or (daterange == dates_filter))
+                    if i:
+                        self._append_text(u"  \u2022  ", "special") # bullet
+                    if not is_active:
+                        self._actionlinks[self._stc.Length] = daterange
+                    self._append_text(title, "bold" if is_active else "link")
             self._actionlink_last = None
             self._append_text("\n\n")
 

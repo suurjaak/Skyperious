@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2013
+@modified    14.04.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -36,9 +36,9 @@ Title = "Skyperious"
 """Module containing application main window class."""
 MainWindowModule = "skyperious"
 
-Version = "1.3"
+Version = "1.3.1"
 
-VersionDate = "10.04.2013"
+VersionDate = "14.04.2013"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
