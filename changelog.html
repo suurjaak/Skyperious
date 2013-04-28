@@ -39,13 +39,24 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
+
       <section>
         <h2>Changelog</h2>
+
+        <h4>v1.3.2, 2013-04-28:</h4>
+        <ul>
+          <li>fixed a bug in comparing databases where messages have no author</li>
+          <li>fixed a bug in generating chat statistics for databases with exotic Unicode pathnames</li>
+          <li>fixed showing database labels with exotic Unicode pathnames in database comparison</li>
+          <li>fixed a problem where chat history could remain stuck in text selection mode after clicking a hyperlink</li>
+          <li>disabled "Merge selected contacts" buttons after swapping left-right databases</li>
+        </ul>
+        <br />
 
         <h4>v1.3.1, 2013-04-14:</h4>
         <ul>
@@ -99,7 +110,7 @@
           <li>added full message date-time as hovertext in HTML exports</li>
           <li>made chat list ordering case-insensitive</li>
           <li>small UI logic changes</li>
-          <li>started restoring previous window size and on position on load</li>
+          <li>started restoring previous window size and position on load</li>
           <li>upgraded RangeSlider logic for single-selection range and disabled state</li>
           <li>enlarged the search icon in the lower right corner of chat history</li>
           <li>removed the wx.inspection tool</li>
