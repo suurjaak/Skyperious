@@ -18,7 +18,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2013
+@modified    28.04.2013
 """
 import BeautifulSoup
 import collections
@@ -3258,9 +3258,9 @@ class DatabasePage(wx.Panel):
                 c2 = BeautifulSoup.Tag(h, "td", {"valign": "top"})
                 avatar_filename = "avatar__default.jpg"
                 if "avatar_bitmap" in contact:
-                    avatar_filename = "%s_%s.jpg" % tuple(map(
-                        urllib.quote, (self.db.filename, contact["identity"])
-                     ))
+                    avatar_filename = "%s_%s.jpg" % tuple(map(urllib.quote,
+                        (self.db.filename.encode("utf-8"), contact["identity"])
+                    ))
                     if avatar_filename not in self.memoryfs["files"]:
                         self.memoryfs["handler"].AddFile(avatar_filename,
                             contact["avatar_bitmap"], wx.BITMAP_TYPE_BMP
@@ -4057,14 +4057,11 @@ class MergerPage(wx.Panel):
         structures and UI content.
         """
         self.db1, self.db2 = self.db2, self.db1
-        self.html_dblabel.SetPage(
-            "Database %s"
-            " vs %s:" % (export.htmltag("a",
-                            {"href": self.db1.filename}, self.db1.filename),
-                         export.htmltag("a",
-                            {"href": self.db2.filename}, self.db2.filename)
-            )
-        )
+        f1, f2 = self.db1.filename, self.db2.filename
+        label_title = "Database %s vs %s:" % (
+            export.htmltag("a", {"href": f1}, f1),
+            export.htmltag("a", {"href": f2}, f2))
+        self.html_dblabel.SetPage(label_title.decode("utf-8"))
         self.html_dblabel.BackgroundColour = self.BackgroundColour
         self.con1diff, self.con2diff = self.con2diff, self.con1diff
         self.con1difflist, self.con2difflist = \
@@ -4128,10 +4125,12 @@ class MergerPage(wx.Panel):
             self.list_chats.SortListItems(3, 0) # Sort by last message in left
             self.list_chats.OnSortOrderChanged()
         # Swap button states
-        for i in ["all", "_chat_", "_contacts", "_allcontacts"]:
+        for i in ["all", "_chat_", "_allcontacts"]:
             n = "button_merge%s" % i
             b1, b2 = getattr(self, "%s1" % n), getattr(self, "%s2" % n)
             b1.Enabled, b2.Enabled = b2.Enabled, b1.Enabled
+        self.button_merge_contacts1.Enabled = False # Selection and ordering
+        self.button_merge_contacts2.Enabled = False # is lost anyway
         self.Refresh()
         self.page_merge_all.Layout()
         self.Layout()
@@ -4519,14 +4518,11 @@ class MergerPage(wx.Panel):
 
     def load_data(self):
         """Loads data from our SkypeDatabases."""
-        self.html_dblabel.SetPage(
-            "Database %s"
-            " vs %s:" % (export.htmltag("a",
-                            {"href": self.db1.filename}, self.db1.filename),
-                         export.htmltag("a",
-                            {"href": self.db2.filename}, self.db2.filename)
-            )
-        )
+        f1, f2 = self.db1.filename, self.db2.filename
+        label_title = "Database %s vs %s:" % (
+            export.htmltag("a", {"href": f1}, f1),
+            export.htmltag("a", {"href": f2}, f2))
+        self.html_dblabel.SetPage(label_title.decode("utf-8"))
         self.html_dblabel.BackgroundColour = self.BackgroundColour
 
         # Populate the chat comparison list
@@ -4855,7 +4851,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             elif url:
                 # Launching an external program here will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
-                wx.CallAfter(webbrowser.open, url)
+                wx.CallLater(50, webbrowser.open, url)
         event.StopPropagation()
 
 

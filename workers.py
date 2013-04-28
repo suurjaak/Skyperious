@@ -4,7 +4,7 @@ Background workers for searching and diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    07.04.2013
+@modified    28.04.2013
 """
 import cStringIO
 import datetime
@@ -516,7 +516,7 @@ class DiffThread(WorkerThread):
                     t = parser.parse(m, text={"wrap": False})
                 t = t if type(t) is str else t.encode("utf-8")
                 difftext = difftexts[id(m)] = "%s-%s-%s" % (
-                    m["author"].encode("utf-8"), m["type"], t
+                    (m["author"] or "").encode("utf-8"), m["type"], t
                 )
                 if difftext not in bodymap: bodymap[difftext] = []
                 bodymap[difftext].append(m)
