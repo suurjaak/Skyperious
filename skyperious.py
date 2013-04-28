@@ -1331,7 +1331,7 @@ class DatabasePage(wx.Panel):
         tb = self.tb_chat = \
             wx.ToolBar(parent=panel_stc1, style=wx.TB_FLAT | wx.TB_NODIVIDER)
         tb.SetToolBitmapSize((24, 24))
-        tb.AddCheckTool(wx.ID_TOP,
+        tb.AddCheckTool(wx.ID_ZOOM_100,
                         bitmap=images.ToolbarMaximize.Bitmap,
                         shortHelp="Maximize chat panel  (Alt-M)")
         tb.AddCheckTool(wx.ID_PROPERTIES,
@@ -1340,7 +1340,7 @@ class DatabasePage(wx.Panel):
         tb.AddCheckTool(wx.ID_MORE, bitmap=images.ToolbarFilter.Bitmap,
                         shortHelp="Toggle filter panel  (Alt-G)")
         tb.Realize()
-        self.Bind(wx.EVT_TOOL, self.on_toggle_maximize, id=wx.ID_TOP)
+        self.Bind(wx.EVT_TOOL, self.on_toggle_maximize, id=wx.ID_ZOOM_100)
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats, id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter, id=wx.ID_MORE)
 
@@ -1487,24 +1487,23 @@ class DatabasePage(wx.Panel):
             wx.ToolBar(parent=page, style=wx.TB_FLAT | wx.TB_NODIVIDER)
         tb.MinSize = (175, -1)
         tb.SetToolBitmapSize((24, 24))
-        tb.AddRadioTool(wx.ID_INFO, bitmap=images.ToolbarMessage.Bitmap,
+        tb.AddRadioTool(wx.ID_INDEX, bitmap=images.ToolbarMessage.Bitmap,
             shortHelp="Search in message body")
         tb.AddRadioTool(wx.ID_ABOUT, bitmap=images.ToolbarTitle.Bitmap,
             shortHelp="Search in chat title and participants")
-        tb.AddRadioTool(wx.ID_NETWORK, bitmap=images.ToolbarContact.Bitmap,
+        tb.AddRadioTool(wx.ID_PREVIEW, bitmap=images.ToolbarContact.Bitmap,
             shortHelp="Search in contact information")
         tb.AddSeparator()
         tb.AddCheckTool(wx.ID_NEW, bitmap=images.ToolbarTabs.Bitmap,
             shortHelp="New tab for each search  (Alt-N)", longHelp="")
-        tb.AddStretchableSpace()
         tb.AddSimpleTool(wx.ID_STOP, bitmap=images.ToolbarStopped.Bitmap,
             shortHelpString="Stop current search, if any")
         tb.Realize()
-        tb.ToggleTool(wx.ID_INFO, conf.SearchInMessageBody)
+        tb.ToggleTool(wx.ID_INDEX, conf.SearchInMessageBody)
         tb.ToggleTool(wx.ID_ABOUT, conf.SearchInChatInfo)
-        tb.ToggleTool(wx.ID_NETWORK, conf.SearchInContacts)
+        tb.ToggleTool(wx.ID_PREVIEW, conf.SearchInContacts)
         tb.ToggleTool(wx.ID_NEW, conf.SearchInNewTab)
-        for id in [wx.ID_INFO, wx.ID_ABOUT, wx.ID_NETWORK, wx.ID_NEW]:
+        for id in [wx.ID_INDEX, wx.ID_ABOUT, wx.ID_PREVIEW, wx.ID_NEW]:
             self.Bind(wx.EVT_TOOL, self.on_searchall_toggle_toolbar, id=id)
         self.Bind(wx.EVT_TOOL, self.on_searchall_stop, id=wx.ID_STOP)
 
@@ -2474,13 +2473,13 @@ class DatabasePage(wx.Panel):
 
     def on_searchall_toggle_toolbar(self, event):
         """Handler for toggling a setting in search toolbar."""
-        if wx.ID_INFO == event.Id:
+        if wx.ID_INDEX == event.Id:
             conf.SearchInMessageBody = True
             conf.SearchInChatInfo = conf.SearchInContacts = False
         elif wx.ID_ABOUT == event.Id:
             conf.SearchInChatInfo = True
             conf.SearchInMessageBody = conf.SearchInContacts = False
-        elif wx.ID_NETWORK == event.Id:
+        elif wx.ID_PREVIEW == event.Id:
             conf.SearchInContacts = True
             conf.SearchInMessageBody = conf.SearchInChatInfo = False
 
@@ -2779,7 +2778,7 @@ class DatabasePage(wx.Panel):
                 self.panel_chats1, self.panel_chats2, sashPosition=p
             )
             shorthelp = "Maximize chat panel  (Alt-M)"
-        self.tb_chat.SetToolShortHelp(wx.ID_TOP, shorthelp)
+        self.tb_chat.SetToolShortHelp(wx.ID_ZOOM_100, shorthelp)
 
 
     def toggle_filter(self, on):
@@ -3013,8 +3012,9 @@ class DatabasePage(wx.Panel):
     def on_rollback_table(self, event):
         """Handler for clicking to rollback the changed database table."""
         self.grid_table.Table.UndoChanges()
-        self.grid_table.ContainingSizer.Layout() # Refresh scrollbars
         self.on_change_table(None)
+        # Refresh scrollbars; without CallAfter wx 2.8 can crash
+        wx.CallAfter(self.grid_table.ContainingSizer.Layout)
 
 
     def on_insert_row(self, event):
@@ -3026,8 +3026,9 @@ class DatabasePage(wx.Panel):
         self.grid_table.SetGridCursor(0, 0)
         self.grid_table.ScrollLineY = 0 # Scroll to top to the new row
         self.grid_table.Refresh()
-        self.grid_table.ContainingSizer.Layout() # Refresh scrollbars
         self.on_change_table(None)
+        # Refresh scrollbars; without CallAfter wx 2.8 can crash
+        wx.CallAfter(self.grid_table.ContainingSizer.Layout)
 
 
     def on_delete_row(self, event):

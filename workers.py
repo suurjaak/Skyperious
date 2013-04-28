@@ -340,7 +340,7 @@ class SearchThread(WorkerThread):
                 final_text = "No matches found."
                 if self._drop_results:
                     result["html"] = ""
-                elif result_count:
+                if result_count:
                     final_text = ""
                     for table, count in filter(lambda x: x[1], counts.items()):
                         text = util.plural(table[:-1], count)

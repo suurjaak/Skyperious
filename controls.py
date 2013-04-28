@@ -1796,6 +1796,7 @@ class ProgressPanel(wx.Window):
         label.ForegroundColour = self.FOREGROUND_COLOUR
         sizer.Add(label, border=15, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         self.Fit()
+        self.Layout()
         self.CenterOnParent()
         self.Show()
         parent.Refresh()

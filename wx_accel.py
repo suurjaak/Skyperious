@@ -25,7 +25,7 @@ Uses primitive heuristic analysis to detect connected label-control pairs:
 
 @author    Erki Suurjaak
 @created   19.11.2011
-@modified  24.03.2013
+@modified  28.04.2013
 """
 import functools
 import re
@@ -107,9 +107,14 @@ def collect_shortcuts(control, use_heuristics=True):
         result = []
         # wx.TextCtrl.Label is the same as its value, so must not use that
         if isinstance(ctrl, wx.ToolBar):
-            for i in range(ctrl.GetToolsCount()):
-                id = ctrl.GetToolByPos(i).GetId()
-                text = ctrl.GetToolShortHelp(id)
+            toolsmap = dict()
+            for i in range(ctrl.GetToolsCount() + 1):
+                # wx 2.8 has no functionality for getting tools by index, so
+                # need to gather them by layout position
+                tool = ctrl.FindToolForPosition(i * ctrl.ToolSize[0], 0)
+                toolsmap[repr(tool)] = tool
+            for tool in filter(None, toolsmap.values()):
+                text = ctrl.GetToolShortHelp(tool.GetId())
                 parts = re.split("\(Alt-(.)\)", text, maxsplit=1)
                 if len(parts) > 1:
                     result.append(parts[1].lower())
@@ -169,7 +174,7 @@ def collect_shortcuts(control, use_heuristics=True):
             # Do not include buttons, as buttons have their own shortcut keys.
             if next_sibling and not isinstance(next_sibling, wx.Button) \
             and (not next_sibling.Enabled or next_sibling.AcceptsFocus()
-            or next_sibling.CanAcceptFocus()):
+            or getattr(next_sibling, "CanAcceptFocus", lambda: False)()):
                 chosen = next_sibling
                 if (DEBUG):
                     print 'Selected "%s" by previous sibling wxStaticText ' \
@@ -182,7 +187,7 @@ def collect_shortcuts(control, use_heuristics=True):
                 # Disabled controls might return False for AcceptsFocus).
                 if next_ctrl and not isinstance(next_ctrl, wx.Button) \
                 and (not next_ctrl.Enabled or next_ctrl.AcceptsFocus()
-                or next_ctrl.CanAcceptFocus()):
+                or getattr(next_ctrl, "CanAcceptFocus", lambda: False)()):
                     chosen = next_ctrl
                     if (DEBUG):
                         print 'Selected "%s" by previous ID wxStaticText ' \
@@ -204,7 +209,7 @@ def collect_shortcuts(control, use_heuristics=True):
                     next_ctrl = sizer_items[index + 1]
                     if next_ctrl and not isinstance(next_ctrl, wx.Button) \
                     and (not next_ctrl.Enabled or next_ctrl.AcceptsFocus()
-                    or next_sibling.CanAcceptFocus()):
+                    or getattr(next_ctrl, "CanAcceptFocus", lambda: False)()):
                         chosen = next_ctrl
                         if (DEBUG):
                             print 'Selected "%s" by previous in sizer ' \
@@ -306,9 +311,13 @@ def accelerate(window, use_heuristics=True):
                     target.SetFocus()
                 elif isinstance(target, wx.ToolBar):
                     # Toolbar shortcuts are defined in their shorthelp texts
-                    for i in range(target.GetToolsCount()):
-                        id = target.GetToolByPos(i).GetId()
-                        text = target.GetToolShortHelp(id)
+                    toolsmap, tb = dict(), target
+                    for i in range(tb.GetToolsCount() + 1):
+                        tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
+                        toolsmap[repr(tool)] = tool
+                    for tool in filter(None, toolsmap.values()):
+                        id = tool.GetId()
+                        text = tb.GetToolShortHelp(id)
                         parts = re.split("\(Alt-(%s)\)" % key, text,
                                          maxsplit=1, flags=re.IGNORECASE)
                         if len(parts) > 1:
