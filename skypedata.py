@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2013
+@modified    29.04.2013
 """
 import copy
 import cStringIO
@@ -2317,7 +2317,7 @@ def detect_databases():
     # Then search system directories for main.db files.
     search_paths = filter(None, [os.getenv("HOME")])
     if os.name in ["mac", "posix"]:
-        search_paths.append(["/Users", "/home"][os.name])
+        search_paths.append({"mac": "/Users", "posix": "/home"}[os.name])
     elif "nt" == os.name:
         search_paths.append(os.path.join(os.getenv("APPDATA"), "Skype"))
         c = os.getenv("SystemDrive") or "C:"

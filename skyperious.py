@@ -18,7 +18,7 @@ In addition, Skyperious allows to:
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.04.2013
+@modified    29.04.2013
 """
 import BeautifulSoup
 import collections
@@ -357,9 +357,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         sizer.Add(sizer_sides,
             border=5, proportion=1, flag=wx.LEFT | wx.RIGHT | wx.GROW
         )
-        sizer.Add(
-            infotext, border=5, flag=wx.TOP | wx.GROW | wx.ALIGN_CENTER
-        )
+        sizer.Add(infotext, border=5, flag=wx.TOP | wx.ALIGN_CENTER)
         sizer_footer = wx.BoxSizer(wx.HORIZONTAL)
         sizer_footer.Add(wx.StaticText(parent=page, label=conf.VersionText))
         hyperlink = wx.HyperlinkCtrl(parent=page, id=wx.NewId(),
@@ -628,7 +626,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         detection in a background thread.
         """
         self.button_detect.Enabled = False
-        threading.Thread(target=self.detect_databases).start()
+        #threading.Thread(target=self.detect_databases).start()
+        wx.CallAfter(self.detect_databases)
 
 
     def on_export_multi(self, event):
@@ -2200,6 +2199,9 @@ class DatabasePage(wx.Panel):
             "CSV spreadsheet (*.csv)|*.csv"
         if wx.ID_OK == self.dialog_savefile.ShowModal():
             filename = self.dialog_savefile.GetPath()
+            extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
+            if not filename.lower().endswith(".%s" % extname):
+                filename += ".%s" % extname
             busy = controls.ProgressPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
@@ -2295,6 +2297,9 @@ class DatabasePage(wx.Panel):
             "CSV spreadsheet (*.csv)|*.csv"
         if wx.ID_OK == self.dialog_savefile.ShowModal():
             filename = self.dialog_savefile.GetPath()
+            extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
+            if not filename.lower().endswith(".%s" % extname):
+                filename += ".%s" % extname
             busy = controls.ProgressPanel(
                 self, "Filtering and exporting \"%s\"." % self.chat["title"]
             )
@@ -2868,6 +2873,11 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.Message = "Save table as"
             if wx.ID_OK == self.dialog_savefile.ShowModal():
                 filename = self.dialog_savefile.GetPath()
+                exts = ["html", "csv"] if grid_source is not self.grid_table \
+                       else ["html", "sql", "csv"]
+                extname = exts[self.dialog_savefile.FilterIndex]
+                if not filename.lower().endswith(".%s" % extname):
+                    filename += ".%s" % extname
                 busy = controls.ProgressPanel(
                     self, "Exporting \"%s\"." % filename
                 )
@@ -3577,7 +3587,8 @@ class DatabasePage(wx.Panel):
         # Chat name column can be really long, pushing all else out of view
         self.list_chats.SetColumnWidth(0, 300)
 
-        wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
+        #wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
+        wx.CallLater(200, self.load_later_data)
 
 
     def load_later_data(self):
@@ -4415,8 +4426,9 @@ class MergerPage(wx.Panel):
                 s.SetReadOnly(False)
                 s.ClearAll()
                 s.SetReadOnly(True)
-            later = threading.Thread(target=self.load_later_data)
-            wx.CallLater(20, later.start)
+            #later = threading.Thread(target=self.load_later_data)
+            #wx.CallLater(20, later.start)
+            wx.CallLater(20, self.load_later_data)
 
 
 
@@ -4548,7 +4560,8 @@ class MergerPage(wx.Panel):
         self.list_chats.SortListItems(3, 0) # Sort by last message in left
         self.list_chats.OnSortOrderChanged()
         self.compared = compared
-        wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
+        #wx.CallLater(200, threading.Thread(target=self.load_later_data).start)
+        wx.CallLater(200, self.load_later_data)
 
 
     def load_later_data(self):

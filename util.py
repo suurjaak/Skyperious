@@ -4,12 +4,13 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    07.03.2013
+@modified    29.04.2013
 """
 import math
 import os
 import re
 import string
+import subprocess
 import time
 
 
