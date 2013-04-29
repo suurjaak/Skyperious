@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.03.2013
+@modified    29.04.2013
 """
 import datetime
 import locale
@@ -16,6 +16,8 @@ import threading
 import wx
 import wx.html
 import wx.lib.agw.flatnotebook
+import wx.lib.agw.gradientbutton
+import wx.lib.agw.shapedbutton
 import wx.lib.embeddedimage
 import wx.lib.mixins.listctrl
 import wx.stc
@@ -1298,10 +1300,10 @@ class SearchableStyledTextCtrl(wx.PyPanel):
     CB_CASE_LABEL = "Match case"
 
     """Label for the "Match whole word" checkbox."""
-    CB_WHOLEWORD_LABEL = "Match whole word"
+    CB_WHOLEWORD_LABEL = "Whole word"
 
     """Label for the "Match regex" checkbox."""
-    CB_REGEX_LABEL = "Match regex"
+    CB_REGEX_LABEL = "Regex"
 
     """Width of the search box, in pixels."""
     SEARCH_WIDTH = 150

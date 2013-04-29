@@ -1,10 +1,11 @@
 #-*- coding: utf-8 -*-
 """
-Background workers for searching and diffing.
+Background workers for potentially long-running tasks like searching and
+diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    28.04.2013
+@modified    29.04.2013
 """
 import cStringIO
 import datetime
@@ -614,3 +615,30 @@ class ContactSearchThread(WorkerThread):
                 if not self._drop_results:
                     result["done"] = True
                     self._postback(result)
+
+
+
+class DetectDatabaseThread(WorkerThread):
+    """
+    Skype database detection background thread, goes through potential
+    directories and yields database filenames back to main thread one by one.
+    """
+
+    def run(self):
+        self._is_running = True
+        while self._is_running:
+            search = self._queue.get()
+            self._stop_work = self._drop_results = False
+            if search:
+                filenames = set() # To handle potential duplicates
+                for filename in skypedata.detect_databases():
+                    
+                    if not self._drop_results and filename not in filenames:
+                        result = {"filename": filename}
+                        self._postback(result)
+                    filenames.add(filename)
+                    if self._stop_work:
+                        break # break for filename in skypedata.detect_data...
+
+                result = {"done": True, "count": len(filenames)}
+                self._postback(result)

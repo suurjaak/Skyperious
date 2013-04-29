@@ -49,12 +49,11 @@ import wx.grid
 import wx.lib
 import wx.lib.agw.fmresources
 import wx.lib.agw.genericmessagedialog
-import wx.lib.agw.gradientbutton
 import wx.lib.agw.labelbook
 import wx.lib.agw.flatnotebook
-import wx.lib.agw.shapedbutton
 import wx.lib.agw.ultimatelistctrl
 import wx.lib.buttons
+import wx.lib.delayedresult
 import wx.lib.newevent
 import wx.lib.wordwrap
 import wx.py
@@ -76,6 +75,7 @@ import wx_accel
 """Custom application events for worker results."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
 ContactWorkerEvent, EVT_CONTACT_WORKER = wx.lib.newevent.NewEvent()
+DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 
 
 
@@ -144,6 +144,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # Memory file system for feeding avatar images to HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
         wx.FileSystem_AddHandler(self.memoryfs["handler"])
+        self.worker_detection = \
+            workers.DetectDatabaseThread(self.on_detect_databases_callback)
+        self.Bind(EVT_DETECTION_WORKER, self.on_detect_databases_result)
 
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
@@ -420,20 +423,38 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_exit, m_exit)
 
 
-    def detect_databases(self):
-        """Fills the databases list with autodetected Skype databases."""
+    def on_detect_databases(self, event):
+        """
+        Handler for clicking to auto-detect Skype databases, starts the
+        detection in a background thread.
+        """
         main.logstatus("Searching local computer for Skype databases..")
-        count = 0
-        for filename in skypedata.detect_databases():
-            if self.update_database_list(filename):
-                main.log("Detected Skype database %s." % filename)
-                count += 1
-        main.logstatus("Detected %d%s Skype database%s.",
-            count,
-            " additional" if not (count) else "",
-            "" if count == 1 else "s"
-        )
-        self.button_detect.Enabled = True
+        self.button_detect.Enabled = False
+        self.worker_detection.work(True)
+
+
+    def on_detect_databases_callback(self, result):
+        """Callback for DetectDatabaseThread, posts the data to self."""
+        wx.PostEvent(self, DetectionWorkerEvent(result=result))
+
+
+    def on_detect_databases_result(self, event):
+        """
+        Handler for getting results from database detection thread, adds the
+        results to the database list.
+        """
+        result = event.result
+        if "filename" in result:
+            if self.update_database_list(result["filename"]):
+                main.log("Detected Skype database %s." % result["filename"])
+        if "count" in result:
+            main.logstatus("Detected %d%s Skype database%s.",
+                result["count"],
+                " additional" if not (result["count"]) else "",
+                "" if result["count"] == 1 else "s"
+            )
+        if result.get("done", False):
+            self.button_detect.Enabled = True
 
 
     def update_database_list(self, filename=""):
@@ -618,16 +639,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.notebook.SetSelection(self.notebook.GetPageCount() - 1)
             self.page_log.Show(show)
             self.menu_log.Enable(False)
-
-
-    def on_detect_databases(self, event):
-        """
-        Handler for clicking to auto-detect Skype databases, starts the
-        detection in a background thread.
-        """
-        self.button_detect.Enabled = False
-        #threading.Thread(target=self.detect_databases).start()
-        wx.CallAfter(self.detect_databases)
 
 
     def on_export_multi(self, event):
@@ -1180,9 +1191,7 @@ class DatabasePage(wx.Panel):
 
         sizer_header = wx.BoxSizer(wx.HORIZONTAL)
         label_title = self.label_title = wx.StaticText(parent=self, label="")
-        sizer_header.Add(
-            label_title, border=5, flag=wx.ALIGN_CENTER_VERTICAL | wx.TOP
-        )
+        sizer_header.Add(label_title, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_header.AddStretchSpacer()
 
         sizer_header.Add(wx.StaticText(
@@ -1199,7 +1208,7 @@ class DatabasePage(wx.Panel):
         tb.AddLabelTool(wx.ID_FIND, "", bitmap=bmp, shortHelp="Start search")
         tb.Realize()
         self.Bind(wx.EVT_TOOL, self.on_searchall, id=wx.ID_FIND)
-        sizer_header.Add(edit_search, border=5, flag=wx.RIGHT | wx.ALIGN_RIGHT)
+        sizer_header.Add(edit_search, border=5, flag=wx.RIGHT | wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
         sizer_header.Add(tb, flag=wx.ALIGN_RIGHT | wx.GROW)
         sizer.Add(sizer_header,
             border=5, flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW
@@ -1274,7 +1283,6 @@ class DatabasePage(wx.Panel):
         self.toggle_filter(True)
 
 
-
     def create_page_chats(self, notebook):
         """Creates a page for listing and reading chats."""
         page = self.page_chats = wx.Panel(parent=notebook)
@@ -1296,7 +1304,7 @@ class DatabasePage(wx.Panel):
             parent=panel1, style=wx.LC_REPORT | wx.LC_SINGLE_SEL
         )
         button_export_allchats = self.button_export_allchats = wx.Button(
-            parent=panel1, label="Exp&ort all chats", size=(100, -1)
+            parent=panel1, label="Exp&ort all chats"
         )
         sizer_top.Add(button_export_allchats, flag=wx.ALIGN_CENTER_HORIZONTAL)
         self.Bind(wx.EVT_BUTTON, self.on_export_allchats, button_export_allchats)
@@ -1352,7 +1360,7 @@ class DatabasePage(wx.Panel):
         )
         sizer_header.Add(tb, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         sizer_header.Add(button_export, border=15,
-            flag=wx.ALIGN_BOTTOM | wx.LEFT
+            flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT
         )
 
         stc = self.stc_history = ChatContentSTC(
@@ -1593,7 +1601,7 @@ class DatabasePage(wx.Panel):
         tb.Realize() # should be called after adding tools
         label_table = self.label_table = wx.StaticText(parent=panel2, label="")
         button_reset = self.button_reset_grid_table = wx.Button(
-            parent=panel2, label="&Reset filter/sort", size=(100, -1)
+            parent=panel2, label="&Reset filter/sort"
         )
         button_reset.SetToolTipString(
             "Resets all applied sorting and filtering."
@@ -1652,7 +1660,7 @@ class DatabasePage(wx.Panel):
         )
         splitter.SetMinimumPaneSize(50)
 
-        panel1 = wx.Panel(parent=splitter)
+        panel1 = self.panel_sql1 = wx.Panel(parent=splitter)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         label_stc = wx.StaticText(parent=panel1, label="SQ&L:")
         stc = self.stc_sql = controls.SQLiteTextCtrl(parent=panel1,
@@ -1666,7 +1674,7 @@ class DatabasePage(wx.Panel):
         sizer1.Add(label_stc, border=5, flag=wx.ALL)
         sizer1.Add(stc, border=5, proportion=1, flag=wx.GROW | wx.LEFT)
 
-        panel2 = wx.Panel(parent=splitter)
+        panel2 = self.panel_sql2 = wx.Panel(parent=splitter)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         label_help = wx.StaticText(panel2, label=stc.GetToolTip().GetTip())
         label_help.ForegroundColour = "grey"
@@ -1674,7 +1682,7 @@ class DatabasePage(wx.Panel):
         button_sql = self.button_sql = wx.Button(panel2, label="Execute &SQL")
         self.Bind(wx.EVT_BUTTON, self.on_button_sql, button_sql)
         button_reset = self.button_reset_grid_sql = wx.Button(
-            parent=panel2, label="&Reset filter/sort", size=(100, -1)
+            parent=panel2, label="&Reset filter/sort"
         )
         button_reset.SetToolTipString(
             "Resets all applied sorting and filtering."

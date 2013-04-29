@@ -2312,7 +2312,7 @@ def detect_databases():
         for root, dirs, files in os.walk(search_path):
             for f in files:
                 if f.lower().endswith(".db"):
-                    yield os.path.join(root, f)
+                    yield os.path.realpath(os.path.join(root, f))
 
     # Then search system directories for main.db files.
     search_paths = filter(None, [os.getenv("HOME")])
