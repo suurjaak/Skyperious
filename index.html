@@ -39,9 +39,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.3.2-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.4_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.4_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_1.4-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -51,7 +51,7 @@
 
 <ul>
 <li>search across all messages and contacts</li>
-<li>browse, filter and export chat histories, see chat statistics</li>
+<li>browse chat history and export as HTML, see chat statistics</li>
 <li>import contacts from a CSV file to your Skype contacts</li>
 <li>view any database table and and export their data</li>
 <li>change, add or delete data in any table</li>
@@ -74,28 +74,41 @@ automatically, or you can select files yourself.</p>
 its core functionality should work wherever Python and required Python
 packages are installed.</p>
 
-<h2>Dependencies</h2>
-
-<p>Skyperious has been built in Python 2.7, using these 3rd-party Python packages:</p>
-
-<ul>
-<li>wxPython 2.9 (<a href="http://wxpython.org/">http://wxpython.org/</a>)</li>
-<li>Python Imaging Library, required by wxPython
-(<a href="http://www.pythonware.com/products/pil/">http://www.pythonware.com/products/pil/</a>)</li>
-<li>BeautifulSoup 3.2.0, included in source package
-(<a href="http://www.crummy.com/software/BeautifulSoup">http://www.crummy.com/software/BeautifulSoup</a>)</li>
-<li>pywin32, not required if in source code form: used for launching/shutting down Skype
-(<a href="https://sourceforge.net/projects/pywin32/">https://sourceforge.net/projects/pywin32/</a>)</li>
-<li>pyinstaller 2.0 (<a href="http://www.pyinstaller.org/">http://www.pyinstaller.org/</a>)</li>
-</ul>
-
-<p>In source code form, Skyperious also runs under Python 2.6 and wxPython 2.8, but with some quirks.</p>
 
 <h2>Attribution</h2>
 
+Skyperious has been built using the following open-source software:
+<ul>
+<li>Python 2.7.5, <a href="http://www.python.org">www.python.org</a></li>
+<li>wxPython 2.9.4, <a href="http://wxpython.org">wxpython.org</a></li>
+<li>BeautifulSoup 3.2.1, <a href="http://crummy.com/software/BeautifulSoup">crummy.com/software/BeautifulSoup</a></li>
+<li>step, Simple Template Engine for Python, <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
+<li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
+<li>Skype4Py, <a href="https://github.com/awahlig/skype4py">github.com/awahlig/skype4py</a></li>
+<li>PyInstaller 2.0, <a href="http://www.pyinstaller.org">www.pyinstaller.org</a></li>
+</ul>
+
 <p>Default avatar icon from:
-  Fancy Avatars, (c) 2009 Brandon Mathis,
+  Fancy Avatars, &copy; 2009 Brandon Mathis,
   <a href="http://brandonmathis.com/projects/fancy-avatars/">http://brandonmathis.com/projects/fancy-avatars/</a></p>
+
+<p>Several toolbar icons from:
+  Fugue Icons, &copy; 2010 Yusuke Kamiyamane,
+  <a href="http://p.yusukekamiyamane.com/">http://p.yusukekamiyamane.com/</a></p>
+
+
+<h2>Dependencies</h2>
+
+<p>In source code form, Skyperious needs these 3rd-party Python packages:</p>
+
+<ul>
+<li>wxPython 2.9.4 (<a href="http://wxpython.org/">http://wxpython.org/</a>)</li>
+<li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
+<li>Skype4Py, <a href="https://github.com/awahlig/skype4py">github.com/awahlig/skype4py</a></li>
+</ul>
+
+<p>Skyperious can also run under Python 2.6 and wxPython 2.8.</p>
+
 
 <h2>License</h2>
 
