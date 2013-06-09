@@ -4,7 +4,7 @@ GUI frame templates.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    16.12.2012
+@modified    25.05.2013
 """
 import os
 import wx
@@ -58,7 +58,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
             parent=page, label="C&lear log", size=(100, -1)
         )
         button_clear.Bind(wx.EVT_BUTTON, lambda event: self.log.Clear())
-        edit_log = self.log = wx.TextCtrl(page, -1, style=wx.TE_MULTILINE)
+        edit_log = self.log = wx.TextCtrl(page, style=wx.TE_MULTILINE)
         edit_log.SetEditable(False)
         # Read-only controls tend to be made grey by default
         edit_log.BackgroundColour = "white"
@@ -124,7 +124,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
 
     def save_last_command(self):
         """Saves the last console command in conf."""
-        history = self.console.history[-conf.ConsoleHistoryMax:][::-1]
+        history = self.console.history[:conf.ConsoleHistoryMax][::-1]
         if history != conf.ConsoleHistoryCommands:
             conf.ConsoleHistoryCommands[:] = history
             conf.save()
@@ -137,11 +137,16 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
 
     def on_log_message(self, event):
         """Event handler for adding a message to the log page."""
-        try:
-            if not (hasattr(conf, "LogEnabled")) or conf.LogEnabled:
-                self.log.AppendText(event.text + "\n")
-        except Exception, e:
-            print "Exception %s in on_log_message" % e
+        if not (hasattr(conf, "LogEnabled")) or conf.LogEnabled:
+            text = event.text
+            try:
+                self.log.AppendText(text + "\n")
+            except Exception, e:
+                try:
+                    self.log.AppendText(text.decode("utf-8", "replace") + "\n")
+                except Exception, e:
+                    print "Exception %s: %s in on_log_message" % (
+                          e.__class__.__name__, e)
 
 
     def on_showhide_console(self, event):
@@ -170,9 +175,9 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
                 self.console.Size.height / self.console.GetTextExtent(" ")[1]
             ))
         self.frame_console.Show(show)
-        self.menu_console.Text = "%s &console\tCtrl-W" % (
-            "Hide" if show else "Show"
-        )
+        label = "Hide" if show else "Show"
+        self.menu_console.Text = "%s Python &console\tCtrl-W" % label
+        self.menu_console.Help = "%ss the Python console window" % label
 
 
     def on_open_widget_inspector(self, event):

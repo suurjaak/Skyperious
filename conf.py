@@ -6,42 +6,76 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.04.2013
+@modified    09.06.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
 import json
 import os
 import sys
-
-if getattr(sys, 'frozen', False):
-    # Running as a pyinstaller executable
-    ApplicationDirectory = os.path.dirname(sys.executable)
-else:
-    ApplicationDirectory = os.path.dirname(__file__)
-
-"""List of attribute names that can be saved to and loaded from ConfigFile."""
-FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup", "RecentFiles",
-    "DBFiles", "LastSelectedFiles", "WindowPosition", "WindowSize",
-    "SearchInMessageBody", "SearchInChatInfo", "SearchInContacts",
-    "SearchInNewTab",
-]
-
-"""Whether logging is enabled."""
-LogEnabled = True
+import urllib
+import wx
 
 """Program title."""
 Title = "Skyperious"
 
-"""Module containing application main window class."""
-MainWindowModule = "skyperious"
+Version = "1.4"
 
-Version = "1.3.3a"
+VersionDate = "09.06.2013"
 
-VersionDate = "29.04.2013"
+if getattr(sys, 'frozen', False):
+    # Running as a pyinstaller executable
+    ApplicationDirectory = os.path.dirname(sys.executable)
+    ApplicationFile = os.path.realpath(sys.executable)
+else:
+    ApplicationDirectory = os.path.dirname(__file__)
+    ApplicationFile = os.path.join(ApplicationDirectory, "main.py")
+
+"""List of attribute names that can be saved to and loaded from ConfigFile."""
+FileDirectives = ["AllowMultipleInstances", "ConsoleHistoryCommands",
+    "DBDoBackup",  "DBFiles", "ErrorsReportedOnDay", "ErrorReportsAutomatic",
+    "ErrorReportHashes", "LastSelectedFiles", "LastUpdateCheck", "RecentFiles",
+    "SearchInChatInfo", "SearchInContacts", "SearchInMessageBody",
+    "SearchInNewTab", "WindowPosition", "WindowSize",
+]
+
+"""Whether logging to log window is enabled."""
+LogEnabled = True
+
+"""URLs for download list, changelog and submitting feedback."""
+DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
+ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
+ReportURL    = "http://erki.lap.ee/downloads/Skyperious/feedback"
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
+
+"""Whether multiple instances of Skyperious can be running."""
+AllowMultipleInstances = True
+
+"""
+Port for inter-process communication, receiving data from other
+launched instances if not AllowMultipleInstances.
+"""
+IPCPort = 59987
+
+"""Identifier for inter-process communication."""
+IPCName = urllib.quote_plus("%s-%s" % (wx.GetUserId(), ApplicationFile))
+
+"""Whether caught errors are reported automatically to author."""
+ErrorReportsAutomatic = False
+
+"""Errors reported on day X, e.g. {'20130530': 4, '20130531': 1, }."""
+ErrorsReportedOnDay = {}
+
+"""Maximum number of error reports sent per day."""
+ErrorReportsPerDay = 5
+
+"""Saved hashes of automatically reported errors."""
+ErrorReportHashes = []
+
+"""Maximum number of error hashes and report days to keep."""
+ErrorsStoredMax = 1000
 
 """Main window position, (x, y)."""
 WindowPosition = None
@@ -72,6 +106,12 @@ SearchInContacts = False
 
 """Whether to create a new tab for each search or reuse current."""
 SearchInNewTab = False
+
+"""Time interval to keep between update checks, a datetime.timedelta."""
+UpdateCheckInterval = datetime.timedelta(days=7)
+
+"""Date string of last time updates were checked."""
+LastUpdateCheck = None
 
 """
 Maximum number of messages shown in the chat history initially, before user
@@ -133,9 +173,6 @@ HistoryLineColour = "#E4E8ED"
 """Descriptive text shown in chat history searchbox."""
 HistorySearchDescription = "Search for.."
 
-"""Background colour of the chat history searchbox if no matches found."""
-HistorySearchNoMatchBgColour = "#FF6666"
-
 """Colour used for contact field names in search results."""
 ResultContactFieldColour = "#727272"
 
@@ -149,13 +186,13 @@ DBFileOpenedColour = "blue"
 DBTableChangedColour = "red"
 
 """Color set to the database table list table that is currently open."""
-DBTableOpenedColour = "blue"
+DBTableOpenedColour = "pink"
 
 """Colour set to table/list rows that have been changed."""
-GridRowChangedColour = "#FFCCCC"#"#FFAA22"#"#FFDAFF"
+GridRowChangedColour = "#FFCCCC"
 
 """Colour set to table/list rows that have been inserted."""
-GridRowInsertedColour = "#88DDFF"#"#22AAFF"#"#FFDAFF"
+GridRowInsertedColour = "#88DDFF"
 
 """Colour set to table/list cells that have been changed."""
 GridCellChangedColour = "#FF7777"
@@ -163,38 +200,84 @@ GridCellChangedColour = "#FF7777"
 """Colour set to chat diff list rows with identical sides."""
 DiffIdenticalColour = "#666666"
 
-"""Copyright symbol and year string."""
-Copyright = u"\xA9 2011-2013"
-
-"""Large information text shown on the first page."""
-InfoText = """
-%(name)s can open local Skype SQLite databases and look at their contents:
-- search across all messages and contacts
-- browse, filter and export chat histories, see chat statistics
-- import contacts from a CSV file to your Skype contacts
-- view database tables and export their data, change table data
-- execute direct SQL queries
-
-%(name)s can also compare two Skype databases, show the differences in chat
-histories, and copy any differences from one database to another.
-Skype uses local database files to keep its chat history, and older messages
-tend to get lost as computers get upgraded or changed.""" % {"name": Title}
-
-"""Small version text shown on the first page."""
-VersionText = "%(copy)s, Erki Suurjaak. Version %(ver)s, %(date)s." % {
-    "copy": Copyright, "ver": Version, "date": VersionDate}
-
-"""Homepage hyperlink shown on the first page."""
+"""Skyperious homepage URL."""
 HomeUrl = "http://suurjaak.github.com/Skyperious/"
+
+"""Copyright symbol and year string."""
+CopyrightSymbol = u"\xA9"
+
+"""Copyright symbol and year string."""
+Copyright = u"%s 2011-2013" % CopyrightSymbol
+
+"""Text shown in Help -> About dialog (HTML content)."""
+AboutText = """
+<font size='2' face='Tahoma'>
+<table cellpadding='0' cellspacing='0'><tr><td valign='top'>
+<img src="memory:skyperious.png" /></td><td width='10'></td><td valign='center'>
+<b>%(name)s version %(ver)s</b>, released %(date)s.<br /><br />
+
+%(name)s is written in Python, released as free open source software
+under the MIT License.
+</td></tr></table><br /><br />
+
+
+%(copyright)s, Erki Suurjaak.
+<a href='%(link)s'>suurjaak.github.com/Skyperious</a><br /><br /><br />
+
+
+
+%(name)s has been built using the following open source software:
+<ul>
+<li>wxPython 2.9.4, <a href='http://wxpython.org'>wxpython.org</a></li>
+<li>BeautifulSoup 3.2.1, <a href='http://crummy.com/software/BeautifulSoup'>
+    crummy.com/software/BeautifulSoup</a></li>
+<li>step, Simple Template Engine for Python,
+    <a href='https://github.com/dotpy/step'>github.com/dotpy/step</a></li>
+<li>dateutil, <a href='https://pypi.python.org/pypi/python-dateutil'>
+    pypi.python.org/pypi/python-dateutil</a></li>
+<li>Skype4Py, <a href='https://github.com/awahlig/skype4py'>
+    github.com/awahlig/skype4py</a></li>
+%(plus)s
+</ul><br /><br /><br />
+
+
+
+Default avatar icon from Fancy Avatars, %(copy)s 2009 Brandon Mathis<br />
+<a href='http://brandonmathis.com/projects/fancy-avatars/'>
+brandonmathis.com/projects/fancy-avatars</a><br /><br />
+
+
+Several toolbar icons from Fugue Icons, %(copy)s 2010 Yusuke Kamiyamane<br />
+<a href='http://p.yusukekamiyamane.com/'>p.yusukekamiyamane.com/</a>
+</font>
+""" % {"copy": CopyrightSymbol, "copyright": Copyright, "ver": Version,
+       "date": VersionDate, "name": Title, "link": HomeUrl,
+       "plus": "<li>Python 2.7.5, <a href='http://www.python.org'>" \
+               "www.python.org</a></li>" \
+               "<li>PyInstaller 2.0, <a href='http://www.pyinstaller.org'>" \
+               "www.pyinstaller.org</a></li>"
+               if getattr(sys, 'frozen', False) else ""
+}
+
+"""Information text shown on the first page."""
+InfoText = """
+Open a Skype message database to browse its contents, search over all chats, export chats as HTML.
+Select two databases to compare their chats, and restore missing messages.
+
+Creating a backup of the database file is recommended before making any changes.""" % {
+    "title": Title, "ver": Version, "date": VersionDate}
 
 """Width and height tuple of the avatar image, shown in chat data."""
 AvatarImageSize = (32, 32)
 
-"""Colour for files plot in chat statistics."""
+"""Colour for messages plot in chat statistics."""
 PlotMessagesColour = "#3399FF"
 
-"""Colour for files plot in chat statistics."""
+"""Colour for SMSes plot in chat statistics."""
 PlotSMSesColour = "#FFB333"
+
+"""Colour for calls plot in chat statistics."""
+PlotCallsColour = "#FF6C91"
 
 """Colour for files plot in chat statistics."""
 PlotFilesColour = "#33DD66"
@@ -203,7 +286,13 @@ PlotFilesColour = "#33DD66"
 PlotBgColour = "#DDDDDD"
 
 """Length of the chat statistics plots, in pixels."""
-PlotWidth = 200
+PlotWidth = 350
+
+"""Size of the messages plot in chat statistics, as (w, h)."""
+MessagePlotSize = (450, 300)
+
+"""Duration of "flashed" status message on StatusBar, in milliseconds."""
+StatusFlashLength = 30000
 
 """Whether a backup copy is made of a database before it's changed."""
 DBDoBackup = False

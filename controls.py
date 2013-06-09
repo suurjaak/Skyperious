@@ -4,7 +4,7 @@ Stand-alone GUI components for wx.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    29.04.2013
+@modified    30.05.2013
 """
 import datetime
 import locale
@@ -12,7 +12,6 @@ import operator
 import os
 import re
 import sys
-import threading
 import wx
 import wx.html
 import wx.lib.agw.flatnotebook
@@ -73,7 +72,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             col_lengths[col_name] = \
                 max(col_lengths[col_name], len(col_value) + 3)
             self.InsertStringItem(row_index, col_value)
-            row_id = id(row)
+            row_id = row_index
             self.SetItemData(row_index, row_id)
             item_data_map[row_id] = {0: row[col_name]}
             row_data_map[row_id] = row
@@ -82,10 +81,10 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 selected_index = row_index
             row_index += 1
         row_index = 0
-        # @todo find out why doing it it one pass mixes up values between rows
+        # Adding all cols in one pass can mix up values between rows (wx bug?).
         for row in rows:
             col_index = 1 # First was already inserted
-            row_id = id(row)
+            row_id = row_index
             for col_name, col_label in column_map[col_index:]:
                 col_value = "" if (col_name not in row
                                    or row[col_name] is None
@@ -615,13 +614,16 @@ class RangeSlider(wx.PyPanel):
                         value = confine(value, limit)
                     except: # Fails if a value of new type is being set
                         self._vals[i] = None
+                if self._rng[0] is not None \
+                and not (self._rng[0] <= value <= self._rng[1]):
+                    value = self._rng[0] if value < self._rng[0] \
+                            else self._rng[1]
             self._vals_prev[i] = self._vals[i]
             self._vals[i] = value
         if refresh and self._vals != self._vals_prev:
             self.Refresh()
     Values = property(GetValues, SetValues, doc= \
-        "See `GetValues` and `SetValues`."
-    )
+                      "See `GetValues` and `SetValues`.")
 
 
     def GetValue(self, side):
@@ -649,6 +651,9 @@ class RangeSlider(wx.PyPanel):
                     value = confine(value, limit)
                 except: # Comparison fails if a value of new type is being set
                     self._vals[i] = None
+            if self._rng[0] is not None \
+            and not (self._rng[0] < value < self._rng[1]):
+                value = self._rng[0] if value < self._rng[0] else self._rng[1]
         self._vals_prev[i] = self._vals[i]
         self._vals[i] = value
         if refresh and self._vals[i] != self._vals_prev[i]:
@@ -2073,3 +2078,90 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
             self.GetScrollRange(wx.HORIZONTAL), self.GetScrollRange(wx.VERTICAL)
         ]
         event.Skip() # Allow event to propagate wx handler
+
+
+
+class NonModalOKDialog(wx.Dialog):
+    """A simple non-modal dialog with an OK button, stays on top of parent."""
+
+    def __init__(self, parent, title, message):
+        wx.Dialog.__init__(self, parent=parent, title=title,
+                           style=wx.CAPTION | wx.CLOSE_BOX | 
+                                 wx.FRAME_FLOAT_ON_PARENT)
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        self.label_message = wx.StaticText(self, label=message)
+        self.Sizer.Add(self.label_message, proportion=1,
+                       border=2*8, flag=wx.ALL)
+        sizer_buttons = self.CreateButtonSizer(wx.OK)
+        self.Sizer.Add(sizer_buttons, proportion=0, border=8,
+                       flag=wx.ALIGN_CENTER | wx.BOTTOM)
+        self.Bind(wx.EVT_BUTTON, self.OnClose, id=wx.ID_OK)
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+        self.Fit()
+        self.Layout()
+        self.CenterOnParent()
+        self.Show()
+
+
+    def OnClose(self, event):
+        self.Close()
+        event.Skip()
+
+
+
+class ProgressWindow(wx.Dialog):
+    """
+    A simple non-modal ProgressDialog, stays on top of parent frame.
+    """
+
+    def __init__(self, parent, title, message="", maximum=100):
+        wx.Dialog.__init__(self, parent=parent, title=title,
+                          style=wx.CAPTION | wx.CLOSE_BOX |
+                                wx.FRAME_FLOAT_ON_PARENT)
+        self.is_cancelled = False
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        panel = self.panel = wx.Panel(self)
+        sizer = self.panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+
+        label = self.label_message = wx.StaticText(panel, label=message)
+        sizer.Add(label, border=2*8, flag=wx.LEFT | wx.TOP)
+        gauge = self.gauge = wx.Gauge(panel, range=maximum, size=(300,-1),
+                              style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
+        sizer.Add(gauge, border=2*8,
+                  flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW)
+        gauge.Value = 0
+        button = self.button_cancel = wx.Button(self.panel, id=wx.ID_CANCEL)
+        sizer.Add(button, border=8,
+                  flag=wx.TOP | wx.BOTTOM | wx.ALIGN_CENTER_HORIZONTAL)
+
+        self.Bind(wx.EVT_BUTTON, self.OnCancel, button)
+        self.Bind(wx.EVT_CLOSE, self.OnCancel)
+
+        self.Sizer.Add(panel, flag=wx.GROW)
+        self.Fit()
+        self.Layout()
+        self.Refresh()
+        self.Show()
+
+
+    def Update(self, value, message=None):
+        """
+        Updates the progressbar value, and message if given.
+
+        @return  False if dialog was cancelled by user, True otherwise
+        """
+        if message is not None:
+            self.label_message.Label = message
+        self.gauge.Value = value
+        self.Refresh()
+        return not self.is_cancelled
+
+
+    def OnCancel(self, event):
+        """
+        Handler for cancelling the dialog, hides the window.
+        """
+        self.is_cancelled = True
+        self.Hide()

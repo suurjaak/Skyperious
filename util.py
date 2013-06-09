@@ -4,7 +4,7 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    29.04.2013
+@modified    27.05.2013
 """
 import math
 import os
@@ -53,6 +53,27 @@ def format_bytes(size, precision=2):
         formatted += " " + ["byte" if 1 == size else "bytes",
             "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
         ][int(log)]
+    return formatted
+
+
+
+def format_seconds(seconds, insert=""):
+    """
+    Returns nicely formatted seconds, e.g. "25 hours, 12 seconds".
+
+    @param   insert  text inserted between count and unit, e.g. "4 call hours"
+    """
+    insert = insert + " " if insert else ""
+    formatted = "0 %sseconds" % insert
+    seconds = int(seconds)
+    if seconds:
+        formatted, inter = "", ""
+        for unit, count in zip(["hour", "minute", "second"], [3600, 60, 1]):
+            if seconds >= count:
+                label = "%s%s" % (insert if not formatted else "", unit)
+                formatted += inter + plural(label, seconds / count)
+                seconds %= count
+                inter = ", "
     return formatted
 
 
@@ -112,26 +133,26 @@ def cmp_dictlists(list1, list2):
     return result
 
 
-def try_until(func, tries=10, sleep=0.5):
+def try_until(func, count=10, sleep=0.5):
     """
     Tries to execute the specified function a number of times.
 
     @param    func   callable to execute
-    @param    tries  number of times to try (default 10)
+    @param    count  number of times to try (default 10)
     @param    sleep  seconds to sleep after failed attempts, if any
                      (default 0.5)
     @return          (True, func_result) if success else (False, None)
     """
-    count = 0
+    tries = 0
     result = False
     func_result = None
-    while count < tries:
-        count += 1
+    while tries < count:
+        tries += 1
         try:
             func_result = func()
             result = True
         except Exception, e:
-            if count < tries and sleep:
+            if tries < count and sleep:
                 time.sleep(sleep)
     return result, func_result
 
@@ -154,8 +175,80 @@ def unique_path(pathname):
 def start_file(filepath):
     """Tries to open the specified file."""
     if "nt" == os.name:
-        os.startfile(filepath)
+        try:
+            os.startfile(filepath)
+        except WindowsError, e:
+            if 1155 == e.winerror: # ERROR_NO_ASSOCIATION
+                cmd = "Rundll32.exe SHELL32.dll, OpenAs_RunDLL %s"
+                os.popen(cmd % filepath)
+            else:
+                raise
     elif "mac" == os.name:
         subprocess.call(("open", filepath))
     elif "posix" == os.name:
         subprocess.call(("xdg-open", filepath))
+
+
+def is_os_64bit():
+    """Returns whether the operating system is 64-bit (only MSW for now)."""
+    if 'PROCESSOR_ARCHITEW6432' in os.environ:
+        return True
+    return os.environ['PROCESSOR_ARCHITECTURE'].endswith('64')
+
+
+def htmltag(name, attrs=None, content=None, utf=True):
+    """
+    Returns an HTML tag string for the specified name, attributes and content.
+
+    @param   name     HTML tag name, like 'a'
+    @param   attrs    tag attributes dict
+    @param   content  tag content string
+    @param   utf      whether to convert all values to UTF-8
+    """
+    SELF_CLOSING_TAGS = ["img", "br", "meta", "hr", "base", "basefont",
+                         "input", "area", "link"]
+    tag = "<%s" % name
+    if attrs:
+        tag += " " + " ".join([
+            "%s='%s'" % (k, escape_html(v, utf=utf))
+            for k, v in attrs.items()
+        ])
+    if name not in SELF_CLOSING_TAGS:
+    #or (content is not None and str(content)):
+        tag += ">%s</%s>" % (escape_html(content, utf=utf), name)
+    else:
+        tag += " />"
+    return tag
+
+
+def escape_html(value, utf=True):
+    """
+    Escapes the value for HTML content (converts "'< to &quot;&#39;&lt;).
+
+    @param   value  string or unicode value
+    @param   utf    whether to encode result into UTF-8 (True by default)
+    """
+    strval = value if isinstance(value, basestring) \
+             else (str(value) if value is not None else "")
+    result = strval.replace("<",    "&lt;").replace(">", "&gt;") \
+                   .replace("\"", "&quot;").replace("'", "&#39;")
+    if utf:
+        result = result.encode("utf-8")
+    return result
+
+
+def round_float(value, precision=1):
+    """
+    Returns the float as a string, rounded to the specified precision and
+    with trailing zeroes (and . if no decimals) removed.
+    """
+    result = str(round(value, precision)).rstrip("0").rstrip(".")
+    return result
+
+
+def divide_delta(td1, td2):
+    """Divides two timedeltas and returns the integer result."""
+    us1 = td1.microseconds + 1000000 * (td1.seconds + 86400 * td1.days)
+    us2 = td2.microseconds + 1000000 * (td2.seconds + 86400 * td2.days)
+    # Integer division, fractional division would be float(us1) / us2
+    return us1 / us2

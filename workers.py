@@ -5,19 +5,22 @@ diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    29.04.2013
+@modified    05.06.2013
 """
-import cStringIO
 import datetime
+import multiprocessing
+import multiprocessing.connection
 import Queue
 import re
 import threading
 import time
-import xml.etree.cElementTree
 
 import conf
 import export
+import main
 import skypedata
+import step
+import templates
 import util
 
 
@@ -91,6 +94,10 @@ class SearchThread(WorkerThread):
         # For identifying "chat:xxx" and "from:xxx" keywords
         pattern_chat    = re.compile("chat\:([^\s]+)")
         pattern_contact = re.compile("from\:([^\s]+)")
+        template_chat = step.Template(templates.SEARCH_ROW_CHAT_HTML)
+        template_contact = step.Template(templates.SEARCH_ROW_CONTACT_HTML)
+        template_message = step.Template(templates.SEARCH_ROW_MESSAGE_HTML)
+        wrap_b = lambda x: "<b>%s</b>" % x.group(0)
         while self._is_running:
             search = self._queue.get()
             self._stop_work = False
@@ -116,10 +123,8 @@ class SearchThread(WorkerThread):
                         match_contacts.append(pattern_contact.split(word)[1])
                         match_words.remove(word)
                 # For replacing matching words with <b>words</b>
-                pattern_replace = re.compile(
-                    "(%s)" % "|".join(map(re.escape, match_words)),
-                    re.IGNORECASE
-                )
+                patt = "(%s)" % "|".join(map(re.escape, match_words))
+                pattern_replace = re.compile(patt, re.IGNORECASE)
 
                 # Find chats with a matching title or matching participants
                 chats = search["db"].get_conversations()
@@ -133,49 +138,20 @@ class SearchThread(WorkerThread):
                         if self.match_all(chat["title"], match_words):
                             title_matches = True
                         for participant in chat["participants"]:
-                            c = participant["contact"]
-                            if c:
-                                for n in filter(None, [c["fullname"],
-                                c["displayname"], c["identity"]]):
+                            contact = participant["contact"]
+                            if contact:
+                                for n in filter(None, [contact["fullname"],
+                                contact["displayname"], contact["identity"]]):
                                     if self.match_all(n, match_words) \
-                                    and c not in matching_authors:
-                                        matching_authors.append(c)
+                                    and contact not in matching_authors:
+                                        matching_authors.append(contact)
 
                         if title_matches or matching_authors:
                             result_count += 1
                             counts["chats"] += 1
-                            title = chat["title"]
-                            if title_matches:
-                                title = pattern_replace.sub(
-                                    lambda x: "<b>%s</b>" % x.group(0), title
-                                )
-
-                            entry = "<tr><td align='right' valign='top'>" \
-                                    "<font color='%s'>%s</font></td>" \
-                                    "<td colspan='2'><a href='chat:%s'>" \
-                                    "<font color='%s'>%s</font></a><br />" % (
-                                        conf.HistoryGreyColour, result_count,
-                                        chat["id"], conf.HistoryLinkColour,
-                                        chat["title_long"]
-                            )
-                            if title_matches:
-                                entry += u"Title matches.<br />"
-                            if matching_authors:
-                                entry += u"Participant matches: %s.<br />" % \
-                                    ", ".join([u"%s (%s)" % (
-                                        pattern_replace.sub(
-                                            lambda x: "<b>%s</b>" % x.group(0),
-                                            c["fullname"] or c["displayname"]
-                                        ), pattern_replace.sub(
-                                            lambda x: "<b>%s</b>" % x.group(0),
-                                            c["identity"]
-                                        )
-                                    ) for c in matching_authors
-                                ])
-                            entry += "</td></tr>"
-                            result["html"] += entry
-                            result["map"]["chat:%s" % chat["id"]] = \
-                                {"chat": chat}
+                            result["html"] += template_chat.expand(locals())
+                            key = "chat:%s" % chat["id"]
+                            result["map"][key] = {"chat": chat}
                             if not counts["chats"] % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 self._postback(result)
@@ -198,71 +174,26 @@ class SearchThread(WorkerThread):
                         "displayname", "skypename", "province", "city",
                         "pstnnumber", "phone_home", "phone_office",
                         "phone_mobile", "homepage", "emails", "about",
-                        "mood_text"
+                        "mood_text",
                     ]
-                    field_titles = {
-                        "displayname": "Display name",
-                        "skypename": "Skype Name",
-                        "province": "State/Province",
-                        "city": "City",
-                        "pstnnumber": "Phone",
-                        "phone_home": "Home phone",
-                        "phone_office": "Office phone",
-                        "phone_mobile": "Mobile phone",
-                        "homepage": "Website",
-                        "emails": "Emails",
-                        "about": "About me",
-                        "mood_text": "Mood",
-                        "country": "Country/Region",
-                        "province": "State/Province",
-                    }
                     for contact in contacts:
                         match = False
                         fields_filled = {}
                         for field in match_fields:
                             if contact[field]:
-                                value = contact[field]
-                                if self.match_all(value, match_words):
+                                val = contact[field]
+                                if self.match_all(val, match_words):
                                     match = True
-                                    value = pattern_replace.sub(
-                                        lambda x: "<b>%s</b>" % x.group(0),
-                                        value
-                                    )
-                                fields_filled[field] = value
+                                    val = pattern_replace.sub(wrap_b, val)
+                                fields_filled[field] = val
                         if match:
-                            entry = u""
-                            if (not counts["contacts"]) and result_count:
-                                entry += "<tr><td colspan='3'><hr /></td></tr>"
                             result_count += 1
                             counts["contacts"] += 1
-                            entry += u"<tr><td align='right' valign='top'>" \
-                                    "<font color='%s'>%s</font></td>" \
-                                    "<td colspan='2'>" \
-                                    "<font color='%s'>Contact %s</font>" \
-                                    "<br /><table>" % (
-                                        conf.HistoryGreyColour, result_count,
-                                        conf.ResultContactFieldColour,
-                                        pattern_replace.sub(
-                                            lambda x: "<b>%s</b>" % x.group(0),
-                                            contact["name"]
-                                        )
-                                    )
-                            for field in match_fields:
-                                if field in fields_filled:
-                                    entry += u"<tr><td nowrap valign='top'>" \
-                                            "<font color='%s'>%s</font></td>" \
-                                            "<td>&nbsp;</td><td>%s</td></tr>" \
-                                             % (conf.ResultContactFieldColour,
-                                                field_titles[field],
-                                                fields_filled[field]
-                                             )
-                            entry += "</table><br /></td></tr>"
-                            result["html"] += entry
-                            result["map"]["contact:%s" % contact["id"]] = \
-                                {"contact": contact}
-                            if not \
-                                counts["contacts"] % conf.SearchResultsChunk \
-                            and not self._drop_results:
+                            result["html"] += template_contact.expand(locals())
+                            key = "contact:%s" % contact["id"]
+                            result["map"][key] = {"contact": contact}
+                            if not (self._drop_results
+                            or counts["contacts"] % conf.SearchResultsChunk):
                                 self._postback(result)
                                 result = {"html": "", "map": {},
                                           "search": search, "counts": counts}
@@ -285,46 +216,14 @@ class SearchThread(WorkerThread):
                     for m in messages:
                         chat = chat_map.get(m["convo_id"], None)
                         chat_title = chat["title_long"]
-                        entry = u""
-                        if (not counts["messages"]) and result_count:
-                            entry += "<tr><td colspan='3'><hr /></td></tr>"
-                        result["html"] += entry
-                        result_count += 1
-                        counts["messages"] += 1
-                        time_value = datetime.datetime.fromtimestamp(
-                            m["timestamp"]).strftime("%d.%m.%Y %H:%M"
-                        )
-                        displayname = m["from_dispname"]
                         body = parser.parse(m,
                             pattern_replace if match_words else None,
                             html={"w": search["window"].Size.width * 5 / 9})
-                        if type(body) is str:
-                            body = body.decode("utf-8")
-
-                        entry = \
-                            u"<tr><td align='right' valign='top'>" \
-                            "<font color='%s'>%s</font></td>" \
-                            "<td valign='top'><a href='message:%s'>" \
-                            "<font color='%s'>%s%s</font></a></td>" \
-                            "<td align='right' nowrap>&nbsp;&nbsp;" \
-                            "<font color='%s'>%s</font></td></tr><tr>" \
-                            "<td></td>" \
-                            "<td width='100%%' valign='top' colspan='2'>" \
-                            "%s<br/></td></tr>" \
-                            % (conf.HistoryGreyColour,
-                               result_count,
-                               m["id"], conf.HistoryLinkColour,
-                               displayname,
-                               "" if (
-                                   skypedata.CHATS_TYPE_SINGLE == chat["type"] \
-                                   and m["author"] != search["db"].id
-                               ) else " in %s" % chat_title,
-                               conf.HistoryTimestampColour, time_value,
-                               body
-                        )
-                        result["html"] += entry
-                        result["map"]["message:%s" % m["id"]] = \
-                            {"chat": chat, "message": m}
+                        result_count += 1
+                        counts["messages"] += 1
+                        result["html"] += template_message.expand(locals())
+                        key = "message:%s" % m["id"]
+                        result["map"][key] = {"chat": chat, "message": m}
                         if self._stop_work:
                             break # break for m in messages
                         if not counts["messages"] % conf.SearchResultsChunk \
@@ -421,7 +320,7 @@ class DiffThread(WorkerThread):
                     for i in range(2):
                         new_chat = not chat["c1" if i else "c2"]
                         newstr = "" if new_chat else "new "
-                        info = export.htmltag("a", {"href": chat["identity"]},
+                        info = util.htmltag("a", {"href": chat["identity"]},
                             chat["title_long"], utf=False
                         )
                         if new_chat:
@@ -592,6 +491,9 @@ class ContactSearchThread(WorkerThread):
             result = {"search": search, "results": []}
             if search:
                 for i, value in enumerate(search["values"]):
+                    main.log("Searching Skype contact directory for '%s'.",
+                             value)
+
                     for user in search["handler"].search_users(value):
                         if user.Handle not in found:
                             result["results"].append(user)
@@ -611,6 +513,7 @@ class ContactSearchThread(WorkerThread):
 
                     if self._stop_work:
                         break # break for i, value in enumerate(search_values)
+
 
                 if not self._drop_results:
                     result["done"] = True
@@ -642,3 +545,51 @@ class DetectDatabaseThread(WorkerThread):
 
                 result = {"done": True, "count": len(filenames)}
                 self._postback(result)
+
+
+
+class IPCListener(threading.Thread):    
+    """
+    Inter-process communication server that listens on a port and posts
+    received data to application.
+    """
+
+    def __init__(self, authkey, port, callback):
+        threading.Thread.__init__(self)
+        self.daemon = True # Daemon threads do not keep application running
+        self.listener = None
+        self.authkey = authkey
+        self.port = port
+        self.callback = callback
+        self.start()
+
+
+    def run(self):
+        self.is_running = False
+        port = self.port
+        limit = 10000
+        while not self.listener and limit:
+            kwargs = {"address": ("localhost", port), "authkey": self.authkey}
+            try:
+                self.listener = multiprocessing.connection.Listener(**kwargs)
+                self.is_running = True
+            except:
+                port = port + 1
+                limit -= 1
+        self.port = port
+        while self.is_running:
+            try:
+                connection = self.listener.accept()
+                data = connection.recv()
+                self.callback(data)
+            except:
+                if self.is_running:
+                    raise
+        if self.listener:
+            self.listener.close()
+
+
+    def stop(self):
+        self.is_running = False
+        self.listener.close()
+        self.listener = None

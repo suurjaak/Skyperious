@@ -4,19 +4,20 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.04.2013
+@modified    05.06.2013
 """
+import collections
 import copy
 import cStringIO
 import csv
 import datetime
+import math
 import os
 import Queue
 import re
 import sqlite3
 import shutil
 import sys
-import threading
 import textwrap
 import time
 import traceback
@@ -25,11 +26,14 @@ import wx
 import wx.lib.wordwrap
 import wx.grid
 import xml.etree.cElementTree
-import xml.parsers.expat
 
 import conf
+import export
 import main
+import step
 import util
+import templates
+import wordcloud
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat
@@ -56,6 +60,40 @@ MESSAGES_TYPE_FILE         =  68 # File transfer
 MESSAGES_TYPE_BIRTHDAY     = 110 # Birthday notification
 TRANSFER_TYPE_OUTBOUND     =   1 # An outbound transfer, sent by this account
 TRANSFER_TYPE_INBOUND      =   2 # An inbound transfer, sent to this account
+CONTACT_FIELD_TITLES = {
+    "displayname" : "Display name",
+    "skypename"   : "Skype Name",
+    "province"    : "State/Province",
+    "city"        : "City",
+    "pstnnumber"  : "Phone",
+    "phone_home"  : "Home phone",
+    "phone_office": "Office phone",
+    "phone_mobile": "Mobile phone",
+    "homepage"    : "Website",
+    "emails"      : "Emails",
+    "about"       : "About me",
+    "mood_text"   : "Mood",
+    "country"     : "Country/Region",
+}
+ACCOUNT_FIELD_TITLES = {
+    "fullname"           : "Full name",
+    "skypename"          : "Skype name",
+    "mood_text"          : "Mood",
+    "phone_mobile"       : "Mobile phone",
+    "phone_home"         : "Home phone",
+    "phone_office"       : "Office phone",
+    "emails"             : "E-mails",
+    "country"            : "Country",
+    "province"           : "Province",
+    "city"               : "City",
+    "homepage"           : "Website",
+    "gender"             : "Gender",
+    "birthday"           : "Birth date",
+    "languages"          : "Languages",
+    "nrof_authed_buddies": "Contacts",
+    "about"              : "About me",
+    "skypeout_balance"   : "SkypeOut balance",
+}
 
 
 class SkypeDatabase(object):
@@ -318,7 +356,8 @@ class SkypeDatabase(object):
         @param   chat_likes      list of words to match in chat name fields
                                  with (LIKE.. OR LIKE..)
         @param   timestamp_from  timestamp beyond which messages will start
-        @param   use_cache       whether to use cached values if available
+        @param   use_cache       whether to use cached values if available. The
+                                 LIKE keywords will be ignored if True.
         """
         if self.is_open() and "messages" in self.tables:
             if "messages" not in self.table_rows:
@@ -374,7 +413,8 @@ class SkypeDatabase(object):
                     messages.append(message)
                     yield message
                     message = res.fetchone()
-                if chat and use_cache:
+                if chat and use_cache and len(params) == 1:
+                    # Only cache queries getting full range
                     self.table_rows["messages"][chat["id"]] = messages
             else:
                 messages_sorted = sorted(
@@ -501,7 +541,8 @@ class SkypeDatabase(object):
 
         @param   chats  list of chats, as returned from get_conversations()
         """
-        main.log("Statistics collection starting (%s).", self.filename)
+        if chats and len(chats) > 1:
+            main.log("Statistics collection starting (%s).", self.filename)
         stats = []
         participants = {}
         if self.is_open() and "messages" in self.tables:
@@ -533,7 +574,8 @@ class SkypeDatabase(object):
                         stamptodate(data["last_message_timestamp"])
                     
                 chat.update(data)
-        main.log("Statistics collected (%s).", self.filename)
+        if chats and len(chats) > 1:
+            main.log("Statistics collected (%s).", self.filename)
 
 
     def get_contactgroups(self):
@@ -1812,73 +1854,6 @@ class TableBase(wx.grid.PyGridTableBase):
 
 
 
-class ExecuteThread(threading.Thread):
-    """
-    A thread for executing a database query and yielding its results. Can
-    be used as an iterator.
-    """
-
-    """Number of rows retrieved in one cycle."""
-    CHUNK_SIZE = 50
-
-    def __init__(self, db, sql, params=None):
-        """
-        Creates and starts a new execution thread.
-
-        @param   db      SkypeDatabase instance
-        @param   sql     SQL query to execute
-        @param   params  execution parameters, if any
-        """
-        threading.Thread.__init__(self)
-        self.daemon = True # Daemon threads do not keep application running
-        self._db = db
-        self._cursor = None
-        self._sql = sql
-        self._params = params
-        self._event_next = threading.Event()
-        self._rows = Queue.Queue()
-        self._running = False
-        self.start()
-
-
-    def run(self):
-        """Runs the execution thread, retrieving in chunks until all done."""
-        self._running = True
-        self._cursor = self._db.execute(self._sql, self._params or [])
-        while self._running:
-            self._event_next.wait()
-            self._event_next.clear()
-            count = 0
-            while self._cursor and count < self.CHUNK_SIZE:
-                try:
-                    row = self._cursor.next()
-                    self._rows.put(row)
-                    count += 1
-                except StopIteration:
-                    self._cursor = None
-                    self._rows.put(None)
-                    self._running = False
-
-
-    def __iter__(self):
-        return self
-
-
-    def next(self):
-        """
-        Returns the next row from the query, waking the execution thread and
-        waiting until more has been retrieved if necessary, or raises
-        StopIteration if no more rows.
-        """
-        if not self._rows.qsize():
-            self._event_next.set()
-        row = self._rows.get()
-        if row == None:
-            raise StopIteration()
-        return row
-
-
-
 class MessageParser(object):
     """A simple Skype message parser."""
 
@@ -1928,9 +1903,11 @@ class MessageParser(object):
                                  "</tr></table>"
 
 
-    def __init__(self, db):
+    def __init__(self, db, chat=None, stats=False):
         """
-        @param   db             SkypeDatabase instance for additional queries
+        @param   db     SkypeDatabase instance for additional queries
+        @param   chat   chat being parsed
+        @param   stats  whether to collect message statistics
         """
         self.db = db
         self.dc = wx.MemoryDC()
@@ -1941,6 +1918,16 @@ class MessageParser(object):
             expand_tabs=False, replace_whitespace=False,
             break_long_words=False, break_on_hyphens=False
         )
+        self.chat = chat
+        self.stats = None
+        if stats:
+            self.stats = {"smses": 0, "transfers": [], "calls": 0,
+                          "messages": 0, "counts": {}, "total": 0,
+                          "calldurations": 0, "callmaxdurations": 0,
+                          "startdate": None, "enddate": None, "wordcloud": [],
+                          "cloudtext": "", "links": [], "last_message": "",
+                          "chars": 0, "smschars": 0, "files": 0, "bytes": 0,
+                          "info_items": []}
 
 
     def parse(self, message, rgx_highlight=None, html=None, text=None):
@@ -1967,6 +1954,8 @@ class MessageParser(object):
         """
         result = None
         dom = None
+        call_durations = {} # {identity: duration in seconds, }
+
         if "dom" in message:
             dom = message["dom"] # Cached DOM already exists
         if not dom:
@@ -2047,7 +2036,8 @@ class MessageParser(object):
                     a.tail = "."
             elif MESSAGES_TYPE_CONTACTS == message["type"]:
                 self.db.get_contacts()
-                contacts = sorted([self.db.get_contact_name(i.get("f"))
+                contacts = sorted([
+                    self.db.get_contact_name(i.get("f") or i.get("s"))
                     for i in dom.findall("*/c")
                 ])
                 dom.clear()
@@ -2079,6 +2069,15 @@ class MessageParser(object):
                 else:
                     dom.text = "Changed the conversation picture."
             elif MESSAGES_TYPE_CALL == message["type"]:
+                for elem in dom.getiterator("part"):
+                    identity = elem.get("identity")
+                    duration = elem.findtext("duration")
+                    if identity and duration:
+                        try:
+                            call_durations[identity] = int(duration)
+                        except:
+                            pass
+                    message["__call_durations"] = call_durations
                 dom.clear()
                 elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
                 elm_stat.text = " Call"
@@ -2211,6 +2210,9 @@ class MessageParser(object):
                         subelem.tail = " " + (subelem.tail or "")
                     elif "a" == subelem.tag:
                         subelem.set("target", "_blank")
+                        if html.get("export", False):
+                            href = subelem.get("href").encode("utf-8")
+                            subelem.set("href", urllib.quote(href, ":/=?&#"))
                     index += 1
                 for name, value in [("text", elem.text), ("tail", elem.tail)]:
                     if value:
@@ -2259,13 +2261,97 @@ class MessageParser(object):
         else:
             result = dom
 
+        # Collect statistics
+        if self.stats:
+            author_stats = collections.defaultdict(lambda: 0)
+            author, m = message["author"], message
+            self.stats["last_message"] = ""
+            if m["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
+                self.collect_dom_stats(message["dom"])
+            if m["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_CALL,
+            MESSAGES_TYPE_FILE, MESSAGES_TYPE_MESSAGE] \
+            and author not in self.stats["counts"]:
+                self.stats["counts"][author] = author_stats.copy()
+            if MESSAGES_TYPE_SMS == m["type"]:
+                self.stats["smses"] += 1
+                self.stats["counts"][author]["smses"] += 1
+                self.stats["counts"][author]["smschars"] += \
+                    len(self.stats["last_message"])
+            if MESSAGES_TYPE_CALL == m["type"]:
+                self.stats["calls"] += 1
+                self.stats["counts"][author]["calls"] += 1
+                if not call_durations and "__call_durations" in m:
+                    call_durations = m["__call_durations"]
+                for identity, duration in call_durations.items():
+                    if identity not in self.stats["counts"]:
+                        self.stats["counts"][identity] = author_stats.copy()
+                    self.stats["counts"][identity]["calldurations"] += duration
+                self.stats["callmaxdurations"] += \
+                    max(call_durations.values() + [0])
+            elif MESSAGES_TYPE_FILE == m["type"]:
+                transfers = self.db.get_transfers()
+                files = [i for i in transfers
+                         if i["chatmsg_guid"] == m["guid"]]
+                if not files and "__files" in m:
+                    files = m["__files"]
+                self.stats["transfers"].extend(files)
+                self.stats["counts"][author]["files"] += len(files)
+                self.stats["counts"][author]["bytes"] += \
+                    sum([int(i["filesize"]) for i in files])
+            elif MESSAGES_TYPE_MESSAGE == m["type"]:
+                self.stats["messages"] += 1
+                self.stats["counts"][author]["messages"] += 1
+                self.stats["counts"][author]["chars"] += \
+                    len(self.stats["last_message"])
+            if not self.stats["startdate"]:
+                self.stats["startdate"] = m["datetime"]
+            self.stats["enddate"] = m["datetime"]
+            self.stats["total"] += 1
+
         return result
 
 
-    def dom_to_text(self, dom):
+    def collect_dom_stats(self, dom, tails_new=None):
+        """Updates current statistics with data from the message DOM."""
+        to_skip = {} # {element to skip: True, }
+        tails_new = {} if tails_new is None else tails_new
+        for elem in dom.getiterator():
+            if elem in to_skip:
+                continue
+            text = elem.text or ""
+            tail = tails_new[elem] if elem in tails_new else (elem.tail or "")
+            if type(text) is str:
+                text = text.decode("utf-8")
+            if type(tail) is str:
+                tail = tail.decode("utf-8")
+            subitems = []
+            if "quote" == elem.tag:
+                self.add_dict_text(self.stats, "cloudtext", text)
+                self.add_dict_text(self.stats, "last_message", text)
+                subitems = elem.getchildren()
+            elif "a" == elem.tag:
+                self.stats["links"].append(text)
+                self.add_dict_text(self.stats, "last_message", text)
+            elif "quotefrom" == elem.tag:
+                self.add_dict_text(self.stats, "last_message", text)
+            elif elem.tag in ["xml", "b"]:
+                self.add_dict_text(self.stats, "cloudtext", text)
+                self.add_dict_text(self.stats, "last_message", text)
+            for i in subitems:
+                self.collect_dom_stats(i, tails_new)
+                to_skip[i] = True
+            if tail:
+                self.add_dict_text(self.stats, "cloudtext", tail)
+                self.add_dict_text(self.stats, "last_message", tail)
+
+
+    def dom_to_text(self, dom, tails_new=None):
+        """Returns a plaintext representation of the message DOM."""
         fulltext = ""
         to_skip = {} # {element to skip: True, }
         for elem in dom.getiterator():
+            if elem in to_skip:
+                continue
             text = elem.text or ""
             tail = elem.tail or ""
             subitems = []
@@ -2284,6 +2370,87 @@ class MessageParser(object):
             if tail:
                 fulltext += tail
         return fulltext
+
+
+    def add_dict_text(self, dictionary, key, text, inter=" "):
+        """Adds text to an entry in the dictionary."""
+        dictionary[key] += (inter if dictionary[key] else "") + text
+
+
+    def get_collected_stats(self):
+        """
+        Returns the statistics collected during message parsing.
+
+        @return  dict with statistics entries, or empty dict if not collecting
+        """
+        if not self.stats:
+            return {}
+        stats = self.stats
+        for k in ["chars", "smschars", "files", "bytes", "calls",
+                  "calldurations"]:
+            stats[k] = sum(i[k] for i in stats["counts"].values())
+
+        del stats["info_items"][:]
+        delta_date = stats["enddate"] - stats["startdate"]
+        if delta_date.days:
+            period_value = "%s - %s (%s)" % \
+                           (stats["startdate"].strftime("%d.%m.%Y"),
+                            stats["enddate"].strftime("%d.%m.%Y"),
+                            util.plural("day", delta_date.days))
+        else:
+            period_value = stats["startdate"].strftime("%d.%m.%Y")
+        stats["info_items"].append(("Time period", period_value))
+        if stats["messages"]:
+            msgs_value  = "%d (%s)" % \
+                (stats["messages"], util.plural("character", stats["chars"]))
+            stats["info_items"].append(("Messages", msgs_value))
+        if stats["smses"]:
+            smses_value  = "%d (%s)" % \
+                (stats["smses"], util.plural("character", stats["smschars"]))
+            stats["info_items"].append(("SMSes", smses_value))
+        if stats["calls"]:
+            calls_value  = "%d (%s)" % (stats["calls"],
+                           util.format_seconds(stats["callmaxdurations"]))
+            stats["info_items"].append(("Calls", calls_value))
+        if stats["calldurations"]:
+            calls_total_value  = util.format_seconds(stats["calldurations"])
+            stats["info_items"].append(("Total time spent in calls",
+                                        calls_total_value))
+        if stats["transfers"]:
+            files_value  = "%d (%s)" % \
+                (len(stats["transfers"]), util.format_bytes(stats["bytes"]))
+            stats["info_items"].append(("Files", files_value))
+
+        msgs_per_day = util.safedivf(stats["messages"], delta_date.days + 1)
+        if msgs_per_day == int(msgs_per_day): # Drop trailing zeroes
+            msgs_per_day = "%d" % msgs_per_day
+        else:
+            msgs_per_day = "%.1f" % msgs_per_day
+        stats["info_items"].append(("Messages per day", msgs_per_day))
+
+        cloud = wordcloud.get_cloud(stats["cloudtext"], stats["links"])
+        stats["wordcloud"] = cloud
+        return stats
+
+
+    def get_stats_html(self, sort_by="name"):
+        """
+        Returns the collected statistics as an HTML string.
+
+        @param   sort_by    field to sort statistics by
+                            (name/messages/characters/smses/files)
+        """
+        if not self.stats:
+            return ""
+
+        namespace = {
+            "db":           self.db,
+            "participants": [p["contact"] for p in self.chat["participants"]],
+            "stats":        self.get_collected_stats(),
+            "sort_by":      sort_by,
+        }
+        s = step.Template(templates.STATS_HTML).expand(namespace)
+        return s
 
 
     @classmethod
@@ -2410,11 +2577,12 @@ def bitmap_from_raw(raw, size=None, keep_aspect_ratio=True):
     result = None
     if raw:
         try:
-            data = raw.encode("latin1")
-            if data.startswith("\0"):
-                # For some reason, Skype avatar image blobs
-                # start with a null byte, unsupported by wx
-                data = data[1:]
+            data = fix_raw(raw)
+            #data = raw.encode("latin1")
+            #if data.startswith("\0"):
+            #    # For some reason, Skype avatar image blobs
+            #    # start with a null byte, unsupported by wx
+            #    data = data[1:]
             img = wx.ImageFromStream(cStringIO.StringIO(data))
 
             if size and size[:] != [img.Width, img.Height]:
@@ -2432,6 +2600,20 @@ def bitmap_from_raw(raw, size=None, keep_aspect_ratio=True):
         except Exception, e:
             main.log("Error loading bitmap (%s)." % e)
     return result
+
+
+def fix_raw(raw):
+    """
+    Returns the raw image bytestream with non-standard null bytes removed from
+    the front (Skype image blobs can start with null bytes)."""
+    if isinstance(raw, unicode):
+        raw = raw.encode("latin1")
+    if raw.startswith("\0"):
+        raw = raw[1:]
+    if raw.startswith("\0"):
+        raw = "\xFF" + raw[1:]
+    return raw
+
 
 
 

@@ -4,7 +4,7 @@ embedded images and docstrings.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  22.03.2013
+@modified  07.06.2013
 """
 import base64
 import datetime
@@ -19,11 +19,14 @@ Q3 = '"""'
 
 """Application icons of different size and colour depth."""
 APPICONS = {
-  #"Icon.ico": "Skyperious application iconset, with 16x16 and 32x32 icons.",
-  "Icon8bit16x16.png": "Skyperious application 16x16 icon, 8-bit colour.",
-  "Icon8bit32x32.png": "Skyperious application 16x16 icon, 8-bit colour.",
-  "Icon32bit16x16.png": "Skyperious application 32x32 icon, 32-bit colour.",
-  "Icon32bit32x32.png": "Skyperious application 32x32 icon, 32-bit colour.",
+  "Icon16x16_8bit.png":  "Skyperious application 16x16 icon, 8-bit colour.",
+  "Icon16x16_32bit.png": "Skyperious application 16x16 icon, 32-bit colour.",
+  "Icon32x32_8bit.png":  "Skyperious application 32x32 icon, 8-bit colour.",
+  "Icon32x32_32bit.png": "Skyperious application 32x32 icon, 32-bit colour.",
+  "Icon48x48_8bit.png":  "Skyperious application 48x48 icon, 8-bit colour.",
+  "Icon48x48_32bit.png": "Skyperious application 48x48 icon, 32-bit colour.",
+  "Icon64x64_8bit.png":  "Skyperious application 64x64 icon, 8-bit colour.",
+  "Icon64x64_32bit.png": "Skyperious application 64x64 icon, 32-bit colour.",
 }
 IMAGES = {
     "AvatarDefault.png":

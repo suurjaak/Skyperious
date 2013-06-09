@@ -6,7 +6,7 @@ Skyperious is a Skype database viewer and merger, written in Python.
 You can open local Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
-- browse, filter and export chat histories, see chat statistics
+- browse chat history and export as HTML, see chat statistics
 - import contacts from a CSV file to your Skype contacts
 - view any database table and export their data
 - change, add or delete data in any table
@@ -41,7 +41,7 @@ Python packages are installed.
 Dependencies
 ------------
 
-If running from source code, Skyperious requires Python 2.7 and uses
+If running from source code, Skyperious requires Python 2.7 and needs
 these 3rd-party Python packages:
 
 * wxPython 2.9 (http://wxpython.org/)
@@ -49,14 +49,18 @@ these 3rd-party Python packages:
   (http://www.pythonware.com/products/pil/)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
 * Skype4Py, (https://github.com/awahlig/skype4py)
-* BeautifulSoup 3.2.0, already included in source
-  (http://www.crummy.com/software/BeautifulSoup)
 
 Skyperious also runs under Python 2.6 and wxPython 2.8, but with some quirks.
 
 
 Attribution
 -----------
+
+Skyperious includes source from the following 3rd-party Python libraries:
+* BeautifulSoup 3.2.1
+  (http://www.crummy.com/software/BeautifulSoup)
+* step, Simple Template Engine for Python
+  (https://github.com/dotpy/step)
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,

@@ -3,7 +3,7 @@ Contains embedded image and icon resources for Skyperious. Auto-generated.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  27.03.2013
+@modified  07.06.2013
 """
 from base64 import b64decode
 from cStringIO import StringIO
@@ -14,13 +14,13 @@ import wx
 def get_appicons():
     icons = wx.IconBundle()
     [icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) for i in [
-        Icon32bit16x16, Icon32bit32x32, Icon8bit16x16, Icon8bit32x32
+        Icon16x16_32bit, Icon16x16_8bit, Icon32x32_32bit, Icon32x32_8bit, Icon48x48_32bit, Icon48x48_8bit, Icon64x64_32bit, Icon64x64_8bit
     ]]
     return icons
 
 
-"""Skyperious application 32x32 icon, 32-bit colour."""
-Icon32bit16x16 = PyEmbeddedImage(
+"""Skyperious application 16x16 icon, 32-bit colour."""
+Icon16x16_32bit = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAB3RJTUUH3QMaFiYCLwtVsAAA"
     "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAAEhSURBVHjaY/z//z8DKYAF"
     "mXP07Z/WWz9vf/mHLJgkz1qpxgHnMsJtePztn9nBLy9+oltoIsB8yp6HkRHKZYJLrHj6C1M1"
@@ -32,8 +32,20 @@ Icon32bit16x16 = PyEmbeddedImage(
 )
 
 
+"""Skyperious application 16x16 icon, 8-bit colour."""
+Icon16x16_8bit = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAB3RJTUUH3QMaFiYSMrxF1AAA"
+    "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACEUExURf////3+/0DD8yS6"
+    "8lPJ9Mnu+9rz/ACv8By38eP2/f7+/4zb+Ira9+H1/XLS9vT7/mPO9a7l+vr9/pDc+Aex8DbA"
+    "8/f8/rLn+hK08RS18czv+8ru+xO18bLm+jG+8gWw8I7b+Knk+VzM9fP7/gGv8Ov4/uL1/Ri2"
+    "8TS/88Ts+0nG9IbZ91Ok98QAAABxSURBVHjabc9HEoAwCAVQe+y9917vfz+D4iQLWeW/DAwI"
+    "wl8dpwx1fXndyFO7iWC/mcwLggvJ4EYMAOPEwGspdH3IpKqp5A3XlOVUipJBGMVUkpQb48Pg"
+    "gGtyANz3bVq4GLHxV8Osf8uJ0nObov5efgN2BQW1nHoFYgAAAABJRU5ErkJggg=="
+)
+
+
 """Skyperious application 32x32 icon, 32-bit colour."""
-Icon32bit32x32 = PyEmbeddedImage(
+Icon32x32_32bit = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAAAlw"
     "SFlzAAALEQAACxEBf2RfkQAAAAd0SU1FB90DGhY0Alf/JWMAAAAadEVYdFNvZnR3YXJlAFBh"
     "aW50Lk5FVCB2My41LjEwMPRyoQAAAYFJREFUWEftlr1KxFAUhG9h4QNYWFpY+gg+hoWFhYWP"
@@ -47,20 +59,8 @@ Icon32bit32x32 = PyEmbeddedImage(
 )
 
 
-"""Skyperious application 16x16 icon, 8-bit colour."""
-Icon8bit16x16 = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAB3RJTUUH3QMaFiYSMrxF1AAA"
-    "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACEUExURf////3+/0DD8yS6"
-    "8lPJ9Mnu+9rz/ACv8By38eP2/f7+/4zb+Ira9+H1/XLS9vT7/mPO9a7l+vr9/pDc+Aex8DbA"
-    "8/f8/rLn+hK08RS18czv+8ru+xO18bLm+jG+8gWw8I7b+Knk+VzM9fP7/gGv8Ov4/uL1/Ri2"
-    "8TS/88Ts+0nG9IbZ91Ok98QAAABxSURBVHjabc9HEoAwCAVQe+y9917vfz+D4iQLWeW/DAwI"
-    "wl8dpwx1fXndyFO7iWC/mcwLggvJ4EYMAOPEwGspdH3IpKqp5A3XlOVUipJBGMVUkpQb48Pg"
-    "gGtyANz3bVq4GLHxV8Osf8uJ0nObov5efgN2BQW1nHoFYgAAAABJRU5ErkJggg=="
-)
-
-
-"""Skyperious application 16x16 icon, 8-bit colour."""
-Icon8bit32x32 = PyEmbeddedImage(
+"""Skyperious application 32x32 icon, 8-bit colour."""
+Icon32x32_8bit = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAAwBQ"
     "TFRFAAAAAK/wBLDwCLLwFLXxGLfxILnyJLryLL3zPML0VMn1WMv1XMz1YM32ZM72lN35mN/5"
     "rOX6uOn7vOr7wOv7xOz8zO/80PD81PL82PP93PT94PX95Pf96Pj+9Pz++P3//v7/AAAAAAAA"
@@ -87,6 +87,119 @@ Icon8bit32x32 = PyEmbeddedImage(
     "WafYAokCQgtECqAHEzgD11+DwQDgBLzagwBijvjoCAB3Bg6NIvwcEHGeAOodZ1wkIWRVuGgu"
     "CGkzH1GhdUPHvh6R9d9KOSOdAByMF2bU3cY37DOSCcA9eyBaAsgAW63bJuACHWjPcNMJpWnR"
     "bCRxHZkDbBKdKi9Duhh8bN3jCsDS7/8DqHNjgvHE59IAAAAASUVORK5CYII="
+)
+
+
+"""Skyperious application 48x48 icon, 32-bit colour."""
+Icon48x48_32bit = PyEmbeddedImage(
+    "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"
+    "D5GjATh9KtVTAAAAAElFTkSuQmCC"
+)
+
+
+"""Skyperious application 48x48 icon, 8-bit colour."""
+Icon48x48_8bit = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAAEX2zkjAAAAB3RJTUUH3QYHESIrZgkebwAA"
+    "AAlwSFlzAAAK8AAACvABQqw0mAAAAARnQU1BAACxjwv8YQUAAAC0UExURQAAAP////7+/v3+"
+    "/v/+/2TO9QCv8ASw8CC58ii88kjG9HDS9qbj+fL6/Ri38Qyz8XTT9+/6/svv/Nfy/X/X9+P2"
+    "/TjB80TE9Of3/sPs+5/h+WDN9lTJ9fv+/3zW9/P7/o/c+Kvl+giy8Lvq+3jV9yS68pfe+Sy9"
+    "8/f8/zzC9FjL9WzR9tPx/N/1/b/r+6fj+ovb+HDS9xC08TC+82TO9rfo+0DD9IfZ+Mft/FDI"
+    "9dv0/TS/88xqrdsAAAABdFJOUwBA5thmAAABrUlEQVR42pWUDVuCQAzHOayJViBqpSZh9iaa"
+    "ZvZqff/vFdxxsHE3wT2Pwu63P9ttB44jMkv/AUBe3qS3AHkRt4CYikxAsuxfMRUJ3fQy1J74"
+    "9UBHZPLSybwXoR3Rr4Z1lNNKfydlWJ5cOkslKTVftjx5UEkKp/DUo1PHK/MwVct7H5XTqtZG"
+    "TIMAtP0QAMgswPKoqSKvZg79sNgAYkRSkHLvFAkNkI4caLtouWOiKJZ7ZES2ljjMcr1g9teW"
+    "OfZ0H+NqDy3lEvCBwCcGbQTeMdjJpYU5jyE7KDBIDiYKBOYEV8XJrw4qUWRpjvZRkSdztAE5"
+    "Dri7CsxNQI4dBqEJptzZHXEAz+OSAF8vByHZh+vmbnEj+FPCvoSc4Lh4I/V6D1XbHRAMArDY"
+    "NyvYgNXmC07wbBfAAyfAQduwXI84QYIEqyZdWpNCtg3auiZdam8azGFIkvijWoGIyNmFJKoT"
+    "CBHT7vZqBenAfbKVca1AiHv8AeIHh22GFbMGAhHjbtkFkfWsohfayDDh4m+4kq7s8dfspvu2"
+    "cG/AttV1T3H/vU737PyiftKHzTnyO+M4/8CIIdP02kirAAAAAElFTkSuQmCC"
+)
+
+
+"""Skyperious application 64x64 icon, 32-bit colour."""
+Icon64x64_32bit = PyEmbeddedImage(
+    "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"
+    "RK5CYII="
+)
+
+
+"""Skyperious application 64x64 icon, 8-bit colour."""
+Icon64x64_8bit = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAAHqsLF6AAAAB3RJTUUH3QYHES0v5vzGuQAA"
+    "AAlwSFlzAAAK8AAACvABQqw0mAAAAARnQU1BAACxjwv8YQUAAADDUExURQAAAP////7+///+"
+    "//7///3+/v7+/jzC9ACv8Bi38SC58jS/80zH9GzR9pfe+dfy/e/6/gSw8Ci88o/c+Pf8/6Pi"
+    "+hy48rfo+1zM9ZPd+fv+/xC08cPs+wyz8d/1/XjV91TJ9dv0/YPY+ETE9PP7/giy8FDI9RS1"
+    "8eP2/VjL9XDS97vq+6vl+r/r+9Px/CS68uv5/jjB8+f3/mjQ9pvg+afj+rPn+4fZ+EDD9Ivb"
+    "+GDN9kjG9Cy988/w/J/h+a/m+nTT9/c0HisAAAABdFJOUwBA5thmAAACTklEQVR42rWWaVvi"
+    "MBCAO147RV0sLB6VFg8QZcUDvN1d/f+/SkqbJpnJNOTx2flCmbx5m5mmgSiCMopPRFxeoLoY"
+    "FZ/VUFJeAGX2EDvVUMGWQx82s9RUHhA8qIfMqNgyrIRFAOqUchSZXTMBzGElrNtGzd9tR53I"
+    "aULdpKsSb4sv78zRNxPtIpOatZyx4jrWXZSmJVZ75GzhInKS+GVJG+p3taOMT9ThAEZoRocB"
+    "O2gHAzI0l+pYw9DqumuRaW2fSVU8OWogjTlRxL4A6LXqxbJG0tsoYIRCIyI6s4qEAYfW+BFf"
+    "5KaxDvPa97gjD+AbX2FDGY2ajXUR9w5g4N4vNXCKHiCxgX8MIJ2OfQCKgFimAlIJyCSFAmYK"
+    "yKROvijiVmp1rIgLAdC9ehYA3Yu+ADjfPms/3DUdIMu44aWQHXXNOkq33FUFTCRAHSRjAtQH"
+    "jPhu0vFzCnQIkFOgb4/rZ+p+/RPggLmtzaOwBraM5JYLkGKF88Hr+J/zxRWm09fDl1ZMmj9w"
+    "Gniqd4xC7K0ieEA55isILrApcq/guXE+XnkFrWYB/vUJWNWX5PH4BH+IoA2+IIIeXcIkUAAT"
+    "akiuwwTwyho3bgcJYHbLFPfDEMHifMmYYh4kcO7nxyABwJwZsnaQAIY/eCvSEMHiX3vMFNMg"
+    "AcA0oYZumACgSw2/AwVwSQTbgYKcHTAewbnnPDD/GDsFpz7Bma+EQfP8E+9TSI+b5vfAK+BH"
+    "ii7/wNVm/hToFo5b2zu7P8UzgQnW1lzY+vrGhiD49o/rd36fi8lfI7xBk5tF2NYAAAAASUVO"
+    "RK5CYII="
 )
 
 

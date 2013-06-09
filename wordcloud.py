@@ -5,12 +5,10 @@ layout.
 
 @author    Erki Suurjaak
 @created   17.01.2012
-@modified  11.04.2012
+@modified  25.05.2012
 """
 import collections
-import operator
 import re
-import sys
 
 import conf
 
