@@ -41,16 +41,20 @@ Python packages are installed.
 Dependencies
 ------------
 
-If running from source code, Skyperious requires Python 2.7 and needs
-these 3rd-party Python packages:
-
+If running from source code, Skyperious needs Python 2.7 and the following
+3rd-party Python packages:
 * wxPython 2.9 (http://wxpython.org/)
 * Python Imaging Library, required by wxPython
   (http://www.pythonware.com/products/pil/)
-* dateutil (http://pypi.python.org/pypi/python-dateutil)
-* Skype4Py, (https://github.com/awahlig/skype4py)
 
-Skyperious also runs under Python 2.6 and wxPython 2.8, but with some quirks.
+The following 3rd-party Python packages are used for convenient date period
+choices in chat history, and for importing contacts, not strictly required:
+
+* dateutil (http://pypi.python.org/pypi/python-dateutil)
+* Skype4Py (https://github.com/awahlig/skype4py)
+
+Skyperious can also run under Python 2.6 and wxPython 2.8, with some
+layout quirks.
 
 
 Attribution
@@ -61,6 +65,9 @@ Skyperious includes source from the following 3rd-party Python libraries:
   (http://www.crummy.com/software/BeautifulSoup)
 * step, Simple Template Engine for Python
   (https://github.com/dotpy/step)
+
+Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
+released under the Skype Component License 1.0.
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
@@ -74,24 +81,5 @@ Several toolbar icons from:
 License
 -------
 
-(The MIT License)
-
-Copyright (C) 2011-2013 by Erki Suurjaak
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+Copyright (C) 2011-2013 by Erki Suurjaak.
+Released under the MIT License (see LICENSE.txt for details).

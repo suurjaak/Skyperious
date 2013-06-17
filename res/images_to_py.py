@@ -4,7 +4,7 @@ embedded images and docstrings.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  07.06.2013
+@modified  11.06.2013
 """
 import base64
 import datetime
@@ -13,7 +13,7 @@ import shutil
 import wx.tools.img2py
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "images.py")
+TARGET = os.path.join("..", "src", "images.py")
 
 Q3 = '"""'
 
@@ -86,10 +86,9 @@ Contains embedded image and icon resources for Skyperious. Auto-generated.
 @created   07.02.2012
 @modified  %s
 %s
-from base64 import b64decode
-from cStringIO import StringIO
 from wx.lib.embeddedimage import PyEmbeddedImage
-import wx""" % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)
+import wx
+""" % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)
 
 
 def create_py(target):
@@ -97,12 +96,14 @@ def create_py(target):
     f = open(target, "w")
     f.write(HEADER)
     icons = [os.path.splitext(i)[0] for i in sorted(APPICONS.keys())]
+    icon_parts = [", ".join(icons[4*i:4*i+4]) for i in range(len(icons) / 4)]
+    iconstr = ",\n        ".join(icon_parts)
     f.write("\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
             "    [icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) "
             "for i in [\n        %s\n    ]]\n    return icons\n" % (Q3,
         "Returns the application icon bundle, "
         "for several sizes and colour depths.",
-        Q3, str(icons).replace("'", "").replace("[", "").replace("]", "")
+        Q3, iconstr.replace("'", "").replace("[", "").replace("]", "")
     ))
     for filename, desc in sorted(APPICONS.items()):
         name, extension = os.path.splitext(filename)
