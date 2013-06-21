@@ -5,7 +5,7 @@ diffing.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    12.06.2013
+@modified    20.06.2013
 """
 import datetime
 import multiprocessing.connection
@@ -15,7 +15,6 @@ import threading
 import time
 
 import conf
-import export
 import main
 import skypedata
 import step

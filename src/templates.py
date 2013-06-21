@@ -3,13 +3,13 @@
 HTML and TXT templates for exports and statistics.
 
 @created   09.05.2013
-@modified  17.06.2013
+@modified  21.06.2013
 """
 
 """HTML chat history export template."""
 CHAT_HTML = """
 <%
-import base64, datetime, locale
+import base64, datetime, locale, urllib
 import conf, emoticons, images, skypedata, util
 %>
 <!DOCTYPE HTML><html>
@@ -58,6 +58,7 @@ import conf, emoticons, images, skypedata, util
       vertical-align: top;
       line-height: 1.5em;
       padding-bottom: 4px;
+      padding-top: 3px;
     }
     #content_table table.quote td {
       padding-bottom: 0px;
@@ -133,7 +134,7 @@ import conf, emoticons, images, skypedata, util
       border-radius: 5px;
       padding: 5px;
     }
-    #participants span.avatar {
+    #participants span.avatar_large {
       margin-right: 5px;
     }
     #statistics {
@@ -156,28 +157,27 @@ import conf, emoticons, images, skypedata, util
       color: gray;
       cursor: default;
     }
-    span.avatar {
+    span.avatar_large {
       height: 96px;
       width: 96px;
       display: block;
       float: left;
       border: 1px solid lightgray;
     }
-    span.avatar_small {
+    span.avatar {
       height: 32px;
       width: 32px;
       display: block;
       margin-right: 10px;
-
     }
-    .participants span.avatar {
+    .participants span.avatar_large {
       margin-right: 4px;
       display: inline;
     }
     #content_table td.day {
       border-top: 1px solid {{conf.HistoryLineColour}};
       border-bottom: 1px solid {{conf.HistoryLineColour}};
-      padding-top: 7px; padding-bottom: 7px;
+      padding-top: 3px; padding-bottom: 4px;
     }
     #content_table .weekday { font-weight: bold; }
     #content_table .timestamp {
@@ -186,7 +186,7 @@ import conf, emoticons, images, skypedata, util
       width: 40px;
     }
     #content_table tr.shifted td.author, #content_table tr.shifted td.timestamp { 
-      padding-top: 12px;
+      padding-top: 10px;
     }
     #content_table .author { min-width: 90px; text-align: right; }
     #content_table .remote { color: {{conf.HistoryRemoteAuthorColour}}; }
@@ -199,6 +199,11 @@ import conf, emoticons, images, skypedata, util
       background: url("data:image/png;base64,{{images.ExportClock.data}}")
                   center center no-repeat;
     }
+    #content_table .message_content {
+      min-width: 500px;
+      max-width: 635px;
+      word-wrap: break-word;
+    }
     #stats_data {
       width: 100%;
     }
@@ -209,8 +214,10 @@ import conf, emoticons, images, skypedata, util
       vertical-align: top;
       width: 150px;
     }
-    #stats_data > tbody > tr > td:last-child {
+    #stats_data > tbody > tr.stats_row > td:last-child {
       padding-left: 5px;
+      line-height: 16px;
+      white-space: nowrap;
     }
     .identity {
       color: gray;
@@ -218,7 +225,7 @@ import conf, emoticons, images, skypedata, util
     #stats_data .name {
       vertical-align: middle;
     }
-    #stats_data .avatar_small {
+    #stats_data .avatar {
       float: left;
       padding: 0 5px 5px 0;
     }
@@ -235,6 +242,7 @@ import conf, emoticons, images, skypedata, util
     }
     table.plot_row {
       border-collapse: collapse;
+      min-width: 100px;
       width: 100%;
       font-size: 0.9em;
       text-align: center;
@@ -306,50 +314,35 @@ import conf, emoticons, images, skypedata, util
       display: block;
       font-size: 1.1em;
     }
-    span.avatar__default {
+    span.avatar_large__default {
       background: url("data:image/png;base64,{{images.AvatarDefaultLarge.data}}")
                   center center no-repeat;
     }
-    span.avatar_small__default {
+    span.avatar__default {
       background: url("data:image/png;base64,{{images.AvatarDefault.data}}")
                   center center no-repeat;
     }
-%if emoticons_used:
-    span.emoticon {
-      margin-top: 5px;
-      display: inline-block;
-      height: 19px;
-      width: 19px;
-    }
-%endif
-%for e in emoticons_used:
-    span.emoticon.{{e}} {
-      background: url("data:image/gif;base64,{{getattr(emoticons, e).data}}")
-                  center center no-repeat;
-    }
-%endfor
 %for p in participants:
 <%
 p["avatar_class"] = "avatar__default"
-p["avatar_class_small"] = "avatar_small__default"
+p["avatar_class_large"] = "avatar_large__default"
 %>
+%if p["avatar_image_large_raw"]:
+<%
+id_csssafe = urllib.quote(p["identity"]).replace("%", "___").replace(".", "___").replace("/", "___")
+p["avatar_class_large"] = "avatar_large__" + id_csssafe
+%>
+    span.{{p["avatar_class_large"]}} {
+      background: url("data:image/jpg;base64,{{base64.b64encode(p["avatar_image_large_raw"])}}")
+                  center center no-repeat;
+    }
+%endif
 %if p["avatar_image_raw"]:
 <%
-# Dots and commas are not valid CSS identifier characters
-id_csssafe = p["identity"].replace(".", "___").replace(",", "---")
 p["avatar_class"] = "avatar__" + id_csssafe
 %>
     span.{{p["avatar_class"]}} {
       background: url("data:image/jpg;base64,{{base64.b64encode(p["avatar_image_raw"])}}")
-                  center center no-repeat;
-    }
-%endif
-%if p["avatar_image_small_raw"]:
-<%
-p["avatar_class_small"] = "avatar_small__" + id_csssafe
-%>
-    span.{{p["avatar_class_small"]}} {
-      background: url("data:image/jpg;base64,{{base64.b64encode(p["avatar_image_small_raw"])}}")
                   center center no-repeat;
     }
 %endif
@@ -365,6 +358,24 @@ p["avatar_class_small"] = "avatar_small__" + id_csssafe
       height: {{chat_picture.Height}}px;
 %endif
     }
+%if emoticons_used:
+    span.emoticon {
+      margin-top: 1px;
+      display: inline-block;
+      height: 19px;
+      width: 19px;
+      color: rgba(255, 255, 255, 0);
+      text-align: center;
+      word-wrap: normal;
+      line-height: 30px;
+    }
+%endif
+%for e in emoticons_used:
+    span.emoticon.{{e}} {
+      background: url("data:image/gif;base64,{{getattr(emoticons, e).data}}")
+                  center center no-repeat;
+    }
+%endfor
   </style>
   <script>
     var HIGHLIGHT_STYLES = 10;
@@ -545,7 +556,7 @@ p["avatar_class_small"] = "avatar_small__" + id_csssafe
     <td id="header_left">
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
 %for p in filter(lambda p: p["identity"] != db.id, participants):
-      <div><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
+      <div><span class="avatar_large header {{p["avatar_class_large"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -567,19 +578,19 @@ p["avatar_class_small"] = "avatar_small__" + id_csssafe
 %else:
       Chat has
 %endif
-      <b>{{util.plural("message", chat["message_count"])}}</b> in total.<br />
+      <b>{{util.plural("message", chat["message_count"] or 0)}}</b> in total.<br />
       Source: <b>{{db.filename}}</b>.<br /><br />
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
         <a title="Click to show/hide participants" href="javascript:;" onclick="return toggle_element('participants', 'statistics')">Participants</a>
 %endif
-%if stats:
+%if stats and (stats["counts"] or stats["info_items"]):
         <a title="Click to show/hide statistics and wordcloud" class="statistics" href="javascript:;" onclick="return toggle_element('statistics', 'participants')">Statistics</a>
 %endif
     </td>
     <td id="header_right">
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
 %for p in filter(lambda p: p["identity"] == db.id, participants):
-      <div><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
+      <div><span class="avatar_large header {{p["avatar_class_large"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -592,7 +603,7 @@ p["avatar_class_small"] = "avatar_small__" + id_csssafe
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
   <div id="participants">
 %for p in sorted(participants, key=lambda p: p["name"]):
-    <span><span class="avatar {{p["avatar_class"]}}" title="{{p["name"]}} ({{p["identity"]}})"></span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span>
+    <span><span class="avatar_large {{p["avatar_class_large"]}}" title="{{p["name"]}} ({{p["identity"]}})"></span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span>
 %endfor
   </div>
 %endif
@@ -620,11 +631,11 @@ p["avatar_class_small"] = "avatar_small__" + id_csssafe
 %if stats["transfers"]:
         <a title="Sort statistics by files sent" href="#" onClick="return sort_stats(this, 'file');">Files</a>
 %endif
-%endif
       </div></td><td></td></tr>
+%endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], participants):
       <tr class="stats_row">
-        <td><table><tr><td><span class="avatar_small header {{p["avatar_class_small"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
+        <td><table><tr><td><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -645,14 +656,14 @@ if stats["counts"][p["identity"]]["files"]:
 %for type, label, count, total in stat_rows:
 <%
 percent = util.safedivf(count * 100, total)
-text_cell1 = "%d%%" % round(percent) if (percent > 15) else ""
+text_cell1 = "%d%%" % round(percent) if (round(percent) > 9) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
 if "byte" == label:
-  text_total = util.format_bytes(count)
+  text_total = util.format_bytes(total)
 elif "callduration" == label:
-  text_total = util.format_seconds(count)
+  text_total = util.format_seconds(total)
 else:
-  text_total = util.plural(label, count)
+  text_total = util.plural(label, total)
 %>
           <tr title="{{util.round_float(percent)}}% of {{text_total}} in total" class="{{label}}"><td>
             <table class="plot_row {{type}}"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table>
@@ -692,10 +703,11 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
       <table style="width: 100%">
 %for f in stats["transfers"]:
 <%
-inbound = (f["partner_handle"] != db.id)
-partner = db.get_contact_name(f["partner_handle"])
+from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
+              (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
+partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 %>
-        <tr><td{{" class='remote'" if inbound else ""}}>{{partner if inbound else db.account["name"]}}</td><td>
+        <tr><td{{" class='remote'" if from_remote else ""}}>{{partner if from_remote else db.account["name"]}}</td><td>
           <a href="{{skypedata.MessageParser.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td>
           {{util.format_bytes(int(f["filesize"]))}}
@@ -712,6 +724,7 @@ partner = db.get_contact_name(f["partner_handle"])
   <table id="content_table">
 <%
 previous_day = datetime.date.fromtimestamp(0)
+previous_author = None
 %>
 %for m in messages:
 %if m["datetime"].date() != previous_day:
@@ -723,6 +736,7 @@ weekdate = day.strftime("%d. %B %Y")
 if locale.getpreferredencoding():
     weekday = weekday.decode(locale.getpreferredencoding())
     weekdate = weekdate.decode(locale.getpreferredencoding())
+previous_author = None
 %>
   <tr>
     <td class="t1"></td>
@@ -732,19 +746,23 @@ if locale.getpreferredencoding():
   </tr>
 %endif
 <%
-text = parser.parse(m, html={"w": -1, "export": True})
+text = parser.parse(m, html={"export": True})
+from_name = m["from_dispname"] if previous_author != m["author"] else ""
 # Kludge to get single-line messages with an emoticon to line up correctly
 # with the author, as emoticons have an upper margin pushing the row higher
-shift_row = '<span class="emoticon ' in text and ('<br />' not in text and len(m.get("body_txt", text)) < 140)
+text_plain = m.get("body_txt", text)
+emot_start = '<span class="emoticon '
+shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 140) or text.index(emot_start) < 140)
 %>
   <tr{{' class="shifted"' if shift_row else ""}}>
-    <td class="author {{"remote" if m["author"] != db.id else "local"}}" colspan="2">{{m["from_dispname"]}}</td>
+    <td class="author {{"remote" if m["author"] != db.id else "local"}}" colspan="2">{{from_name}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>{{text}}</div></td>
-    <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">{{m["datetime"].strftime("%H:%S")}}</td>
+    <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">{{m["datetime"].strftime("%H:%M")}}</td>
   </tr>
 <%
 previous_day = m["datetime"].date()
+previous_author = m["author"]
 %>
 %endfor
   </table>
@@ -761,7 +779,7 @@ import datetime, locale
 import conf, util
 %>History of Skype {{chat["title_long_lc"]}}.
 Showing {{util.plural("message", messages)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
-Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"])}} in total.
+Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0)}} in total.
 Source: {{db.filename}}.
 Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
 -------------------------------------------------------------------------------
@@ -785,7 +803,7 @@ previous_day = m["datetime"].date()
 ----------------------------------------
 
 %endif
-{{m["datetime"].strftime("%H:%S")}} {{m["from_dispname"]}}:
+{{m["datetime"].strftime("%H:%M")}} {{m["from_dispname"]}}:
 {{parser.parse(m, text=True)}}
 
 %endfor
@@ -994,7 +1012,7 @@ if stats["counts"][p["identity"]]["files"]:
 %for type, label, count, total in stat_rows:
 <%
 percent = int(round(util.safedivf(count * 100, total)))
-text_cell1 = "&nbsp;%d%%&nbsp;" % percent if (percent > 15) else ""
+text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 9) else ""
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 if "byte" == label:
   text_cell3 = util.format_bytes(count)
@@ -1032,11 +1050,12 @@ else:
 <table width="100%">
 %for f in stats["transfers"]:
 <%
-inbound = (f["partner_handle"] != db.id)
-partner = db.get_contact_name(f["partner_handle"])
+from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
+              (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
+partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 %>
   <tr>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if inbound else conf.HistoryLocalAuthorColour}}">{{partner if inbound else db.account["name"]}}</font></td>
+    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{skypedata.MessageParser.path_to_url(f["filepath"] or f["filename"])}}">{{f["filepath"] or f["filename"]}}</a></font></td>
     <td align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{datetime.datetime.fromtimestamp(f["starttime"])}}</font></td>

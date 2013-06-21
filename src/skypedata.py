@@ -4,7 +4,7 @@ Skype database access functionality.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.06.2013
+@modified    21.06.2013
 """
 import collections
 import copy
@@ -59,8 +59,8 @@ MESSAGES_TYPE_CONTACTS     =  63 # Sent contacts
 MESSAGES_TYPE_SMS          =  64 # SMS message
 MESSAGES_TYPE_FILE         =  68 # File transfer
 MESSAGES_TYPE_BIRTHDAY     = 110 # Birthday notification
-TRANSFER_TYPE_OUTBOUND     =   1 # An outbound transfer, sent by this account
-TRANSFER_TYPE_INBOUND      =   2 # An inbound transfer, sent to this account
+TRANSFER_TYPE_OUTBOUND     =   1 # Transfer sent by partner_handle
+TRANSFER_TYPE_INBOUND      =   2 # Transfer sent to partner_handle
 CONTACT_FIELD_TITLES = {
     "displayname" : "Display name",
     "skypename"   : "Skype Name",
@@ -1865,33 +1865,32 @@ class MessageParser(object):
     """HTML entities in the body to be replaced before feeding to xml.etree."""
     REPLACE_ENTITIES = { "&apos;": "'" }
 
-    """Regex for replacing raw emoticon texts with emoticon tags."""
-    EMOTICON_RGX = re.compile("(^|[^>])(%s)" % "|".join(
-                       s for i in emoticons.EmoticonData.values()
-                       for s in map(re.escape, i["strings"])), re.IGNORECASE)
-
     """Regex for checking if string ends with any HTML entity, like "&lt;"."""
-    ENTITY_CHECK_RGX = re.compile(".*(&[#\\w]{2,};)$", re.MULTILINE)
+    ENTITY_CHECK_RGX = re.compile(".*(&[#\\w]{2,};)$",
+                                  re.MULTILINE | re.UNICODE)
+
+    """Regex for replacing raw emoticon texts with emoticon tags."""
+    EMOTICON_RGX = re.compile("(^|[^>])(%s)($|\\W)" % "|".join(
+                              s for i in emoticons.EmoticonData.values()
+                              for s in map(re.escape, i["strings"])),
+                              re.IGNORECASE | re.UNICODE)
 
     """
     Regex replacement for raw emoticon text. Must check whether the preceding
     string up to the first emoticon char is not an HTML entity, e.g. "(&lt;)".
     """
-    EMOTICON_REPL = lambda self, m: ("%s<ss type=\"%s\">%s</ss>" % 
-        (m.group(1), emoticons.EmoticonStrings[m.group(2)], m.group(2))
+    EMOTICON_REPL = lambda self, m: ("%s<ss type=\"%s\">%s</ss>%s" % 
+        (m.group(1), emoticons.EmoticonStrings[m.group(2)], m.group(2), m.group(3))
         if m.group(2) in emoticons.EmoticonStrings and (m.group(2)[:1] != ";"
             or not MessageParser.ENTITY_CHECK_RGX.match(
-            m.string[m.start(2) - 7:m.start(2) + 1])) # Entity can be 2-8 chars
-        else m.group(1) + m.group(2))
+            m.string[max(0, m.start(2) - 7):m.start(2) + 1]))
+        else m.group(1) + m.group(2) + m.group(3))
 
     """Regex for checking the existence of any character all emoticons have."""
     EMOTICON_CHARS_RGX = re.compile("[:|()/]")
 
     """Regex for replacing low bytes unparseable in XML (\x00 etc)."""
     SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
-
-    """Regex for finding long words to break."""
-    BREAKLONG_RGX = re.compile("([^\s-]{%d})" % 120)
 
     """Regex replacement for low bytes unparseable in XML (\x00 etc)."""
     SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape")
@@ -1952,12 +1951,17 @@ class MessageParser(object):
         except Exception, e:
             text = self.SAFEBYTE_RGX.sub(self.SAFEBYTE_REPL, text)
             try:
-                main.log("Doing second try for parsing \"%s\".", text)
+                main.log("Doing 2nd try for parsing \"%s\" (%s).", text, e)
                 result = xml.etree.cElementTree.fromstring(TAG % text)
             except Exception, e:
-                result = xml.etree.cElementTree.fromstring(TAG % "")
-                main.log("Error parsing message %s, body \"%s\" (%s).", 
-                         message["id"], text, e)
+                try:
+                    text = text.replace("&", "&amp;")
+                    main.log("Doing 3rd try for parsing \"%s\" (%s).", text, e)
+                    result = xml.etree.cElementTree.fromstring(TAG % text)
+                except Exception, e:
+                    result = xml.etree.cElementTree.fromstring(TAG % "")
+                    main.log("Error parsing message %s, body \"%s\" (%s).", 
+                             message["id"], text, e)
         return result
 
 
@@ -2006,21 +2010,37 @@ class MessageParser(object):
                 # SMS body can be plaintext, or can be XML. Relevant tags:
                 # <sms alt="It's hammer time."><status>6</status>
                 # <failurereason>0</failurereason><targets>
-                # <target status="6">+555011235</target></targets></sms>
-                status_text = " SMS"
-                if dom.find("sms"): # Body is XML data
-                    body = dom.find("sms").get("alt").encode("utf-8")
-                if self.EMOTICON_CHARS_RGX.search(body):
+                # <target status="6">+555011235</target></targets><body>
+                # <chunk id="0">te</chunk><chunk id="1">xt</chunk></body>
+                # <encoded_body>text</encoded_body></sms>
+                if dom.find("sms") is not None: # Body is XML data
+                    if dom.find("*/encoded_body") is not None:
+                        # Message has all content in a single element
+                        elem = dom.find("*/encoded_body")
+                        encoded_body = xml.etree.cElementTree.tostring(elem)
+                        body = encoded_body[14:-15] # Drop <encoded_body> tags
+                    elif dom.find("*/body/chunk") is not None:
+                        # Message content is in <body>/<chunk> elements
+                        chunks = {}
+                        for c in dom.findall("*/body/chunk"):
+                            chunks[int(c.get("id"))] = c.text
+                        body = "".join([v for k, v in sorted(chunks.items())])
+                    else:
+                        # Fallback, message content is in <sms alt="content"
+                        body = dom.find("sms").get("alt")
+                    body = body.encode("utf-8")
+                if "<" not in body and self.EMOTICON_CHARS_RGX.search(body):
                     body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
                 status = dom.find("*/failurereason")
+                status_text = " SMS"
                 if status is not None and status.text in self.FAILURE_REASONS:
                     status_text += ": %s" % self.FAILURE_REASONS[status.text]
                 dom = self.make_xml("<msgstatus>%s</msgstatus>%s"
                                     % (status_text, body), message)
             elif MESSAGES_TYPE_FILE == message["type"]:
                 transfers = self.db.get_transfers()
-                files = dict((i["chatmsg_index"], i) for i in transfers
-                             if i["chatmsg_guid"] == message["guid"])
+                files = dict((f["chatmsg_index"], f) for f in transfers
+                             if f["chatmsg_guid"] == message["guid"])
                 if not files:
                     # No rows in Transfers, try to find data from message body
                     # and create replacements for Transfers fields
@@ -2029,13 +2049,14 @@ class MessageParser(object):
                             "filename": f.text, "filepath": "",
                             "filesize": f.get("size"),
                             "partner_handle": message["author"],
+                            "partner_dispname": message["from_dispname"],
                             "starttime": message["timestamp"],
                             "type": (TRANSFER_TYPE_OUTBOUND 
                                      if message["author"] == self.db.id
                                      else TRANSFER_TYPE_INBOUND)}
-                message["__files"] = files.values()
+                message["__files"] = [f for i, f in sorted(files.items())]
                 dom.clear()
-                dom.text = "Sent file" + (len(files) > 1 and "s " or " ")
+                dom.text = "Sent file" + ("s " if len(files) > 1 else " ")
                 a = None
                 for i in sorted(files.keys()):
                     f = files[i]
@@ -2218,14 +2239,16 @@ class MessageParser(object):
                         elem[index] = table # Replace <quote> element in parent
                     elif "ss" == subelem.tag: # Emoticon
                         if html.get("export", False):
-                            emo_type = subelem.get("type")
-                            if emo_type in emoticons.EmoticonData:
-                                template = "<span class=\"emoticon %s\" title=\"%s\"> </span>"
-                                data = emoticons.EmoticonData[emo_type]
+                            emot_type = subelem.get("type")
+                            emot = subelem.text.replace("&", "&amp;")
+                            if emot_type in emoticons.EmoticonData:
+                                template = "<span class=\"emoticon %s\" " \
+                                           "title=\"%s\">%s</span>"
+                                data = emoticons.EmoticonData[emot_type]
                                 title = data["title"] + " " + data["strings"][0]
-                                span_str = template % (emo_type, title)
+                                span_str = template % (emot_type, title, emot)
                             else:
-                                span_str = "<span>%s</span>" % subelem.text
+                                span_str = "<span>%s</span>" % emot
                             span = xml.etree.cElementTree.fromstring(span_str)
                             span.tail = subelem.tail
                             elem[index] = span # Replace <ss> element in parent
@@ -2240,13 +2263,12 @@ class MessageParser(object):
                             href = subelem.get("href").encode("utf-8")
                             subelem.set("href", urllib.quote(href, ":/=?&#"))
                     index += 1
+                if html.get("w", 0) <= 0:
+                    continue # Skip word-wrapping if no real width given
                 for name, value in [("text", elem.text), ("tail", elem.tail)]:
                     if value:
-                        value_new = wx.lib.wordwrap.wordwrap(
-                            value, html["w"], self.dc
-                        ) if (html.get("w", 0) > 0) \
-                          else self.BREAKLONG_RGX.sub("\\1 ", value)
-                        setattr(elem, name, value_new)
+                        w = wx.lib.wordwrap.wordwrap(value, html["w"], self.dc)
+                        setattr(elem, name, w)
             try:
                 # Discard <?xml ..?><xml> tags from start, </xml> from end
                 result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
@@ -2316,11 +2338,13 @@ class MessageParser(object):
                 self.stats["callmaxdurations"] += \
                     max(call_durations.values() + [0])
             elif MESSAGES_TYPE_FILE == m["type"]:
-                transfers = self.db.get_transfers()
-                files = [i for i in transfers
-                         if i["chatmsg_guid"] == m["guid"]]
-                if not files and "__files" in m:
-                    files = m["__files"]
+                files = m.get("__files", None)
+                if files is None:
+                    transfers = self.db.get_transfers()
+                    filedict = dict((f["chatmsg_index"], f) for f in transfers
+                                    if f["chatmsg_guid"] == m["guid"])
+                    files = [f for i, f in sorted(filedict.items)]
+                    m["__files"] = files
                 self.stats["transfers"].extend(files)
                 self.stats["counts"][author]["files"] += len(files)
                 self.stats["counts"][author]["bytes"] += \
@@ -2422,15 +2446,17 @@ class MessageParser(object):
             stats[k] = sum(i[k] for i in stats["counts"].values())
 
         del stats["info_items"][:]
-        delta_date = stats["enddate"] - stats["startdate"]
-        if delta_date.days:
-            period_value = "%s - %s (%s)" % \
-                           (stats["startdate"].strftime("%d.%m.%Y"),
-                            stats["enddate"].strftime("%d.%m.%Y"),
-                            util.plural("day", delta_date.days))
-        else:
-            period_value = stats["startdate"].strftime("%d.%m.%Y")
-        stats["info_items"].append(("Time period", period_value))
+        delta_date = None
+        if stats["enddate"] and stats["startdate"]:
+            delta_date = stats["enddate"] - stats["startdate"]
+            if delta_date.days:
+                period_value = "%s - %s (%s)" % \
+                               (stats["startdate"].strftime("%d.%m.%Y"),
+                                stats["enddate"].strftime("%d.%m.%Y"),
+                                util.plural("day", delta_date.days))
+            else:
+                period_value = stats["startdate"].strftime("%d.%m.%Y")
+            stats["info_items"].append(("Time period", period_value))
         if stats["messages"]:
             msgs_value  = "%d (%s)" % \
                 (stats["messages"], util.plural("character", stats["chars"]))
@@ -2452,12 +2478,13 @@ class MessageParser(object):
                 (len(stats["transfers"]), util.format_bytes(stats["bytes"]))
             stats["info_items"].append(("Files", files_value))
 
-        msgs_per_day = util.safedivf(stats["messages"], delta_date.days + 1)
-        if msgs_per_day == int(msgs_per_day): # Drop trailing zeroes
-            msgs_per_day = "%d" % msgs_per_day
-        else:
-            msgs_per_day = "%.1f" % msgs_per_day
-        stats["info_items"].append(("Messages per day", msgs_per_day))
+        if delta_date is not None:
+            per_day = util.safedivf(stats["messages"], delta_date.days + 1)
+            if per_day == int(per_day): # Drop trailing zeroes
+                per_day = "%d" % per_day
+            else:
+                per_day = "%.1f" % per_day
+            stats["info_items"].append(("Messages per day", per_day))
 
         cloud = wordcloud.get_cloud(stats["cloudtext"], stats["links"])
         stats["wordcloud"] = cloud
@@ -2597,52 +2624,90 @@ def import_contacts_file(filename):
 
 
 
-def bitmap_from_raw(raw, size=None, keep_aspect_ratio=True):
+def get_avatar(datadict, size=None, keep_aspect_ratio=True):
     """
-    Returns a wx.Bitmap from the raw data string.
+    Returns a wx.Bitmap for the contact/account avatar, if any.
 
+    @param   datadict           row from Contacts or Accounts
     @param   size               (width, height) to resize image to, if any
     @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
                                 resizing, filling the outside in white
     """
     result = None
+    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
     if raw:
         try:
-            data = fix_raw(raw)
-            #data = raw.encode("latin1")
-            #if data.startswith("\0"):
-            #    # For some reason, Skype avatar image blobs
-            #    # start with a null byte, unsupported by wx
-            #    data = data[1:]
+            data = fix_image_raw(raw)
             img = wx.ImageFromStream(cStringIO.StringIO(data))
 
             if size and size[:] != [img.Width, img.Height]:
                 pos, newsize = None, list(size)
                 if keep_aspect_ratio:
-                    ratio = util.safedivf(img.Width,img.Height)
+                    ratio = util.safedivf(img.Width, img.Height)
                     i = 0 if ratio < 1 else 1
                     newsize[i] = newsize[i] / ratio if i \
                                  else newsize[i] * ratio
                     pos = ((size[0]-newsize[0]) / 2, (size[1]-newsize[1]) / 2)
                 img = img.ResampleBox(*newsize)
                 if pos:
-                    img.Resize(conf.AvatarImageSize, pos, 255, 255, 255)
+                    img.Resize(size, pos, 255, 255, 255)
             result = wx.BitmapFromImage(img)
         except Exception, e:
-            main.log("Error loading bitmap (%s)." % e)
+            main.log("Error loading avatar image for %s (%s).",
+                     datadict["skypename"], e)
     return result
 
 
-def fix_raw(raw):
+def get_avatar_jpg(datadict, max_size=None, keep_aspect_ratio=True):
     """
-    Returns the raw image bytestream with non-standard null bytes removed from
-    the front (Skype image blobs can start with null bytes)."""
+    Returns the JPG data of the contact/account avatar image, if any.
+
+    @param   datadict           row from Contacts or Accounts
+    @param   max_size           (width, height) to resize larger image down to,
+                                if any
+    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
+                                resizing, filling the outside in white
+    """
+    result = ""
+    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
+    if raw:
+        try:
+            result = fix_image_raw(raw)
+
+            img = wx.ImageFromStream(cStringIO.StringIO(result))
+            if max_size and \
+            (img.Width > max_size[0] or img.Height > max_size[1]):
+                pos, newsize = None, list(max_size)
+                if keep_aspect_ratio:
+                    ratio = util.safedivf(img.Width, img.Height)
+                    i = 0 if ratio < 1 else 1
+                    newsize[i] = newsize[i] / ratio if i \
+                                 else newsize[i] * ratio
+                    pos = ((size[0]-newsize[0]) / 2, (size[1]-newsize[1]) / 2)
+                img = img.ResampleBox(*newsize)
+                if pos:
+                    img.Resize(max_size, pos, 255, 255, 255)
+                result = util.bitmap_to_raw(img)
+        except Exception, e:
+            main.log("Error loading avatar image for %s (%s).",
+                     datadict["skypename"], e)
+    return result
+
+
+def fix_image_raw(raw):
+    """Returns the raw image bytestream with garbage removed from front."""
+    JPG_HEADER = "\xFF\xD8\xFF\xE0\x00\x10JFIF"
+    PNG_HEADER = "\x89PNG\r\n\x1A\n"
     if isinstance(raw, unicode):
         raw = raw.encode("latin1")
-    if raw.startswith("\0"):
+    if JPG_HEADER in raw:
+        raw = raw[raw.index(JPG_HEADER):]
+    elif PNG_HEADER in raw:
+        raw = raw[raw.index(PNG_HEADER):]
+    elif raw.startswith("\0"):
         raw = raw[1:]
-    if raw.startswith("\0"):
-        raw = "\xFF" + raw[1:]
+        if raw.startswith("\0"):
+            raw = "\xFF" + raw[1:]
     return raw
 
 
@@ -2782,8 +2847,8 @@ Transfers:
                   10:   file isn't available
                   11:   file isn't available on this computer
                   12:   delivered
-  type            1:    outbound
-                  2:    inbound
+  type            1:    partner_handle is sending
+                  2:    partner_handle is receiving
 
 
 Videos:

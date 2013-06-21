@@ -4,7 +4,7 @@ Functionality for exporting Skype data to external files.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.06.2013
+@modified    19.06.2013
 """
 import cStringIO
 import csv
@@ -21,6 +21,7 @@ import main
 import skypedata
 import step
 import templates
+import util
 
 
 def export_chat(chat, messages, filename, db):
@@ -59,7 +60,7 @@ def export_chat(chat, messages, filename, db):
             namespace["participants"] = []
             # Write HTML header and table header
             if chat["meta_picture"]:
-                raw = skypedata.fix_raw(chat["meta_picture"])
+                raw = skypedata.fix_image_raw(chat["meta_picture"])
                 img = wx.ImageFromStream(cStringIO.StringIO(raw))
                 namespace["chat_picture"] = img
                 namespace["chat_picture_raw"] = raw
@@ -67,30 +68,18 @@ def export_chat(chat, messages, filename, db):
                 for p in chat["participants"]:
                     c = p["contact"].copy()
                     namespace["participants"].append(c)
-                    c["avatar_image_raw"], c["avatar_image_small_raw"] = "", ""
-                    if c.get("avatar_image", None):
-                        if "avatar_bitmap" not in c:
-                            bmp = skypedata.bitmap_from_raw(
-                                  c["avatar_image"], conf.AvatarImageSize)
-                            c["avatar_bitmap"] = bmp
+                    c["avatar_image_raw"], c["avatar_image_large_raw"] = "", ""
+                    bmp = c.get("avatar_bitmap")
+                    if not bmp:
+                        bmp = skypedata.get_avatar(c, conf.AvatarImageSize)
+                        if bmp:
                             p["contact"]["avatar_bitmap"] = bmp # Cache resized
 
-                        raw = skypedata.fix_raw(c["avatar_image"])
-                        c["avatar_image_raw"] = raw
-
-                        # Create small avatar image for statistics
-                        try:
-                            fd, fn_bmp = tempfile.mkstemp()
-                            os.close(fd)
-                            bmp = c["avatar_bitmap"]
-                            bmp.SaveFile(fn_bmp, wx.BITMAP_TYPE_JPEG)
-                            raw_small = open(fn_bmp, "rb").read()
-                            c["avatar_image_small_raw"] = raw_small
-                            os.unlink(fn_bmp)
-                        except:
-                            main.log("Failed to write temporary avatar file "
-                                     "for contact %s.\n%s",
-                                     c["identity"], traceback.format_exc())
+                    if bmp:
+                        c["avatar_image_raw"] = util.bitmap_to_raw(bmp)
+                        sz_large = conf.AvatarImageLargeSize
+                        raw_large = skypedata.get_avatar_jpg(c, sz_large)
+                        c["avatar_image_large_raw"] = raw_large
 
             for m in messages:
                 parser.parse(m)

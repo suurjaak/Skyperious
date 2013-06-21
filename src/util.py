@@ -4,14 +4,17 @@ Miscellaneous utility functions.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    27.05.2013
+@modified    19.06.2013
 """
 import math
 import os
 import re
 import string
 import subprocess
+import tempfile
 import time
+import traceback
+import wx
 
 
 def m(o, name, case_insensitive=True):
@@ -252,3 +255,19 @@ def divide_delta(td1, td2):
     us2 = td2.microseconds + 1000000 * (td2.seconds + 86400 * td2.days)
     # Integer division, fractional division would be float(us1) / us2
     return us1 / us2
+
+
+def bitmap_to_raw(wx_bmp, file_type=wx.BITMAP_TYPE_JPEG):
+    """Returns the wx.Bitmap or wx.Image as raw data of specified type."""
+    result = ""
+    filename = ""
+    try:
+        fd, filename = tempfile.mkstemp()
+        os.close(fd)
+        wx_bmp.SaveFile(filename, file_type)
+        result = open(filename, "rb").read()
+    except:
+        traceback.print_exc()
+    finally:
+        try_until(lambda: os.unlink(filename), 1)
+    return result

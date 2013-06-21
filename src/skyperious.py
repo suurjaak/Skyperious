@@ -4,7 +4,7 @@ All Skyperious user interface and most application logic.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.06.2013
+@modified    21.06.2013
 """
 import base64
 import collections
@@ -1042,10 +1042,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             page.Show(False)
         if self.page_log == page:
             if not self.page_log.is_hidden:
-                self.page_log.is_hidden = True
-                event.Veto() # Veto delete event, fire remove event
-                log_index = self.notebook.GetPageIndex(self.page_log)
-                self.notebook.RemovePage(log_index)
+                event.Veto() # Veto delete event
+                self.on_showhide_log(None) # Fire remove event
             self.pages_visited = filter(lambda x: x != page, self.pages_visited)
             self.page_log.Show(False)
             return
@@ -1504,8 +1502,7 @@ class DatabasePage(wx.Panel):
                          flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT)
 
         stc = self.stc_history = ChatContentSTC(
-            parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history"
-        )
+            parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history")
         stc.SetDatabasePage(self)
         html_stats = self.html_stats = wx.html.HtmlWindow(parent=panel_stc1)
         html_stats.Bind(wx.html.EVT_HTML_LINK_CLICKED,
@@ -1985,8 +1982,7 @@ class DatabasePage(wx.Panel):
         account = self.db.account or {}
         bmp_panel = wx.Panel(parent=panel1)
         bmp_panel.Sizer = wx.BoxSizer(wx.VERTICAL)
-        bmp = skypedata.bitmap_from_raw(account.get("avatar_image", None)) \
-              or images.AvatarDefaultLarge.Bitmap
+        bmp = skypedata.get_avatar(account) or images.AvatarDefaultLarge.Bitmap
         bmp_static = wx.StaticBitmap(bmp_panel, bitmap=bmp)
         sizer_accountinfo = wx.FlexGridSizer(cols=2, hgap=10, vgap=3)
         fields = ["fullname", "skypename", "mood_text", "phone_mobile",
@@ -2374,7 +2370,7 @@ class DatabasePage(wx.Panel):
                 "Text document (*.txt)|*.txt|" \
                 "CSV spreadsheet (*.csv)|*.csv"
         if chats and wx.ID_OK == self.dialog_savefile.ShowModal():
-
+            filenames = []
             dirname = os.path.dirname(self.dialog_savefile.GetPath())
             extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
             busy = controls.ProgressPanel(
@@ -2394,7 +2390,9 @@ class DatabasePage(wx.Panel):
                     filename = util.unique_path(filename)
                     export_result = export.export_chat(chat,
                         list(self.db.get_messages(chat)), filename, self.db)
-                    if not export_result:
+                    if export_result:
+                        filenames.append(filename)
+                    else:
                         errormsg = "An error occurred when saving \"%s\"." \
                                    % filename
                         break # break for chat in self.chats
@@ -2408,7 +2406,7 @@ class DatabasePage(wx.Panel):
                 main.logstatus_flash("Exported %s from %s as %s under %s.",
                                      util.plural("chat", chats),
                                      self.db.filename, extname.upper(), dirname)
-                util.start_file(dirname)
+                util.start_file(dirname if len(filenames) > 1 else filenames[0])
             else:
                 main.logstatus_flash(
                     "Failed to export %s from %s as %s under %s.",
@@ -2838,7 +2836,6 @@ class DatabasePage(wx.Panel):
                 busy.Close()
             has_messages = self.chat["message_count"] > 0
             self.tb_chat.EnableTool(wx.ID_MORE, has_messages)
-            self.button_export_chat.Enabled = (self.chat["message_count"] > 0)
 
 
     def build_filter(self):
@@ -3262,19 +3259,16 @@ class DatabasePage(wx.Panel):
                     # If chat has changed, load avatar images for the contacts
                     self.list_participants.ClearAll()
                     self.list_participants.InsertColumn(0, "")
-                    il = wx.ImageList(*conf.AvatarImageSize)
+                    sz_avatar = conf.AvatarImageSize
+                    il = wx.ImageList(*sz_avatar)
                     il.Add(avatar_default)
                     index = 0
                     # wx will open a warning dialog on image error otherwise
                     nolog = wx.LogNull()
                     for p in chat["participants"]:
                         b = 0
-                        if "avatar_image" in p["contact"] \
-                        and "avatar_bitmap" not in p["contact"] \
-                        and p["contact"]["avatar_image"]:
-                            bmp = skypedata.bitmap_from_raw(
-                                p["contact"]["avatar_image"],
-                                conf.AvatarImageSize)
+                        if not p["contact"].get("avatar_bitmap"):
+                            bmp = skypedata.get_avatar(p["contact"], sz_avatar)
                             if bmp:
                                 p["contact"]["avatar_bitmap"] = bmp
                         if "avatar_bitmap" in p["contact"]:
@@ -4596,8 +4590,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         # Index of the centered message in _messages
         self._center_message_index = -1
         self._filelinks = {} # {link end position: file path}
-        self._actionlinks = {} # {link end position: callable or two dates}
-        self._actionlink_last = None # Title of clicked action link, if any
+        self._datelinks = {} # {link end position: two dates, }
+        self._datelink_last = None # Title of clicked date link, if any
         # Currently set message filter {"daterange": (datetime, datetime),
         # "text": text in message, "participants": [skypename1, ],
         # "message_id": message ID to show, range shown will be centered
@@ -4674,6 +4668,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 url_range[step] = pos
             url_range[1] += 1
             url = stc.GetTextRange(url_range[-1], url_range[1])
+            function, params = None, []
             if url_range[-1] in self._filelinks:
                 def start_file(url):
                     if os.path.exists(url):
@@ -4684,28 +4679,28 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                             "on this computer." % url,
                             conf.Title, wx.OK | wx.ICON_INFORMATION
                         )
-                url = self._filelinks[url_range[-1]]
-                # Launching an external program here will cause STC to lose
-                # MouseUp, resulting in autoselect mode from click position.
-                wx.CallAfter(start_file, url)
-            elif url_range[-1] in self._actionlinks:
-                mapping = self._actionlinks[url_range[-1]]
-                if callable(mapping):
-                    mapping()
-                else:
+                function, params = start_file, [self._filelinks[url_range[-1]]]
+            elif url_range[-1] in self._datelinks:
+                def filter_range(label, daterange):
                     busy = controls.ProgressPanel(self._page, "Filtering messages.")
-                    self._actionlink_last = url
-                    self._page.chat_filter["daterange"] = mapping
-                    self._page.range_date.SetValues(*mapping)
-                    self.Filter = self._page.chat_filter
-                    self.RefreshMessages()
-                    self.ScrollToLine(0)
-                    self._page.populate_chat_statistics()
-                    busy.Close()
+                    try:
+                        self._datelink_last = label
+                        self._page.chat_filter["daterange"] = daterange
+                        self._page.range_date.SetValues(*daterange)
+                        self.Filter = self._page.chat_filter
+                        self.RefreshMessages()
+                        self.ScrollToLine(0)
+                        self._page.populate_chat_statistics()
+                    finally:
+                        busy.Close()
+                function = filter_range
+                params = [url, self._datelinks[url_range[-1]]]
             elif url:
-                # Launching an external program here will cause STC to lose
+                function, params = webbrowser.open, [url]
+            if function:
+                # Calling function here immediately will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
-                wx.CallLater(50, webbrowser.open, url)
+                wx.CallLater(50, function, *params)
         event.StopPropagation()
 
 
@@ -4793,7 +4788,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             focus_message_id = None
             transfers = self._db.get_transfers()
             self._filelinks.clear()
-            self._actionlinks.clear()
+            self._datelinks.clear()
             # For accumulating various statistics
             rgx_highlight = re.compile(
                 "(%s)" % re.escape(self._filter["text"]), re.I
@@ -4928,14 +4923,14 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 from_items.append(("From the beginning", daterange))
                 for i, (title, daterange) in enumerate(from_items):
                     is_active = center_message_id is None \
-                                and ((title == self._actionlink_last) 
+                                and ((title == self._datelink_last) 
                                      or (daterange == dates_filter))
                     if i:
                         self._append_text(u"  \u2022  ", "special") # bullet
                     if not is_active:
-                        self._actionlinks[self._stc.Length] = daterange
+                        self._datelinks[self._stc.Length] = daterange
                     self._append_text(title, "bold" if is_active else "link")
-            self._actionlink_last = None
+            self._datelink_last = None
             self._append_text("\n\n")
 
             for i, m in enumerate(self._messages_current):
@@ -5041,12 +5036,12 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         """
         Populates the chat history with messages from the specified chat.
 
-        @param   chat           chat data, as returned from SkypeDatabase
-        @param   db             SkypeDatabase to use
-        @param   messages       messages to show (if set, messages are not
-                                retrieved from database)
-        @param   center_msg_id  if set, specifies the message around which to
-                                center other messages in the shown range
+        @param   chat               chat data, as returned from SkypeDatabase
+        @param   db                 SkypeDatabase to use
+        @param   messages           messages to show (if set, messages are not
+                                    retrieved from database)
+        @param   center_message_id  if set, specifies the message around which
+                                    to center other messages in the shown range
         """
         message_show_limit = conf.MaxHistoryInitialMessages
         if messages:
@@ -5123,7 +5118,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         result = False
         if "participants" in self._filter \
         and self._filter["participants"] \
-        and message["author"] not in self._filter["participants"]:
+        and message["author"] not in self._filter["participants"] \
+        and message["author"] \
+        in [p["identity"] for p in self._chat["participants"]]:
+            # Last check among chat participants is for cases where contact is
+            # not listed among chat participants at all (e.g. left at once)
             result = True
         elif "daterange" in self._filter \
         and not (self._filter["daterange"][0] <= message["datetime"].date() \

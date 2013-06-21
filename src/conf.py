@@ -6,7 +6,7 @@ and all values are kept in JSON.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.06.2013
+@modified    21.06.2013
 """
 from ConfigParser import RawConfigParser
 import datetime
@@ -19,9 +19,9 @@ import wx
 """Program title."""
 Title = "Skyperious"
 
-Version = "1.5"
+Version = "1.5.1"
 
-VersionDate = "17.06.2013"
+VersionDate = "21.06.2013"
 
 if getattr(sys, 'frozen', False):
     # Running as a pyinstaller executable
@@ -274,8 +274,13 @@ Select two databases to compare their chats, and restore missing messages.
 Creating a backup of the database file is recommended before making any changes.""" % {
     "title": Title, "ver": Version, "date": VersionDate}
 
-"""Width and height tuple of the avatar image, shown in chat data."""
+"""
+Width and height tuple of the avatar image, shown in chat data and export HTML
+statistics."""
 AvatarImageSize = (32, 32)
+
+"""Width and height tuple of the large avatar image, shown in HTML export."""
+AvatarImageLargeSize = (96, 96)
 
 """Colour for messages plot in chat statistics."""
 PlotMessagesColour = "#3399FF"

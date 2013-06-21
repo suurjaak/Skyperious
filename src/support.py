@@ -4,7 +4,7 @@ Updates and error reporting.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    15.06.2013
+@modified    19.06.2013
 """
 import base64
 import BeautifulSoup
@@ -365,12 +365,7 @@ class FeedbackDialog(wx.Dialog):
             kwargs = {"type": "feedback"}
             kwargs["content"] = self.edit_text.Value.strip()
             if self.cb_bmp.Value and self.screenshot:
-                fd, filename = tempfile.mkstemp()
-                os.close(fd)
-                self.screenshot.SaveFile(filename, wx.BITMAP_TYPE_PNG)
-                image_raw = open(filename, "rb").read()
-                kwargs["screenshot"] = image_raw
-                util.try_until(lambda: os.unlink(filename), 1)
+                kwargs["screenshot"] = util.bitmap_to_raw(self.screenshot)
             wx.CallAfter(lambda: send_report(**kwargs))
             wx.MessageBox("Feedback sent, thank you!", self.Title, wx.OK)
             self.edit_text.Value = ""
