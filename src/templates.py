@@ -2,14 +2,32 @@
 """
 HTML and TXT templates for exports and statistics.
 
-@created   09.05.2013
-@modified  21.06.2013
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
+@author      Erki Suurjaak
+@created     09.05.2013
+@modified    08.09.2013
+------------------------------------------------------------------------------
 """
+import re
+
+# Modules imported inside templates:
+import base64, datetime, urllib
+import conf, emoticons, images, skypedata, util
+
+
+"""Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
+SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
+
+"""Regex replacement for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
+SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 
 """HTML chat history export template."""
 CHAT_HTML = """
 <%
-import base64, datetime, locale, urllib
+import base64, datetime, urllib
 import conf, emoticons, images, skypedata, util
 %>
 <!DOCTYPE HTML><html>
@@ -182,8 +200,23 @@ import conf, emoticons, images, skypedata, util
     #content_table .weekday { font-weight: bold; }
     #content_table .timestamp {
       color: {{conf.HistoryTimestampColour}};
-      text-align: right;
-      width: 40px;
+      text-align: left;
+      width: 30px;
+    }
+    #content_table .timestamp span {
+      position: relative;
+      left: 5px;
+      top: -1px;
+      width: 11px;
+      height: 11px;
+    }
+    #content_table .timestamp span.edited {
+      background: url("data:image/png;base64,{{images.ExportEdited.data}}")
+                  center center no-repeat;
+    }
+    #content_table .timestamp span.removed {
+      background: url("data:image/png;base64,{{images.ExportRemoved.data}}")
+                  center center no-repeat;
     }
     #content_table tr.shifted td.author, #content_table tr.shifted td.timestamp { 
       padding-top: 10px;
@@ -706,13 +739,14 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
 partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
+f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
         <tr><td{{" class='remote'" if from_remote else ""}}>{{partner if from_remote else db.account["name"]}}</td><td>
-          <a href="{{skypedata.MessageParser.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
+          <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td>
           {{util.format_bytes(int(f["filesize"]))}}
         </td><td>
-          {{datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M")}}
+          {{f_datetime}}
         </td></tr>
 %endfor
       </table>
@@ -731,11 +765,7 @@ previous_author = None
 <%
 # Day has changed: insert a date header
 day = m["datetime"].date()
-weekday = day.strftime("%A").capitalize()
-weekdate = day.strftime("%d. %B %Y")
-if locale.getpreferredencoding():
-    weekday = weekday.decode(locale.getpreferredencoding())
-    weekdate = weekdate.decode(locale.getpreferredencoding())
+weekday, weekdate = util.get_locale_day_date(day)
 previous_author = None
 %>
   <tr>
@@ -748,17 +778,30 @@ previous_author = None
 <%
 text = parser.parse(m, html={"export": True})
 from_name = m["from_dispname"] if previous_author != m["author"] else ""
+# Info messages like "/me is thirsty" -> author on same line.
+is_info = (skypedata.MESSAGES_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
 # with the author, as emoticons have an upper margin pushing the row higher
 text_plain = m.get("body_txt", text)
 emot_start = '<span class="emoticon '
 shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 140) or text.index(emot_start) < 140)
+author_class = "remote" if m["author"] != db.id else "local"
 %>
   <tr{{' class="shifted"' if shift_row else ""}}>
-    <td class="author {{"remote" if m["author"] != db.id else "local"}}" colspan="2">{{from_name}}</td>
+    <td class="author {{author_class}}" colspan="2">{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
-    <td class="message_content"><div>{{text}}</div></td>
-    <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">{{m["datetime"].strftime("%H:%M")}}</td>
+    <td class="message_content"><div>
+%if is_info:
+    <span class="{{author_class}}">{{m["from_dispname"]}}</span>
+%endif
+    {{text}}</div></td>
+    <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">
+%if m["edited_timestamp"]:
+    {{m["datetime"].strftime("%H:%M")}}<span class="{{"edited" if m["body_xml"] else "removed"}}" title="{{"Edited" if m["body_xml"] else "Removed"}} {{datetime.datetime.fromtimestamp(m["edited_timestamp"]).strftime("%H:%M:%S")}}">&nbsp;&nbsp;&nbsp;</span>
+%else:
+    {{m["datetime"].strftime("%H:%M")}}
+%endif
+    </td>
   </tr>
 <%
 previous_day = m["datetime"].date()
@@ -775,8 +818,8 @@ previous_author = m["author"]
 
 """TXT chat history export template."""
 CHAT_TXT = """<%
-import datetime, locale
-import conf, util
+import datetime
+import conf, skypedata, util
 %>History of Skype {{chat["title_long_lc"]}}.
 Showing {{util.plural("message", messages)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
 Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0)}} in total.
@@ -791,11 +834,7 @@ previous_day = datetime.date.fromtimestamp(0)
 <%
 # Day has changed: insert a date header
 day = m["datetime"].date()
-weekday = day.strftime("%A").capitalize()
-weekdate = day.strftime("%d. %B %Y")
-if locale.getpreferredencoding():
-    weekday = weekday.decode(locale.getpreferredencoding())
-    weekdate = weekdate.decode(locale.getpreferredencoding())
+weekday, weekdate = util.get_locale_day_date(day)
 previous_day = m["datetime"].date()
 %>
 
@@ -803,8 +842,13 @@ previous_day = m["datetime"].date()
 ----------------------------------------
 
 %endif
+%if skypedata.MESSAGES_TYPE_INFO == m["type"]:
+{{m["datetime"].strftime("%H:%M")}}
+{{m["from_dispname"]}} {{parser.parse(m, text=True)}}
+%else:
 {{m["datetime"].strftime("%H:%M")}} {{m["from_dispname"]}}:
 {{parser.parse(m, text=True)}}
+%endif
 
 %endfor
 """
@@ -812,7 +856,7 @@ previous_day = m["datetime"].date()
 
 """HTML data grid export template."""
 GRID_HTML = """<%
-import datetime, locale
+import datetime
 import conf, images, util
 %><!DOCTYPE HTML><html>
 <head>
@@ -877,7 +921,7 @@ import conf, images, util
             Source: <b>{{db_filename}}</b>.<br />
             <b>{{len(rows)}}</b> rows in results.<br />
 %if sql:
-            <b>SQL:</b> {{sql}}
+            <b>SQL:</b> {{escape(sql)}}
 %endif
         </td>
     </tr></table>
@@ -949,7 +993,7 @@ import conf, skypedata, util
 %>
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="top"><b>Statistics for currently shown messages:</b></a></td>
-%if stats.get("wordcloud", None):
+%if stats.get("wordcloud"):
   <td align="right"><a href="#cloud">Jump to word cloud</a></td>
 %endif
 </tr></table>
@@ -962,7 +1006,7 @@ import conf, skypedata, util
 %if len(stats["counts"]) > 1:
   <tr><td><br /><br /></td><td valign="bottom"><font size="2">
     <table cellpadding="0" cellspacing="0"><tr>
-      <td><b>Sort by:&nbsp;&nbsp;&nbsp;</b></td>
+      <td nowrap="nowrap"><b>Sort by:&nbsp;&nbsp;&nbsp;</b></td>
 %for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files")]:
 %if "name" == name or stats[name]:
 %if sort_by == name:
@@ -1024,7 +1068,7 @@ else:
       <table cellpadding="0" width="100%" cellspacing="0"><tr>
         <td bgcolor="{{colormap[type]}}" width="{{percent * conf.PlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
         <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.PlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
-        <td>&nbsp;{{text_cell3}}</td>
+        <td nowrap="nowrap">&nbsp;{{text_cell3}}</td>
       </tr></table>
 %endfor
     </td>
@@ -1033,7 +1077,7 @@ else:
   
 </table>
 
-%if stats.get("wordcloud", None):
+%if stats.get("wordcloud"):
 <br /><hr />
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="cloud"><b>Word cloud for currently shown messages:</b></a></td>
@@ -1045,7 +1089,7 @@ else:
 %endfor
 %endif
 
-%if stats.get("transfers", None):
+%if stats.get("transfers"):
 <br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top">Back to top</a></td></tr></table><br /><br />
 <table width="100%">
 %for f in stats["transfers"]:
@@ -1053,12 +1097,13 @@ else:
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
 partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
+f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{skypedata.MessageParser.path_to_url(f["filepath"] or f["filename"])}}">{{f["filepath"] or f["filename"]}}</a></font></td>
+    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}">{{f["filepath"] or f["filename"]}}</a></font></td>
     <td align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{datetime.datetime.fromtimestamp(f["starttime"])}}</font></td>
+    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
   </tr>
 %endfor
 </table>
@@ -1142,11 +1187,15 @@ if (skypedata.CHATS_TYPE_SINGLE != chat["type"]) or (m["author"] == search["db"]
 %>
     <a href="message:{{m["id"]}}"><font color="{{conf.HistoryLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
   </td><td align="right" nowrap>
-    &nbsp;&nbsp;<font color="conf.HistoryTimestampColour">{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
+    &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
   </td>
 </tr>
 <tr><td></td>
-  <td width="100%" valign="top" colspan="2">{{body}}<br /></td>
+  <td width="100%" valign="top" colspan="2">
+%if skypedata.MESSAGES_TYPE_INFO == m["type"]:
+    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{m["from_dispname"]}}</font>
+%endif
+  {{body}}<br /></td>
 </tr>
 """
 
@@ -1157,6 +1206,411 @@ SEARCH_HEADER_HTML = """<%
 import conf
 %>
 <font size="2" face="{{conf.HistoryFontName}}">
-Results for "{{escape(text)}}" from {{fromtext}}:<br /><br />
+Results for "{{escape(text)}}" from {{fromtext}}:
+%if "all tables" != fromtext:
+<br /><br />
 <table width="600" cellpadding="2" cellspacing="0">
+%endif
+"""
+
+
+"""HTML template for table search results header, start of HTML table."""
+SEARCH_ROW_TABLE_HEADER_HTML = """
+<br /><br /><b>Table {{table["name"]}}:</b><br />
+<table border="1" cellpadding="4" cellspacing="0" width="1000">
+<tr>
+<th>#</th>
+%for col in table["columns"]:
+<th>{{escape(col["name"])}}</th>
+%endfor
+</tr>
+"""
+
+
+"""HTML template for search result of DB table row, HTML table row."""
+SEARCH_ROW_TABLE_HTML = """<%
+import re
+import conf, templates
+%>
+<tr>
+<td align="right" valign="top"><a href="table:{{escape(table["name"])}}:{{count}}">{{count}}</a></td>
+%for col in table["columns"]:
+<%
+value = row[col["name"]]
+value = value if value is not None else ""
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+%>
+<td valign="top">{{pattern_replace.sub(wrap_b, escape(value))}}</td>
+%endfor
+</tr>
+"""
+
+
+"""Text shown in Help -> About dialog (HTML content)."""
+ABOUT_TEXT = """
+<%
+import sys
+import conf
+%>
+<font size="2" face="Tahoma">
+<table cellpadding="0" cellspacing="0"><tr><td valign="top">
+<img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
+<b>{{conf.Title}} version {{conf.Version}}</b>, released {{conf.VersionDate}}.<br /><br />
+
+{{conf.Title}} is written in Python, released as free open source software
+under the MIT License.
+</td></tr></table><br /><br />
+
+
+&copy; 2011-2013, Erki Suurjaak.
+<a href="{{conf.HomeUrl}}">suurjaak.github.com/Skyperious</a><br /><br /><br />
+
+
+
+{{conf.Title}} has been built using the following open source software:
+<ul>
+  <li>wxPython 2.9.4, <a href="http://wxpython.org">wxpython.org</a></li>
+  <li>BeautifulSoup 3.2.1, <a href="http://crummy.com/software/BeautifulSoup">
+      crummy.com/software/BeautifulSoup</a></li>
+  <li>step, Simple Template Engine for Python,
+      <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
+  <li>pyparsing 2.0.1,
+      <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
+  <li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">
+      pypi.python.org/pypi/python-dateutil</a></li>
+  <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
+      github.com/awahlig/skype4py</a></li>
+%if getattr(sys, 'frozen', False):
+  <li>Python 2.7.5, <a href="http://www.python.org">www.python.org</a></li>
+  <li>PyInstaller 2.0, <a href="http://www.pyinstaller.org">
+      www.pyinstaller.org</a></li>
+%endif
+</ul><br /><br /><br />
+
+
+
+Emoticons in HTML export are property of Skype Limited, &copy; 2004-2006,
+released under the Skype Component License 1.0.<br /><br />
+
+
+Default avatar icon from Fancy Avatars, &copy; 2009 Brandon Mathis<br />
+<a href="http://brandonmathis.com/projects/fancy-avatars/">
+brandonmathis.com/projects/fancy-avatars</a><br /><br />
+
+
+Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
+<a href="http://p.yusukekamiyamane.com/">p.yusukekamiyamane.com/</a>
+</font>
+"""
+
+
+
+"""Contents of the default page on search page."""
+SEARCH_WELCOME_HTML = """
+<%
+import conf
+%>
+<font face="{{conf.HistoryFontName}}" size="2">
+<center>
+<h5><font color="{{conf.HistoryLinkColour}}">Explore the database</font></h5>
+<table cellpadding="10" cellspacing="0">
+<tr>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <img src="memory:HelpSearch.png" />
+      </td><td width="10"></td><td valign="center">
+        Search over all Skype messages using a simple Google-like <a href="page:#help">syntax</a>.<br />
+        <br />
+        Or choose other search targets from the toolbar: <br />
+        search in contact information, or in chat information, <br />
+        or across all database tables.
+      </td></tr><tr><td nowrap align="center">
+        <b><font color="black">Search</font></b><br />
+    </td></tr></table>
+  </td>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:tables"><img src="memory:HelpTables.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        Browse, filter and change database tables,<br />
+        export as HTML, SQL INSERT-statements or CSV.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:tables"><b><font color="black">Data tables</font></b></a><br />
+    </td></tr></table>
+  </td>
+</tr>
+<tr>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:chats"><img src="memory:HelpChats.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        Read Skype chats,
+        view statistics and word clouds, <br />
+        filter by content, date or author,<br />
+        export as HTML, TXT or CSV.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:chats"><b><font color="black">Chats</font></b></a><br />
+    </td></tr></table>
+  </td>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:sql"><img src="memory:HelpSQL.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        Make direct SQL queries in the database,<br />
+        export results as HTML or CSV.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:sql"><b><font color="black">SQL window</font></b></a><br />
+    </td></tr></table>
+  </td>
+</tr>
+<tr>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:info"><img src="memory:HelpInfo.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        See information about the Skype account in this file.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:info"><b><font color="black">Information</font></b></a>
+    </td></tr></table>
+  </td>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:contacts"><img src="memory:HelpContacts.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        Import contacts to Skype from a CSV file,<br />
+        like ones exported from MSN or GMail.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:contacts"><b><font color="black">Contacts+</font></b></a>
+    </td></tr></table>
+  </td>
+</tr>
+</table>
+</center>
+</font>
+"""
+
+
+"""Long help text shown in a separate tab on search page."""
+SEARCH_HELP_LONG = """
+<%
+import conf
+%>
+<font size="2" face="{{conf.HistoryFontName}}">
+
+{{conf.Title}} supports a Google-like syntax for searching messages:<br /><br />
+<table><tr><td width="500">
+
+  <table border="0" cellpadding="5" cellspacing="1" bgcolor="#E5E5E5"
+   valign="top" width="500">
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search for exact word or phrase<br /><br />
+      <font color="#006600"><code>"x = y + 4"</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      Use quotes (<font color="#006600"><code>"</code></font>) to search for
+      an exact phrase or word. Quoted text is searched exactly as entered,
+      leaving whitespace as-is and ignoring any wildcard characters.
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search for either word<br /><br />
+      <font color="#006600"><code>this OR that</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      To find messages containing at least one of several words,
+      include <font color="#006600"><code>OR</code></font> between the words.
+      <font color="#006600"><code>OR</code></font> works also
+      for phrases and grouped words (but not keywords).
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Group words together<br /><br />
+      <font color="#006600"><code>(these two) OR this<br/>
+      -(none of these)</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      Surround words with round brackets to group them for <code>OR</code>
+      queries or for excluding from results.
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search for partially matching text<br /><br />
+      <font color="#006600"><code>bas*ball</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      Use an asterisk (<font color="#006600"><code>*</code></font>) to make a
+      wildcard query: the wildcard will match any text between its front and
+      rear characters (including other words).
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search within specific chats<br /><br />
+      <font color="#006600"><code>chat:office<br />
+      chat:"coffee &amp cig"</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      To find messages from specific chats only, use the keyword
+      <font color="#006600"><code>chat:name</code></font>.<br /><br />
+      Search from more than one chat by adding more 
+      <font color="#006600"><code>chat:</code></font> keywords.
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search from specific authors<br /><br />
+      <font color="#006600"><code>from:maria<br />
+      from:"john smith"</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      To find messages from specific authors only, use the keyword
+      <font color="#006600"><code>from:name</code></font>.<br /><br />
+      Search from more than one author by adding more
+      <font color="#006600"><code>from:</code></font> keywords.
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Search from specific time periods<br /><br />
+      <font color="#006600"><code>date:2008<br />date:2009-01<br />
+      date:2005-12-24..2007</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      To find messages from specific time periods, use the keyword
+      <font color="#006600"><code>date:period</code></font> or
+      <font color="#006600"><code>date:periodstart..periodend</code></font>.
+      For the latter, either start or end can be omitted.<br /><br />
+      A date period can be year, year-month, or year-month-day. Additionally,
+      <font color="#006600"><code>date:period</code></font> can use a wildcard
+      in place of any part, so
+      <font color="#006600"><code>date:*-12-24</code></font> would search for
+      all messages from the 24th of December.<br /><br />
+      Search from a more narrowly defined period by adding more
+      <font color="#006600"><code>date:</code></font> keywords.
+      <br />
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>Exclude words or keywords<br /><br />
+      <font color="#006600"><code>-notthisword<br />-"not this phrase"<br />
+      -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
+      -date:2013</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      To exclude certain messages, add a dash
+      (<font color="#006600"><code>-</code></font>) in front of words,
+      phrases, grouped words or keywords.
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="white" width="150">
+      <b>SPECIAL: search specific tables<br /><br />
+      <font color="#006600"><code>table:fromthistable<br />
+      -table:notfromthistable</code></font>
+      <br />
+    </td>
+    <td bgcolor="white">
+      <br /><br />
+      When performing search on all columns of all database tables, use the keyword
+      <font color="#006600"><code>table:name</code></font> to constrain results
+      to specific tables only.<br /><br />
+      Search from more than one table by adding more
+      <font color="#006600"><code>table:</code></font> keywords, or exclude certain
+      tables by adding a <font color="#006600"><code>-table:</code></font> keyword.
+      <br />
+    </td>
+  </tr>
+  </table>
+
+</td><td valign="top" align="left">
+
+  <b><font size="3">Examples</font></b><br /><br />
+
+  <ul>
+    <li>search for "flickr.com" from John or Jane in chats named "links":
+        <br /><br />
+        <font color="#006600">
+        <code>flickr.com from:john from:jane chat:links</code></font><br />
+    </li>
+    <li>search from John Smith up to 2011:<br /><br />
+        <font color="#006600"><code>from:"john smith" date:..2011</code></font>
+        <br />
+    </li>
+    <li>search for either "John" and "my side" or "Stark" and "your side":
+        <br /><br />
+        <font color="#006600">
+        <code>(john "my side") OR (stark "your side")</code></font><br />
+    </li>
+    <li>search for either "barbecue" or "grill" in 2012,
+        except from June to August:<br /><br />
+        <font color="#006600">
+        <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
+        </font><br />
+    </li>
+    <li>search for "TPS report" in chats named "office"
+        (but not named "backoffice") on the first day of the month in 2012:
+        <br /><br />
+        <font color="#006600">
+        <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
+        </font><br />
+    </li>
+  </ul>
+
+  <br /><br /><br />
+  Search is made on raw Skype message body, so there can be results which do not
+  seem to match the query - Skype messages contain more than plain text.<br />
+  For example, searching for <font color="#006600"><code>href</code></font> will match a message with body
+  <code><font color="blue">&lt;a <font color="red">href</font>=<font
+  color="#FF00FF">"http://lmgtfy.com/"</font>&gt;</font>lmgtfy.com<font
+  color="blue">&lt;/a&gt;</font></code>,<br />
+  displayed as <a href="http://lmgtfy.com/">lmgtfy.com</a>.<br /><br />
+  This can be used for finding specific type of messages, for example
+  <font color="#006600"><code>&lt;sms</code></font> finds SMS messages, <font color="#006600"><code>&lt;file</code></font> finds transfers and <font color="#006600"><code>&lt;quote</code></font>
+  finds quoted messages.
+
+
+</td></tr></table>
+</font>
+"""
+
+
+"""Short help text shown on search page."""
+SEARCH_HELP_SHORT = """<%
+import os
+import conf
+helplink = "Search help"
+if "nt" == os.name: # In Windows, wx.HtmlWindow shows link whitespace quirkily
+    helplink = helplink.replace(" ", "_")
+%>
+<font size="2" face="{{conf.HistoryFontName}}" color="gray">
+For searching messages from specific chats, add "chat:name", and from specific contacts, add "from:name".
+&nbsp;&nbsp;<a href=\"page:#help\">{{helplink}}</a>.
+</font>
 """

@@ -2,9 +2,14 @@
 """
 Functionality for exporting Skype data to external files.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.06.2013
+@modified    24.08.2013
+------------------------------------------------------------------------------
 """
 import cStringIO
 import csv
@@ -15,11 +20,12 @@ import tempfile
 import traceback
 import wx
 
+from third_party import step
+
 import conf
 import emoticons
 import main
 import skypedata
-import step
 import templates
 import util
 
@@ -121,9 +127,8 @@ def export_chat(chat, messages, filename, db):
     except Exception, e:
         if f:
             f.close()
-        main.log("Export cannot access %s.\n%s", filename,
-            traceback.format_exc()
-        )
+        main.log("Export cannot access %s.\n\n%s", filename,
+                 traceback.format_exc())
     return result
 
 
@@ -204,7 +209,6 @@ def export_grid(grid, filename, title, db, sql="", table=""):
     except Exception, e:
         if f:
             f.close()
-        main.log("Export cannot access %s.\n%s", filename,
-            traceback.format_exc()
-        )
+        main.log("Export cannot access %s.\n\n%s", filename,
+                 traceback.format_exc())
     return result

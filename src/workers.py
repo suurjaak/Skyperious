@@ -1,23 +1,30 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Background workers for potentially long-running tasks like searching and
 diffing.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    20.06.2013
+@modified    02.09.2013
+------------------------------------------------------------------------------
 """
 import datetime
-import multiprocessing.connection
 import Queue
 import re
 import threading
 import time
+import traceback
+
+from third_party import step
 
 import conf
 import main
+import searchparser
 import skypedata
-import step
 import templates
 import util
 
@@ -91,38 +98,34 @@ class SearchThread(WorkerThread):
     def run(self):
         self._is_running = True
         # For identifying "chat:xxx" and "from:xxx" keywords
-        pattern_chat    = re.compile("chat\:([^\s]+)")
-        pattern_contact = re.compile("from\:([^\s]+)")
         template_chat = step.Template(templates.SEARCH_ROW_CHAT_HTML)
         template_contact = step.Template(templates.SEARCH_ROW_CONTACT_HTML)
         template_message = step.Template(templates.SEARCH_ROW_MESSAGE_HTML)
+        template_row = step.Template(templates.SEARCH_ROW_TABLE_HTML)
+        template_table = step.Template(templates.SEARCH_ROW_TABLE_HEADER_HTML)
+        query_parser = searchparser.SearchQueryParser()
         wrap_b = lambda x: "<b>%s</b>" % x.group(0)
+        result = None
         while self._is_running:
-            search = self._queue.get()
-            self._stop_work = False
-            self._drop_results = False
-            if search:
-                result_count = 0
+            try:
+                search = self._queue.get()
+                if not search:
+                    continue # continue while self._is_running
+                self._stop_work = False
+                self._drop_results = False
                 parser = skypedata.MessageParser(search["db"])
                 # {"html": html with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
-                count = 0
-                result = {"html": "", "map": {}, "search": search,
-                          "count": count}
-                # Lists of words to find in either message body, chat title and
-                # participant name fields, or contact name fields.
-                match_words = filter(None, search["text"].lower().split(" "))
-                match_chats, match_contacts = [], []
+                result_type, result_count, count = None, 0, 0
+                result = {"html": "", "map": {},
+                          "search": search, "count": 0}
+                sql, params, match_words = query_parser.Parse(search["text"])
 
-                for word in match_words[:]:
-                    if pattern_chat.match(word):
-                        match_chats.append(pattern_chat.split(word)[1])
-                        match_words.remove(word)
-                    elif pattern_contact.match(word):
-                        match_contacts.append(pattern_contact.split(word)[1])
-                        match_words.remove(word)
+                # Turn wildcard characters * into regex-compatible .*
+                match_words_re = [".*".join(map(re.escape, w.split("*")))
+                                  for w in match_words]
+                patt = "(%s)" % "|".join(match_words_re)
                 # For replacing matching words with <b>words</b>
-                patt = "(%s)" % "|".join(map(re.escape, match_words))
                 pattern_replace = re.compile(patt, re.IGNORECASE)
 
                 # Find chats with a matching title or matching participants
@@ -146,26 +149,29 @@ class SearchThread(WorkerThread):
                                         matching_authors.append(contact)
 
                         if title_matches or matching_authors:
-                            result_count += 1
                             count += 1
+                            result_count += 1
                             result["html"] += template_chat.expand(locals())
                             key = "chat:%s" % chat["id"]
-                            result["map"][key] = {"chat": chat}
+                            result["map"][key] = {"chat": chat["id"]}
                             if not count % conf.SearchResultsChunk \
                             and not self._drop_results:
+                                result["count"] = result_count
                                 self._postback(result)
                                 result = {"html": "", "map": {},
-                                          "search": search, "count": count}
+                                          "search": search, "count": 0}
                     if self._stop_work:
                         break # break for chat in chats
                 if result["html"] and not self._drop_results:
+                    result["count"] = result_count
                     self._postback(result)
                     result = {"html": "", "map": {}, "search": search,
-                              "count": count}
+                              "count": 0}
 
                 # Find contacts with a matching name
                 if not self._stop_work and "contacts" == search["table"] \
                 and match_words:
+                    count = 0
                     contacts = search["db"].get_contacts()
                     # Possibly more: country (ISO code, need map), birthday
                     # (base has YYYYMMDD in integer field).
@@ -186,78 +192,134 @@ class SearchThread(WorkerThread):
                                     val = pattern_replace.sub(wrap_b, val)
                                 fields_filled[field] = val
                         if match:
-                            result_count += 1
                             count += 1
+                            result_count += 1
                             result["html"] += template_contact.expand(locals())
-                            key = "contact:%s" % contact["id"]
-                            result["map"][key] = {"contact": contact}
                             if not (self._drop_results
                             or count % conf.SearchResultsChunk):
+                                result["count"] = result_count
                                 self._postback(result)
                                 result = {"html": "", "map": {},
-                                          "search": search, "count": count}
+                                          "search": search, "count": 0}
                         if self._stop_work:
                             break # break for contact in contacts
                 if result["html"] and not self._drop_results:
+                    result["count"] = result_count
                     self._postback(result)
-                    result = {"html": "", "map": {}, "search": search,
-                              "count": count}
+                    result = {"html": "", "map": {},
+                              "search": search, "count": 0}
 
                 # Find messages with a matching body
                 if not self._stop_work and "messages" == search["table"]:
+                    count, result_type = 0, "messages"
                     chat_messages = {} # {chat id: [message, ]}
                     chat_order = []    # [chat id, ]
                     messages = search["db"].get_messages(
-                        ascending=False, body_likes=match_words,
-                        author_likes=match_contacts, chat_likes=match_chats,
-                        use_cache=False)
+                        additional_sql=sql, additional_params=params,
+                        ascending=False, use_cache=False)
                     for m in messages:
-                        chat = chat_map.get(m["convo_id"], None)
+                        chat = chat_map.get(m["convo_id"])
                         chat_title = chat["title_long"]
                         body = parser.parse(m,
                             pattern_replace if match_words else None,
-                            html={"w": search["window"].Size.width * 5 / 9})
-                        result_count += 1
+                            html={"w": search["window"].Size.width * 5/9})
                         count += 1
+                        result_count += 1
                         result["html"] += template_message.expand(locals())
                         key = "message:%s" % m["id"]
-                        result["map"][key] = {"chat": chat, "message": m}
-                        if self._stop_work:
-                            break # break for m in messages
+                        result["map"][key] = {"chat": chat["id"],
+                                              "message": m["id"]}
                         if not count % conf.SearchResultsChunk \
                         and not self._drop_results:
+                            result["count"] = result_count
                             self._postback(result)
-                            result = {"html": "", "map": {}, "search": search,
-                                      "count": count}
-                        if count >= conf.SearchMessagesMax:
-                            break
+                            result = {"html": "", "map": {},
+                                      "search": search, "count": 0}
                         if self._stop_work or count >= conf.SearchMessagesMax:
-                            break # break for c in chat_order
+                            break # break for m in messages
 
+                infotext = search["table"]
+                if not self._stop_work and "all tables" == search["table"]:
+                    infotext, result_type = "", "table row"
+                    # Search over all fields of all tables.
+                    for table in search["db"].tables_list:
+                        sql, params, words = \
+                            query_parser.Parse(search["text"], table)
+                        if not sql:
+                            continue # continue for table in search["db"]..
+                        infotext += (", " if infotext else "") + table["name"]
+                        rows = search["db"].execute(sql, params)
+                        row = rows.fetchone()
+                        if not row:
+                            continue # continue for table in search["db"]..
+                        result["html"] = template_table.expand(locals())
+                        count = 0
+                        while row:
+                            count += 1
+                            result_count += 1
+                            result["html"] += template_row.expand(locals())
+                            key = "table:%s:%s" % (table["name"], count)
+                            result["map"][key] = {"table": table["name"],
+                                                  "row": row}
+                            if not count % conf.SearchResultsChunk \
+                            and not self._drop_results:
+                                result["count"] = result_count
+                                self._postback(result)
+                                result = {"html": "", "map": {},
+                                          "search": search, "count": 0}
+                            if self._stop_work \
+                            or result_count >= conf.SearchTableRowsMax:
+                                break # break while row
+                            row = rows.fetchone()
+                        if not self._drop_results:
+                            result["html"] += "</table>"
+                            result["count"] = result_count
+                            self._postback(result)
+                            result = {"html": "", "map": {},
+                                      "search": search, "count": 0}
+                        infotext += " (%s)" % util.plural("result", count)
+                        if self._stop_work \
+                        or result_count >= conf.SearchTableRowsMax:
+                            break # break for table in search["db"]..
+                    single_table = ("," not in infotext)
+                    infotext = "table%s: %s" % \
+                               ("" if single_table else "s", infotext)
+                    if not single_table:
+                        infotext += "; %s in total" % \
+                                    util.plural("result", result_count)
                 final_text = "No matches found."
                 if self._drop_results:
                     result["html"] = ""
                 if result_count:
-                    final_text = "Finished searching %s." % search["table"]
+                    final_text = "Finished searching %s." % infotext
 
                 if self._stop_work:
                     final_text += " Stopped by user."
-                elif "messages" == search["table"] \
+                elif "messages" == result_type \
                 and count >= conf.SearchMessagesMax:
-                    final_text += " Stopped at message limit %s." \
-                                  % conf.SearchMessagesMax
+                    final_text += " Stopped at %s limit %s." % \
+                                  (result_type, conf.SearchMessagesMax)
+                elif "table row" == result_type \
+                and count >= conf.SearchTableRowsMax:
+                    final_text += " Stopped at %s limit %s." % \
+                                  (result_type, conf.SearchTableRowsMax)
 
-                result["html"] += "</table><br />%s</font>" % final_text
+                result["html"] += "</table><br /><br />%s</font>" % final_text
                 result["done"] = True
-                result["count"] = count
+                result["count"] = result_count
+                self._postback(result)
+            except Exception, e:
+                if not result:
+                    result = {}
+                result["done"], result["error"] = True, traceback.format_exc()
+                result["error_short"] = "%s: %s" % (type(e).__name__, e.message)
                 self._postback(result)
 
 
-
-class DiffThread(WorkerThread):
+class MergeThread(WorkerThread):
     """
-    Diff background thread, compares conversations in two databases, yielding
-    results back to main thread in chunks.
+    Merge background thread, compares conversations in two databases, yielding
+    results back to main thread in chunks, or merges compared differences.
     """
 
     # Difftext to compare will be assembled from other fields for these types.
@@ -274,94 +336,162 @@ class DiffThread(WorkerThread):
             params = self._queue.get()
             self._stop_work = False
             self._drop_results = False
-            if params:
-                # {"htmls": [html result for db1, db2],
-                #  "chats": [differing chats in db1, db2]}
-                result = {
-                    "htmls": ["", ""], "chats": [[], []], "params": params
-                }
-                db1, db2 = params["db1"], params["db2"]
-                chats1 = db1.get_conversations()
-                chats2 = db2.get_conversations()
-                skypenames1 = [i["identity"] for i in db1.get_contacts()]
-                skypenames2 = [i["identity"] for i in db2.get_contacts()]
-                skypenames1.append(db1.id)
-                skypenames2.append(db2.id)
-                c1map = dict((c["identity"], c) for c in chats1)
-                c2map = dict((c["identity"], c) for c in chats2)
-                compared = []
-                for c1 in chats1:
-                    c2 = c2map.get(c1["identity"], None)
-                    c = c1.copy()
-                    c["messages1"] = c1["message_count"] or 0
-                    c["messages2"] = c2["message_count"] or 0 if c2 else 0
-                    c["c1"] = c1
-                    c["c2"] = c2
-                    compared.append(c)
-                for c2 in chats2:
-                    c1 = c1map.get(c2["identity"], None)
-                    if not c1:
-                        c = c2.copy()
-                        c["messages2"] = c["message_count"] or 0
-                        c["messages1"] = 0
-                        c["c1"] = c1
-                        c["c2"] = c2
-                        compared.append(c)
-                compared.sort(key=lambda x: x["title"])
-                for chat in compared:
-                    diff = self.get_chat_diff(chat, db1, db2)
-                    if self._stop_work:
-                        break # break for chat in compared
-                    for i in range(2):
-                        new_chat = not chat["c1" if i else "c2"]
-                        newstr = "" if new_chat else "new "
-                        info = util.htmltag("a", {"href": chat["identity"]},
-                            chat["title_long"], utf=False
-                        )
-                        if new_chat:
-                            info += " - new chat"
-                        skypenames_other = [skypenames1, skypenames2][1 - i]
-                        if diff["messages"][i]:
-                           info += ", %s" % (
-                                util.plural("%smessage" % newstr,
-                                    len(diff["messages"][i])
-                                )
-                           )
-                        if diff["participants"][i] and newstr:
-                                info += ", %s" % (
-                                    util.plural("%sparticipant" % newstr,
-                                        len(diff["participants"][i])
-                                    )
-                                )
-                        if diff["messages"][i] or diff["participants"][i]:
-                            info += ".<br />"
-                            result["htmls"][i] += info
-                            result["chats"][i].append(
-                                {"chat": chat, "diff": diff}
-                            )
-                            if not self._drop_results \
-                            and not len(result["chats"][i]) \
-                            % conf.DiffResultsChunk:
-                                self._postback(result)
-                                result = {
-                                    "htmls": ["", ""], "chats": [[], []],
-                                    "params": params
-                                }
-                if not self._drop_results:
-                    result["done"] = True
-                    self._postback(result)
+            if params and "diff" == params.get("type"):
+                self.work_diff(params)
+            elif params and "merge" == params.get("type"):
+                self.work_merge(params)
+
+
+    def work_diff(self, params):
+        """
+        Worker branch that compares all chats for differences, posting results
+        back to application.
+        """
+        # {"htmls": [html result for db1, db2],
+        #  "chats": [differing chats in db1, db2]}
+        result = {"htmls": ["", ""], "chats": [[], []],
+                  "params": params, "index": 0, "type": "diff"}
+        db1, db2 = params["db1"], params["db2"]
+        chats1 = db1.get_conversations()
+        chats2 = db2.get_conversations()
+        skypenames1 = [i["identity"] for i in db1.get_contacts()]
+        skypenames2 = [i["identity"] for i in db2.get_contacts()]
+        skypenames1.append(db1.id)
+        skypenames2.append(db2.id)
+        c1map = dict((c["identity"], c) for c in chats1)
+        c2map = dict((c["identity"], c) for c in chats2)
+        compared = []
+        for c1 in chats1:
+            c2 = c2map.get(c1["identity"])
+            c = c1.copy()
+            c["messages1"] = c1["message_count"] or 0
+            c["messages2"] = c2["message_count"] or 0 if c2 else 0
+            c["c1"], c["c2"] = c1, c2
+            compared.append(c)
+        for c2 in chats2:
+            c1 = c1map.get(c2["identity"])
+            if not c1:
+                c = c2.copy()
+                c["messages1"], c["messages2"] = 0, c["message_count"] or 0
+                c["c1"], c["c2"] = c1, c2
+                compared.append(c)
+        compared.sort(key=lambda x: x["title"].lower())
+        for index, chat in enumerate(compared):
+            diff = self.get_chat_diff(chat, db1, db2)
+            if self._stop_work:
+                break # break for index, chat in enumerate(compared)
+            for i in range(2):
+                new_chat = not chat["c1" if i else "c2"]
+                newstr = "" if new_chat else "new "
+                info = util.htmltag("a", {"href": chat["identity"]},
+                                    chat["title_long"], utf=False)
+                if new_chat:
+                    info += " - new chat"
+                if diff["messages"][i]:
+                   info += ", %s" % util.plural("%smessage" % newstr,
+                                                diff["messages"][i])
+                if diff["participants"][i] and newstr:
+                        info += ", %s" % (
+                            util.plural("%sparticipant" % newstr,
+                                        diff["participants"][i]))
+                if diff["messages"][i] or diff["participants"][i]:
+                    info += ".<br />"
+                    result["htmls"][i] += info
+                    result["chats"][i].append({"chat": chat, "diff": diff})
+            if not self._drop_results:
+                self._postback(result)
+                result = {"htmls": ["", ""], "chats": [[], []],
+                          "params": params, "index": index, "type": "diff"}
+        if not self._drop_results:
+            result["done"] = True
+            self._postback(result)
+
+
+
+    def work_merge(self, params):
+        """
+        Worker branch that merges differences given in params, posting progress
+        back to application.
+        """
+        error, e = None, None
+        db1, db2, info = params["db1"], params["db2"], params["info"]
+        chats, contacts = params["chats"], params["contacts"]
+        source, contactgroups = params["source"], params["contactgroups"]
+        count_messages = 0
+        count_participants = 0
+        try:
+            if contacts:
+                content = util.plural("contact", contacts)
+                self._postback({"type": "merge", "gauge": 0,
+                                "message": "Merging %s." % content})
+                db2.insert_contacts(contacts, db1)
+                self._postback({"type": "merge", "gauge": 100,
+                                "message": "Merged %s." % content})
+            if contactgroups:
+                content = util.plural("contact group", contactgroups)
+                self._postback({"type": "merge", "gauge": 0,
+                                "message": "Merging %s." % content})
+                db2.replace_contactgroups(contactgroups, db1)
+                self._postback({"type": "merge", "gauge": 100,
+                                "message": "Merged %s." % content})
+            for index, chat_data in enumerate(chats):
+                if self._stop_work:
+                    break # break for i, chat_data in enumerate(chats)
+                chat1 = chat_data["chat"]["c2" if source else "c1"]
+                chat2 = chat_data["chat"]["c1" if source else "c2"]
+                if not chat_data["diff"].get("messages"):
+                    # Hack to ensure original diff db order
+                    d1, d2 = (db2, db1) if source else (db1, db2)
+                    diff = self.get_chat_diff(chat_data["chat"], d1, d2)
+                    chat_data["diff"]["messages"] = diff["messages"]
+                step = -1 if source else 1
+                messages1, messages2 = chat_data["diff"]["messages"][::step]
+                participants, participants2 = \
+                    chat_data["diff"]["participants"][::step]
+                if not chat2:
+                    chat2 = chat1.copy()
+                    chat_data["chat"]["c1" if source else "c2"] = chat2
+                    chat2["id"] = db2.insert_chat(chat2, db1)
+                if participants:
+                    db2.insert_participants(chat2, participants, db1)
+                    count_participants += len(participants)
+                if messages1:
+                    db2.insert_messages(chat2, messages1, db1, chat1)
+                    count_messages += len(messages1)
+                self._postback({"type": "merge", "index": index,
+                                "params": params})
+        except Exception, e:
+            error = traceback.format_exc()
+        finally:
+            if chats:
+                if count_participants:
+                    info += (" and " if info else "") + \
+                            util.plural("participant", count_participants)
+                if count_messages:
+                    info += (" and " if info else "") \
+                        + util.plural("message", count_messages)
+            if not self._drop_results:
+                result = {"type": "merge", "done": True, "info": info,
+                          "source": source, "params": params}
+                if error:
+                    result["error"] = error
+                    if e:
+                        result["error_short"] = "%s: %s" % (
+                                                type(e).__name__, e.message)
+                self._postback(result)
 
 
     def get_chat_diff(self, chat, db1, db2):
         """
-        Compares the chat in the two databases and returns the differences as {
-          "messages": [[messages different in db1], [..db2]],
-          "participants": [[participants different in db1], [..db2]]
-        }.
+        Compares the chat in the two databases and returns the differences as
+          {"messages": [[messages different in db1], [..db2]],
+           "participants": [[participants different in db1], [..db2]]}.
         """
         c = chat
-        messages1 = list(db1.get_messages(c["c1"])) if c["c1"] else []
-        messages2 = list(db2.get_messages(c["c2"])) if c["c2"] else []
+        messages1 = list(db1.get_messages(c["c1"], use_cache=False)) \
+                    if c["c1"] else []
+        messages2 = list(db2.get_messages(c["c2"], use_cache=False)) \
+                    if c["c2"] else []
         c1m_diff = [] # Messages different in chat 1
         c2m_diff = [] # Messages different in chat 2
         participants1 = c["c1"]["participants"] if c["c1"] else []
@@ -389,11 +519,11 @@ class DiffThread(WorkerThread):
             parser1 = skypedata.MessageParser(db1)
             parser2 = skypedata.MessageParser(db2)
 
-        # Assemble maps by remote_id and create diff texts. remote_id is not
-        # unique and can easily have duplicates.
-        for messages, idmap, noidmap, bodymap, parser, mdiff in [
-        (messages1, m1map, m1_no_remote_ids, m1bodymap, parser1, c1m_diff),
-        (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2, c2m_diff)]:
+        # Assemble maps by remote_id and create diff texts. remote_id is
+        # not unique and can easily have duplicates.
+        for messages, idmap, noidmap, bodymap, parser in [
+        (messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
+        (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]:
             for m in messages:
                 if m["remote_id"]:
                     if m["remote_id"] not in idmap:
@@ -439,18 +569,15 @@ class DiffThread(WorkerThread):
 
         # For messages with no remote_id-s, compare by author-type-body key
         # and see if there are no matching messages sufficiently close in time.
-        for m in m1_no_remote_ids:
-            potential_matches = m2bodymap.get(difftexts[id(m)], [])
-            # Allow a 3-minute leeway between timestamps of duplicated messages
-            if not [i for i in potential_matches if 
-            (abs(i["timestamp"] - m["timestamp"]) < 3 * 60)]:
-                c1m_diff.append(m)
-        for m in m2_no_remote_ids:
-            potential_matches = m1bodymap.get(difftexts[id(m)], [])
-            # Allow a 3-minute leeway between timestamps of duplicated messages
-            if not [i for i in potential_matches if 
-            (abs(i["timestamp"] - m["timestamp"]) < 180)]:
-                c2m_diff.append(m)
+        for m_no_remote_ids, cm_diff, mbodymap in [
+        (m1_no_remote_ids, c1m_diff, m2bodymap),
+        (m2_no_remote_ids, c2m_diff, m1bodymap)]:
+            for m in m_no_remote_ids:
+                potential_matches = mbodymap.get(difftexts[id(m)], [])
+                if not [m2 for m2 in potential_matches
+                        if self.match_time(m.get("datetime"),
+                        m2.get("datetime"), 180)]:
+                    cm_diff.append(m)
         for p in participants1:
             if p["identity"] not in c2p_map:
                 c1p_diff.append(p)
@@ -461,10 +588,23 @@ class DiffThread(WorkerThread):
         c1m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
         c2m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
 
-        result = {
-            "messages": [c1m_diff, c2m_diff],
-            "participants": [c1p_diff, c2p_diff]
-        }
+        result = { "messages": [c1m_diff, c2m_diff],
+                   "participants": [c1p_diff, c2p_diff] }
+        return result
+
+
+    def match_time(self, d1, d2, leeway_seconds=0):
+        """Whether datetimes might be same but from different timezones."""
+        result = False
+        d1, d2 = (d1, d2) if d1 and d2 and (d1 < d2) else (d2, d1)
+        delta = d2 - d1 if d1 and d2 else datetime.timedelta()
+        if util.timedelta_seconds(delta) > 24 * 3600:
+            delta = datetime.timedelta() # Skip if not even within same day
+        for hour in range(int(util.timedelta_seconds(delta) / 3600) + 1):
+            d1plus = d1 + datetime.timedelta(hours=hour)
+            result = util.timedelta_seconds(d2 - d1plus) < leeway_seconds
+            if result:
+                break # break for hour in range(..
         return result
 
 
@@ -528,63 +668,15 @@ class DetectDatabaseThread(WorkerThread):
             search = self._queue.get()
             self._stop_work = self._drop_results = False
             if search:
-                filenames = set() # To handle potential duplicates
-                for filename in skypedata.detect_databases():
-                    
-                    if not self._drop_results and filename not in filenames:
-                        result = {"filename": filename}
+                all_filenames = set() # To handle potential duplicates
+                for filenames in skypedata.detect_databases():
+                    filenames = all_filenames.symmetric_difference(filenames)
+                    if not self._drop_results:
+                        result = {"filenames": filenames}
                         self._postback(result)
-                    filenames.add(filename)
+                    all_filenames.update(filenames)
                     if self._stop_work:
                         break # break for filename in skypedata.detect_data...
 
-                result = {"done": True, "count": len(filenames)}
+                result = {"done": True, "count": len(all_filenames)}
                 self._postback(result)
-
-
-
-class IPCListener(threading.Thread):    
-    """
-    Inter-process communication server that listens on a port and posts
-    received data to application.
-    """
-
-    def __init__(self, authkey, port, callback):
-        threading.Thread.__init__(self)
-        self.daemon = True # Daemon threads do not keep application running
-        self.listener = None
-        self.authkey = authkey
-        self.port = port
-        self.callback = callback
-        self.start()
-
-
-    def run(self):
-        self.is_running = False
-        port = self.port
-        limit = 10000
-        while not self.listener and limit:
-            kwargs = {"address": ("localhost", port), "authkey": self.authkey}
-            try:
-                self.listener = multiprocessing.connection.Listener(**kwargs)
-                self.is_running = True
-            except:
-                port = port + 1
-                limit -= 1
-        self.port = port
-        while self.is_running:
-            try:
-                connection = self.listener.accept()
-                data = connection.recv()
-                self.callback(data)
-            except:
-                if self.is_running:
-                    raise
-        if self.listener:
-            self.listener.close()
-
-
-    def stop(self):
-        self.is_running = False
-        self.listener.close()
-        self.listener = None

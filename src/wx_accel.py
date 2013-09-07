@@ -14,6 +14,7 @@ Supported controls:
 - wx.Control      control focused
 - wx.ToolBar      tool event is called, if the tool shorthelp includes a
                   parseable shortcut key like (Alt-S)
+- wx.ToggleButton ToggleButton handler called
 
 Uses primitive heuristic analysis to detect connected label-control pairs:
 - wx.StaticTexts whose next sibling is a focusable control
@@ -23,9 +24,14 @@ Uses primitive heuristic analysis to detect connected label-control pairs:
   prepended,
   e.g. "iptext" and "iptext_label"|"iptext.label"|"iptext label"|"labeliptext"
 
-@author    Erki Suurjaak
-@created   19.11.2011
-@modified  28.04.2013
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
+@author      Erki Suurjaak
+@created     19.11.2011
+@modified    28.04.2013
+------------------------------------------------------------------------------
 """
 import functools
 import re

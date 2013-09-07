@@ -1,10 +1,10 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 GUI frame templates.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    25.05.2013
+@modified    28.08.2013
 """
 import os
 import wx
@@ -61,7 +61,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
         edit_log = self.log = wx.TextCtrl(page, style=wx.TE_MULTILINE)
         edit_log.SetEditable(False)
         # Read-only controls tend to be made grey by default
-        edit_log.BackgroundColour = "white"
+        edit_log.BackgroundColour = wx.WHITE
+        edit_log.ForegroundColour = wx.Colour(128, 128, 128)
 
         sizer.Add(
             button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP | wx.RIGHT
@@ -137,7 +138,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
 
     def on_log_message(self, event):
         """Event handler for adding a message to the log page."""
-        if not (hasattr(conf, "LogEnabled")) or conf.LogEnabled:
+        if hasattr(self, "log") \
+        and not (hasattr(conf, "LogEnabled")) or conf.LogEnabled:
             text = event.text
             try:
                 self.log.AppendText(text + "\n")

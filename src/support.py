@@ -1,13 +1,17 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Updates and error reporting.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    19.06.2013
+@modified    24.08.2013
+------------------------------------------------------------------------------
 """
 import base64
-import BeautifulSoup
 import datetime
 import functools
 import hashlib
@@ -21,6 +25,8 @@ import urllib
 import urllib2
 import urlparse
 import wx
+
+from third_party import BeautifulSoup
 
 import conf
 import controls
@@ -106,11 +112,12 @@ def check_newest_version(callback=None):
                     if changes:
                         changes = "Changes in %s\n\n%s" % (h, changes)
                 except:
-                    main.log("Failed to read changelog:\n%s.", traceback.format_exc())
+                    main.log("Failed to read changelog.\n\n%s.",
+                             traceback.format_exc())
                 url = urlparse.urljoin(conf.DownloadURL, link["href"])
                 result = (version, url, changes)
     except:
-        main.log("Failed to retrieve new version from %s:\n%s",
+        main.log("Failed to retrieve new version from %s.\n\n%s",
                  conf.DownloadURL, traceback.format_exc())
         result = None
     update_window = None
@@ -122,7 +129,7 @@ def check_newest_version(callback=None):
 
 def download_and_install(url):
     """
-    Downloads and launches the specified file, closes Skyperious.
+    Downloads and launches the specified file.
     """
     global update_window, url_opener
     try:
@@ -131,6 +138,7 @@ def download_and_install(url):
         filename, tmp_dir = os.path.split(url)[-1], tempfile.mkdtemp()
         dlg_progress = \
             controls.ProgressWindow(parent, "Downloading %s" % filename)
+        dlg_progress.SetGaugeForegroundColour(conf.GaugeColour)
         dlg_progress.Position = (
             parent.Position.x + parent.Size.width  - dlg_progress.Size.width,
             parent.Position.y + parent.Size.height - dlg_progress.Size.height)
@@ -174,7 +182,7 @@ def download_and_install(url):
             update_window = dlg_proceed
             dlg_proceed.Bind(wx.EVT_CLOSE, proceed_handler)
     except:
-        main.log("Failed to download new version from %s:\n%s", url,
+        main.log("Failed to download new version from %s.\n\n%s", url,
                  traceback.format_exc())
 
 
@@ -216,7 +224,8 @@ def reporting_write(write):
         cached[:] = []
     def cache_text(string):
         if not cached:
-            wx.CallLater(500, handle_error)
+            # CallLater fails if not called from main thread
+            wx.CallAfter(wx.CallLater, 500, handle_error)
         cached.append(string)
         return write(string)
     return cache_text
@@ -259,7 +268,7 @@ def send_report(content, type, screenshot=""):
         url_opener.open(conf.ReportURL, urllib.urlencode(data))
         main.log("Sent %s report to %s (%s).", type, conf.ReportURL, content)
     except:
-        main.log("Failed to send %s to %s:\n%s", type, conf.ReportURL,
+        main.log("Failed to send %s to %s.\n\n%s", type, conf.ReportURL,
                  traceback.format_exc())
 
 
@@ -359,13 +368,22 @@ class FeedbackDialog(wx.Dialog):
         Handler for clicking to send feedback, hides the dialog and posts data
         to feedback web service.
         """
-        if self.edit_text.Value.strip():
+        text = self.edit_text.Value.strip()
+        text_short = text[:500] + ".." if len(text) > 500 else text
+        bmp = self.cb_bmp.Value and self.screenshot
+        if text:
+            ok = wx.MessageBox("Send the entered text%s?\n\n\"%s\"" % (
+                               " and screenshot" if bmp else "", text_short),
+                               self.Title, wx.OK | wx.CANCEL | 
+                               wx.ICON_INFORMATION)
+            text = (text if wx.OK == ok else "")
+        if text:
             self.Hide()
             time.sleep(0.1)
             kwargs = {"type": "feedback"}
-            kwargs["content"] = self.edit_text.Value.strip()
-            if self.cb_bmp.Value and self.screenshot:
-                kwargs["screenshot"] = util.bitmap_to_raw(self.screenshot)
+            kwargs["content"] = text
+            if bmp:
+                kwargs["screenshot"] = util.bitmap_to_raw(bmp)
             wx.CallAfter(lambda: send_report(**kwargs))
             wx.MessageBox("Feedback sent, thank you!", self.Title, wx.OK)
             self.edit_text.Value = ""

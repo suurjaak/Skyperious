@@ -1,26 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Skyperious main program entrance.
+Skyperious main program entrance: launches application and handles logging
+and status calls.
 
-Skyperious is a simple tool for accessing Skype database files, with the
-primary aim of merging chat history from another Skype database file.
-
-In addition, Skyperious allows to:
-- read, search, filter and export chats
-- see chat statistics
-- import contacts from a CSV file to your Skype contacts
-- browse and modify all database tables
-- execute arbitrary queries on the database
-- fix chat history messages that have been saved with a future timestamp
-  (can happen if the computer's clock has been in the future when receiving
-  messages)
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.06.2013
+@modified    29.08.2013
+------------------------------------------------------------------------------
 """
 import datetime
-import multiprocessing.connection
 import os
 import sys
 import wx
@@ -33,18 +25,12 @@ import support
 window = None          # Application main window instance
 deferred_logs = []     # Log messages cached before main window is available
 deferred_status = []   # Last status cached before main window is available
-instance_check = None  # wx.SingleInstanceChecker
+
 
 def run():
     """Main program entrance."""
-    global deferred_logs, deferred_status, instance_check, window
+    global deferred_logs, deferred_status, window
     conf.load()
-
-    instance_check = wx.SingleInstanceChecker(conf.IPCName)
-    if not conf.AllowMultipleInstances and instance_check.IsAnotherRunning():
-        data = os.path.realpath(sys.argv[1]) if len(sys.argv) > 1 else ""
-        if ipc_send(conf.IPCName, conf.IPCPort, data):
-            return
 
     # Values in some threads would otherwise not be the same
     sys.modules["main"].deferred_logs = deferred_logs
@@ -62,11 +48,12 @@ def run():
     window.console.run("import datetime, os, re, time, sys, wx")
     window.console.run("# All %s modules:" % conf.Title)
     window.console.run("import conf, controls, emoticons, export, guibase,"
-                       " images, main, skypedata, skyperious, step, support,"
-                       " templates, util, wordcloud, workers, wx_accel")
+                       "images, main, searchparser, skypedata, skyperious, "
+                       "support, templates, util, wordcloud, workers, "
+                       "wx_accel")
 
     window.console.run("self = main.window # Application main window instance")
-    log("Started application.")
+    log("Started application on %s.", datetime.date.today())
     if len(sys.argv) > 1:
         event = skyperious.OpenDatabaseEvent(file=sys.argv[1])
         wx.CallAfter(wx.PostEvent, window, event)
@@ -81,9 +68,12 @@ def log(text, *args):
     """
     global deferred_logs, window
     timestamp = datetime.datetime.now()
+    finaltext = text % args if args else text
+    if "\n" in finaltext: # Indent all linebreaks
+        finaltext = finaltext.replace("\n", "\n\t\t")
     msg = "%s,%03d\t%s" % (timestamp.strftime("%H:%M:%S"),
                            timestamp.microsecond / 1000,
-                           text % args if args else text)
+                           finaltext)
     if window:
         process_deferreds()
         wx.PostEvent(window, guibase.LogEvent(text=msg))
@@ -119,7 +109,7 @@ def status_flash(text, *args):
         process_deferreds()
         wx.PostEvent(window, guibase.StatusEvent(text=msg))
         def clear_status():
-            if window.StatusBar.StatusText == msg:
+            if window.StatusBar and window.StatusBar.StatusText == msg:
                 window.SetStatusText("")
         wx.CallLater(conf.StatusFlashLength, clear_status)
     else:
@@ -161,27 +151,6 @@ def process_deferreds():
         if deferred_status:
             wx.PostEvent(window, guibase.StatusEvent(text=deferred_status[0]))
             del deferred_status[:]
-
-
-def ipc_send(authkey, port, data):
-    """
-    Sends data to another Skyperious instance via multiprocessing.
-
-    @return  True if operation successful, False otherwise
-    """
-    result = False
-    client = None
-    limit = 10000
-    while not client and limit:
-        kwargs = {"address": ("localhost", port), "authkey": authkey}
-        try:
-            client = multiprocessing.connection.Client(**kwargs)
-            client.send(data)
-            result = True
-        except Exception, e:
-            port = port + 1
-            limit -= 1
-    return result
 
 
 if "__main__" == __name__:

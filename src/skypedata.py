@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Skype database access functionality.
+Skype database access and message parsing functionality.
+
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.06.2013
+@modified    04.09.2013
+------------------------------------------------------------------------------
 """
 import collections
 import copy
@@ -28,12 +33,9 @@ import wx.grid
 import xml.etree.cElementTree
 
 import conf
-import export
 import emoticons
 import main
-import step
 import util
-import templates
 import wordcloud
 
 
@@ -54,6 +56,7 @@ MESSAGES_TYPE_LEAVE        =  13 # Contact left the chat
 MESSAGES_TYPE_CALL         =  30 # Started Skype call
 MESSAGES_TYPE_CALL_END     =  39 # Skype call ended
 MESSAGES_TYPE_SHARE_DETAIL =  51 # Sharing contact details
+MESSAGES_TYPE_INFO         =  60 # Info message like "/me is planting corn"
 MESSAGES_TYPE_MESSAGE      =  61 # Ordinary message
 MESSAGES_TYPE_CONTACTS     =  63 # Sent contacts
 MESSAGES_TYPE_SMS          =  64 # SMS message
@@ -144,7 +147,7 @@ class SkypeDatabase(object):
         self.update_fileinfo()
         try:
             self.connection = sqlite3.connect(self.filename,
-                check_same_thread = False)
+                                              check_same_thread=False)
             self.connection.row_factory = self.row_factory
             self.connection.text_factory = str
             rows = self.execute(
@@ -154,9 +157,8 @@ class SkypeDatabase(object):
                 self.tables[row["name"].lower()] = row
         except Exception, e:
             if log_error:
-                main.log("Error opening database %s (%s).", filename,
-                    traceback.format_exc()
-                )
+                main.log("Error opening database %s.\n\n%s.", filename,
+                         traceback.format_exc())
             self.close()
             raise
 
@@ -165,7 +167,7 @@ class SkypeDatabase(object):
             # NULLIF() will return the string or NULL if the string is empty.
             self.account = self.execute("SELECT *, "
                 "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
-                "         NULLIF(skypename, '')) AS name, "
+                         "NULLIF(skypename, '')) AS name, "
                 "skypename AS identity FROM accounts LIMIT 1"
             ).fetchone()
             self.id = self.account["skypename"]
@@ -223,11 +225,14 @@ class SkypeDatabase(object):
                 setattr(self, attr, None if ("tables_list" == attr) else {})
 
 
-    def execute(self, *args, **kwargs):
-        """Shorthand for self.execute()."""
+    def execute(self, sql, params=[], log=True):
+        """Shorthand for self.connection.execute()."""
         result = None
         if self.connection:
-            result = self.connection.execute(*args, **kwargs)
+            if log and conf.LogSQL:
+                main.log("SQL: %s%s", sql,
+                         ("\nParameters: %s" % params) if params else "")
+            result = self.connection.execute(sql, params)
         return result
 
 
@@ -262,14 +267,15 @@ class SkypeDatabase(object):
         result = (None, None)
         if self.is_open() and "messages" in self.tables:
             now = self.future_check_timestamp = int(time.time())
-            timestamp_max = self.execute(
-                "SELECT MAX(Timestamp) AS max FROM messages"
-            ).fetchone()["max"] # UNIX timestamp
-            count = self.execute(
-                "SELECT COUNT(*) AS count FROM messages WHERE timestamp > ?",
-                [now]
-            ).fetchone()["count"]
-            result = (count, datetime.datetime.fromtimestamp(timestamp_max))
+            try:
+                maxtimestamp = self.execute("SELECT MAX(timestamp) AS max "
+                                             "FROM messages").fetchone()["max"]
+                count = self.execute("SELECT COUNT(*) AS count FROM messages "
+                                     "WHERE timestamp > ?", [now]
+                                    ).fetchone()["count"]
+                result = (count, datetime.datetime.fromtimestamp(maxtimestamp))
+            except:
+                pass
 
         return result
 
@@ -310,7 +316,8 @@ class SkypeDatabase(object):
         """
         if self.is_open() and (refresh or self.tables_list is None):
             sql = "SELECT name, sql FROM sqlite_master WHERE type = 'table' " \
-                  "%sORDER BY name" % ("AND name = ? " if this_table else "")
+                  "%sORDER BY name COLLATE NOCASE" % \
+                  ("AND name = ? " if this_table else "")
             params = [this_table] if this_table else []
             rows = self.execute(sql, params).fetchall()
             tables = {}
@@ -318,7 +325,7 @@ class SkypeDatabase(object):
             for row in rows:
                 table = row
                 table["rows"] = self.execute(
-                    "SELECT COUNT(*) AS count FROM %s" % table["name"]
+                    "SELECT COUNT(*) AS count FROM %s" % table["name"], log=False
                 ).fetchone()["count"]
                 # Here and elsewhere in this module - table names are turned to
                 # lowercase when used as keys.
@@ -339,26 +346,22 @@ class SkypeDatabase(object):
 
 
     def get_messages(self, chat=None, ascending=True,
-                     timestamp_from=None, body_likes=None, author_likes=None,
-                     chat_likes=None, use_cache=True):
+                     additional_sql=None, additional_params=None,
+                     timestamp_from=None, use_cache=True):
         """
         Yields all the messages (or messages for the specified chat), as
         {"datetime": datetime, ..}, ordered from earliest to latest.
         Uses already retrieved cached values if possible, unless additional
         query parameters are used.
 
-        @param   chat            as returned from get_conversations(), if any
-        @param   ascending       can specify message order, earliest to latest
-                                 or latest to earliest
-        @param   body_likes      list of words to match in body with
-                                 (LIKE.. AND LIKE..)
-        @param   author_like     list of words to match in author or
-                                 from_dispname with (LIKE.. OR LIKE..)
-        @param   chat_likes      list of words to match in chat name fields
-                                 with (LIKE.. OR LIKE..)
-        @param   timestamp_from  timestamp beyond which messages will start
-        @param   use_cache       whether to use cached values if available. The
-                                 LIKE keywords will be ignored if True.
+        @param   chat               as returned by get_conversations(), if any
+        @param   ascending          specify message order, earliest to latest
+                                    or latest to earliest
+        @param   additional_sql     additional SQL string added to the end
+        @param   additional_params  SQL parameter dict for additional_sql
+        @param   timestamp_from     timestamp beyond which messages will start
+        @param   use_cache          whether to use cached values if available.
+                                    The LIKE keywords will be ignored if True.
         """
         if self.is_open() and "messages" in self.tables:
             if "messages" not in self.table_rows:
@@ -368,10 +371,11 @@ class SkypeDatabase(object):
                 params = {}
                 # Take only message types we can handle
                 sql = "SELECT m.* FROM messages m "
-                if chat_likes:
+                if additional_sql and " c." in additional_sql:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
+                # Take only known and supported types of messages.
                 sql += "WHERE m.type IN " \
-                       "(2, 10, 12, 13, 30, 39, 51, 61, 63, 64, 68)"
+                       "(2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68)"
                 if chat:
                     sql += " AND m.convo_id = :convo_id"
                     params["convo_id"] = chat["id"]
@@ -379,27 +383,9 @@ class SkypeDatabase(object):
                     sql += " AND m.timestamp %s :timestamp" % \
                            (">" if ascending else "<")
                     params["timestamp"] = timestamp_from
-                for i, word in enumerate(body_likes or []):
-                    sql += " AND m.body_xml LIKE :body_like%s" % i
-                    params["body_like%s" % i] = "%%%s%%" % word
-                if author_likes:
-                    sql += " AND ("
-                    for i, word in enumerate(author_likes):
-                        sql += "%(or)s(m.author LIKE :author_like%(i)s " \
-                               "OR m.from_dispname LIKE :author_like%(i)s)" \
-                               % {"i": i, "or": " OR " if i else ""}
-                        params["author_like%s" % i] = "%%%s%%" % word
-                    sql += ")"
-                if chat_likes:
-                    sql += " AND ("
-                    for i, word in enumerate(chat_likes):
-                        sql += "%(or)s(c.identity LIKE :chat_like%(i)s " \
-                               "OR c.displayname LIKE :chat_like%(i)s " \
-                               "OR c.given_displayname LIKE :chat_like%(i)s " \
-                               "OR c.meta_topic LIKE :chat_like%(i)s)" \
-                               % {"i": i, "or": " OR " if i else ""}
-                        params["chat_like%s" % i] = "%%%s%%" % word
-                    sql += ")"
+                if additional_sql:
+                    sql += " AND (%s)" % additional_sql
+                    params.update(additional_params or {})
                 sql += " ORDER BY m.timestamp %s" \
                     % ("ASC" if ascending else "DESC")
                 res = self.execute(sql, params)
@@ -486,7 +472,7 @@ class SkypeDatabase(object):
                                                 "displayname": i["identity"]}
                             )
                         participants[i["convo_id"]].append(i)
-                [i.sort(key=lambda x: (x["contact"]["name"] or "").lower())
+                [i.sort(key=lambda x: (x["contact"].get("name", "")).lower())
                  for i in participants.values()]
                 rows = self.execute(
                     "SELECT *, COALESCE(NULLIF(displayname, ''), "
@@ -559,7 +545,7 @@ class SkypeDatabase(object):
                 "NULL AS first_message_datetime, "
                 "NULL AS last_message_datetime "
                 "FROM messages "
-                "WHERE type IN (2, 10, 13, 51, 61, 63, 64, 68) "
+                "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
                 + and_str +
                 "GROUP BY convo_id", and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
@@ -616,7 +602,8 @@ class SkypeDatabase(object):
                                        "NULLIF(pstnnumber, '')) AS identity, "
                     "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
                              "NULLIF(skypename, ''), NULLIF(pstnnumber, '')) "
-                    "AS name FROM contacts ORDER BY name").fetchall()
+                    "AS name FROM contacts ORDER BY name COLLATE NOCASE"
+                ).fetchall()
                 self.table_objects["contacts"] = {}
                 for c in rows:
                     contacts.append(c)
@@ -666,6 +653,26 @@ class SkypeDatabase(object):
             else:
                 rows = self.table_rows[table]
         return rows
+
+
+    def get_smses(self):
+        """
+        Returns all the SMSes in the database.
+        Uses already retrieved cached values if possible.
+        """
+        transfers = []
+        if self.is_open() and "smses" in self.tables:
+            if "smses" not in self.table_rows:
+                rows = self.execute(
+                    "SELECT * FROM smses ORDER BY id").fetchall()
+                smses = []
+                for sms in rows:
+                    smses.append(sms)
+                self.table_rows["smses"] = smses
+            else:
+                smses = self.table_rows["smses"]
+
+        return smses
 
 
     def get_transfers(self):
@@ -772,13 +779,11 @@ class SkypeDatabase(object):
                 "FROM contacts AS c INNER JOIN participants AS p "
                 "ON p.identity = c.skypename "
                 "WHERE p.convo_id = :id AND c.skypename != :skypename "
-                "ORDER BY name ASC",
+                "ORDER BY name COLLATE NOCASE",
                 {"id": chat["id"], "skypename": self.account["skypename"]}
             ).fetchall()
             for p in rows:
-                p["contact"] = self.table_objects["contacts"].get(
-                    p["identity"], None
-                )
+                p["contact"] = self.table_objects["contacts"].get(p["identity"])
                 if not p["contact"]:
                     p["contact"] = self.get_contact(p["identity"])
                 participants.append(p)
@@ -796,7 +801,7 @@ class SkypeDatabase(object):
             """Returns the specified contact row, using cache if possible."""
             if "contacts" not in self.table_objects:
                 self.table_objects["contacts"] = {}
-            contact = self.table_objects["contacts"].get(identity, None)
+            contact = self.table_objects["contacts"].get(identity)
             if not contact:
                 contact = self.execute(
                     "SELECT *, COALESCE(NULLIF(fullname, ''), "
@@ -826,7 +831,7 @@ class SkypeDatabase(object):
             if "columns" in self.tables[table]:
                 table_columns = self.tables[table]["columns"]
             else:
-                res = self.execute("PRAGMA table_info(%s)" % table)
+                res = self.execute("PRAGMA table_info(%s)" % table, log=False)
                 table_columns = []
                 for row in res.fetchall():
                     table_columns.append(row)
@@ -965,41 +970,34 @@ class SkypeDatabase(object):
         if self.is_open() and "chats" not in self.tables:
             self.create_table("chats")
         if self.is_open() and "messages" in self.tables:
-            main.log("Merging %d chat messages (%s) into %s.", len(messages),
-                chat["title_long_lc"], self.filename
-            )
+            main.log("Merging %s (%s) into %s.",
+                     util.plural("chat message", messages),
+                     chat["title_long_lc"], self.filename)
             self.ensure_backup()
             # Messages.chatname corresponds to Chats.name, and Chats entries
             # must exist for Skype application to be able to find the messages.
             chatrows_source = dict([(i["name"], i) for i in 
-                source_db.execute(
-                    "SELECT * FROM chats WHERE conv_dbid = ?",
-                    [source_chat["id"]]
-                )
-            ])
+                source_db.execute("SELECT * FROM chats WHERE conv_dbid = ?",
+                                  [source_chat["id"]])])
             chatrows_present = dict([(i["name"], 1)
-                for i in self.execute("SELECT name FROM chats")]
-            )
+                for i in self.execute("SELECT name FROM chats")])
             col_data = self.get_table_columns("messages")
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
             transfer_col_data = self.get_table_columns("transfers")
             transfer_fields = [col["name"] for col in transfer_col_data
-                if col["name"] != "id"
-            ]
+                               if col["name"] != "id"]
             transfer_cols = ", ".join(transfer_fields)
             transfer_vals = ", ".join(["?"] * len(transfer_fields))
             sms_col_data = self.get_table_columns("smses")
             sms_fields = [col["name"] for col in sms_col_data
-                if col["name"] != "id"
-            ]
+                          if col["name"] != "id"]
             sms_cols = ", ".join(sms_fields)
             sms_vals = ", ".join(["?"] * len(sms_fields))
             chat_col_data = self.get_table_columns("chats")
             chat_fields = [col["name"] for col in chat_col_data
-                if col["name"] != "id"
-            ]
+                           if col["name"] != "id"]
             chat_cols = ", ".join(chat_fields)
             chat_vals = ", ".join(["?"] * len(chat_fields))
             timestamp_earliest = source_chat["creation_timestamp"] \
@@ -1008,66 +1006,49 @@ class SkypeDatabase(object):
                 # Insert corresponding Chats entry, if not present
                 if (m["chatname"] not in chatrows_present
                 and m["chatname"] in chatrows_source):
-                    chatrow = chatrows_source[m["chatname"]]
-                    chatrow = [(chatrow[col] if col in chatrow else "")
-                        for col in chat_fields
-                    ]
+                    chatrowdata = chatrows_source[m["chatname"]]
+                    chatrow = [chatrowdata.get(col, "") for col in chat_fields]
                     chatrow = self.blobs_to_binary(
-                        chatrow, chat_fields, chat_col_data
-                    )
-                    self.execute(
-                        "INSERT INTO chats (%s) VALUES (%s)" % (
-                            chat_cols, chat_vals
-                        )
-                    , chatrow)
+                        chatrow, chat_fields, chat_col_data)
+                    sql = "INSERT INTO chats (%s) VALUES (%s)" % \
+                          (chat_cols, chat_vals)
+                    self.execute(sql, chatrow)
                     chatrows_present[m["chatname"]] = 1
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
-                self.execute("INSERT INTO messages (%s) VALUES (%s)" % (
-                    str_cols, str_vals
-                ), m_filled)
+                cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
+                                      % (str_cols, str_vals), m_filled)
+                m_id = cursor.lastrowid
                 if (m["chatmsg_type"] == 7 and m["type"] == 68
                 and "transfers" in source_db.tables):
-                    transfer = source_db.execute(
-                        "SELECT * FROM Transfers WHERE chatmsg_guid = :guid", m
-                    ).fetchone()
-                    if transfer:
-                        t = []
-                        for col in transfer_fields:
-                            if col == "convo_id":
-                                t.append(chat["id"])
-                            else:
-                                t.append(transfer[col])
-                        # pk_id and nodeid are troublesome, because their
-                        # meaning is unknown, maybe something will go out of
-                        # sync if their values can differ?
-                        t = self.blobs_to_binary(
-                            t, transfer_fields, transfer_col_data
-                        )
-                        self.execute(
-                            "INSERT INTO transfers (%s) VALUES (%s)" % (
-                                transfer_cols, transfer_vals
-                            )
-                        , t)
+                    transfers = [t for t in source_db.get_transfers()
+                                 if t.get("chatmsg_guid") == m["guid"]]
+                    if transfers:
+                        sql = "INSERT INTO transfers (%s) VALUES (%s)" % \
+                              (transfer_cols, transfer_vals)
+                        transfers.sort(key=lambda x: x.get("chatmsg_index"))
+                        for t in transfers:
+                            # pk_id and nodeid are troublesome, ditto in SMSes,
+                            # because their meaning is unknown - will
+                            # something go out of sync if their values differ?
+                            row = [t.get(col, "") if col != "convo_id" else chat["id"]
+                                   for col in transfer_fields]
+                            row = self.blobs_to_binary(row, transfer_fields,
+                                                       transfer_col_data)
+                            self.execute(sql, row)
                 if (m["chatmsg_type"] == 7 and m["type"] == 64
                 and "smses" in source_db.tables):
-                    sms = source_db.execute(
-                        "SELECT * FROM smses WHERE chatmsg_id = :id", m
-                    ).fetchone()
-                    if sms:
-                        t = [(sms[col] if col in sms else "")
-                            for col in sms_fields
-                        ]
-                        # pk_id and nodeid are troublesome, because their
-                        # meaning is unknown, maybe something will go out of
-                        # sync if their values can differ?
-                        t = self.blobs_to_binary(t, sms_fields, sms_col_data)
-                        self.execute(
-                            "INSERT INTO smses (%s) VALUES (%s)" % (
-                                sms_cols, sms_vals
-                            )
-                        , t)
+                    smses = [s for s in source_db.get_smses()
+                             if s.get("chatmsg_id") == m["id"]]
+                    if smses:
+                        sql = "INSERT INTO smses (%s) VALUES (%s)" % \
+                              (sms_cols, sms_vals)
+                        for sms in smses:
+                            t = [sms.get(col, "") if col != "chatmsg_id" else m_id
+                                 for col in sms_fields]
+                            t = self.blobs_to_binary(t, sms_fields, sms_col_data)
+                            self.execute(sql, t)
                 timestamp_earliest = min(timestamp_earliest, m["timestamp"])
             if (timestamp_earliest
             and chat["creation_timestamp"] > timestamp_earliest):
@@ -1082,7 +1063,7 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
 
 
-    def insert_participants(self, chat, participants):
+    def insert_participants(self, chat, participants, source_db):
         """
         Inserts the specified messages under the specified chat in this
         database.
@@ -1145,7 +1126,7 @@ class SkypeDatabase(object):
             self.id = a_filled["skypename"]
 
 
-    def insert_contacts(self, contacts):
+    def insert_contacts(self, contacts, source_db):
         """
         Inserts the specified contacts into this database.
         """
@@ -1172,7 +1153,7 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
 
 
-    def replace_contactgroups(self, groups):
+    def replace_contactgroups(self, groups, source_db):
         """
         Inserts or updates the specified contact groups in this database.
         """
@@ -1302,39 +1283,6 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
 
 
-    def query_table(self, table, order=None, params=None):
-        """
-        Queries the table and yields results as dicts.
-
-        @param   table     a simple table name, or a more complex join
-        @param   order     [(column name to order by, is_ascending), ]
-        @param   params    list of AND criteria {name: (operator, value)}
-        """
-        if self.is_open():
-            table = table.lower()
-            if table in self.tables:
-                paramstr = ""
-                orderstr = ""
-                values = {}
-                if order:
-                    for name, ascending in order:
-                        orderstr += ", " if orderstr else " ORDER BY "
-                        orderstr += name + (" ASC" if ascending else " DESC")
-                if params:
-                    for name in params:
-                        paramstr += " AND " if paramstr else " WHERE "
-                        paramstr += "%s %s :%s" % (name, params[name][0], name)
-                        values[name] = params[name][1]
-
-                res = self.execute("SELECT * FROM %s%s%s" % (
-                    table, paramstr, orderstr
-                ), values)
-                row = res.fetchone()
-                while row:
-                    yield row
-                    row = res.fetchone()
-
-
 
 class TableBase(wx.grid.PyGridTableBase):
     """
@@ -1360,7 +1308,7 @@ class TableBase(wx.grid.PyGridTableBase):
         self.row_iterator = self.db.execute(sql)
         # Fill column information
         self.columns = []
-        for idx, col in enumerate(self.row_iterator.description):
+        for idx, col in enumerate(self.row_iterator.description or []):
             coldata = {"name": col[0], "type": "TEXT"}
             self.columns.append(coldata)
 
@@ -1775,7 +1723,11 @@ class TableBase(wx.grid.PyGridTableBase):
         compare = cmp
         if 0 <= col < len(self.columns):
             col_name = self.columns[col]["name"]
-            compare = lambda a, b: cmp(a[col_name], b[col_name])
+            def compare(a, b):
+                aval, bval = a[col_name], b[col_name]
+                aval = aval.lower() if hasattr(aval, "lower") else aval
+                bval = bval.lower() if hasattr(bval, "lower") else bval
+                return cmp(aval, bval)
         self.rows_current.sort(cmp=compare, reverse=self.sort_ascending)
         if self.View:
             self.View.ForceRefresh()
@@ -1960,6 +1912,7 @@ class MessageParser(object):
                     result = xml.etree.cElementTree.fromstring(TAG % text)
                 except Exception, e:
                     result = xml.etree.cElementTree.fromstring(TAG % "")
+                    result.text = text
                     main.log("Error parsing message %s, body \"%s\" (%s).", 
                              message["id"], text, e)
         return result
@@ -2029,14 +1982,15 @@ class MessageParser(object):
                         # Fallback, message content is in <sms alt="content"
                         body = dom.find("sms").get("alt")
                     body = body.encode("utf-8")
+                # Replace text emoticons with <ss>-tags if body not XML.
                 if "<" not in body and self.EMOTICON_CHARS_RGX.search(body):
                     body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
-                status = dom.find("*/failurereason")
                 status_text = " SMS"
+                status = dom.find("*/failurereason")
                 if status is not None and status.text in self.FAILURE_REASONS:
                     status_text += ": %s" % self.FAILURE_REASONS[status.text]
-                dom = self.make_xml("<msgstatus>%s</msgstatus>%s"
-                                    % (status_text, body), message)
+                dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
+                                    (status_text, body), message)
             elif MESSAGES_TYPE_FILE == message["type"]:
                 transfers = self.db.get_transfers()
                 files = dict((f["chatmsg_index"], f) for f in transfers
@@ -2059,36 +2013,22 @@ class MessageParser(object):
                 dom.text = "Sent file" + ("s " if len(files) > 1 else " ")
                 a = None
                 for i in sorted(files.keys()):
-                    f = files[i]
                     if len(dom) > 0:
                         a.tail = ", "
-                    a = xml.etree.cElementTree.SubElement(dom, "a", {
-                        "href": self.path_to_url(f["filepath"] or f["filename"])
-                    })
+                    f = files[i]
+                    h = util.path_to_url(f["filepath"] or f["filename"])
+                    a = xml.etree.cElementTree.SubElement(dom, "a", {"href": h})
                     a.text = f["filename"]
                 if a is not None:
                     a.tail = "."
             elif MESSAGES_TYPE_CONTACTS == message["type"]:
                 self.db.get_contacts()
-                contacts = sorted([
-                    self.db.get_contact_name(i.get("f") or i.get("s"))
-                    for i in dom.findall("*/c")
-                ])
+                get_name = self.db.get_contact_name
+                contacts = sorted([get_name(i.get("f") or i.get("s"))
+                                   for i in dom.findall("*/c")])
                 dom.clear()
                 dom.text = "Sent contact" + (len(contacts) > 1 and "s " or " ")
                 for i in contacts:
-                    if len(dom) > 0:
-                        b.tail = ", "
-                    b = xml.etree.cElementTree.SubElement(dom, "b")
-                    b.text = i["name"] if type(i) is dict else i
-                b.tail = "."
-            elif MESSAGES_TYPE_PARTICIPANTS == message["type"]:
-                participants = sorted([self.db.get_contact_name(i)
-                    for i in message["identities"].split(" ")
-                ])
-                dom.clear()
-                dom.text = "Added "
-                for i in participants:
                     if len(dom) > 0:
                         b.tail = ", "
                     b = xml.etree.cElementTree.SubElement(dom, "b")
@@ -2122,18 +2062,24 @@ class MessageParser(object):
             elif MESSAGES_TYPE_LEAVE == message["type"]:
                 dom.text = "%s has left the conversation." \
                             % message["from_dispname"]
-            elif MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
-                names_to = [self.db.get_contact_name(i)
-                    for i in message["identities"].split(" ")
-                ]
-                dom.text = "Has shared contact details with "
-                for i in names_to:
+            elif message["type"] in [MESSAGES_TYPE_PARTICIPANTS,
+            MESSAGES_TYPE_REMOVE, MESSAGES_TYPE_SHARE_DETAIL]:
+                names = sorted([self.db.get_contact_name(i)
+                                for i in message["identities"].split(" ")])
+                dom.clear()
+                dom.text = "Added "
+                if MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
+                    dom.text = "Has shared contact details with "
+                for i in names:
                     if len(dom) > 0:
                         b.tail = ", "
                     b = xml.etree.cElementTree.SubElement(dom, "b")
-                    b.text = i
+                    b.text = i["name"] if type(i) is dict else i
                 b.tail = "."
-            elif MESSAGES_TYPE_MESSAGE == message["type"]:
+                if MESSAGES_TYPE_REMOVE == message["type"]:
+                    dom.text = "Removed "
+                    b.tail = " from this conversation."
+            elif message["type"] in [MESSAGES_TYPE_INFO, MESSAGES_TYPE_MESSAGE]:
                 if message["edited_timestamp"] and not message["body_xml"]:
                     elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
                     elm_sub.text = MESSAGE_REMOVED_TEXT
@@ -2338,7 +2284,7 @@ class MessageParser(object):
                 self.stats["callmaxdurations"] += \
                     max(call_durations.values() + [0])
             elif MESSAGES_TYPE_FILE == m["type"]:
-                files = m.get("__files", None)
+                files = m.get("__files")
                 if files is None:
                     transfers = self.db.get_transfers()
                     filedict = dict((f["chatmsg_index"], f) for f in transfers
@@ -2417,6 +2363,8 @@ class MessageParser(object):
                 text = "[%s]\r\n" % text.strip()
             elif "ss" == elem.tag:
                 text = elem.text
+            else:
+                text = text + " " if text else ""
             if text:
                 fulltext += text
             for i in subitems:
@@ -2491,35 +2439,21 @@ class MessageParser(object):
         return stats
 
 
-    def get_stats_html(self, sort_by="name"):
-        """
-        Returns the collected statistics as an HTML string.
-
-        @param   sort_by    field to sort statistics by
-                            (name/messages/characters/smses/files)
-        """
-        if not self.stats:
-            return ""
-
-        namespace = {
-            "db":           self.db,
-            "participants": [p["contact"] for p in self.chat["participants"]],
-            "stats":        self.get_collected_stats(),
-            "sort_by":      sort_by,
-        }
-        s = step.Template(templates.STATS_HTML).expand(namespace)
-        return s
-
-
-    @classmethod
-    def path_to_url(cls, path, encoding="utf-8"):
-        """Returns the local file path as a URL."""
-        if type(path) is unicode:
-            path = path.encode(encoding)
-        url = urllib.pathname2url(path)
-        url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
-        return url
-
+def is_sqlite_file(filename, path=None):
+    """Returns whether the file looks to be an SQLite database file."""
+    result = filename.lower().endswith(".db")
+    if result:
+        try:
+            fullpath = os.path.join(path, filename) if path else filename
+            result = bool(os.path.getsize(fullpath))
+            if result:
+                result = False
+                SQLITE_HEADER = "SQLite format 3\00"
+                with open(fullpath, "rb") as f:
+                    result = (f.read(len(SQLITE_HEADER)) == SQLITE_HEADER)
+        except:
+            pass
+    return result
 
 
 def detect_databases():
@@ -2527,19 +2461,10 @@ def detect_databases():
     Tries to detect Skype database files on the current computer, looking
     under "Documents and Settings", and other potential locations.
 
-    @yield   a list of detected database paths
+    @yield   each value is a list of detected database paths
     """
 
-    # First, search current working directory for *.db files.
-    search_paths = [os.getcwd()]
-    for search_path in search_paths:
-        main.log("Looking for Skype databases under %s.", search_path)
-        for root, dirs, files in os.walk(search_path):
-            for f in files:
-                if f.lower().endswith(".db"):
-                    yield os.path.realpath(os.path.join(root, f))
-
-    # Then search system directories for main.db files.
+    # First, search system directories for main.db files.
     search_paths = filter(None, [os.getenv("HOME")])
     if os.name in ["mac", "posix"]:
         search_paths.append({"mac": "/Users", "posix": "/home"}[os.name])
@@ -2560,10 +2485,21 @@ def detect_databases():
                 filtered = filter(lambda x: "skype" == x.lower(), dirs)
                 del dirs[:]
                 dirs.extend(filtered)
+            results = []
             for f in files:
-                if "main.db" == f.lower():
-                    yield os.path.realpath(os.path.join(root, f))
+                if "main.db" == f.lower() and is_sqlite_file(f, root):
+                    results.append(os.path.realpath(os.path.join(root, f)))
+            if results: yield results
 
+    # Then search current working directory for *.db files.
+    search_paths = [os.getcwd()]
+    for search_path in search_paths:
+        main.log("Looking for Skype databases under %s.", search_path)
+        for root, dirs, files in os.walk(search_path):
+            results = []
+            for f in filter(lambda f: is_sqlite_file(f, root), files):
+                results.append(os.path.realpath(os.path.join(root, f)))
+            if results: yield results
 
 
 def find_databases(folder):
@@ -2571,10 +2507,8 @@ def find_databases(folder):
     Yields a list of all Skype databases under the specified folder.
     """
     for root, dirs, files in os.walk(folder):
-        db_files = filter(lambda x: x.lower().endswith(".db"), files)
-        for filename in db_files:
-            yield os.path.join(root, filename)
-
+        for f in filter(lambda f: is_sqlite_file(f, root), files):
+            yield os.path.join(root, f)
 
 
 def import_contacts_file(filename):

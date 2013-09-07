@@ -114,8 +114,13 @@ Contains embedded Skype emoticon image resources. Auto-generated.
 Skype emoticon images are property of Skype, released under the
 Skype Component License 1.0.
 
-@created   11.06.2013
-@modified  %s
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
+@created     11.06.2013
+@modified    %s
+------------------------------------------------------------------------------
 %s
 from wx.lib.embeddedimage import PyEmbeddedImage
 """ % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)

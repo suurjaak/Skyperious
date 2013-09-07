@@ -3,9 +3,14 @@
 A very simple word cloud analyzer, provides only word size calculation and no
 layout.
 
-@author    Erki Suurjaak
-@created   17.01.2012
-@modified  17.06.2012
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
+@author      Erki Suurjaak
+@created     17.01.2012
+@modified    17.06.2012
+------------------------------------------------------------------------------
 """
 import collections
 import re

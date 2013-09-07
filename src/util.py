@@ -1,19 +1,27 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Miscellaneous utility functions.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    19.06.2013
+@modified    03.09.2013
+------------------------------------------------------------------------------
 """
+import locale
 import math
 import os
 import re
 import string
 import subprocess
+import sys
 import tempfile
 import time
 import traceback
+import urllib
 import wx
 
 
@@ -31,16 +39,8 @@ def safedivf(a, b):
     return a / float(b) if b else 0.0
 
 
-
 def safe_filename(filename):
     return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "", filename)
-    CHARS_VALID = "-_.() %s%s" % (string.ascii_letters, string.digits)
-    encoded = unicodedata.normalize("NFKD", filename).encode(
-        "ASCII", "ignore"
-    )
-    safe = "".join(c for c in encoded if c in CHARS_VALID)
-    return safe
-
 
 
 def format_bytes(size, precision=2):
@@ -57,7 +57,6 @@ def format_bytes(size, precision=2):
             "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
         ][int(log)]
     return formatted
-
 
 
 def format_seconds(seconds, insert=""):
@@ -80,7 +79,6 @@ def format_seconds(seconds, insert=""):
     return formatted
 
 
-
 def plural(word, count_or_items=None):
     """
     Returns the word as 'count words', or '1 word' if count is 1,
@@ -99,7 +97,6 @@ def plural(word, count_or_items=None):
     return result
 
 
-
 def cmp_dicts(dict1, dict2):
     """Returns True if dict2 has all the keys and matching values as dict1."""
     result = True
@@ -109,6 +106,8 @@ def cmp_dicts(dict1, dict2):
             result = False
         elif dict2[key] != val:
             result = False
+        if not result:
+            break # break for key, val
     return result
 
 
@@ -122,7 +121,7 @@ def cmp_dictlists(list1, list2):
         for d2 in list2:
             if cmp_dicts(d1, d2):
                 match = True
-                break
+                break # break for d2 in list2
         if not match:
             result[0].append(d1)
     for d2 in list2:
@@ -130,7 +129,7 @@ def cmp_dictlists(list1, list2):
         for d1 in list1:
             if cmp_dicts(d2, d1):
                 match = True
-                break
+                break # break for d1 in list1
         if not match:
             result[1].append(d2)
     return result
@@ -158,6 +157,15 @@ def try_until(func, count=10, sleep=0.5):
             if tries < count and sleep:
                 time.sleep(sleep)
     return result, func_result
+
+
+def toint(value):
+    """Returns the value as integer, or None if not integer."""
+    try:
+        result = int(value)
+    except ValueError, e:
+        result = None
+    return result
 
 
 def unique_path(pathname):
@@ -270,4 +278,72 @@ def bitmap_to_raw(wx_bmp, file_type=wx.BITMAP_TYPE_JPEG):
         traceback.print_exc()
     finally:
         try_until(lambda: os.unlink(filename), 1)
+    return result
+
+
+def timedelta_seconds(timedelta):
+    """Returns the total timedelta duration in seconds."""
+    if hasattr(timedelta, "total_seconds"):
+        result = timedelta.total_seconds()
+    else:
+        result = timedelta.days * 24 * 3600 + timedelta.seconds + \
+                 timedelta.microseconds / 1000000.
+    return result
+
+
+def add_unique(lst, item, direction=1, maxlen=sys.maxint):
+    """
+    Adds the item to the list from start or end. If item is already in list,
+    removes it first. If list is longer than maxlen, shortens it.
+
+    @param   direction  side from which item is added, -1/1 for start/end
+    @param   maxlen     maximum length list is allowed to grow to before
+                        shortened from the other direction
+    """
+    if item in lst:
+        lst.remove(item)
+    lst.insert(0, item) if (direction < 0) else lst.append(item)
+    if len(lst) > maxlen:
+        lst[:] = lst[:maxlen] if (direction < 0) else lst[-maxlen:]
+    return lst
+
+
+def get_locale_day_date(dt):
+    """Returns a formatted (weekday, weekdate) in current locale language."""
+    weekday = dt.strftime("%A")
+    weekdate = dt.strftime("%d. %B %Y")
+    if locale.getpreferredencoding():
+        try:
+            weekday = weekday.decode(locale.getpreferredencoding())
+            weekdate = weekdate.decode(locale.getpreferredencoding())
+        except:
+            try:
+                weekday = weekday.decode("latin1")
+                weekdate = weekdate.decode("latin1")
+            except:
+                pass
+    weekday = weekday.capitalize()
+    return weekday, weekdate
+
+
+def path_to_url(path, encoding="utf-8"):
+    """Returns the local file path as a URL."""
+    if isinstance(path, unicode):
+        path = path.encode(encoding)
+    url = urllib.pathname2url(path)
+    url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
+    return url
+
+
+def to_unicode(value):
+    """Returns the value as a Unicode string."""
+    result = value
+    if not isinstance(result, unicode):
+        if isinstance(result, str):
+            try:
+                result = unicode(result, locale.getpreferredencoding())
+            except:
+                result = unicode(result, "utf-8")
+        else:
+            x = unicode(x)
     return result

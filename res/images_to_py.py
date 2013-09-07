@@ -2,9 +2,14 @@
 Simple small script for generating a nicely formatted Python module with
 embedded images and docstrings.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  11.06.2013
+@modified  05.09.2013
+------------------------------------------------------------------------------
 """
 import base64
 import datetime
@@ -33,24 +38,68 @@ IMAGES = {
         "Default avatar image for contacts without one.",
     "AvatarDefaultLarge.png":
         "Default large avatar image for contacts.",
+    "ButtonClear.png":
+        "Small icon for clear list button on start page.",
+    "ButtonCompare.png":
+        "Small icon for compare databases button on start and merger page.",
+    "ButtonDetect.png":
+        "Large icon for detect databases button on start page.",
+    "ButtonFolder.png":
+        "Large icon for import folder button on start page.",
+    "ButtonExport.png":
+        "Small icon for export button on start page.",
+    "ButtonHome.png":
+        "Large icon for home on start page.",
+    "ButtonListDatabase.png":
+        "Button for databases in database list.",
+    "ButtonMergeRight.png":
+        "Small icon for right merge button on merger page.",
+    "ButtonMergeLeft.png":
+        "Small icon for left merge button on merger page.",
+    "ButtonOpen.png":
+        "Button for open file on main page.",
+    "ButtonOpenA.png":
+        "Large icon for open database button on start page.",
+    "ButtonRemove.png":
+        "Small icon for remove database button on start page.",
+    "ButtonRemoveMissing.png":
+        "Small icon for remove missing button on start page.",
+    "ButtonSaveAs.png":
+        "Small icon for save as button on start page.",
     "ExportClock.png":
         "Clock image icon for new days in exported chat HTML.",
-    "IconChats.png":
+    "ExportEdited.png":
+        "Edited image icon for edited messages in exported chat HTML.",
+    "ExportRemoved.png":
+        "Removed image icon for removed messages in exported chat HTML.",
+    "HelpChats.png":
+        "Help image on default search page for chats page.",
+    "HelpContacts.png":
+        "Help image on default search page for contacts import page.",
+    "HelpTables.png":
+        "Help image on default search page for tables page.",
+    "HelpInfo.png":
+        "Help image on default search page for information page.",
+    "HelpSearch.png":
+        "Help image on default search page for search page.",
+    "HelpSQL.png":
+        "Help image on default search page for SQL window page.",
+    "PageChats.png":
         "Icon for the Chats page in a database tab.",
-    "IconContacts.png":
+    "PageContacts.png":
         "Icon for the Contacts+ page in a database tab, and\n"
         "Merge Contacts page in a merger tab.",
-    "IconDatabase.png":
-        "Icon for the Database page in a database tab.",
-    "IconInfo.png":
+    "PageTables.png":
+        "Icon for the Data tables page in a database tab.",
+    "PageInfo.png":
         "Icon for the Info page in a database tab.",
-    "IconMergeAll.png":
+    "PageMergeAll.png":
         "Icon for the Merge All page in a merger tab.",
-    "IconMergeChats.png":
+    "PageMergeChats.png":
         "Icon for the Merge Chats page in a merger tab.",
-    "IconSearch.png":
+    "PageSearch.png":
         "Icon for the Search page in a database tab.",
-    "IconSQL.png":
+    "PageSQL.png":
         "Icon for the SQL Window page in a database tab.",
     "ToolbarCommit.png":
         "Toolbar icon for commit button in database table grids.",
@@ -74,6 +123,8 @@ IMAGES = {
         "Toolbar icon for stop button on search page.",
     "ToolbarStopped.png":
         "Toolbar icon for inactive stop button on search page.",
+    "ToolbarTables.png":
+        "Toolbar icon for tables button on search page.",
     "ToolbarTabs.png":
         "Toolbar icon for tabs toggle button on search page.",
     "ToolbarTitle.png":
@@ -82,9 +133,14 @@ IMAGES = {
 HEADER = """%s
 Contains embedded image and icon resources for Skyperious. Auto-generated.
 
-@author    Erki Suurjaak
-@created   07.02.2012
-@modified  %s
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
+@author      Erki Suurjaak
+@created     07.02.2012
+@modified    %s
+------------------------------------------------------------------------------
 %s
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx
