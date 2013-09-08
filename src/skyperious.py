@@ -3521,7 +3521,7 @@ class DatabasePage(wx.Panel):
         Handler for selecting an item in the chats list, loads the
         messages into the message log.
         """
-        self.load_chat(self.list_chats.GetItemMappedData(event.Data))
+        self.load_chat(self.list_chats.GetItemMappedData(event.Index))
 
 
     def load_chat(self, chat, center_message_id=None):
@@ -4370,7 +4370,7 @@ class MergerPage(wx.Panel):
         right.
         """
         c = chat if event is None \
-            else self.list_chats.GetItemMappedData(event.Data)
+            else self.list_chats.GetItemMappedData(event.Index)
         if not self.chat_diff or c["identity"] != self.chat_diff["identity"]:
             self.label_merge_chat.Label = "Messages different in %s:" \
                 % c["title_long_lc"]
