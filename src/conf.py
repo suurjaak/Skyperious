@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.09.2013
+@modified    18.09.2013
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import wx
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "2.0"
-VersionDate = "08.09.2013"
+Version = "2.1"
+VersionDate = "18.09.2013"
 
 if getattr(sys, 'frozen', False):
     # Running as a pyinstaller executable
@@ -40,10 +40,10 @@ ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "ErrorsReportedOnDay", "ErrorReportsAutomatic", "ErrorReportHashes",
-    "LastSearchResults", "LastSelectedFiles", "LastUpdateCheck", "RecentFiles",
-    "SearchHistory", "SearchInChatInfo", "SearchInContacts",
-    "SearchInMessageBody", "SearchInNewTab", "SearchInTables",
-    "SQLWindowTexts", "WindowPosition", "WindowSize",
+    "LastActivePage", "LastSearchResults", "LastSelectedFiles",
+    "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
+    "SearchInContacts", "SearchInMessageBody", "SearchInNewTab",
+    "SearchInTables", "SQLWindowTexts", "WindowPosition", "WindowSize",
 ]
 
 """---------------------------- FileDirectives: ----------------------------"""
@@ -65,6 +65,9 @@ ErrorsReportedOnDay = {}
 
 """Saved hashes of automatically reported errors."""
 ErrorReportHashes = []
+
+"""Index of last active page in database tab, {db path: index}."""
+LastActivePage = {}
 
 """HTMLs of last search result, {db path: {"content", "info", "title"}}."""
 LastSearchResults = {}

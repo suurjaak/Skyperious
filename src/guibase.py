@@ -4,7 +4,7 @@ GUI frame templates.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    28.08.2013
+@modified    15.09.2013
 """
 import os
 import wx
@@ -40,6 +40,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
         self.frame_console.Bind(wx.EVT_CLOSE, self.on_showhide_console)
         self.frame_console_shown = False # Init flag
         console = self.console = self.frame_console.shell
+        if not isinstance(conf.ConsoleHistoryCommands, list):
+           conf.ConsoleHistoryCommands = [] 
         for cmd in conf.ConsoleHistoryCommands:
             console.addHistory(cmd)
         console.Bind(wx.EVT_KEY_DOWN, self.on_keydown_console)
@@ -105,8 +107,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
 
 
     def on_exit(self, event):
-        """
-        Handler on application exit, asks about unsaved changes, if any.
+        """Handler on application exit, saves configuration.
         """
         do_exit = True
         if do_exit:

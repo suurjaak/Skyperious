@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    28.04.2013
+@modified    09.09.2013
 ------------------------------------------------------------------------------
 """
 import functools
@@ -205,10 +205,9 @@ def collect_shortcuts(control, use_heuristics=True):
                 sizer_items = []
                 while True:
                     try:
-                        sizer_items.append(ctrl.ContainingSizer.GetItem(
-                            len(sizer_items)
-                        ).Window)
-                    except wx.PyAssertionError:
+                        item = ctrl.ContainingSizer.GetItem(len(sizer_items))
+                        sizer_items.append(item.Window)
+                    except:
                         break # Reached item limit
                 index = sizer_items.index(ctrl)
                 if index < len(sizer_items) - 1:

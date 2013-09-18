@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.09.2013
+@modified    13.09.2013
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -18,6 +18,7 @@ import re
 import threading
 import time
 import traceback
+import wx
 
 from third_party import step
 
@@ -73,12 +74,17 @@ class WorkerThread(threading.Thread):
         self._drop_results = drop_results
 
 
-    def _postback(self, data):
+    def postback(self, data):
         # Check whether callback is still bound to a valid object instance
         if getattr(self._callback, "__self__", True):
             time.sleep(0.5) # Feeding results too fast makes GUI unresponsive
             self._callback(data)
 
+
+    def yield_ui(self):
+        """Allows UI to respond to user input."""
+        try: wx.SafeYield()
+        except: pass
 
 
 class SearchThread(WorkerThread):
@@ -157,14 +163,14 @@ class SearchThread(WorkerThread):
                             if not count % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 result["count"] = result_count
-                                self._postback(result)
+                                self.postback(result)
                                 result = {"html": "", "map": {},
                                           "search": search, "count": 0}
                     if self._stop_work:
                         break # break for chat in chats
                 if result["html"] and not self._drop_results:
                     result["count"] = result_count
-                    self._postback(result)
+                    self.postback(result)
                     result = {"html": "", "map": {}, "search": search,
                               "count": 0}
 
@@ -198,14 +204,14 @@ class SearchThread(WorkerThread):
                             if not (self._drop_results
                             or count % conf.SearchResultsChunk):
                                 result["count"] = result_count
-                                self._postback(result)
+                                self.postback(result)
                                 result = {"html": "", "map": {},
                                           "search": search, "count": 0}
                         if self._stop_work:
                             break # break for contact in contacts
                 if result["html"] and not self._drop_results:
                     result["count"] = result_count
-                    self._postback(result)
+                    self.postback(result)
                     result = {"html": "", "map": {},
                               "search": search, "count": 0}
 
@@ -232,7 +238,7 @@ class SearchThread(WorkerThread):
                         if not count % conf.SearchResultsChunk \
                         and not self._drop_results:
                             result["count"] = result_count
-                            self._postback(result)
+                            self.postback(result)
                             result = {"html": "", "map": {},
                                       "search": search, "count": 0}
                         if self._stop_work or count >= conf.SearchMessagesMax:
@@ -264,7 +270,7 @@ class SearchThread(WorkerThread):
                             if not count % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 result["count"] = result_count
-                                self._postback(result)
+                                self.postback(result)
                                 result = {"html": "", "map": {},
                                           "search": search, "count": 0}
                             if self._stop_work \
@@ -274,7 +280,7 @@ class SearchThread(WorkerThread):
                         if not self._drop_results:
                             result["html"] += "</table>"
                             result["count"] = result_count
-                            self._postback(result)
+                            self.postback(result)
                             result = {"html": "", "map": {},
                                       "search": search, "count": 0}
                         infotext += " (%s)" % util.plural("result", count)
@@ -307,13 +313,13 @@ class SearchThread(WorkerThread):
                 result["html"] += "</table><br /><br />%s</font>" % final_text
                 result["done"] = True
                 result["count"] = result_count
-                self._postback(result)
+                self.postback(result)
             except Exception, e:
                 if not result:
                     result = {}
                 result["done"], result["error"] = True, traceback.format_exc()
                 result["error_short"] = "%s: %s" % (type(e).__name__, e.message)
-                self._postback(result)
+                self.postback(result)
 
 
 class MergeThread(WorkerThread):
@@ -328,6 +334,8 @@ class MergeThread(WorkerThread):
         skypedata.MESSAGES_TYPE_REMOVE, skypedata.MESSAGES_TYPE_LEAVE,
         skypedata.MESSAGES_TYPE_SHARE_DETAIL
     ]
+    # Number of iterations between allowing a UI refresh
+    REFRESH_COUNT = 20000
 
 
     def run(self):
@@ -399,12 +407,12 @@ class MergeThread(WorkerThread):
                     result["htmls"][i] += info
                     result["chats"][i].append({"chat": chat, "diff": diff})
             if not self._drop_results:
-                self._postback(result)
+                self.postback(result)
                 result = {"htmls": ["", ""], "chats": [[], []],
                           "params": params, "index": index, "type": "diff"}
         if not self._drop_results:
             result["done"] = True
-            self._postback(result)
+            self.postback(result)
 
 
 
@@ -422,28 +430,23 @@ class MergeThread(WorkerThread):
         try:
             if contacts:
                 content = util.plural("contact", contacts)
-                self._postback({"type": "merge", "gauge": 0,
+                self.postback({"type": "merge", "gauge": 0,
                                 "message": "Merging %s." % content})
                 db2.insert_contacts(contacts, db1)
-                self._postback({"type": "merge", "gauge": 100,
+                self.postback({"type": "merge", "gauge": 100,
                                 "message": "Merged %s." % content})
             if contactgroups:
                 content = util.plural("contact group", contactgroups)
-                self._postback({"type": "merge", "gauge": 0,
+                self.postback({"type": "merge", "gauge": 0,
                                 "message": "Merging %s." % content})
                 db2.replace_contactgroups(contactgroups, db1)
-                self._postback({"type": "merge", "gauge": 100,
+                self.postback({"type": "merge", "gauge": 100,
                                 "message": "Merged %s." % content})
             for index, chat_data in enumerate(chats):
                 if self._stop_work:
                     break # break for i, chat_data in enumerate(chats)
                 chat1 = chat_data["chat"]["c2" if source else "c1"]
                 chat2 = chat_data["chat"]["c1" if source else "c2"]
-                if not chat_data["diff"].get("messages"):
-                    # Hack to ensure original diff db order
-                    d1, d2 = (db2, db1) if source else (db1, db2)
-                    diff = self.get_chat_diff(chat_data["chat"], d1, d2)
-                    chat_data["diff"]["messages"] = diff["messages"]
                 step = -1 if source else 1
                 messages1, messages2 = chat_data["diff"]["messages"][::step]
                 participants, participants2 = \
@@ -456,9 +459,10 @@ class MergeThread(WorkerThread):
                     db2.insert_participants(chat2, participants, db1)
                     count_participants += len(participants)
                 if messages1:
-                    db2.insert_messages(chat2, messages1, db1, chat1)
+                    db2.insert_messages(chat2, messages1, db1, chat1,
+                                        self.yield_ui, self.REFRESH_COUNT)
                     count_messages += len(messages1)
-                self._postback({"type": "merge", "index": index,
+                self.postback({"type": "merge", "index": index,
                                 "params": params})
         except Exception, e:
             error = traceback.format_exc()
@@ -478,19 +482,19 @@ class MergeThread(WorkerThread):
                     if e:
                         result["error_short"] = "%s: %s" % (
                                                 type(e).__name__, e.message)
-                self._postback(result)
+                self.postback(result)
 
 
     def get_chat_diff(self, chat, db1, db2):
         """
         Compares the chat in the two databases and returns the differences as
-          {"messages": [[messages different in db1], [..db2]],
+          {"messages": [[IDs of messages different in db1], [..db2]],
            "participants": [[participants different in db1], [..db2]]}.
         """
         c = chat
-        messages1 = list(db1.get_messages(c["c1"], use_cache=False)) \
+        messages1 = db1.get_messages(c["c1"], use_cache=False) \
                     if c["c1"] else []
-        messages2 = list(db2.get_messages(c["c2"], use_cache=False)) \
+        messages2 = db2.get_messages(c["c2"], use_cache=False) \
                     if c["c2"] else []
         c1m_diff = [] # Messages different in chat 1
         c2m_diff = [] # Messages different in chat 2
@@ -501,83 +505,86 @@ class MergeThread(WorkerThread):
         c1p_map = dict((p["identity"], p) for p in participants1)
         c2p_map = dict((p["identity"], p) for p in participants2)
 
-        m1map = {} # {remote_id: [message, ], }
-        m2map = {} # {remote_id: [message, ], }
-        m1_no_remote_ids = [] # [message, ] with a NULL remote_id
-        m2_no_remote_ids = [] # [message, ] with a NULL remote_id
-        m1bodymap = {} # {author+type+body: [message, ], }
-        m2bodymap = {} # {author+type+body: [message, ], }
-        difftexts = {} # {id(message): text, }
+        m1map = {} # {remote_id: [(id, datetime), ], }
+        m2map = {} # {remote_id: [(id, datetime), ], }
+        m1_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
+        m2_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
+        m1bodymap = {} # {author+type+body: [(id, datetime), ], }
+        m2bodymap = {} # {author+type+body: [(id, datetime), ], }
+        difftexts = {} # {(id, datetime): text, }
 
         # Skip comparing messages if one side is completely empty
         parser1, parser2 = None, None
         if not messages1:
-            c2m_diff, messages1, messages2 = messages2, [], []
+            c2m_diff = [(m["id"], m.get("datetime")) for m in messages2]
+            messages1, messages2 = [], []
         elif not messages2:
-            c1m_diff, messages1, messages2 = messages1, [], []
+            c1m_diff = [(m["id"], m.get("datetime")) for m in messages1]
+            messages1, messages2 = [], []
         else:
             parser1 = skypedata.MessageParser(db1)
             parser2 = skypedata.MessageParser(db2)
 
         # Assemble maps by remote_id and create diff texts. remote_id is
         # not unique and can easily have duplicates.
-        for messages, idmap, noidmap, bodymap, parser in [
-        (messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
-        (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]:
-            for m in messages:
+        things = [(messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
+                  (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]
+        for messages, idmap, noidmap, bodymap, parser in things:
+            for i, m in enumerate(messages):
+                # Avoid keeping whole messages in memory, can easily run out.
+                m_cache = (m["id"], m.get("datetime"))
                 if m["remote_id"]:
                     if m["remote_id"] not in idmap:
                         idmap[m["remote_id"]] = []
-                    idmap[m["remote_id"]].append(m)
+                    idmap[m["remote_id"]].append(m_cache)
                 else:
-                    noidmap.append(m)
+                    noidmap.append(m_cache)
                 # In these messages, parsed body can differ even though
                 # message is the same: contact names are taken from current
                 # database values. Using raw values instead.
                 if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
-                    t = m["author"] if skypedata.MESSAGES_TYPE_LEAVE \
-                                       == m["type"] else m["identities"]
+                    t = m["identities"]
+                    if skypedata.MESSAGES_TYPE_LEAVE == m["type"]:
+                        t = m["author"]
                 else:
                     t = parser.parse(m, text={"wrap": False})
-                t = t if type(t) is str else t.encode("utf-8")
-                difftext = difftexts[id(m)] = "%s-%s-%s" % (
-                    (m["author"] or "").encode("utf-8"), m["type"], t
-                )
+                t = t if isinstance(t, str) else t.encode("utf-8")
+                author = (m["author"] or "").encode("utf-8")
+                difftext = "%s-%s-%s" % (author, m["type"], t)
+                difftexts[m_cache]  = difftext
                 if difftext not in bodymap: bodymap[difftext] = []
-                bodymap[difftext].append(m)
+                bodymap[difftext].append(m_cache)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
 
         # Compare assembled remote_id maps between databases and see if there
         # are no messages with matching body in the other database.
-        for remote_id, m in [(r, j) for r, i in m1map.items() for j in i]:
-            if remote_id in m2map:
-                if not filter(lambda x: difftexts[id(m)] == difftexts[id(x)],
-                    m2map[remote_id]
-                ):
-                    # No message with same remote_id has same body
-                    c1m_diff.append(m)
-            else:
-                c1m_diff.append(m)
-        for remote_id, m in [(r, j) for r, i in m2map.items() for j in i]:
-            if remote_id in m1map:
-                if not filter(lambda x: difftexts[id(m)] == difftexts[id(x)],
-                    m1map[remote_id]
-                ):
-                    # No message with same remote_id has same body
-                    c2m_diff.append(m)
-            else:
-                c2m_diff.append(m)
+        remote_id_maps = [(m1map, m2map, c1m_diff), (m2map, m1map, c2m_diff)]
+        for map1, map2, output in remote_id_maps:
+            remote_id_messages = [(r, j) for r, i in map1.items() for j in i]
+            for i, (remote_id, m) in enumerate(remote_id_messages):
+                if remote_id in map2:
+                    is_match = lambda x: difftexts[m] == difftexts[x]
+                    if not filter(is_match, map2[remote_id]):
+                        output.append(m) # Nothing with same remote_id and body
+                else:
+                    output.append(m)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
+            
 
         # For messages with no remote_id-s, compare by author-type-body key
         # and see if there are no matching messages sufficiently close in time.
-        for m_no_remote_ids, cm_diff, mbodymap in [
-        (m1_no_remote_ids, c1m_diff, m2bodymap),
-        (m2_no_remote_ids, c2m_diff, m1bodymap)]:
-            for m in m_no_remote_ids:
-                potential_matches = mbodymap.get(difftexts[id(m)], [])
+        no_remote_ids =  [(m1_no_remote_ids, c1m_diff, m2bodymap),
+                          (m2_no_remote_ids, c2m_diff, m1bodymap)]
+        for m_no_remote_ids, output, mbodymap in no_remote_ids:
+            for i, m in enumerate(m_no_remote_ids):
+                potential_matches = mbodymap.get(difftexts[m], [])
                 if not [m2 for m2 in potential_matches
-                        if self.match_time(m.get("datetime"),
-                        m2.get("datetime"), 180)]:
-                    cm_diff.append(m)
+                        if self.match_time(m[1], m2[1], 180)]:
+                    output.append(m)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
         for p in participants1:
             if p["identity"] not in c2p_map:
                 c1p_diff.append(p)
@@ -585,10 +592,12 @@ class MergeThread(WorkerThread):
             if p["identity"] not in c1p_map:
                 c2p_diff.append(p)
 
-        c1m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
-        c2m_diff.sort(lambda a, b: cmp(a["datetime"], b["datetime"]))
+        c1m_diff.sort(lambda a, b: cmp(a[1], b[1]))
+        c2m_diff.sort(lambda a, b: cmp(a[1], b[1]))
+        message_ids1 = [m[0] for m in c1m_diff]
+        message_ids2 = [m[0] for m in c2m_diff]
 
-        result = { "messages": [c1m_diff, c2m_diff],
+        result = { "messages": [message_ids1, message_ids2],
                    "participants": [c1p_diff, c2p_diff] }
         return result
 
@@ -636,14 +645,14 @@ class ContactSearchThread(WorkerThread):
 
                         if not (self._drop_results 
                         or len(result["results"]) % conf.ContactResultsChunk):
-                            self._postback(result)
+                            self.postback(result)
                             result = {"search": search, "results": []}
 
                         if self._stop_work:
                             break # break for user in search["handler"].searc..
 
                     if result["results"] and not self._drop_results:
-                        self._postback(result)
+                        self.postback(result)
                         result = {"search": search, "results": []}
 
                     if self._stop_work:
@@ -652,7 +661,7 @@ class ContactSearchThread(WorkerThread):
 
                 if not self._drop_results:
                     result["done"] = True
-                    self._postback(result)
+                    self.postback(result)
 
 
 
@@ -673,10 +682,10 @@ class DetectDatabaseThread(WorkerThread):
                     filenames = all_filenames.symmetric_difference(filenames)
                     if not self._drop_results:
                         result = {"filenames": filenames}
-                        self._postback(result)
+                        self.postback(result)
                     all_filenames.update(filenames)
                     if self._stop_work:
                         break # break for filename in skypedata.detect_data...
 
                 result = {"done": True, "count": len(all_filenames)}
-                self._postback(result)
+                self.postback(result)

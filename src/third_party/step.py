@@ -25,8 +25,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-@modified  11.06.2013 Erki Suurjaak: enclose expressions in {{}} instead of {},
-                                     better Unicode support,
+@modified  15.09.2013 Erki Suurjaak: streaming support, escaping "&" in HTML.
+@modified  11.06.2013 Erki Suurjaak: {{expression}} instead of {expression},
+                                     any Python expression valid in {{}},
+                                     increased Unicode support,
                                      option for strip in constructor,
                                      HTML escape function in namespace,
                                      template caching,
@@ -38,14 +40,17 @@ import re
 class Template(object):
 
     COMPILED_TEMPLATES = {} # {template string: code object, }
+    # Regex for stripping all leading, trailing and interleaving whitespace.
+    RE_STRIP = re.compile("(^[ \t]+|[ \t]+$|(?<=[ \t])[ \t]+|^\r?\n)", re.M)
+
 
     def __init__(self, template, strip=True):
         """Initialize class"""
         super(Template, self).__init__()
         self.template = template
-        self.options = {"strip": strip}
-        self.builtins = {"setopt": lambda k, v: self.options.update({k: v}),
-                         "escape": lambda s: escape_html(s)}
+        self.options  = {"strip": strip}
+        self.builtins = {"escape": lambda s: escape_html(s),
+                         "setopt": lambda k, v: self.options.update({k: v}), }
         if template in Template.COMPILED_TEMPLATES:
             self.code = Template.COMPILED_TEMPLATES[template]
         else:
@@ -56,22 +61,33 @@ class Template(object):
     def expand(self, namespace={}, **kw):
         """Return the expanded template string"""
         output = []
-        namespace.update(kw)
-        namespace.update(self.builtins)
+        namespace.update(kw, **self.builtins)
         namespace["echo"]  = lambda s: output.append(s)
         namespace["isdef"] = lambda v: v in namespace
 
         eval(compile(self.code, "<string>", "exec"), namespace)
-        return self._postprocess("".join(map(to_uni, output)))
+        return self._postprocess("".join(map(to_unicode, output)))
 
 
-    def _strify(self, x):
-        if not isinstance(x, unicode):
-            if isinstance(x, str):
-                x = unicode(x, "utf-8")
-            else:
-                x = str(x)
-        return x
+    def stream(self, buffer, namespace={}, encoding="utf-8", **kw):
+        """Expand the template and stream it to a file-like buffer."""
+
+        def write_buffer(s, flush=False, cache = [""]):
+            # Cache output as a single string and write to buffer.
+            cache[0] += to_unicode(s)
+            if flush and cache[0] or len(cache[0]) > 65536:
+                buffer.write(postprocess(cache[0]))
+                cache[0] = ""
+
+        namespace.update(kw, **self.builtins)
+        namespace["echo"]  = write_buffer
+        namespace["isdef"] = lambda v: v in namespace
+        postprocess = lambda s: s.encode(encoding)
+        if self.options["strip"]:
+            postprocess = lambda s: Template.RE_STRIP.sub("", s).encode(encoding)
+
+        eval(compile(self.code, "<string>", "exec"), namespace)
+        write_buffer("", flush=True) # Flush any last cached bytes
 
 
     def _preprocess(self, template):
@@ -130,22 +146,20 @@ class Template(object):
     def _postprocess(self, output):
         """Modify output string after variables and code evaluation"""
         if self.options["strip"]:
-            output = re.sub("(?m)(^[ \t]+|[ \t]+$|(?<=[ \t])[ \t]+|^\n)", "",
-                            output)
+            output = Template.RE_STRIP.sub("", output)
         return output
 
 
 def escape_html(x):
-    """Escape HTML special characters <> and quotes '"."""
+    """Escape HTML special characters &<> and quotes "'."""
+    CHARS, ENTITIES = "&<>\"'", ["&amp;", "&lt;", "&gt;", "&quot;", "&#39;"]
     string = x if isinstance(x, basestring) else str(x)
-    return string.replace("<",    "&lt;").replace(">", "&gt;") \
-                 .replace("\"", "&quot;").replace("'", "&#39;")
+    for c, e in zip(CHARS, ENTITIES): string = string.replace(c, e)
+    return string
 
 
-def to_uni(x):
+def to_unicode(x, encoding="utf-8"):
+    """Convert anything to Unicode."""
     if not isinstance(x, unicode):
-        if isinstance(x, str):
-            x = unicode(x, "utf-8")
-        else:
-            x = str(x)
+        x = unicode(str(x), encoding, errors="replace")
     return x

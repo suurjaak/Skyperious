@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.09.2013
+@modified    15.09.2013
 ------------------------------------------------------------------------------
 """
 import base64
@@ -116,9 +116,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # or MergerPage get deleted on closing automatically.
         self.page_log.is_hidden = True
 
-        sizer.Add(notebook, proportion=1,
-                  flag=wx.GROW | wx.RIGHT | wx.BOTTOM)
-
+        sizer.Add(notebook, proportion=1, flag=wx.GROW | wx.RIGHT | wx.BOTTOM)
         self.create_menu()
 
         self.dialog_selectfolder = wx.DirDialog(
@@ -826,31 +824,27 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     db.get_conversations_stats(chats)
                 try:
                     for chat in chats:
-                        main.status("Exporting %s", chat["title_long_lc"])
-                        wx.GetApp().Yield(True) # Allow status to refresh
-                        messages = list(db.get_messages(chat))
-                        if messages:
-                            filename = os.path.join(
-                                db_dirname, util.safe_filename("Skype %s.%s" %
-                                    (chat["title_long_lc"], extname)))
-                            filename = util.unique_path(filename)
-                            export_result = export.export_chat(
-                                            chat, messages, filename, db)
-                            if export_result:
+                        if chat["message_count"]:
+                            main.status("Exporting %s", chat["title_long_lc"])
+                            wx.GetApp().Yield(True) # Allow status to refresh
+                            f = "Skype %s.%s" % (chat["title_long_lc"], extname)
+                            f = os.path.join(db_dirname, util.safe_filename(f))
+                            f = util.unique_path(f)
+                            messages = db.get_messages(chat)
+                            if export.export_chat(chat, messages, f, db):
                                 count += 1
                             else:
-                                errormsg = "An error occurred when saving " \
-                                           "\"%s\"." % filename
-                                error = True
+                                e = "An error occurred when saving \"%s\"." % f
+                                error, errormsg = True, e
                                 break # break for chat in chats
                         else:
                             main.logstatus("Skipping %s: no messages.",
                                            chat["title_long_lc"])
                 except Exception, e:
-                    errormsg = "An unexpected error occurred when saving " \
-                               "all %s from \"%s\" as %s under %s: %s" % (
-                               util.plural("chat", chats),
-                               extname.upper(), db_dirname, e)
+                    errormsg = ("An unexpected error occurred when saving "
+                                "all %s from \"%s\" as %s under %s: %s" %
+                                (util.plural("chat", chats),
+                                 extname.upper(), db_dirname, e))
                     error = True
                 busy.Close()
             self.button_export.Enabled = True
@@ -1160,6 +1154,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 util.add_unique(conf.SearchHistory, page.edit_searchall.Value,
                                 1, conf.SearchHistoryMax)
 
+                active_idx = page.notebook.Selection
+                if active_idx:
+                    conf.LastActivePage[page.db.filename] = active_idx
+                elif page.db.filename in conf.LastActivePage:
+                    del conf.LastActivePage[page.db.filename]
+
                 # Save last search results HTML
                 search_data = page.html_searchall.GetActiveTabData()
                 if search_data:
@@ -1234,6 +1234,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     do_close = False
             if not do_close:
                 return event.Veto()
+
+            if page.notebook.Selection:
+                conf.LastActivePage[page.db.filename] = page.notebook.Selection
+            elif page.db.filename in conf.LastActivePage:
+                del conf.LastActivePage[page.db.filename]
 
             [i.stop() for i in page.workers_search.values()]
             # Save search box state
@@ -1486,8 +1491,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 class DatabasePage(wx.Panel):
     """
     A wx.Notebook page for managing a single database file, has its own
-    Notebook with a page for browsing chat history, and a page for
-    viewing-changing tables.
+    Notebook with a number of pages for searching, browsing chat history and
+    database tables, information and contact import.
     """
 
     def __init__(self, parent_notebook, title, db, memoryfs, skype_handler):
@@ -1618,6 +1623,11 @@ class DatabasePage(wx.Panel):
         # Hack to get chats-page filter split window to layout without quirks.
         self.notebook.SetSelection(self.pageorder[self.page_chats])
         self.notebook.SetSelection(self.pageorder[self.page_search])
+        # Restore last active page
+        if db.filename in conf.LastActivePage \
+        and conf.LastActivePage[db.filename] != self.notebook.Selection:
+            self.notebook.SetSelection(conf.LastActivePage[db.filename])
+
         try:
             self.load_data()
         finally:
@@ -1699,11 +1709,11 @@ class DatabasePage(wx.Panel):
         button_export.SetToolTipString(
             "Export currently shown messages to a file")
         self.Bind(wx.EVT_BUTTON, self.on_export_chat, button_export)
-        sizer_header.Add(label_chat, proportion=1, border=5,
-                         flag=wx.ALIGN_BOTTOM | wx.LEFT)
+        sizer_header.Add(label_chat, proportion=1, border=5, flag=wx.LEFT |
+                         wx.ALIGN_BOTTOM)
         sizer_header.Add(tb, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-        sizer_header.Add(button_export, border=15,
-                         flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT)
+        sizer_header.Add(button_export, border=15, flag=wx.LEFT |
+                         wx.ALIGN_CENTER_VERTICAL)
 
         stc = self.stc_history = ChatContentSTC(
             parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history")
@@ -1715,8 +1725,8 @@ class DatabasePage(wx.Panel):
         html_stats.Bind(wx.EVT_SIZE, self.on_size_html_stats)
         html_stats.Hide()
 
-        sizer_stc1.Add(sizer_header, border=5,
-                       flag=wx.GROW | wx.RIGHT | wx.BOTTOM)
+        sizer_stc1.Add(sizer_header, border=5, flag=wx.GROW | wx.RIGHT |
+                       wx.BOTTOM)
         sizer_stc1.Add(stc, proportion=1, border=5, flag=wx.GROW)
         sizer_stc1.Add(html_stats, proportion=1, flag=wx.GROW)
 
@@ -1761,15 +1771,12 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_filterreset_chat, button_filter_reset)
         button_filter_apply.SetToolTipString(
             "Filters the conversation by the specified text, "
-            "date range and participants."
-        )
+            "date range and participants.")
         button_filter_export.SetToolTipString(
             "Exports filtered messages straight to file, "
-            "without showing them (showing thousands of messages gets slow)."
-        )
+            "without showing them (showing thousands of messages gets slow).")
         button_filter_reset.SetToolTipString(
-            "Restores filter controls to initial values."
-        )
+            "Restores filter controls to initial values.")
         sizer_filter_buttons.Add(button_filter_apply)
         sizer_filter_buttons.AddSpacer(5)
         sizer_filter_buttons.Add(button_filter_export)
@@ -1791,13 +1798,11 @@ class DatabasePage(wx.Panel):
 
         splitter_stc.SplitVertically(panel_stc1, panel_stc2, sashPosition=0)
         splitter_stc.Unsplit(panel_stc2) # Hide filter panel
-        sizer2.Add(splitter_stc, proportion=1, border=5,
-                   flag=wx.GROW | wx.ALL)
+        sizer2.Add(splitter_stc, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
         sizer.AddSpacer(10)
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
-        splitter.SplitHorizontally(panel1, panel2,
-                                   sashPosition=self.Size[1] / 3)
+        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1]/3)
         panel2.Enabled = False
 
 
@@ -1950,33 +1955,25 @@ class DatabasePage(wx.Panel):
         button_export.Enabled = False
         sizer_tb.Add(label_table, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_tb.AddStretchSpacer()
-        sizer_tb.Add(button_reset,
-                     border=5, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | 
-                                    wx.BOTTOM | wx.ALIGN_RIGHT)
-        sizer_tb.Add(button_export, border=5,
-                     flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.BOTTOM |
-                          wx.ALIGN_RIGHT)
+        sizer_tb.Add(button_reset, border=5, flag=wx.BOTTOM | wx.RIGHT |
+                     wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
+        sizer_tb.Add(button_export, border=5, flag=wx.BOTTOM | wx.RIGHT |
+                     wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
         sizer_tb.Add(tb, flag=wx.ALIGN_RIGHT)
         grid = self.grid_table = wx.grid.Grid(parent=panel2)
         grid.SetToolTipString("Double click on column header to sort, "
                               "right click to filter.")
-        grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK,
-            self.on_sort_grid_column
-        )
+        grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK, self.on_sort_grid_column)
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
-            self.on_filter_grid_column
-        )
-        grid.Bind(wx.grid.EVT_GRID_CELL_CHANGE,
-            self.on_change_table
-        )
+                  self.on_filter_grid_column)
+        grid.Bind(wx.grid.EVT_GRID_CELL_CHANGE, self.on_change_table)
         label_help = wx.StaticText(panel2, wx.NewId(),
             "Double-click on column header to sort, right click to filter.")
         label_help.ForegroundColour = "grey"
         sizer2.Add(sizer_tb, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
-        sizer2.Add(grid,
-            border=5, proportion=2, flag=wx.GROW | wx.LEFT | wx.RIGHT
-        )
+        sizer2.Add(grid, border=5, proportion=2,
+                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
         sizer2.Add(label_help, border=5, flag=wx.LEFT | wx.TOP)
 
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
@@ -1989,9 +1986,8 @@ class DatabasePage(wx.Panel):
         self.pageorder[page] = len(self.pageorder)
         notebook.AddPage(page, "SQL window")
         sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
-        splitter = self.splitter_sql = wx.SplitterWindow(
-            parent=page, style=wx.BORDER_NONE
-        )
+        splitter = self.splitter_sql = \
+            wx.SplitterWindow(parent=page, style=wx.BORDER_NONE)
         splitter.SetMinimumPaneSize(50)
 
         panel1 = self.panel_sql1 = wx.Panel(parent=splitter)
@@ -2000,16 +1996,15 @@ class DatabasePage(wx.Panel):
         stc = self.stc_sql = controls.SQLiteTextCtrl(parent=panel1,
             style=wx.BORDER_STATIC | wx.TE_PROCESS_TAB | wx.TE_PROCESS_ENTER)
         stc.Bind(wx.EVT_KEY_DOWN, self.on_keydown_sql)
-        stc.SetToolTipString(
-            "Ctrl-Space shows autocompletion list. Alt-Enter runs the query "
-            "contained in currently selected text or on the current line.")
         stc.SetText(conf.SQLWindowTexts.get(self.db.filename, ""))
         sizer1.Add(label_stc, border=5, flag=wx.ALL)
         sizer1.Add(stc, border=5, proportion=1, flag=wx.GROW | wx.LEFT)
 
         panel2 = self.panel_sql2 = wx.Panel(parent=splitter)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
-        label_help = wx.StaticText(panel2, label=stc.GetToolTip().GetTip())
+        label_help = wx.StaticText(panel2, label=
+            "Ctrl-Space shows autocompletion list. Alt-Enter runs the query "
+            "contained in currently selected text or on the current line.")
         label_help.ForegroundColour = "grey"
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         button_sql = self.button_sql = wx.Button(panel2, label="Execute S&QL")
@@ -2051,7 +2046,7 @@ class DatabasePage(wx.Panel):
 
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
         sash_pos = self.Size[1] / 3
-        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1] / 3)
+        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1]/3)
 
 
     def create_page_contacts(self, notebook):
@@ -2115,8 +2110,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_import_search, button_search_selected)
         self.Bind(wx.EVT_BUTTON, self.on_import_select_all, button_select_all)
         button_search_selected.SetToolTipString("Search for the selected "
-            "contacts through the running Skype application."
-        )
+            "contacts through the running Skype application.")
         button_search_selected.Enabled = button_select_all.Enabled = False
         label_search = wx.StaticText(parent=panel2,
                                      label="Skype use&rbase search:")
@@ -2183,9 +2177,7 @@ class DatabasePage(wx.Panel):
         sizer2.Add(sizer_footer, border=5, flag=wx.GROW | wx.ALL)
 
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
-        splitter.SplitHorizontally(
-            panel1, panel2, sashPosition=self.Size[1] / 3
-        )
+        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1]/3)
 
 
     def create_page_info(self, notebook):
@@ -2566,13 +2558,13 @@ class DatabasePage(wx.Panel):
             )
             main.logstatus("Exporting to %s.", filename)
             try:
-                mm = self.stc_history.GetMessages()
-                if export.export_chat(self.chat, mm, filename, self.db):
+                messages = self.stc_history.GetMessages()
+                if export.export_chat(self.chat, messages, filename, self.db):
                     main.logstatus_flash("Exported %s.", filename)
                     util.start_file(filename)
                 else:
-                    main.logstatus_flash("Cannot access %s.", filename)
-                    wx.MessageBox("Cannot access \"%s\"." % filename,
+                    main.logstatus_flash("Error exporting to %s.", filename)
+                    wx.MessageBox("Error exporting to \"%s\"." % filename,
                                   conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
@@ -2613,26 +2605,24 @@ class DatabasePage(wx.Panel):
                 for chat in chats:
                     main.status("Exporting %s", chat["title_long_lc"])
                     wx.GetApp().Yield()
-                    messages = list(self.db.get_messages(chat))
-                    if messages or not do_all:
-                        filename = os.path.join(dirname, util.safe_filename(
-                            "Skype %s.%s" % (chat["title_long_lc"], extname)))
-                        filename = util.unique_path(filename)
-                        export_result = export.export_chat(
-                                        chat, messages, filename, self.db)
-                        if export_result:
-                            filenames.append(filename)
+                    if chat["message_count"] or not do_all:
+                        f = "Skype %s.%s" % (chat["title_long_lc"], extname)
+                        f = os.path.join(db_dirname, util.safe_filename(f))
+                        f = util.unique_path(f)
+                        messages = self.db.get_messages(chat)
+                        if export.export_chat(chat, messages, f, self.db):
+                            filenames.append(f)
                         else:
-                            errormsg = "An error occurred when saving " \
-                                       "\"%s\"." % filename
+                            errormsg = 'An error occurred when saving "%s".' % f
                             break # break for chat in chats
                     else:
-                        main.log("Skipping %s: no messages.", chat["title_long_lc"])
+                        main.log("Skipping %s: no messages.",
+                                 chat["title_long_lc"])
             except Exception, e:
                 errormsg = "An unexpected error occurred when saving " \
-                           "%s from \"%s\" as %s under %s: %s" % (
-                           util.plural("chat", chats),
-                           extname.upper(), dirname, e)
+                           "%s from \"%s\" as %s under %s: %s" % \
+                           (util.plural("chat", chats),
+                            extname.upper(), dirname, e)
             busy.Close()
             if not errormsg:
                 main.logstatus_flash("Exported %s from %s as %s under %s.",
@@ -2673,17 +2663,17 @@ class DatabasePage(wx.Panel):
                 self.stc_history.SetFilter(filter_new)
                 self.stc_history.RetrieveMessagesIfNeeded()
                 messages_all = self.stc_history.GetRetrievedMessages()
-                messages = [m for m in messages_all
-                            if not self.stc_history.IsMessageFilteredOut(m)]
+                msgs = [m for m in messages_all
+                        if not self.stc_history.IsMessageFilteredOut(m)]
                 self.stc_history.SetFilter(filter_backup)
-                if messages:
+                if msgs:
                     main.logstatus("Filtering and exporting to %s.", filename)
-                    if export.export_chat(self.chat, messages, filename, self.db):
+                    if export.export_chat(self.chat, msgs, filename, self.db):
                         main.logstatus_flash("Exported %s.", filename)
                         util.start_file(filename)
                     else:
-                        main.logstatus_flash("Cannot access %s.", filename)
-                        wx.MessageBox("Cannot access \"%s\"." % filename,
+                        main.logstatus_flash("Error exporting to %s.", filename)
+                        wx.MessageBox("Error exporting to \"%s\"." % filename,
                                       conf.Title, wx.OK | wx.ICON_WARNING)
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
@@ -2718,7 +2708,7 @@ class DatabasePage(wx.Panel):
         """
         idx = event.GetIndex()
         if idx < self.list_participants.GetItemCount():
-            c = self.list_participants.GetItem()
+            c = self.list_participants.GetItem(idx)
             c.Check(not c.IsChecked())
             self.list_participants.SetItem(c)
             self.list_participants.Refresh() # Notify list of data change
@@ -3096,6 +3086,7 @@ class DatabasePage(wx.Panel):
                     tip = unicode(value)
             else:
                 tip = unicode(value)
+            tip = tip if len(tip) < 1000 else tip[:1000] + ".."
         if (row, col) != prev_cell or not (event.EventObject.ToolTip) \
         or event.EventObject.ToolTip.Tip != tip:
             event.EventObject.SetToolTipString(tip)
@@ -3162,8 +3153,8 @@ class DatabasePage(wx.Panel):
             # UltimateListCtrl does not expose checked state, have to
             # query it from each individual row
             if not self.list_participants.GetItem(i).IsChecked():
-                id = self.list_participants.GetItemData(i)["identity"]
-                if id in self.chat_filter["participants"]:
+                identity = self.list_participants.GetItemData(i)["identity"]
+                if identity in self.chat_filter["participants"]:
                     reselecteds.append(i)
         if reselecteds:
             for i in range(self.list_participants.GetItemCount()):
@@ -3181,7 +3172,6 @@ class DatabasePage(wx.Panel):
         filterdata = {
             "daterange": self.range_date.Values,
             "text": self.edit_filtertext.Value,
-            # Participant list items are "Display name (skypename)"
             "participants": participants
         }
         return filterdata
@@ -3227,8 +3217,8 @@ class DatabasePage(wx.Panel):
                 self.splitter_stc.Size.width - self.panel_stc2.BestSize.width)
             self.splitter_stc.SplitVertically(self.panel_stc1, self.panel_stc2,
                                               sashPosition=p)
-            self.list_participants.SetColumnWidth(
-                0, self.list_participants.Size.width)
+            list_participants = self.list_participants
+            list_participants.SetColumnWidth(0, list_participants.Size.width)
 
 
     def show_stats(self, show=True):
@@ -3310,15 +3300,15 @@ class DatabasePage(wx.Panel):
                 main.status("Exporting \"%s\".", filename)
                 try:
                     export_result = export.export_grid(grid_source,
-                        filename, default, self.db, sql=sql, table=table)
+                        filename, default, self.db, sql, table)
                 finally:
                     busy.Close()
                 if export_result:
                     main.logstatus_flash("Exported %s.", filename)
                     util.start_file(filename)
                 else:
-                    main.logstatus_flash("Cannot access %s.", filename)
-                    wx.MessageBox("Cannot access \"%s\"." % filename,
+                    main.logstatus_flash("Error exporting to %s.", filename)
+                    wx.MessageBox("Error exporting to \"%s\"." % filename,
                                   conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -3819,16 +3809,18 @@ class DatabasePage(wx.Panel):
             # Load chat statistics and update the chat list
             self.db.get_conversations_stats(self.chats)
             for c in self.chats:
-                people = []
+                people = sorted([p["identity"] for p in c["participants"]])
                 if skypedata.CHATS_TYPE_SINGLE != c["type"]:
-                    for p in c["participants"]:
-                        people.append(p["contact"]["name"])
                     c["people"] = "%s (%s)" % (len(people), ", ".join(people))
+                else:
+                    people = [p for p in people if p != self.db.id]
+                    c["people"] = ", ".join(people)
             self.list_chats.RefreshItems()
             # Some columns can be really long, pushing all else out of view
             widths = self.list_chats.GetColumnWidths()
             for i, w in [(i, w) for i, w in enumerate(widths) if w > 300]:
                 self.list_chats.SetColumnWidth(i, 300)
+
             if self.chat:
                 # If the user already opened a chat while later data
                 # was loading, update the date range control values.
@@ -3889,8 +3881,8 @@ class MergerPage(wx.Panel):
         self.con2diff = None       # Contact differences for right
         self.congroup1diff = None  # Contact group differences for left
         self.congroup2diff = None  # Contact group differences for right
-        self.chats_differing = None  # [chats differing in db1, in db2]
-        self.diffresults_html = None # [diff results HTML for db1, db2]
+        self.chats_differing = None  # [[chats differing in db1], [in db2]]
+        self.diffresults_html = None # [[diff results HTML for db1], [for db2]]
         self.diffresults_info = None # [{contact, group, chat, message}, ]
         self.contacts_column_map = [
             ("identity", "Account"), ("name", "Name"),
@@ -3903,7 +3895,8 @@ class MergerPage(wx.Panel):
             ("messages2", "Messages in right"),
             ("last_message_datetime1", "Last message in left"),
             ("last_message_datetime2", "Last message in right"),
-            ("type_name", "Type"), ("diff_status", "First glance")
+            ("type_name", "Type"), ("diff_status", "First glance"),
+            ("people", "People"),
         ]
         self.Bind(EVT_WORKER, self.on_worker_merge_result)
         self.worker_merge = workers.MergeThread(self.on_worker_merge_callback)
@@ -3993,6 +3986,7 @@ class MergerPage(wx.Panel):
             "ones not present in the other.\nThis can take several minutes.",
             bmp=images.ButtonCompare.Bitmap, style=wx.ALIGN_CENTER)
         button_scan.BackgroundColour = wx.WHITE
+        button_scan.MinSize = 700, -1
 
         html1 = self.html_results1 = controls.ScrollingHtmlWindow(
             panel, style=wx.BORDER_SUNKEN)
@@ -4023,7 +4017,7 @@ class MergerPage(wx.Panel):
         sizer.AddSpacer(20)
         sizer.Add(sizer_data, flag=wx.ALIGN_CENTER)
         sizer.AddSpacer(10)
-        sizer.Add(button_scan, border=15, flag=wx.GROW | wx.LEFT | wx.RIGHT)
+        sizer.Add(button_scan, flag=wx.ALIGN_CENTER)
         panel_gauge_scan = self.panel_gauge_scan = wx.Panel(panel)
         panel_gauge_scan.BackgroundColour = panel.BackgroundColour
         panel_gauge_scan.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4215,6 +4209,7 @@ class MergerPage(wx.Panel):
         for c in self.compared:
             if c["identity"] == href:
                 chat = c
+                break # break for c in self.compared
         if chat and self.page_merge_chats.Enabled:
             self.on_change_list_chats(chat=chat)
             self.notebook.SetSelection(self.pageorder[self.page_merge_chats])
@@ -4396,7 +4391,26 @@ class MergerPage(wx.Panel):
             busy = controls.BusyPanel(self,
                    "Diffing messages for %s." % c["title_long_lc"])
 
-            diff = self.worker_merge.get_chat_diff(c, self.db1, self.db2)
+            data1, data2 = None, None
+            if self.chats_differing: # Check for already calculated cached diff
+                data1 = next((c1 for c1 in self.chats_differing[0]
+                              if c1["chat"]["id"] == c["id"]), None)
+                data2 = next((c2 for c2 in self.chats_differing[1]
+                              if c2["chat"]["id"] == c["id"]), None)
+            if data1 or data2:
+                diff = (data1 or data2)["diff"]
+            else:
+                diff = self.worker_merge.get_chat_diff(c, self.db1, self.db2)
+
+            for i, ids in filter(lambda x: x[1], enumerate(diff["messages"])):
+                diff["messages"][i] = []
+                db = [self.db1, self.db2][i]
+                for ids2 in [ids[j:j+999] for j in range(0, len(ids), 999)]:
+                    # Divide into chunks, as SQLite can take up to 999 parameters.
+                    sql = "id IN (%s)" % ", ".join("?%s" % (j+1) for j in range(len(ids2)))
+                    params = dict(("%s" % (j+1), x) for j, x in enumerate(ids2))
+                    diff["messages"][i] += db.get_messages(additional_sql=sql,
+                                               additional_params=params)
             self.chat_diff = c
             self.chat_diff_data = diff
             self.button_merge_chat_1.Enabled = len(diff["messages"][0])
@@ -4554,7 +4568,6 @@ class MergerPage(wx.Panel):
             for data in result["chats"][i]:
                 if data["diff"]["messages"]:
                     info["message"] += len(data["diff"]["messages"][i])
-                data["diff"]["messages"] = None # Avoid excessive memory use.
             if result["htmls"][i]:
                 html = [self.html_results1, self.html_results2][i]
                 html.Freeze()
@@ -4845,7 +4858,7 @@ class MergerPage(wx.Panel):
             for c in compared:
                 c["last_message_datetime1"] = None
                 c["last_message_datetime2"] = None
-                c["messages1"] = c["messages2"] = None
+                c["messages1"] = c["messages2"] = c["people"] = None
                 c["diff_status"] = None
 
             self.list_chats.Populate(self.chats_column_map, compared)
@@ -4890,6 +4903,13 @@ class MergerPage(wx.Panel):
                     )
                 if identical:
                     c["diff_status"] = self.DIFFSTATUS_IDENTICAL
+                people = sorted([p["identity"] for p in c["participants"]])
+                if skypedata.CHATS_TYPE_SINGLE != c["type"]:
+                    c["people"] = "%s (%s)" % (len(people), ", ".join(people))
+                else:
+                    people = [p for p in people if p != self.db1.id]
+                    c["people"] = ", ".join(people)
+
 
             self.list_chats.Enabled = True
             self.list_chats.Populate(self.chats_column_map, self.compared)
@@ -5046,7 +5066,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._parser = None     # Current skypedata.MessageParser instance
         self._chat = None       # Currently shown chat
         self._db = None         # Database for currently shown messages
-        self._page = None # DatabasePage instance for action callbacks, if any
+        self._page = None       # DatabasePage/MergerPage for action callbacks
         self._messages = None   # All retrieved messages (collections.deque)
         self._messages_current = None  # Currently shown (collections.deque)
         self._message_positions = {} # {msg id: (start index, end index)}
@@ -5356,7 +5376,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         m2["datetime"].strftime("%d.%m.%Y"), "bold")
                 self._append_text("  (%s).  " % util.plural(
                                   "message", self._messages_current))
-            if self._chat["message_count"]:
+            if self._page and self._chat["message_count"]:
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
                 date_last = self._chat["last_message_datetime"].date()
@@ -5367,7 +5387,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     for unit, count in [("day", 7), ("week", 2), ("day", 30),
                     ("month", 3), ("month", 6), ("year", 1), ("year", 2)]:
                         date_from = date_until - relativedelta(
-                            **{util.plural(unit): count})
+                            **{util.plural(unit, with_items=False): count})
                         if date_from >= date_first and date_from <= date_last:
                             title = util.plural(unit, count)
                             from_items.append((title, [date_from, date_last]))
@@ -5545,9 +5565,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             if self._center_message_index >= 0:
                 self._center_message_index = \
                     len(message_range) - self._center_message_index
-            #main.log("Conversation \"%s\": retrieved %s.",
-            #    chat["title_long"], util.plural("message", message_range)
-            #)
 
         self._chat = chat
         self._db = db
@@ -5694,8 +5711,7 @@ class DayHourDialog(wx.Dialog):
         hbox1.Add(self.text_days, border=5, flag=wx.LEFT | wx.ALIGN_RIGHT)
 
         self.text_hours = wx.SpinCtrl(parent=self, style=wx.ALIGN_LEFT,
-            size=(200, -1), value=str(hours), min=-sys.maxsize, max=sys.maxsize
-        )
+           size=(200, -1), value=str(hours), min=-sys.maxsize, max=sys.maxsize)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         hbox2.AddStretchSpacer()
         hbox2.Add(wx.StaticText(parent=self, label="Hours:"),

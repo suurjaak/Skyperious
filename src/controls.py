@@ -55,7 +55,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    08.09.2013
+@modified    15.09.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -325,7 +325,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         self._text_note = self._note
         if width > 20 and height > 20:
             WORDWRAP = wx.lib.wordwrap.wordwrap
-            dc = wx.WindowDC(self)
+            dc = wx.ClientDC(self)
             dc.Font = self.Font
             x = 10 + self._bmp.Size.width + 10
             self._text_note = WORDWRAP(self._text_note, width - 10 - x, dc)
@@ -1575,19 +1575,14 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             col_item = self.GetColumn(i)
             if i == self._col:
                 new_item = wx.ListItem()
-                new_item.Text = u"%s%s" % (
-                    col_item.Text.replace(ARROWS[0], "").replace(
-                        ARROWS[1], ""
-                    ),
-                    ARROWS[self._colSortFlag[i]]
-                )
+                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
+                new_item.Text = u"%s%s" % (t, ARROWS[self._colSortFlag[i]])
                 self.SetColumn(i, new_item)
             elif filter(lambda i: i in col_item.Text, ARROWS.values()):
                 # Remove the previous sort arrow
                 new_item = wx.ListItem()
-                new_item.Text = col_item.Text.replace(ARROWS[0], "").replace(
-                    ARROWS[1], ""
-                )
+                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
+                new_item.Text = t
                 self.SetColumn(i, new_item)
 
 

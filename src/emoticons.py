@@ -8,7 +8,7 @@ This file is part of Skyperious - a Skype database viewer and merger.
 Released under the MIT License.
 
 @created     11.06.2013
-@modified    02.09.2013
+@modified    14.09.2013
 ------------------------------------------------------------------------------
 """
 from wx.lib.embeddedimage import PyEmbeddedImage
@@ -3670,6 +3670,7 @@ EmoticonData = {
     "angry": {'strings': [':@', ':-@', ':=@', 'x(', 'x-(', 'x=(', 'X(', 'X-(', 'X=('], 'title': 'Angry'},
     "bandit": {'strings': ['(bandit)'], 'title': 'Bandit'},
     "beer": {'strings': ['(beer)', '(b)', '(B)'], 'title': 'Beer'},
+    "bertlett": {'strings': ['(bartlett)'], 'title': '(bartlett)'},
     "blush": {'strings': [':$', '(blush)', ':-$', ':=$'], 'title': 'Blush'},
     "bow": {'strings': ['(bow)'], 'title': 'Bow'},
     "brokenheart": {'strings': ['(u)', '(U)', '(brokenheart)'], 'title': 'Broken heart'},
@@ -3681,7 +3682,7 @@ EmoticonData = {
     "coffee": {'strings': ['(coffee)'], 'title': 'Coffee'},
     "cool": {'strings': ['8=)', '8-)', 'B=)', 'B-)', '(cool)'], 'title': 'Cool'},
     "cry": {'strings': [';(', ';-(', ';=('], 'title': 'Crying'},
-    "dance": {'strings': ['(dance)', '\\\\o/', '\\\\:D/', '\\\\:d/'], 'title': 'Dance'},
+    "dance": {'strings': ['(dance)', '\\o/', '\\:D/', '\\:d/'], 'title': 'Dance'},
     "devil": {'strings': ['(devil)'], 'title': 'Devil'},
     "doh": {'strings': ['(doh)'], 'title': 'Doh!'},
     "drink": {'strings': ['(d)', '(D)'], 'title': 'Drink'},
@@ -3690,7 +3691,9 @@ EmoticonData = {
     "eg": {'strings': [']:)', '>:)', '(grin)'], 'title': 'Evil grin'},
     "emo": {'strings': ['(emo)'], 'title': 'Emo'},
     "envy": {'strings': ['(envy)'], 'title': 'Envy'},
+    "facepalm": {'strings': ['(facepalm)'], 'title': 'Facepalm'},
     "finger": {'strings': ['(finger)'], 'title': 'Finger'},
+    "fingerscrossed": {'strings': ['(fingerscrossed)'], 'title': 'Fingers crossed'},
     "flower": {'strings': ['(f)', '(F)'], 'title': 'Flower'},
     "fubar": {'strings': ['(fubar)'], 'title': 'Fubar'},
     "giggle": {'strings': ['(chuckle)', '(giggle)'], 'title': 'Giggle'},
@@ -3698,10 +3701,14 @@ EmoticonData = {
     "happy": {'strings': ['(happy)'], 'title': 'Happy'},
     "headbang": {'strings': ['(headbang)', '(banghead)'], 'title': 'Headbang'},
     "heart": {'strings': ['(h)', '(H)', '(l)', '(L)'], 'title': 'Heart'},
+    "heidy": {'strings': ['(heidy)'], 'title': 'Heidy'},
     "hi": {'strings': ['(hi)'], 'title': 'Hi'},
+    "highfive": {'strings': ['(highfive)'], 'title': 'High five'},
+    "hollest": {'strings': ['(hollest)'], 'title': 'Hollest'},
     "hug": {'strings': ['(hug)', '(bear)'], 'title': 'Hug'},
     "inlove": {'strings': ['(inlove)'], 'title': 'In love'},
     "kiss": {'strings': [':*', ':=*', ':-*'], 'title': 'Kiss'},
+    "lalala": {'strings': ['(lalala)'], 'title': 'Lalala'},
     "laugh": {'strings': [':D', ':=D', ':-D', ':d', ':=d', ':-d'], 'title': 'Laugh'},
     "lipssealed": {'strings': [':x', ':-x', ':X', ':-X', ':#', ':-#', ':=x', ':=X', ':=#'], 'title': 'My lips are sealed'},
     "mail": {'strings': ['(e)', '(m)'], 'title': 'Mail'},
@@ -3715,6 +3722,7 @@ EmoticonData = {
     "ninja": {'strings': ['(ninja)'], 'title': 'Ninja'},
     "no": {'strings': ['(n)', '(N)'], 'title': 'No'},
     "nod": {'strings': ['(nod)'], 'title': 'Nodding'},
+    "oliver": {'strings': ['(oliver)'], 'title': '(oliver)'},
     "party": {'strings': ['(party)'], 'title': 'Party'},
     "phone": {'strings': ['(ph)', '(mp)'], 'title': 'Phone'},
     "pizza": {'strings': ['(pizza)', '(pi)'], 'title': 'Pizza'},
@@ -3731,6 +3739,7 @@ EmoticonData = {
     "smile": {'strings': [':)', ':=)', ':-)'], 'title': 'Smile'},
     "smirk": {'strings': ['(smirk)'], 'title': 'Smirking'},
     "smoke": {'strings': ['(smoking)', '(smoke)', '(ci)'], 'title': 'Smoking'},
+    "soccer": {'strings': ['(soccer)'], 'title': '(soccer)'},
     "speechless": {'strings': [':|', ':=|', ':-|'], 'title': 'Speechless'},
     "star": {'strings': ['(*)'], 'title': 'Star'},
     "sun": {'strings': ['(sun)'], 'title': 'Sun'},
@@ -3743,12 +3752,16 @@ EmoticonData = {
     "tmi": {'strings': ['(tmi)'], 'title': 'Too much information'},
     "toivo": {'strings': ['(toivo)'], 'title': 'Toivo'},
     "tongueout": {'strings': [':P', ':=P', ':-P', ':p', ':=p', ':-p'], 'title': 'Tongue out'},
+    "tumbleweed": {'strings': ['(tumbleweed)'], 'title': 'Tumbleweed'},
     "wait": {'strings': ['(wait)'], 'title': 'Wait'},
+    "waiting": {'strings': ['(waiting)'], 'title': 'Waiting'},
     "wasntme": {'strings': ['(wasntme)'], 'title': "It wasn't me!"},
+    "wfh": {'strings': ['(wfh)'], 'title': 'Working from home'},
     "whew": {'strings': ['(whew)'], 'title': 'Relieved'},
     "wink": {'strings': ['(wink)', ';)', ';-)', ';=)'], 'title': 'Wink'},
     "wonder": {'strings': [':^)'], 'title': 'Wondering'},
     "worry": {'strings': [':S', ':-S', ':=S', ':s', ':-s', ':=s'], 'title': 'Worried'},
+    "wtf": {'strings': ['(wtf)'], 'title': 'What the...'},
     "yawn": {'strings': ['(yawn)'], 'title': 'Yawn'},
     "yes": {'strings': ['(y)', '(Y)', '(ok)'], 'title': 'Yes'},
 }

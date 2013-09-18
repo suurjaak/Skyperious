@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    24.08.2013
+@modified    16.09.2013
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -16,7 +16,6 @@ import csv
 import datetime
 import os
 import re
-import tempfile
 import traceback
 import wx
 
@@ -46,61 +45,41 @@ def export_chat(chat, messages, filename, db):
         is_html = filename.lower().endswith(".html")
         is_csv  = filename.lower().endswith(".csv")
         is_txt  = filename.lower().endswith(".txt")
+        parser = skypedata.MessageParser(db, chat=chat, stats=is_html)
 
-        parser = skypedata.MessageParser(db, stats=is_html, chat=chat)
-        chat_title = chat["title_long_lc"]
-        namespace = {
-            "db":               db,
-            "chat":             chat,
-            "messages":         messages,
-            "parser":           parser,
-            "date1":            messages[0]["datetime"].strftime("%d.%m.%Y")
-                                if len(messages) else "",
-            "date2":            messages[-1]["datetime"].strftime("%d.%m.%Y")
-                                if len(messages) else "",
-            "chat_picture":     None,
-            "chat_picture_raw": None,
-            "stats":            None,
-        }
+        if is_html or is_txt:
+            namespace = {"db": db, "chat": chat, "messages": messages,
+                         "parser": parser}
+
         if is_html:
-            namespace["participants"] = []
-            # Write HTML header and table header
+            # Collect chat and participant images.
+            namespace.update({"chat_picture": None, "chat_picture_raw": None,
+                              "participants": [], })
             if chat["meta_picture"]:
                 raw = skypedata.fix_image_raw(chat["meta_picture"])
                 img = wx.ImageFromStream(cStringIO.StringIO(raw))
                 namespace["chat_picture"] = img
                 namespace["chat_picture_raw"] = raw
-            if chat["participants"]:
-                for p in chat["participants"]:
-                    c = p["contact"].copy()
-                    namespace["participants"].append(c)
-                    c["avatar_image_raw"], c["avatar_image_large_raw"] = "", ""
-                    bmp = c.get("avatar_bitmap")
-                    if not bmp:
-                        bmp = skypedata.get_avatar(c, conf.AvatarImageSize)
-                        if bmp:
-                            p["contact"]["avatar_bitmap"] = bmp # Cache resized
-
+            for p in chat["participants"]:
+                contact = p["contact"].copy()
+                namespace["participants"].append(contact)
+                contact.update(avatar_image_raw="", avatar_image_large_raw="")
+                bmp = contact.get("avatar_bitmap")
+                if not bmp:
+                    bmp = skypedata.get_avatar(contact, conf.AvatarImageSize)
                     if bmp:
-                        c["avatar_image_raw"] = util.bitmap_to_raw(bmp)
-                        sz_large = conf.AvatarImageLargeSize
-                        raw_large = skypedata.get_avatar_jpg(c, sz_large)
-                        c["avatar_image_large_raw"] = raw_large
+                        p["contact"]["avatar_bitmap"] = bmp # Cache resized
+                if bmp:
+                    s = conf.AvatarImageLargeSize
+                    raw_large = skypedata.get_avatar_jpg(contact, s)
+                    contact["avatar_image_raw"] = util.bitmap_to_raw(bmp)
+                    contact["avatar_image_large_raw"] = raw_large
 
-            for m in messages:
-                parser.parse(m)
-            namespace["stats"] = parser.get_collected_stats()
-            smileys = parser.emoticons_unique
-            smileys = filter(lambda e: e in emoticons.EmoticonData, smileys)
-            namespace["emoticons_used"] = smileys
-            parser.stats = False # Statistics retrieved, disable collecting
-        elif is_csv:
-            # Initialize CSV writer and write header row
+        if is_csv:
             dialect = csv.excel
-            # Default is "," which is actually not Excel
-            dialect.delimiter = ";"
-            # Default is "\r\n", which causes another "\r" to be written
-            dialect.lineterminator = "\r"
+            # Delimiter for Excel dialect "," is actually not used by Excel.
+            # Default linefeed "\r\n" would cause another "\r" to be written.
+            dialect.delimiter, dialect.lineterminator = ";", "\r"
             f = open(filename, "w")
             csv_writer = csv.writer(f, dialect)
             csv_writer.writerow(["Time", "Author", "Message"])
@@ -112,103 +91,123 @@ def export_chat(chat, messages, filename, db):
                 except Exception, e:
                     pass
                 values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
-                    m["from_dispname"].encode("utf-8"),
-                    parsed_text.encode("utf-8")
-                ]
+                          m["from_dispname"], parsed_text, ]
+                values = [v.encode("latin1", 'replace') for v in values]
                 csv_writer.writerow(values)
             f.close()
+        else:
+            # Cannot keep all messages in memory at once - very large chats
+            # (500,000+ messages) can take gigabytes.
+            # As HTML and TXT contain statistics in their headers before
+            # messages, write out all messages to a temporary file first,
+            # statistics will be available for the main file after parsing.
+            tmpname = util.unique_path("%s.messages" % filename)
+            tmpfile = open(tmpname, "w+")
+            mtemplate = templates.CHAT_MESSAGES_HTML if is_html \
+                        else templates.CHAT_MESSAGES_TXT
+            step.Template(mtemplate, strip=False).stream(tmpfile, namespace)
 
-        if is_txt or is_html:
+            namespace["stats"] = stats = parser.get_collected_stats()
+            namespace.update({
+                "date1": stats["startdate"].strftime("%d.%m.%Y")
+                         if stats.get("startdate") else "",
+                "date2": stats["enddate"].strftime("%d.%m.%Y")
+                         if stats.get("enddate") else "",
+                "message_count":  stats.get("messages", 0),
+                "emoticons_used": filter(lambda e: hasattr(emoticons, e),
+                                         parser.emoticons_unique),
+            })
+
+            tmpfile.flush(), tmpfile.seek(0)
+            namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), '')
             template = templates.CHAT_HTML if is_html else templates.CHAT_TXT
-            s = step.Template(template, strip=is_html).expand(namespace)
             with open(filename, "w") as f:
-                f.write(s.encode("utf-8"))
+                step.Template(template, strip=False).stream(f, namespace)
+            tmpfile.close()
+            util.try_until(lambda: os.unlink(tmpname), count=1)
+
         result = True
     except Exception, e:
-        if f:
-            f.close()
-        main.log("Export cannot access %s.\n\n%s", filename,
+        main.log("Error exporting to %s.\n\n%s", filename,
                  traceback.format_exc())
+        if f: f.close()
     return result
 
 
-def export_grid(grid, filename, title, db, sql="", table=""):
+def export_grid(grid, filename, title, db, sql_query="", table=""):
     """
     Exports the current contents of the specified wx.Grid to file.
 
-    @param   grid      a wx.Grid object
-    @param   filename  full path and filename of resulting file, file extension
-                       .html|.csv|.sql determines file format
-    @param   title     title used in HTML
-    @param   db        SkypeDatabase instance
-    @param   sql       the SQL query producing the grid contents, if any
-    @param   table     name of the table producing the grid contents, if any
+    @param   grid       a wx.Grid object
+    @param   filename   full path and filename of resulting file, file extension
+                        .html|.csv|.sql determines file format
+    @param   title      title used in HTML
+    @param   db         SkypeDatabase instance
+    @param   sql_query  the SQL query producing the grid contents, if any
+    @param   table      name of the table producing the grid contents, if any
     """
     result = False
     f = None
+    is_html = filename.lower().endswith(".html")
+    is_csv  = filename.lower().endswith(".csv")
+    is_sql  = filename.lower().endswith(".sql")
     try:
-        if sql: # not related to is_sql
-            sql = sql.encode("utf-8")
         with open(filename, "w") as f:
-            is_html = filename.lower().endswith(".html")
-            is_csv  = filename.lower().endswith(".csv")
-            is_sql  = filename.lower().endswith(".sql")
-            columns = [c["name"].encode("utf-8") for c in grid.Table.columns]
-            namespace = {
-                "db_filename": db.filename,
-                "title":       title,
-                "columns":     columns,
-                "rows":        [],
-                "sql":         sql,
-                "table":       table,
-                "app":         conf.Title,
-            }
+            columns = [c["name"] for c in grid.Table.columns]
+
+            def iter_rows():
+                """Iterating row generator."""
+                row, index = grid.Table.GetRow(0), 0
+                while row:
+                    yield row
+                    index += 1; row = grid.Table.GetRow(index)
 
             if is_csv:
                 dialect = csv.excel
-                dialect.delimiter = ";" # Default is "," which is actually not Excel
-                # Default is "\r\n", which causes another "\r" to be written
-                dialect.lineterminator = "\r"
+                # Delimiter for Excel dialect "," is actually not used by Excel.
+                # Default linefeed "\r\n" would cause another "\r" to be written.
+                dialect.delimiter, dialect.lineterminator = ";", "\r"
                 csv_writer = csv.writer(f, dialect)
-                if sql:
-                    replaced = sql.replace("\r", " ").replace("\n", " ")
-                    csv_writer.writerow(["SQL: %s" % replaced])
-                csv_writer.writerow(columns)
-            elif is_sql and table:
-                # Add CREATE TABLE statement.
-                create_sql = db.tables[table.lower()]["sql"] + ";"
-                re_sql = re.compile(
-                    "^(CREATE\s+TABLE\s+)", re.IGNORECASE | re.MULTILINE)
-                create_sql = re_sql.sub(
-                    lambda m: "%sIF NOT EXISTS " % m.group(1), create_sql)
-                namespace["create_sql"] = create_sql
+                if sql_query:
+                    replaced = sql_query.replace("\r", " ").replace("\n", " ")
+                    top = ["SQL: %s" % replaced.encode("latin1", 'replace')]
+                    csv_writer.writerow(top)
+                header = [c.encode("latin1", "replace") for c in columns]
+                csv_writer.writerow(header)
 
-            for i in range(grid.NumberRows):
-                data = grid.Table.GetRow(i)
-                values = []
-                if is_csv:
-                    for col_name in columns:
-                        if isinstance(data[col_name], unicode):
-                            values.append(data[col_name].encode("utf-8"))
-                        elif data[col_name] is None:
-                            values.append("")
-                        else:
-                            values.append(str(data[col_name]))
+                for row in iter_rows():
+                    values = []
+                    for col in columns:
+                        val = "" if row[col] is None else row[col]
+                        val = val if isinstance(val, unicode) else str(val)
+                        values.append(val.encode("latin1", "replace"))
                     csv_writer.writerow(values)
-                else:
-                    values = [data[c] for c in columns]
-                    namespace["rows"].append(values)
+            else:
+                namespace = {
+                    "db_filename": db.filename,
+                    "title":       title,
+                    "columns":     columns,
+                    "row_count":   grid.NumberRows,
+                    "rows":        iter_rows(),
+                    "sql":         sql_query,
+                    "table":       table,
+                    "app":         conf.Title,
+                }
+                if is_sql and table:
+                    # Add CREATE TABLE statement.
+                    create_sql = db.tables[table.lower()]["sql"] + ";"
+                    re_sql = re.compile("^(CREATE\s+TABLE\s+)", re.IGNORECASE)
+                    replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
+                    namespace["create_sql"] = re_sql.sub(replacer, create_sql)
 
-            if not is_csv:
                 template = templates.GRID_HTML if is_html else templates.SQL_TXT
-                s = step.Template(template, strip=is_html).expand(namespace)
-                f.write(s.encode("utf-8"))
+                step.Template(template, strip=False).stream(f, namespace)
 
             f.close()
             result = True
     except Exception, e:
         if f:
             f.close()
-        main.log("Export cannot access %s.\n\n%s", filename,
+        main.log("Error exporting to %s.\n\n%s", filename,
                  traceback.format_exc())
     return result

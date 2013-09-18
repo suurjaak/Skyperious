@@ -8,20 +8,20 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    08.09.2013
+@modified    16.09.2013
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-import base64, datetime, urllib
+import base64, datetime, os, re, string, sys, urllib
 import conf, emoticons, images, skypedata, util
 
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 
-"""Regex replacement for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
+"""Replacer callback for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 
 """HTML chat history export template."""
@@ -601,7 +601,7 @@ p["avatar_class"] = "avatar__" + id_csssafe
     </td>
     <td id="header_center">
       <div id="header">{{chat["title_long"]}}.</div><br />
-      Showing {{util.plural("message", messages)}}
+      Showing {{util.plural("message", message_count)}}
 %if date1 and date2:
       from <b>{{date1}}</b> to <b>{{date2}}</b>
 %endif
@@ -756,7 +756,22 @@ f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d 
 </td></tr>
 <tr><td>
   <table id="content_table">
-<%
+%for chunk in message_buffer:
+{{chunk}}
+%endfor
+  </table>
+</td></tr></table>
+<div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
+</body>
+</html>
+"""
+
+
+"""HTML chat history export template for the messages part."""
+CHAT_MESSAGES_HTML = """<%
+import datetime
+import skypedata, util
+
 previous_day = datetime.date.fromtimestamp(0)
 previous_author = None
 %>
@@ -794,7 +809,8 @@ author_class = "remote" if m["author"] != db.id else "local"
 %if is_info:
     <span class="{{author_class}}">{{m["from_dispname"]}}</span>
 %endif
-    {{text}}</div></td>
+    {{text}}
+    </div></td>
     <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">
 %if m["edited_timestamp"]:
     {{m["datetime"].strftime("%H:%M")}}<span class="{{"edited" if m["body_xml"] else "removed"}}" title="{{"Edited" if m["body_xml"] else "Removed"}} {{datetime.datetime.fromtimestamp(m["edited_timestamp"]).strftime("%H:%M:%S")}}">&nbsp;&nbsp;&nbsp;</span>
@@ -808,12 +824,8 @@ previous_day = m["datetime"].date()
 previous_author = m["author"]
 %>
 %endfor
-  </table>
-</td></tr></table>
-<div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
-</body>
-</html>
 """
+
 
 
 """TXT chat history export template."""
@@ -821,12 +833,23 @@ CHAT_TXT = """<%
 import datetime
 import conf, skypedata, util
 %>History of Skype {{chat["title_long_lc"]}}.
-Showing {{util.plural("message", messages)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
+Showing {{util.plural("message", message_count)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
 Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0)}} in total.
 Source: {{db.filename}}.
 Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
 -------------------------------------------------------------------------------
-<%
+
+%for chunk in message_buffer:
+{{chunk}}
+%endfor
+"""
+
+
+"""TXT chat history export template for the messages part."""
+CHAT_MESSAGES_TXT = """<%
+import datetime
+import skypedata, util
+
 previous_day = datetime.date.fromtimestamp(0)
 %>
 %for m in messages:
@@ -919,7 +942,7 @@ import conf, images, util
         <td>
             <div class="header">{{title}}</div><br />
             Source: <b>{{db_filename}}</b>.<br />
-            <b>{{len(rows)}}</b> rows in results.<br />
+            <b>{{row_count}}</b> {{util.plural("row", row_count, with_items=False)}} in results.<br />
 %if sql:
             <b>SQL:</b> {{escape(sql)}}
 %endif
@@ -934,8 +957,8 @@ import conf, images, util
 %for i, row in enumerate(rows):
 <tr>
 <td>{{i + 1}}</td>
-%for value in row:
-<td>{{escape("" if value is None else value)}}</td>
+%for col in columns:
+<td>{{escape("" if row[col] is None else row[col])}}</td>
 %endfor
 </tr>
 %endfor
@@ -949,9 +972,11 @@ import conf, images, util
 
 """TXT SQL insert statements export template."""
 SQL_TXT = """<%
-import datetime
+import datetime, re, string
 import conf
 
+UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.printable))
+RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
 str_cols = ", ".join(columns)
 %>-- {{title}}.
 -- Source: {{db_filename}}.
@@ -967,12 +992,21 @@ str_cols = ", ".join(columns)
 <%
 values = []
 %>
-%for value in row:
+%for col in columns:
 <%
-if isinstance(value, unicode):
-    value = value.encode("utf-8")
+value = row[col]
 if isinstance(value, basestring):
-    value = '"%s"' % (value.encode("string-escape").replace('\"', '""'))
+    if RE_UNPRINTABLE.search(value):
+        if isinstance(value, unicode):
+            try:
+                value = value.encode("latin1")
+            except:
+                value = value.encode("utf-8", errors="replace")
+        value = "X'%s'" % value.encode("hex").upper()
+    else:
+        if isinstance(value, unicode):
+            value = value.encode("utf-8")
+        value = '"%s"' % (value.encode("string-escape").replace('\"', '""'))
 elif value is None:
     value = "NULL"
 else:
@@ -990,6 +1024,7 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 STATS_HTML = """<%
 import datetime, urllib
 import conf, skypedata, util
+
 %>
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="top"><b>Statistics for currently shown messages:</b></a></td>

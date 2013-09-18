@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.09.2013
+@modified    16.09.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -22,6 +22,7 @@ import Queue
 import re
 import sqlite3
 import shutil
+import string
 import sys
 import textwrap
 import time
@@ -105,25 +106,26 @@ class SkypeDatabase(object):
 
     """Insert SQL statements for Skype tables."""
     INSERT_STATEMENTS = {
-      "accounts": "CREATE TABLE Accounts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, skypename TEXT, fullname TEXT, pstnnumber TEXT, birthday INTEGER, gender INTEGER, languages TEXT, country TEXT, province TEXT, city TEXT, phone_home TEXT, phone_office TEXT, phone_mobile TEXT, emails TEXT, homepage TEXT, about TEXT, profile_timestamp INTEGER, received_authrequest TEXT, displayname TEXT, refreshing INTEGER, given_authlevel INTEGER, aliases TEXT, authreq_timestamp INTEGER, mood_text TEXT, timezone INTEGER, nrof_authed_buddies INTEGER, ipcountry TEXT, given_displayname TEXT, availability INTEGER, lastonline_timestamp INTEGER, capabilities BLOB, avatar_image BLOB, assigned_speeddial TEXT, lastused_timestamp INTEGER, authrequest_count INTEGER, status INTEGER, pwdchangestatus INTEGER, suggested_skypename TEXT, logoutreason INTEGER, skypeout_balance_currency TEXT, skypeout_balance INTEGER, skypeout_precision INTEGER, skypein_numbers TEXT, offline_callforward TEXT, commitstatus INTEGER, cblsyncstatus INTEGER, chat_policy INTEGER, skype_call_policy INTEGER, pstn_call_policy INTEGER, avatar_policy INTEGER, buddycount_policy INTEGER, timezone_policy INTEGER, webpresence_policy INTEGER, owner_under_legal_age INTEGER, phonenumbers_policy INTEGER, voicemail_policy INTEGER, assigned_comment TEXT, alertstring TEXT, avatar_timestamp INTEGER, mood_timestamp INTEGER, type INTEGER, rich_mood_text TEXT, partner_optedout TEXT, service_provider_info TEXT, registration_timestamp INTEGER, nr_of_other_instances INTEGER, synced_email BLOB, set_availability INTEGER, authorized_time INTEGER, sent_authrequest TEXT, sent_authrequest_time INTEGER, sent_authrequest_serial INTEGER, buddyblob BLOB, cbl_future BLOB, node_capabilities INTEGER, node_capabilities_and INTEGER, revoked_auth INTEGER, added_in_shared_group INTEGER, in_shared_group INTEGER, authreq_history BLOB, profile_attachments BLOB, stack_version INTEGER, offline_authreq_id INTEGER, subscriptions TEXT, authrequest_policy INTEGER, ad_policy INTEGER, options_change_future BLOB, verified_email BLOB, verified_company BLOB, partner_channel_status TEXT, cbl_profile_blob BLOB, flamingo_xmpp_status INTEGER)",
+      "accounts": "CREATE TABLE Accounts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, skypename TEXT, fullname TEXT, pstnnumber TEXT, birthday INTEGER, gender INTEGER, languages TEXT, country TEXT, province TEXT, city TEXT, phone_home TEXT, phone_office TEXT, phone_mobile TEXT, emails TEXT, homepage TEXT, about TEXT, profile_timestamp INTEGER, received_authrequest TEXT, displayname TEXT, refreshing INTEGER, given_authlevel INTEGER, aliases TEXT, authreq_timestamp INTEGER, mood_text TEXT, timezone INTEGER, nrof_authed_buddies INTEGER, ipcountry TEXT, given_displayname TEXT, availability INTEGER, lastonline_timestamp INTEGER, capabilities BLOB, avatar_image BLOB, assigned_speeddial TEXT, lastused_timestamp INTEGER, authrequest_count INTEGER, status INTEGER, pwdchangestatus INTEGER, suggested_skypename TEXT, logoutreason INTEGER, skypeout_balance_currency TEXT, skypeout_balance INTEGER, skypeout_precision INTEGER, skypein_numbers TEXT, offline_callforward TEXT, commitstatus INTEGER, cblsyncstatus INTEGER, chat_policy INTEGER, skype_call_policy INTEGER, pstn_call_policy INTEGER, avatar_policy INTEGER, buddycount_policy INTEGER, timezone_policy INTEGER, webpresence_policy INTEGER, owner_under_legal_age INTEGER, phonenumbers_policy INTEGER, voicemail_policy INTEGER, assigned_comment TEXT, alertstring TEXT, avatar_timestamp INTEGER, mood_timestamp INTEGER, type INTEGER, rich_mood_text TEXT, partner_optedout TEXT, service_provider_info TEXT, registration_timestamp INTEGER, nr_of_other_instances INTEGER, synced_email BLOB, set_availability INTEGER, authorized_time INTEGER, sent_authrequest TEXT, sent_authrequest_time INTEGER, sent_authrequest_serial INTEGER, buddyblob BLOB, cbl_future BLOB, node_capabilities INTEGER, node_capabilities_and INTEGER, revoked_auth INTEGER, added_in_shared_group INTEGER, in_shared_group INTEGER, authreq_history BLOB, profile_attachments BLOB, stack_version INTEGER, offline_authreq_id INTEGER, subscriptions TEXT, authrequest_policy INTEGER, ad_policy INTEGER, options_change_future BLOB, verified_email BLOB, verified_company BLOB, partner_channel_status TEXT, cbl_profile_blob BLOB, flamingo_xmpp_status INTEGER, federated_presence_policy INTEGER, liveid_membername TEXT, roaming_history_enabled INTEGER, uses_jcs INTEGER, cobrand_id INTEGER)",
       "alerts": "CREATE TABLE Alerts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, timestamp INTEGER, partner_name TEXT, is_unseen INTEGER, partner_id INTEGER, partner_event TEXT, partner_history TEXT, partner_header TEXT, partner_logo TEXT, message_content TEXT, message_footer TEXT, meta_expiry INTEGER, message_header_caption TEXT, message_header_title TEXT, message_header_subject TEXT, message_header_cancel TEXT, message_header_later TEXT, message_button_caption TEXT, message_button_uri TEXT, message_type INTEGER, window_size INTEGER, notification_id INTEGER, extprop_hide_from_history INTEGER, chatmsg_guid BLOB, event_flags INTEGER)",
-      "callmembers": "CREATE TABLE CallMembers (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, quality_status INTEGER, call_name TEXT, price_precision INTEGER, transfer_status INTEGER, transfer_active INTEGER, transferred_by TEXT, transferred_to TEXT, guid TEXT, identity TEXT, dispname TEXT, languages TEXT, call_duration INTEGER, price_per_minute INTEGER, price_currency TEXT, type INTEGER, status INTEGER, failurereason INTEGER, sounderror_code INTEGER, soundlevel INTEGER, pstn_statustext TEXT, pstn_feedback TEXT, forward_targets TEXT, forwarded_by TEXT, debuginfo TEXT, videostatus INTEGER, target_identity TEXT, mike_status INTEGER, is_read_only INTEGER, next_redial_time INTEGER, nrof_redials_left INTEGER, nrof_redials_done INTEGER, transfer_topic TEXT, real_identity TEXT, start_timestamp INTEGER, pk_status INTEGER, call_db_id INTEGER, prime_status INTEGER, is_conference INTEGER, quality_problems TEXT, identity_type INTEGER, country TEXT, creation_timestamp INTEGER, payment_category TEXT, stats_xml TEXT, is_premium_video_sponsor INTEGER, is_multiparty_video_capable INTEGER, recovery_in_progress INTEGER, nonse_word TEXT)",
+      "appschemaversion": "CREATE TABLE AppSchemaVersion (ClientVersion TEXT NOT NULL, SQLiteSchemaVersion INTEGER NOT NULL, SchemaUpdateType INTEGER NOT NULL)",
+      "callmembers": "CREATE TABLE CallMembers (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, quality_status INTEGER, call_name TEXT, price_precision INTEGER, transfer_status INTEGER, transfer_active INTEGER, transferred_by TEXT, transferred_to TEXT, guid TEXT, identity TEXT, dispname TEXT, languages TEXT, call_duration INTEGER, price_per_minute INTEGER, price_currency TEXT, type INTEGER, status INTEGER, failurereason INTEGER, sounderror_code INTEGER, soundlevel INTEGER, pstn_statustext TEXT, pstn_feedback TEXT, forward_targets TEXT, forwarded_by TEXT, debuginfo TEXT, videostatus INTEGER, target_identity TEXT, mike_status INTEGER, is_read_only INTEGER, next_redial_time INTEGER, nrof_redials_left INTEGER, nrof_redials_done INTEGER, transfer_topic TEXT, real_identity TEXT, start_timestamp INTEGER, pk_status INTEGER, call_db_id INTEGER, prime_status INTEGER, is_conference INTEGER, quality_problems TEXT, identity_type INTEGER, country TEXT, creation_timestamp INTEGER, payment_category TEXT, stats_xml TEXT, is_premium_video_sponsor INTEGER, is_multiparty_video_capable INTEGER, recovery_in_progress INTEGER, nonse_word TEXT, nr_of_delivered_push_notifications INTEGER, call_session_guid TEXT, version_string TEXT)",
       "calls": "CREATE TABLE Calls (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, begin_timestamp INTEGER, partner_handle TEXT, partner_dispname TEXT, server_identity TEXT, type INTEGER, old_members BLOB, status INTEGER, failurereason INTEGER, topic TEXT, pstn_number TEXT, old_duration INTEGER, conf_participants BLOB, pstn_status TEXT, failurecode INTEGER, is_muted INTEGER, vaa_input_status INTEGER, is_incoming INTEGER, is_conference INTEGER, host_identity TEXT, mike_status INTEGER, duration INTEGER, soundlevel INTEGER, access_token TEXT, active_members INTEGER, is_active INTEGER, name TEXT, video_disabled INTEGER, joined_existing INTEGER, is_unseen_missed INTEGER, is_on_hold INTEGER, members BLOB, conv_dbid INTEGER, start_timestamp INTEGER, quality_problems TEXT, current_video_audience TEXT, premium_video_status INTEGER, premium_video_is_grace_period INTEGER, is_premium_video_sponsor INTEGER, premium_video_sponsor_list TEXT)",
       "chatmembers": "CREATE TABLE ChatMembers (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, chatname TEXT, identity TEXT, role INTEGER, is_active INTEGER, cur_activities INTEGER, adder TEXT)",
       "chats": "CREATE TABLE Chats (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, name TEXT, timestamp INTEGER, adder TEXT, type INTEGER, posters TEXT, participants TEXT, topic TEXT, activemembers TEXT, friendlyname TEXT, alertstring TEXT, is_bookmarked INTEGER, activity_timestamp INTEGER, mystatus INTEGER, passwordhint TEXT, description TEXT, options INTEGER, picture BLOB, guidelines TEXT, dialog_partner TEXT, myrole INTEGER, applicants TEXT, banned_users TEXT, topic_xml TEXT, name_text TEXT, unconsumed_suppressed_msg INTEGER, unconsumed_normal_msg INTEGER, unconsumed_elevated_msg INTEGER, unconsumed_msg_voice INTEGER, state_data BLOB, lifesigns INTEGER, last_change INTEGER, first_unread_message INTEGER, pk_type INTEGER, dbpath TEXT, split_friendlyname TEXT, conv_dbid INTEGER)",
       "contactgroups": "CREATE TABLE ContactGroups (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type_old INTEGER, given_displayname TEXT, nrofcontacts INTEGER, nrofcontacts_online INTEGER, custom_group_id INTEGER, type INTEGER, associated_chat TEXT, proposer TEXT, description TEXT, members TEXT, cbl_id INTEGER, cbl_blob BLOB, fixed INTEGER, keep_sharedgroup_contacts INTEGER, chats TEXT, extprop_is_hidden INTEGER, extprop_sortorder_value INTEGER, extprop_is_expanded INTEGER, given_sortorder INTEGER)",
-      "contacts": "CREATE TABLE Contacts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, skypename TEXT, fullname TEXT, pstnnumber TEXT, birthday INTEGER, gender INTEGER, languages TEXT, country TEXT, province TEXT, city TEXT, phone_home TEXT, phone_office TEXT, phone_mobile TEXT, emails TEXT, homepage TEXT, about TEXT, profile_timestamp INTEGER, received_authrequest TEXT, displayname TEXT, refreshing INTEGER, given_authlevel INTEGER, aliases TEXT, authreq_timestamp INTEGER, mood_text TEXT, timezone INTEGER, nrof_authed_buddies INTEGER, ipcountry TEXT, buddystatus INTEGER, isauthorized INTEGER, isblocked INTEGER, given_displayname TEXT, availability INTEGER, lastonline_timestamp INTEGER, capabilities BLOB, avatar_image BLOB, assigned_speeddial TEXT, lastused_timestamp INTEGER, authrequest_count INTEGER, assigned_comment TEXT, alertstring TEXT, avatar_timestamp INTEGER, mood_timestamp INTEGER, type INTEGER, rich_mood_text TEXT, authorization_certificate BLOB, certificate_send_count INTEGER, account_modification_serial_nr INTEGER, saved_directory_blob BLOB, nr_of_buddies INTEGER, server_synced INTEGER, contactlist_track INTEGER, last_used_networktime INTEGER, assigned_phone1 TEXT, assigned_phone1_label TEXT, assigned_phone2 TEXT, assigned_phone2_label TEXT, assigned_phone3 TEXT, assigned_phone3_label TEXT, authorized_time INTEGER, sent_authrequest TEXT, sent_authrequest_time INTEGER, sent_authrequest_serial INTEGER, buddyblob BLOB, cbl_future BLOB, node_capabilities INTEGER, node_capabilities_and INTEGER, revoked_auth INTEGER, added_in_shared_group INTEGER, in_shared_group INTEGER, authreq_history BLOB, profile_attachments BLOB, stack_version INTEGER, offline_authreq_id INTEGER, authreq_crc INTEGER, authreq_src INTEGER, pop_score INTEGER, authreq_nodeinfo BLOB, main_phone TEXT, unified_servants TEXT, phone_home_normalized TEXT, phone_office_normalized TEXT, phone_mobile_normalized TEXT, sent_authrequest_initmethod INTEGER, authreq_initmethod INTEGER, extprop_seen_birthday INTEGER, extprop_sms_target INTEGER, extprop_can_show_avatar INTEGER, popularity_ord INTEGER, verified_email BLOB, verified_company BLOB, sent_authrequest_extrasbitmask INTEGER, extprop_external_data TEXT)",
-      "conversations": "CREATE TABLE Conversations (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, identity TEXT, type INTEGER, live_host TEXT, live_start_timestamp INTEGER, live_is_muted INTEGER, alert_string TEXT, is_bookmarked INTEGER, given_displayname TEXT, displayname TEXT, local_livestatus INTEGER, inbox_timestamp INTEGER, inbox_message_id INTEGER, unconsumed_suppressed_messages INTEGER, unconsumed_normal_messages INTEGER, unconsumed_elevated_messages INTEGER, unconsumed_messages_voice INTEGER, active_vm_id INTEGER, context_horizon INTEGER, consumption_horizon INTEGER, last_activity_timestamp INTEGER, active_invoice_message INTEGER, spawned_from_convo_id INTEGER, pinned_order INTEGER, creator TEXT, creation_timestamp INTEGER, my_status INTEGER, opt_joining_enabled INTEGER, opt_access_token TEXT, opt_entry_level_rank INTEGER, opt_disclose_history INTEGER, opt_history_limit_in_days INTEGER, opt_admin_only_activities INTEGER, passwordhint TEXT, meta_name TEXT, meta_topic TEXT, meta_guidelines TEXT, meta_picture BLOB, premium_video_status INTEGER, premium_video_is_grace_period INTEGER, guid TEXT, dialog_partner TEXT, meta_description TEXT, premium_video_sponsor_list TEXT, chat_dbid INTEGER, history_horizon INTEGER, extprop_profile_height INTEGER, extprop_chat_width INTEGER, extprop_chat_left_margin INTEGER, extprop_chat_right_margin INTEGER, extprop_entry_height INTEGER, extprop_windowpos_x INTEGER, extprop_windowpos_y INTEGER, extprop_windowpos_w INTEGER, extprop_windowpos_h INTEGER, extprop_window_maximized INTEGER, extprop_window_detached INTEGER, extprop_pinned_order INTEGER, extprop_new_in_inbox INTEGER, extprop_tab_order INTEGER, extprop_video_layout INTEGER, extprop_video_chat_height INTEGER, extprop_chat_avatar INTEGER, extprop_consumption_timestamp INTEGER, extprop_form_visible INTEGER, extprop_recovery_mode INTEGER)",
+      "contacts": "CREATE TABLE Contacts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, skypename TEXT, pstnnumber TEXT, aliases TEXT, fullname TEXT, birthday INTEGER, gender INTEGER, languages TEXT, country TEXT, province TEXT, city TEXT, phone_home TEXT, phone_office TEXT, phone_mobile TEXT, emails TEXT, hashed_emails TEXT, homepage TEXT, about TEXT, avatar_image BLOB, mood_text TEXT, rich_mood_text TEXT, timezone INTEGER, capabilities BLOB, profile_timestamp INTEGER, nrof_authed_buddies INTEGER, ipcountry TEXT, avatar_timestamp INTEGER, mood_timestamp INTEGER, received_authrequest TEXT, authreq_timestamp INTEGER, lastonline_timestamp INTEGER, availability INTEGER, displayname TEXT, refreshing INTEGER, given_authlevel INTEGER, given_displayname TEXT, assigned_speeddial TEXT, assigned_comment TEXT, alertstring TEXT, lastused_timestamp INTEGER, authrequest_count INTEGER, assigned_phone1 TEXT, assigned_phone1_label TEXT, assigned_phone2 TEXT, assigned_phone2_label TEXT, assigned_phone3 TEXT, assigned_phone3_label TEXT, buddystatus INTEGER, isauthorized INTEGER, popularity_ord INTEGER, external_id TEXT, external_system_id TEXT, isblocked INTEGER, authorization_certificate BLOB, certificate_send_count INTEGER, account_modification_serial_nr INTEGER, saved_directory_blob BLOB, nr_of_buddies INTEGER, server_synced INTEGER, contactlist_track INTEGER, last_used_networktime INTEGER, authorized_time INTEGER, sent_authrequest TEXT, sent_authrequest_time INTEGER, sent_authrequest_serial INTEGER, buddyblob BLOB, cbl_future BLOB, node_capabilities INTEGER, revoked_auth INTEGER, added_in_shared_group INTEGER, in_shared_group INTEGER, authreq_history BLOB, profile_attachments BLOB, stack_version INTEGER, offline_authreq_id INTEGER, node_capabilities_and INTEGER, authreq_crc INTEGER, authreq_src INTEGER, pop_score INTEGER, authreq_nodeinfo BLOB, main_phone TEXT, unified_servants TEXT, phone_home_normalized TEXT, phone_office_normalized TEXT, phone_mobile_normalized TEXT, sent_authrequest_initmethod INTEGER, authreq_initmethod INTEGER, verified_email BLOB, verified_company BLOB, sent_authrequest_extrasbitmask INTEGER, extprop_seen_birthday INTEGER, extprop_sms_target INTEGER, extprop_external_data TEXT, extprop_must_hide_avatar INTEGER, liveid_cid TEXT)",
+      "conversations": "CREATE TABLE Conversations (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, identity TEXT, type INTEGER, live_host TEXT, live_start_timestamp INTEGER, live_is_muted INTEGER, alert_string TEXT, is_bookmarked INTEGER, given_displayname TEXT, displayname TEXT, local_livestatus INTEGER, inbox_timestamp INTEGER, inbox_message_id INTEGER, unconsumed_suppressed_messages INTEGER, unconsumed_normal_messages INTEGER, unconsumed_elevated_messages INTEGER, unconsumed_messages_voice INTEGER, active_vm_id INTEGER, context_horizon INTEGER, consumption_horizon INTEGER, last_activity_timestamp INTEGER, active_invoice_message INTEGER, spawned_from_convo_id INTEGER, pinned_order INTEGER, creator TEXT, creation_timestamp INTEGER, my_status INTEGER, opt_joining_enabled INTEGER, opt_access_token TEXT, opt_entry_level_rank INTEGER, opt_disclose_history INTEGER, opt_history_limit_in_days INTEGER, opt_admin_only_activities INTEGER, passwordhint TEXT, meta_name TEXT, meta_topic TEXT, meta_guidelines TEXT, meta_picture BLOB, premium_video_status INTEGER, premium_video_is_grace_period INTEGER, guid TEXT, dialog_partner TEXT, meta_description TEXT, premium_video_sponsor_list TEXT, chat_dbid INTEGER, history_horizon INTEGER, extprop_profile_height INTEGER, extprop_chat_width INTEGER, extprop_chat_left_margin INTEGER, extprop_chat_right_margin INTEGER, extprop_entry_height INTEGER, extprop_windowpos_x INTEGER, extprop_windowpos_y INTEGER, extprop_windowpos_w INTEGER, extprop_windowpos_h INTEGER, extprop_window_maximized INTEGER, extprop_window_detached INTEGER, extprop_pinned_order INTEGER, extprop_new_in_inbox INTEGER, extprop_tab_order INTEGER, extprop_video_layout INTEGER, extprop_video_chat_height INTEGER, extprop_chat_avatar INTEGER, extprop_consumption_timestamp INTEGER, extprop_form_visible INTEGER, extprop_recovery_mode INTEGER, mcr_caller TEXT, history_sync_state TEXT, picture TEXT, is_p2p_migrated INTEGER, thread_version TEXT, consumption_horizon_set_at INTEGER, alt_identity TEXT)",
       "dbmeta": "CREATE TABLE DbMeta (key TEXT NOT NULL PRIMARY KEY, value TEXT)",
       "legacymessages": "CREATE TABLE LegacyMessages (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER)",
       "messages": "CREATE TABLE Messages (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, chatname TEXT, timestamp INTEGER, author TEXT, from_dispname TEXT, chatmsg_type INTEGER, identities TEXT, leavereason INTEGER, body_xml TEXT, chatmsg_status INTEGER, body_is_rawxml INTEGER, edited_by TEXT, edited_timestamp INTEGER, newoptions INTEGER, newrole INTEGER, dialog_partner TEXT, oldoptions INTEGER, guid BLOB, convo_id INTEGER, type INTEGER, sending_status INTEGER, param_key INTEGER, param_value INTEGER, reason TEXT, error_code INTEGER, consumption_status INTEGER, author_was_live INTEGER, participant_count INTEGER, pk_id INTEGER, crc INTEGER, remote_id INTEGER, call_guid TEXT, extprop_contact_review_date TEXT, extprop_contact_received_stamp INTEGER, extprop_contact_reviewed INTEGER)",
-      "participants": "CREATE TABLE Participants (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, convo_id INTEGER, identity TEXT, rank INTEGER, requested_rank INTEGER, text_status INTEGER, voice_status INTEGER, video_status INTEGER, live_identity TEXT, live_price_for_me TEXT, live_fwd_identities TEXT, live_start_timestamp INTEGER, sound_level INTEGER, debuginfo TEXT, next_redial_time INTEGER, nrof_redials_left INTEGER, last_voice_error TEXT, quality_problems TEXT, live_type INTEGER, live_country TEXT, transferred_by TEXT, transferred_to TEXT, adder TEXT, is_premium_video_sponsor INTEGER, is_multiparty_video_capable INTEGER, live_identity_to_use TEXT, livesession_recovery_in_progress INTEGER, extprop_default_identity INTEGER, last_leavereason INTEGER)",
-      "smses": "CREATE TABLE SMSes (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, is_failed_unseen INTEGER, price_precision INTEGER, type INTEGER, status INTEGER, failurereason INTEGER, price INTEGER, price_currency TEXT, target_numbers TEXT, target_statuses BLOB, body TEXT, timestamp INTEGER, reply_to_number TEXT, chatmsg_id INTEGER, extprop_hide_from_history INTEGER, extprop_extended INTEGER, identity TEXT, notification_id INTEGER, event_flags INTEGER)",
-      "transfers": "CREATE TABLE Transfers (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, partner_handle TEXT, partner_dispname TEXT, status INTEGER, failurereason INTEGER, starttime INTEGER, finishtime INTEGER, filepath TEXT, filename TEXT, filesize TEXT, bytestransferred TEXT, bytespersecond INTEGER, chatmsg_guid BLOB, chatmsg_index INTEGER, convo_id INTEGER, pk_id INTEGER, nodeid BLOB, last_activity INTEGER, flags INTEGER, old_status INTEGER, old_filepath INTEGER, extprop_localfilename TEXT, extprop_hide_from_history INTEGER, extprop_window_visible INTEGER, extprop_handled_by_chat INTEGER, accepttime INTEGER)",
+      "participants": "CREATE TABLE Participants (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, convo_id INTEGER, identity TEXT, rank INTEGER, requested_rank INTEGER, text_status INTEGER, voice_status INTEGER, video_status INTEGER, live_identity TEXT, live_price_for_me TEXT, live_fwd_identities TEXT, live_start_timestamp INTEGER, sound_level INTEGER, debuginfo TEXT, next_redial_time INTEGER, nrof_redials_left INTEGER, last_voice_error TEXT, quality_problems TEXT, live_type INTEGER, live_country TEXT, transferred_by TEXT, transferred_to TEXT, adder TEXT, is_premium_video_sponsor INTEGER, is_multiparty_video_capable INTEGER, live_identity_to_use TEXT, livesession_recovery_in_progress INTEGER, extprop_default_identity INTEGER, last_leavereason INTEGER, is_multiparty_video_updatable INTEGER, real_identity TEXT)",
+      "smses": "CREATE TABLE SMSes (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, is_failed_unseen INTEGER, price_precision INTEGER, type INTEGER, status INTEGER, failurereason INTEGER, price INTEGER, price_currency TEXT, target_numbers TEXT, target_statuses BLOB, body TEXT, timestamp INTEGER, reply_to_number TEXT, chatmsg_id INTEGER, extprop_hide_from_history INTEGER, extprop_extended INTEGER, identity TEXT, notification_id INTEGER, event_flags INTEGER, reply_id_number TEXT, convo_name TEXT, outgoing_reply_type INTEGER)",
+      "transfers": "CREATE TABLE Transfers (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, partner_handle TEXT, partner_dispname TEXT, status INTEGER, failurereason INTEGER, starttime INTEGER, finishtime INTEGER, filepath TEXT, filename TEXT, filesize TEXT, bytestransferred TEXT, bytespersecond INTEGER, chatmsg_guid BLOB, chatmsg_index INTEGER, convo_id INTEGER, pk_id INTEGER, nodeid BLOB, last_activity INTEGER, flags INTEGER, old_status INTEGER, old_filepath INTEGER, extprop_localfilename TEXT, extprop_hide_from_history INTEGER, extprop_window_visible INTEGER, extprop_handled_by_chat INTEGER, accepttime INTEGER, parent_id INTEGER, offer_send_list TEXT)",
+      "videomessages": "CREATE TABLE VideoMessages (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, qik_id BLOB, attached_msg_ids TEXT, sharing_id TEXT, status INTEGER, vod_status INTEGER, vod_path TEXT, local_path TEXT, public_link TEXT, progress INTEGER, title TEXT, description TEXT, author TEXT, creation_timestamp INTEGER)",
       "videos": "CREATE TABLE Videos (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, status INTEGER, dimensions TEXT, error TEXT, debuginfo TEXT, duration_1080 INTEGER, duration_720 INTEGER, duration_hqv INTEGER, duration_vgad2 INTEGER, duration_ltvgad2 INTEGER, timestamp INTEGER, hq_present INTEGER, duration_ss INTEGER, ss_timestamp INTEGER, media_type INTEGER, convo_id INTEGER, device_path TEXT)",
       "voicemails": "CREATE TABLE Voicemails (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, partner_handle TEXT, partner_dispname TEXT, status INTEGER, failurereason INTEGER, subject TEXT, timestamp INTEGER, duration INTEGER, allowed_duration INTEGER, playback_progress INTEGER, convo_id INTEGER, chatmsg_guid BLOB, notification_id INTEGER, flags INTEGER, size INTEGER, path TEXT, failures INTEGER, vflags INTEGER, xmsg TEXT, extprop_hide_from_history INTEGER)",
     }
-
 
 
     def __init__(self, filename, log_error=True):
@@ -163,11 +165,8 @@ class SkypeDatabase(object):
             raise
 
         try:
-            # COALESCE() would return the first empty string as a not-NULL:
-            # NULLIF() will return the string or NULL if the string is empty.
             self.account = self.execute("SELECT *, "
-                "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
-                         "NULLIF(skypename, '')) AS name, "
+                "COALESCE(fullname, displayname, skypename, '') AS name, "
                 "skypename AS identity FROM accounts LIMIT 1"
             ).fetchone()
             self.id = self.account["skypename"]
@@ -309,8 +308,8 @@ class SkypeDatabase(object):
         [{"name": "tablename", "rows": 0, "sql": CREATE SQL}, ].
         Uses already retrieved cached values if possible, unless refreshing.
 
-        @param   refresh        if True, information including rowcounts is
-                                refreshed
+        @param   refresh     if True, information including rowcounts is
+                             refreshed
         @param   this_table  if set, only information for this table is
                                 refreshed
         """
@@ -333,9 +332,11 @@ class SkypeDatabase(object):
                 tables_list.append(table)
             if this_table:
                 self.tables.update(tables)
-                for t in self.tables_list:
+                for t in self.tables_list or []:
                     if t["name"] == this_table:
                         self.tables_list.remove(t)
+                if self.tables_list is None:
+                    self.tables_list = []
                 self.tables_list += tables_list
                 self.tables_list.sort(key=lambda x: x["name"])
             else:
@@ -397,7 +398,8 @@ class SkypeDatabase(object):
                         message["datetime"] = datetime.datetime.fromtimestamp(
                             message["timestamp"]
                         )
-                    messages.append(message)
+                    if chat and use_cache and len(params) == 1:
+                        messages.append(message)
                     yield message
                     message = res.fetchone()
                 if chat and use_cache and len(params) == 1:
@@ -475,8 +477,7 @@ class SkypeDatabase(object):
                 [i.sort(key=lambda x: (x["contact"].get("name", "")).lower())
                  for i in participants.values()]
                 rows = self.execute(
-                    "SELECT *, COALESCE(NULLIF(displayname, ''), "
-                                       "NULLIF(meta_topic, '')) AS title, "
+                    "SELECT *, COALESCE(displayname, meta_topic, '') AS title, "
                     "NULL AS created_datetime, "
                     "NULL AS last_activity_datetime "
                     "FROM conversations WHERE displayname IS NOT NULL "
@@ -502,7 +503,6 @@ class SkypeDatabase(object):
                     chat["last_message_timestamp"] = None
                     chat["first_message_datetime"] = None
                     chat["last_message_datetime"] = None
-                    #chat["participants"] = []
                     chat["participants"] = participants.get(chat["id"], [])
                     conversations.append(chat)
                 main.log("Conversations and participants retrieved "
@@ -598,10 +598,9 @@ class SkypeDatabase(object):
         if self.is_open() and "contacts" in self.tables:
             if "contacts" not in self.table_rows:
                 rows = self.execute(
-                    "SELECT *, COALESCE(NULLIF(skypename, ''), "
-                                       "NULLIF(pstnnumber, '')) AS identity, "
-                    "COALESCE(NULLIF(fullname, ''), NULLIF(displayname, ''), "
-                             "NULLIF(skypename, ''), NULLIF(pstnnumber, '')) "
+                    "SELECT *, COALESCE(skypename, pstnnumber, '') "
+                        "AS identity, "
+                    "COALESCE(fullname, displayname, skypename, pstnnumber, '') "
                     "AS name FROM contacts ORDER BY name COLLATE NOCASE"
                 ).fetchall()
                 self.table_objects["contacts"] = {}
@@ -765,16 +764,13 @@ class SkypeDatabase(object):
                 # Retrieve and cache all contacts
                 self.table_objects["contacts"] = {}
                 rows = self.execute(
-                    "SELECT *, COALESCE(NULLIF(skypename, ''), "
-                                       "NULLIF(pstnnumber, '')) AS identity "
+                    "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity "
                     "FROM contacts").fetchall()
                 for row in rows:
                     self.table_objects["contacts"][row["identity"]] = row
             rows = self.execute(
-                "SELECT COALESCE(NULLIF(c.fullname, ''), "
-                                "NULLIF(c.displayname, ''), "
-                                "NULLIF(c.skypename, ''), "
-                                "NULLIF(c.pstnnumber, '')) AS name, "
+                "SELECT COALESCE(c.fullname, c.displayname, c.skypename, "
+                                "c.pstnnumber, '') AS name, "
                 "c.skypename, p.* "
                 "FROM contacts AS c INNER JOIN participants AS p "
                 "ON p.identity = c.skypename "
@@ -804,12 +800,10 @@ class SkypeDatabase(object):
             contact = self.table_objects["contacts"].get(identity)
             if not contact:
                 contact = self.execute(
-                    "SELECT *, COALESCE(NULLIF(fullname, ''), "
-                                       "NULLIF(displayname, ''), "
-                                       "NULLIF(skypename, ''), "
-                                       "NULLIF(pstnnumber, '')) AS name, "
-                    "COALESCE(NULLIF(skypename, ''), NULLIF(pstnnumber, '')) "
-                    "AS identity FROM contacts WHERE skypename = :identity "
+                    "SELECT *, COALESCE(fullname, displayname, skypename, "
+                                       "pstnnumber, '') AS name, "
+                    "COALESCE(skypename, pstnnumber, '') AS identity "
+                    "FROM contacts WHERE skypename = :identity "
                     "OR pstnnumber = :identity",
                     {"identity": identity}
                 ).fetchone()
@@ -922,6 +916,7 @@ class SkypeDatabase(object):
         table = table.lower()
         if create_sql or (table in self.INSERT_STATEMENTS):
             self.execute(create_sql or self.INSERT_STATEMENTS[table])
+            self.connection.commit()
             row = self.execute("SELECT name, sql FROM sqlite_master "
                                 "WHERE type = 'table' "
                                 "AND LOWER(name) = ?", [table]).fetchone()
@@ -943,22 +938,27 @@ class SkypeDatabase(object):
             chat_filled = self.fill_missing_fields(chat, fields)
             chat_filled = self.blobs_to_binary(chat_filled, fields, col_data)
 
-            cursor = self.execute(
-                "INSERT INTO conversations (%s) VALUES (%s)" % (
-                    str_cols, str_vals
-                )
-            , chat_filled)
+            cursor = self.execute("INSERT INTO conversations (%s) VALUES (%s)"
+                                  % (str_cols, str_vals), chat_filled)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
             return cursor.lastrowid
 
 
-    def insert_messages(self, chat, messages, source_db, source_chat):
+    def insert_messages(self, chat, messages, source_db, source_chat,
+                        heartbeat=None, heartbeat_count=None):
         """
         Inserts the specified messages under the specified chat in this
         database, includes related rows in Calls, Videos, Transfers and
         SMSes.
+
+        @param    messages   list of messages, or message IDs from source_db
+        @param    heartbeat  function called after every @beatcount
+                             messages inserted
+        @param    beatcount  number of messages after which to call heartbeat
+        @return              a list of inserted message IDs
         """
+        result = []
         if self.is_open() and not self.account and source_db.account:
             self.insert_account(source_db.account)
         if self.is_open() and "messages" not in self.tables:
@@ -1002,7 +1002,10 @@ class SkypeDatabase(object):
             chat_vals = ", ".join(["?"] * len(chat_fields))
             timestamp_earliest = source_chat["creation_timestamp"] \
                                  or sys.maxsize
-            for m in messages:
+            for i, m in enumerate(messages):
+                if not isinstance(m, dict):
+                    sql = "SELECT * FROM messages WHERE id = ?"
+                    m = source_db.execute(sql, (m, )).fetchone()
                 # Insert corresponding Chats entry, if not present
                 if (m["chatname"] not in chatrows_present
                 and m["chatname"] in chatrows_source):
@@ -1050,6 +1053,9 @@ class SkypeDatabase(object):
                             t = self.blobs_to_binary(t, sms_fields, sms_col_data)
                             self.execute(sql, t)
                 timestamp_earliest = min(timestamp_earliest, m["timestamp"])
+                result.append(m_id)
+                if heartbeat and beatcount and i and not i % beatcount:
+                    heartbeat()
             if (timestamp_earliest
             and chat["creation_timestamp"] > timestamp_earliest):
                 # Conversations.creation_timestamp must not be later than the
@@ -1061,11 +1067,12 @@ class SkypeDatabase(object):
                              ":creation_timestamp WHERE id = :id", chat)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
+        return result
 
 
     def insert_participants(self, chat, participants, source_db):
         """
-        Inserts the specified messages under the specified chat in this
+        Inserts the specified participants under the specified chat in this
         database.
         """
         if self.is_open() and not self.account and source_db.account:
@@ -1257,9 +1264,8 @@ class SkypeDatabase(object):
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
             row = self.blobs_to_binary(row, fields, col_data)
-            cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)" % (
-                table, str_cols, str_vals
-            ), row)
+            cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)"
+                                  % (table, str_cols, str_vals), row)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
             return cursor.lastrowid
@@ -1273,8 +1279,7 @@ class SkypeDatabase(object):
         if self.is_open():
             table = table.lower()
             main.log("Deleting 1 row from table %s, %s.",
-                self.tables[table]["name"], self.filename
-            )
+                     self.tables[table]["name"], self.filename)
             self.ensure_backup()
             col_data = self.get_table_columns(table)
             pk = [c["name"] for c in col_data if c["pk"]][0]
@@ -1807,7 +1812,7 @@ class TableBase(wx.grid.PyGridTableBase):
 
 
 class MessageParser(object):
-    """A simple Skype message parser."""
+    """A Skype message parser, able to collect statistics from its input."""
 
     """
     Maximum line width in characters for text output.
@@ -1818,25 +1823,43 @@ class MessageParser(object):
     REPLACE_ENTITIES = { "&apos;": "'" }
 
     """Regex for checking if string ends with any HTML entity, like "&lt;"."""
-    ENTITY_CHECK_RGX = re.compile(".*(&[#\\w]{2,};)$",
-                                  re.MULTILINE | re.UNICODE)
+    ENTITY_CHECK_RGX = re.compile(".*(&[#\\w]{2,};)$")
 
     """Regex for replacing raw emoticon texts with emoticon tags."""
-    EMOTICON_RGX = re.compile("(^|[^>])(%s)($|\\W)" % "|".join(
+    EMOTICON_RGX = re.compile("(%s)" % "|".join(
                               s for i in emoticons.EmoticonData.values()
-                              for s in map(re.escape, i["strings"])),
-                              re.IGNORECASE | re.UNICODE)
+                              for s in map(re.escape, i["strings"])))
+
+    # Regexes for checking if an emoticon is preceded or followed by
+    # a non-alphanumeric character or a smiley or an empty string.
+    EMOTICON_CHECKBEHIND_RGX = re.compile("(\\W)|(%s)|(^)$" % "|".join(
+                               s for i in emoticons.EmoticonData.values()
+                               for s in map(re.escape, i["strings"])),
+                               re.UNICODE)
+    EMOTICON_CHECKAHEAD_RGX  = re.compile("^(\\W)|(%s)|(^)$" % "|".join(
+                               s for i in emoticons.EmoticonData.values()
+                               for s in map(re.escape, i["strings"])),
+                               re.UNICODE)
 
     """
-    Regex replacement for raw emoticon text. Must check whether the preceding
-    string up to the first emoticon char is not an HTML entity, e.g. "(&lt;)".
+    Replacer callback for raw emoticon text. Must check whether the preceding
+    text up to the first emoticon char is not an HTML entity, e.g. "(&lt;)",
+    and whether emoticon start and preceding text or emoticon end and
+    following text is not alphanumeric.
     """
-    EMOTICON_REPL = lambda self, m: ("%s<ss type=\"%s\">%s</ss>%s" % 
-        (m.group(1), emoticons.EmoticonStrings[m.group(2)], m.group(2), m.group(3))
-        if m.group(2) in emoticons.EmoticonStrings and (m.group(2)[:1] != ";"
-            or not MessageParser.ENTITY_CHECK_RGX.match(
-            m.string[max(0, m.start(2) - 7):m.start(2) + 1]))
-        else m.group(1) + m.group(2) + m.group(3))
+    EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
+        (emoticons.EmoticonStrings[m.group(1)], m.group(1))
+        if m.group(1) in emoticons.EmoticonStrings
+        and (m.group(1)[:1] != ";"
+             or not MessageParser.ENTITY_CHECK_RGX.match(
+                m.string[max(0, m.start(1) - 7):m.start(1) + 1]))
+        and (m.group(1)[:1] not in string.ascii_letters
+             or MessageParser.EMOTICON_CHECKBEHIND_RGX.match(
+                m.string[max(0, m.start(1) - 16):m.start(1)]))
+        and (m.group(1)[-1:] not in string.ascii_letters
+             or MessageParser.EMOTICON_CHECKAHEAD_RGX.match(
+                m.string[m.start(1) + len(m.group(1)):m.start(1) + 32]))
+        else m.group(1))
 
     """Regex for checking the existence of any character all emoticons have."""
     EMOTICON_CHARS_RGX = re.compile("[:|()/]")
@@ -1844,7 +1867,7 @@ class MessageParser(object):
     """Regex for replacing low bytes unparseable in XML (\x00 etc)."""
     SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 
-    """Regex replacement for low bytes unparseable in XML (\x00 etc)."""
+    """Replacer callback for low bytes unusable in XML (\x00 etc)."""
     SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape")
 
     """Mapping known failure reason codes to """
@@ -1920,8 +1943,8 @@ class MessageParser(object):
 
     def parse(self, message, rgx_highlight=None, html=None, text=None):
         """
-        Parses the specified Skype message and returns the message body as DOM
-        or HTML.
+        Parses the specified Skype message and returns the message body as
+        DOM, HTML or TXT.
 
         @param   message        message data dict
         @param   rgx_highlight  regex for finding text to highlight, if any
@@ -1934,11 +1957,11 @@ class MessageParser(object):
                                 representation of the message body, argument
                                 can specify to not wrap lines, as:
                                 {"wrap": False}. By default lines are wrapped.
-        @return                 xml.etree.cElementTree.Element containing
+        @return                 a string if html or text specified, 
+                                or xml.etree.cElementTree.Element containing
                                 message body, with "xml" as the root tag and
                                 any number of subtags:
-                                (a|b|quote|quotefrom|msgstatus|bodystatus)
-                                , or an HTML string if html specified
+                                (a|b|quote|quotefrom|msgstatus|bodystatus),
         """
         result = None
         dom = None
@@ -2187,11 +2210,13 @@ class MessageParser(object):
                         if html.get("export", False):
                             emot_type = subelem.get("type")
                             emot = subelem.text.replace("&", "&amp;")
-                            if emot_type in emoticons.EmoticonData:
+                            if hasattr(emoticons, emot_type):
                                 template = "<span class=\"emoticon %s\" " \
                                            "title=\"%s\">%s</span>"
                                 data = emoticons.EmoticonData[emot_type]
-                                title = data["title"] + " " + data["strings"][0]
+                                title = data["title"]
+                                if data["strings"][0] != data["title"]:
+                                    title += " " + data["strings"][0]
                                 span_str = template % (emot_type, title, emot)
                             else:
                                 span_str = "<span>%s</span>" % emot
@@ -2363,8 +2388,6 @@ class MessageParser(object):
                 text = "[%s]\r\n" % text.strip()
             elif "ss" == elem.tag:
                 text = elem.text
-            else:
-                text = text + " " if text else ""
             if text:
                 fulltext += text
             for i in subitems:
@@ -2655,7 +2678,7 @@ Alerts         - alerts from Skype payments, Facebook etc
 CallMembers    - participants in Skype calls
 Calls          - Skype phone calls
 ChatMembers    - may be unused, migration from old *.dbb files on Skype upgrade
-Chats          - may be unused, migration from old *.dbb files on Skype upgrade
+Chats          - some sort of a bridge between Conversations and Messages
 ContactGroups  - user-defined contact groups
 Contacts       - all Skype contacts, also including plain phone numbers
 Conversations  - all conversations, both single and group chats
@@ -2740,10 +2763,7 @@ Messages:
                         Seems received when one or other adds on request?
                   51:   "%name has shared contact details with %myname."
                         (chatmsg_type 18)
-                  53:   unknown and undetectable (just 1 in encountered
-                        databases, with NULL chatmsg_type and pretty NULL
-                        altogether). Might be related to a contact changing
-                        their account.
+                  53:   blocking contacts in #identities
                   60:   various info messages (chatmsg_type 7),
                         e.g. "has sent a file to x, y, ..", or "/me laughs"
                   61:   ordinary message (chatmsg_type 7)

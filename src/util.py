@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    03.09.2013
+@modified    14.09.2013
 ------------------------------------------------------------------------------
 """
 import locale
@@ -79,20 +79,21 @@ def format_seconds(seconds, insert=""):
     return formatted
 
 
-def plural(word, count_or_items=None):
+def plural(word, items=None, with_items=True):
     """
     Returns the word as 'count words', or '1 word' if count is 1,
-    or 'words' if count omitted.
+    or 'words' if count omitted, or .
 
     @param   word
-    @param   count_or_items  count, or item collection, or None to omit the
-                             count from result
+    @param   items       item collection or count,
+                         or None to get just the plural of the word
+             with_items  if False, count is omitted from final result
     """
-    count = count_or_items or 0
-    if hasattr(count_or_items, "__len__"):
-            count = len(count_or_items)
+    count = items or 0
+    if hasattr(items, "__len__"):
+        count = len(items)
     result = word + ("" if 1 == count else "s")
-    if count_or_items is not None:
+    if with_items and items is not None:
         result = "%s %s" % (count, result)
     return result
 

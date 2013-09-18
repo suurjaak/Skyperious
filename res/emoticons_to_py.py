@@ -5,7 +5,7 @@ embedded Skype emoticon images and docstrings.
 
 @author    Erki Suurjaak
 @created   11.06.2013
-@modified  15.06.2013
+@modified  14.09.2013
 """
 import base64
 import datetime
@@ -19,7 +19,7 @@ TARGET = os.path.join("..", "src", "emoticons.py")
 
 Q3 = '"""'
 
-# Skype emoticon images
+# Skype emoticons
 EMOTICONS = {
     "angel": {"title": "Angel", "file": "0131-angel.gif", "strings": ["(angel)"]},
     "angry": {"title": "Angry", "file": "0121-angry.gif", "strings": [":@", ":-@", ":=@", "x(", "x-(", "x=(", "X(", "X-(", "X=("]},
@@ -36,7 +36,7 @@ EMOTICONS = {
     "coffee": {"title": "Coffee", "file": "0162-coffee.gif", "strings": ["(coffee)"]},
     "cool": {"title": "Cool", "file": "0103-cool.gif", "strings": ["8=)", "8-)", "B=)", "B-)", "(cool)"]},
     "cry": {"title": "Crying", "file": "0106-crying.gif", "strings": [";(", ";-(", ";=("]},
-    "dance": {"title": "Dance", "file": "0169-dance.gif", "strings": ["(dance)", "\\\\o/", "\\\\:D/", "\\\\:d/"]},
+    "dance": {"title": "Dance", "file": "0169-dance.gif", "strings": ["(dance)", "\\o/", "\\:D/", "\\:d/"]},
     "devil": {"title": "Devil", "file": "0130-devil.gif", "strings": ["(devil)"]},
     "doh": {"title": "Doh!", "file": "0120-doh.gif", "strings": ["(doh)"]},
     "drink": {"title": "Drink", "file": "0168-drink.gif", "strings": ["(d)", "(D)"]},
@@ -106,6 +106,20 @@ EMOTICONS = {
     "worry": {"title": "Worried", "file": "0124-worried.gif", "strings": [":S", ":-S", ":=S", ":s", ":-s", ":=s"]},
     "yawn": {"title": "Yawn", "file": "0118-yawn.gif", "strings": ["(yawn)"]},
     "yes": {"title": "Yes", "file": "0148-yes.gif", "strings": ["(y)", "(Y)", "(ok)"]},
+    # The following do not have emoticon images in Skyperious
+    "bertlett": {"title": "(bartlett)", "strings": ["(bartlett)"]},
+    "facepalm": {"title": "Facepalm", "strings": ["(facepalm)"]},
+    "fingerscrossed": {"title": "Fingers crossed", "strings": ["(fingerscrossed)"]},
+    "heidy": {"title": "Heidy", "strings": ["(heidy)"]},
+    "highfive": {"title": "High five", "strings": ["(highfive)"]},
+    "hollest": {"title": "Hollest", "strings": ["(hollest)"]},
+    "lalala": {"title": "Lalala", "strings": ["(lalala)"]},
+    "oliver": {"title": "(oliver)", "strings": ["(oliver)"]},
+    "soccer": {"title": "(soccer)", "strings": ["(soccer)"]},
+    "tumbleweed": {"title": "Tumbleweed", "strings": ["(tumbleweed)"]},
+    "waiting": {"title": "Waiting", "strings": ["(waiting)"]},
+    "wfh": {"title": "Working from home", "strings": ["(wfh)"]},
+    "wtf": {"title": "What the...", "strings": ["(wtf)"]},
 }
 
 
@@ -132,6 +146,7 @@ def create_py(target):
     f = open(target, "w")
     f.write(HEADER)
     for name, data in sorted(EMOTICONS.items()):
+        if "file" not in data: continue # continue for name, data in ..            
         f.write("\n\n%sSkype emoticon \"%s %s\".%s\n%s = PyEmbeddedImage(\n" %
                 (Q3, data["title"], data["strings"][0], Q3, name))
         filename = os.path.join("emoticons", data["file"])
