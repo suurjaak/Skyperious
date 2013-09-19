@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.09.2013
+@modified    19.09.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -946,7 +946,7 @@ class SkypeDatabase(object):
 
 
     def insert_messages(self, chat, messages, source_db, source_chat,
-                        heartbeat=None, heartbeat_count=None):
+                        heartbeat=None, beatcount=None):
         """
         Inserts the specified messages under the specified chat in this
         database, includes related rows in Calls, Videos, Transfers and
