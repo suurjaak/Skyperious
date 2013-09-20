@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.09.2013
+@modified    20.09.2013
 ------------------------------------------------------------------------------
 """
 import base64
@@ -841,13 +841,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                             main.logstatus("Skipping %s: no messages.",
                                            chat["title_long_lc"])
                 except Exception, e:
-                    errormsg = ("An unexpected error occurred when saving "
-                                "all %s from \"%s\" as %s under %s: %s" %
-                                (util.plural("chat", chats),
-                                 extname.upper(), db_dirname, e))
+                    errormsg = ("Error saving all %s as %s: %s" %
+                                (util.plural("chat", chats), 
+                                 extname.upper(), e))
                     error = True
                 busy.Close()
-            self.button_export.Enabled = True
             if not error:
                 main.logstatus_flash("Exported %s from %s as %s "
                     "under %s.", util.plural("chat", count), db.filename,
@@ -857,6 +855,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     "Failed to export all chats from %s as %s.",
                     db.filename, extname.upper())
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+            self.button_export.Enabled = True
             if db and not db.has_consumers():
                 del self.dbs[db.filename]
                 db.close()
@@ -1148,39 +1147,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             do_exit = (wx.CANCEL != response)
         if do_exit:
             for page in self.db_pages:
-                # Save search box state
-                if conf.SearchHistory[-1:] == [""]: # Clear empty search flag
-                    conf.SearchHistory = conf.SearchHistory[:-1]
-                util.add_unique(conf.SearchHistory, page.edit_searchall.Value,
-                                1, conf.SearchHistoryMax)
-
                 active_idx = page.notebook.Selection
                 if active_idx:
                     conf.LastActivePage[page.db.filename] = active_idx
                 elif page.db.filename in conf.LastActivePage:
                     del conf.LastActivePage[page.db.filename]
-
-                # Save last search results HTML
-                search_data = page.html_searchall.GetActiveTabData()
-                if search_data:
-                    info = {}
-                    if search_data.get("info"):
-                        info["map"] = search_data["info"].get("map")
-                        info["text"] = search_data["info"].get("text")
-                    data = {"content": search_data["content"],
-                            "id": search_data["id"], "info": info,
-                            "title": search_data["title"], }
-                    conf.LastSearchResults[page.db.filename] = data
-                elif page.db.filename in conf.LastSearchResults:
-                    del conf.LastSearchResults[page.db.filename]
-
-                # Save page SQL window content, if changed from previous value
-                sql_text = page.stc_sql.Text
-                if sql_text != conf.SQLWindowTexts.get(page.db.filename, ""):
-                    if sql_text:
-                        conf.SQLWindowTexts[page.db.filename] = sql_text
-                    elif page.db.filename in conf.SQLWindowTexts:
-                        del conf.SQLWindowTexts[page.db.filename]
+                page.save_page_conf()
 
             # Save last selected files in db lists, to reselect them on rerun
             del conf.LastSelectedFiles[:]
@@ -1241,34 +1213,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del conf.LastActivePage[page.db.filename]
 
             [i.stop() for i in page.workers_search.values()]
-            # Save search box state
-            if conf.SearchHistory[-1:] == [""]: # Clear empty search flag
-                conf.SearchHistory = conf.SearchHistory[:-1]
-            search_value = page.edit_searchall.Value
-            util.add_unique(conf.SearchHistory, search_value, 1,
-                            conf.SearchHistoryMax)
-
-            # Save last search results HTML
-            search_data = page.html_searchall.GetActiveTabData()
-            if search_data:
-                info = {}
-                if search_data.get("info"):
-                    info["map"] = search_data["info"].get("map")
-                    info["text"] = search_data["info"].get("text")
-                data = {"content": search_data["content"],
-                        "id": search_data["id"], "info": info,
-                        "title": search_data["title"], }
-                conf.LastSearchResults[page.db.filename] = data
-            elif page.db.filename in conf.LastSearchResults:
-                del conf.LastSearchResults[page.db.filename]
-
-            # Save page SQL window content, if changed from previous value
-            sql_text = page.stc_sql.Text
-            if sql_text != conf.SQLWindowTexts.get(page.db.filename, ""):
-                if sql_text:
-                    conf.SQLWindowTexts[page.db.filename] = sql_text
-                elif page.db.filename in conf.SQLWindowTexts:
-                    del conf.SQLWindowTexts[page.db.filename]
+            page.save_page_conf()
 
             if page in self.db_pages:
                 del self.db_pages[page]
@@ -1373,39 +1318,32 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         pass
                     if not is_accessible and self.skype_handler \
                     and self.skype_handler.is_running():
-                        #wx.GetApp().Yield(True) # Allow UI to refresh
                         response = wx.MessageBox(
                             "Could not open %s.\n\n"
                             "Probably because Skype is running. "
                             "Close Skype and try again?" % filename,
-                            conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
-                        )
+                            conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
                         if wx.OK == response:
                             self.skype_handler.shutdown()
                             try_result, db = util.try_until(lambda:
-                                skypedata.SkypeDatabase(filename, False)
-                            )
+                                skypedata.SkypeDatabase(filename, False))
                             if not try_result:
                                 wx.MessageBox(
                                     "Still could not open %s." % filename,
-                                    conf.Title, wx.OK | wx.ICON_WARNING
-                                )
+                                    conf.Title, wx.OK | wx.ICON_WARNING)
                     elif not is_accessible:
                         wx.MessageBox(
                             "Could not open %s.\n\n"
                             "Some other process may be using the file."
-                            % filename, conf.Title, wx.OK | wx.ICON_WARNING
-                        )
+                            % filename, conf.Title, wx.OK | wx.ICON_WARNING)
                     else:
                         wx.MessageBox(
                             "Could not open %s.\n\n"
                             "Not a valid SQLITE database?" % filename,
-                            conf.Title, wx.OK | wx.ICON_WARNING
-                        )
+                            conf.Title, wx.OK | wx.ICON_WARNING)
                 if db:
                     main.log("Opened %s (%s).", db, util.format_bytes(
-                        db.filesize
-                    ))
+                             db.filesize))
                     main.status_flash("Reading Skype database file %s.", db)
                     self.dbs[filename] = db
                     # Add filename to Recent Files menu and conf, if needed
@@ -2288,6 +2226,38 @@ class DatabasePage(wx.Panel):
                   flag=wx.RIGHT | wx.TOP | wx.BOTTOM | wx.GROW)
 
 
+    def save_page_conf(self):
+        """Saves page last configuration like search text and results."""
+
+        # Save search box state
+        if conf.SearchHistory[-1:] == [""]: # Clear empty search flag
+            conf.SearchHistory = conf.SearchHistory[:-1]
+        util.add_unique(conf.SearchHistory, self.edit_searchall.Value,
+                        1, conf.SearchHistoryMax)
+
+        # Save last search results HTML
+        search_data = self.html_searchall.GetActiveTabData()
+        if search_data:
+            info = {}
+            if search_data.get("info"):
+                info["map"] = search_data["info"].get("map")
+                info["text"] = search_data["info"].get("text")
+            data = {"content": search_data["content"],
+                    "id": search_data["id"], "info": info,
+                    "title": search_data["title"], }
+            conf.LastSearchResults[self.db.filename] = data
+        elif self.db.filename in conf.LastSearchResults:
+            del conf.LastSearchResults[self.db.filename]
+
+        # Save page SQL window content, if changed from previous value
+        sql_text = self.stc_sql.Text
+        if sql_text != conf.SQLWindowTexts.get(self.db.filename, ""):
+            if sql_text:
+                conf.SQLWindowTexts[self.db.filename] = sql_text
+            elif self.db.filename in conf.SQLWindowTexts:
+                del conf.SQLWindowTexts[self.db.filename]
+
+
     def split_panels(self):
         """
         Splits all SplitterWindow panels. To be called after layout in
@@ -2619,10 +2589,9 @@ class DatabasePage(wx.Panel):
                         main.log("Skipping %s: no messages.",
                                  chat["title_long_lc"])
             except Exception, e:
-                errormsg = "An unexpected error occurred when saving " \
-                           "%s from \"%s\" as %s under %s: %s" % \
+                errormsg = "Error saving %s as %s: %s" % \
                            (util.plural("chat", chats),
-                            extname.upper(), dirname, e)
+                            extname.upper(), e)
             busy.Close()
             if not errormsg:
                 main.logstatus_flash("Exported %s from %s as %s under %s.",
@@ -3794,10 +3763,14 @@ class DatabasePage(wx.Panel):
                     self.tree_tables.SetItemText(grandchld, col["type"], 1)
             self.tree_tables.Expand(root)
             if child:
+                # Nudge columns to fit and fill the header exactly.
                 self.tree_tables.Expand(child)
                 self.tree_tables.SetColumnWidth(0, -1)
-                self.tree_tables.SetColumnWidth(1, -1)
+                self.tree_tables.SetColumnWidth(1, min(70,
+                    self.tree_tables.Size.width -
+                    self.tree_tables.GetColumnWidth(0) - 5))
                 self.tree_tables.Collapse(child)
+
 
             # Add table and column names to SQL editor autocomplete
             self.stc_sql.AutoCompAddWords([t["name"] for t in tables])
@@ -5687,7 +5660,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         if stats:
             participants = [p["contact"] for p in self._chat["participants"]]
             data = {"db": self._db, "participants": participants,
-                    "sort_by": sort_field, "stats": stats, }
+                    "chat": self._chat, "sort_by": sort_field, "stats": stats }
             result = step.Template(templates.STATS_HTML).expand(data)
         return result
 

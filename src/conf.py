@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2013
+@modified    20.09.2013
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import wx
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "2.1.1"
-VersionDate = "18.09.2013"
+Version = "2.1.2"
+VersionDate = "20.09.2013"
 
 if getattr(sys, 'frozen', False):
     # Running as a pyinstaller executable
@@ -94,7 +94,7 @@ SearchInContacts = False
 SearchInMessageBody = True
 
 """Whether to create a new tab for each search or reuse current."""
-SearchInNewTab = False
+SearchInNewTab = True
 
 """Whether to search in all columns of all tables."""
 SearchInTables = False

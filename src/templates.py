@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    16.09.2013
+@modified    19.09.2013
 ------------------------------------------------------------------------------
 """
 import re
@@ -1027,11 +1027,11 @@ import conf, skypedata, util
 
 %>
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
-  <td><a name="top"><b>Statistics for currently shown messages:</b></a></td>
+  <td><a name="top"><b>Statistics for currently shown messages in {{chat["title_long_lc"]}}:</b></a></td>
 %if stats.get("wordcloud"):
   <td align="right"><a href="#cloud">Jump to word cloud</a></td>
 %endif
-</tr></table>
+</tr><tr><td><font size="0">&nbsp;</font></td></tr></table>
 <br />
 <table>
 %for label, value in stats["info_items"]:
@@ -1440,7 +1440,7 @@ import conf
   <tr>
     <td bgcolor="white" width="150">
       <b>Search for exact word or phrase<br /><br />
-      <font color="#006600"><code>"x = y + 4"</code></font>
+      <font color="#006600"><code>"do re mi"</code></font>
       <br />
     </td>
     <td bgcolor="white">

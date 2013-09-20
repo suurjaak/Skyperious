@@ -55,7 +55,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    15.09.2013
+@modified    19.09.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1686,6 +1686,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         self.SetCaretLineVisible(True)
         self.AutoCompSetIgnoreCase(True)
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
 
         self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, "face:%s" % self.FONT_FACE)
         self.StyleSetSpec(wx.stc.STC_SQL_DEFAULT, "face:%s" % self.FONT_FACE)
@@ -1732,7 +1733,6 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                 self.ReplaceTarget("")
                 self.InsertText(pos, text)
                 self.GotoPos(pos + len(text))
-
         """
 
 
@@ -1758,6 +1758,11 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
             if word_key not in self.autocomps_subwords:
                 self.autocomps_subwords[word_key] = set()
             self.autocomps_subwords[word_key].update(subwords)
+
+
+    def OnKillFocus(self, event):
+        """Handler for control losing focus, hides autocomplete."""
+        self.AutoCompCancel()
 
 
     def OnKeyDown(self, event):
