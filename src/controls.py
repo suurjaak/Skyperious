@@ -55,7 +55,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.09.2013
+@modified    22.09.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1779,14 +1779,14 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
             words = self.autocomps_total
             autocomp_len = 0
             key_code = event.UnicodeKey
-            if wx.WXK_SPACE == key_code and event.CmdDown():
+            if wx.WXK_SPACE == event.UnicodeKey and event.CmdDown():
                 # Start autocomp when user presses Ctrl+Space
                 do_autocomp = True
             elif not event.CmdDown():
                 # Check if we have enough valid text to start autocomplete
                 char = None
                 try: # Not all keycodes can be chars
-                    char = chr(key_code).decode("latin1")
+                    char = chr(event.UnicodeKey).decode("latin1")
                 except:
                     pass
                 if char not in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, 10, 13] \
@@ -1800,8 +1800,6 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                     for last_word in re.findall("(\w+)$", line_text):
                         text += last_word
                     text = text.upper()
-                    self.char=char
-                    self.evt = event
                     if "." == char:
                         # User entered "word.", show subword autocompletion if
                         # defined for the text.
@@ -1826,6 +1824,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
             if do_autocomp:
                 if skip: event.Skip()
                 self.AutoCompShow(autocomp_len, u" ".join(words))
+        elif self.AutoCompActive() and wx.WXK_DELETE == event.KeyCode:
+            self.AutoCompCancel()
         if skip: event.Skip()
 
 

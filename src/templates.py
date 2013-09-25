@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    19.09.2013
+@modified    22.09.2013
 ------------------------------------------------------------------------------
 """
 import re
@@ -756,9 +756,10 @@ f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d 
 </td></tr>
 <tr><td>
   <table id="content_table">
-%for chunk in message_buffer:
-{{chunk}}
-%endfor
+<%
+for chunk in message_buffer:
+    echo(chunk)
+%>
   </table>
 </td></tr></table>
 <div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
@@ -839,9 +840,10 @@ Source: {{db.filename}}.
 Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
 -------------------------------------------------------------------------------
 
-%for chunk in message_buffer:
-{{chunk}}
-%endfor
+<%
+for chunk in message_buffer:
+    echo(chunk)
+%>
 """
 
 

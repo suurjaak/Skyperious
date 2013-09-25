@@ -130,7 +130,8 @@ def export_chat(chat, messages, filename, db):
     except Exception, e:
         main.log("Error exporting to %s.\n\n%s", filename,
                  traceback.format_exc())
-        if f: f.close()
+        if f: util.try_until(lambda: f.close(), count=1)
+        raise
     return result
 
 
@@ -206,8 +207,8 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
             f.close()
             result = True
     except Exception, e:
-        if f:
-            f.close()
         main.log("Error exporting to %s.\n\n%s", filename,
                  traceback.format_exc())
+        if f: util.try_until(lambda: f.close(), count=1)
+        raise
     return result

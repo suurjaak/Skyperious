@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.09.2013
+@modified    24.09.2013
 ------------------------------------------------------------------------------
 """
 import base64
@@ -264,6 +264,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.notebook.SetAGWWindowStyleFlag(style)
 
 
+    def on_drag_list_db(self, event):
+        """Handler for dragging items in the database list, cancels dragging."""
+        class HackEvent(object): # Hack to get UltimateListCtrl to cancel drag.
+            def __init__(self, pos=wx.Point()): self._position = pos
+            def GetPosition(self):        return self._position
+        try:
+            wx.CallAfter(self.list_db.Children[0].DragFinish, HackEvent())
+        except: raise
+
+
     def create_page_main(self, notebook):
         """Creates the main page with database list and buttons."""
         page = self.page_main = wx.Panel(notebook)
@@ -360,7 +370,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for name, label, img, note in BUTTONS_DETAIL:
             button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
             setattr(self, "button_" + name, button)
-            exec("button_%s = self.button_%s" % (name, name)) # Hack for local
+            exec("button_%s = self.button_%s" % (name, name)) # Hack local name
 
         for c in list(panel_main.Children) + list(panel_detail.Children) + \
         [panel_main, panel_detail]:
@@ -370,6 +380,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
         list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_open_from_list_db)
         list_db.Bind(wx.EVT_CHAR_HOOK,           self.on_list_db_key)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_DRAG,
+                     self.on_drag_list_db)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_RDRAG,
+                     self.on_drag_list_db)
         button_opena.Bind(wx.EVT_BUTTON,         self.on_open_database)
         button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
         button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
@@ -785,6 +799,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for clicking to export a whole database, lets the user
         specify a directory where to save chat files and exports all chats.
         """
+        self.button_export.Enabled = False
         self.dialog_savefile.Filename = "Filename will be ignored"
         self.dialog_savefile.Message = "Choose folder where to save all chats"
         self.dialog_savefile.Wildcard = \
@@ -792,8 +807,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "Text document (*.txt)|*.txt|" \
             "CSV spreadsheet (*.csv)|*.csv"
         if wx.ID_OK == self.dialog_savefile.ShowModal():
-            self.button_export.Enabled = False
-            count, error, errormsg = 0, False, None
+            count, error, errormsg, filename = 0, False, None, None
             dirname = os.path.dirname(self.dialog_savefile.GetPath())
             extname = ["html", "txt", "csv"][self.dialog_savefile.FilterIndex]
             db = self.load_database(self.db_filename)
@@ -829,21 +843,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                             wx.GetApp().Yield(True) # Allow status to refresh
                             f = "Skype %s.%s" % (chat["title_long_lc"], extname)
                             f = os.path.join(db_dirname, util.safe_filename(f))
-                            f = util.unique_path(f)
+                            filename = util.unique_path(f)
                             messages = db.get_messages(chat)
-                            if export.export_chat(chat, messages, f, db):
-                                count += 1
-                            else:
-                                e = "An error occurred when saving \"%s\"." % f
-                                error, errormsg = True, e
-                                break # break for chat in chats
+                            export.export_chat(chat, messages, filename, db)
+                            count += 1
                         else:
                             main.logstatus("Skipping %s: no messages.",
                                            chat["title_long_lc"])
                 except Exception, e:
-                    errormsg = ("Error saving all %s as %s: %s" %
-                                (util.plural("chat", chats), 
-                                 extname.upper(), e))
+                    errormsg = ("Error saving %s:\n\n%s" %
+                                (filename, traceback.format_exc()))
                     error = True
                 busy.Close()
             if not error:
@@ -851,16 +860,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     "under %s.", util.plural("chat", count), db.filename,
                     extname.upper(), db_dirname)
             elif errormsg:
-                main.logstatus_flash(
-                    "Failed to export all chats from %s as %s.",
-                    db.filename, extname.upper())
+                main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            self.button_export.Enabled = True
             if db and not db.has_consumers():
                 del self.dbs[db.filename]
                 db.close()
             if db and not error:
                 util.start_file(db_dirname)
+        self.button_export.Enabled = True
 
 
     def on_compare_menu(self, event):
@@ -2529,13 +2536,14 @@ class DatabasePage(wx.Panel):
             main.logstatus("Exporting to %s.", filename)
             try:
                 messages = self.stc_history.GetMessages()
-                if export.export_chat(self.chat, messages, filename, self.db):
-                    main.logstatus_flash("Exported %s.", filename)
-                    util.start_file(filename)
-                else:
-                    main.logstatus_flash("Error exporting to %s.", filename)
-                    wx.MessageBox("Error exporting to \"%s\"." % filename,
-                                  conf.Title, wx.OK | wx.ICON_WARNING)
+                export.export_chat(self.chat, messages, filename, self.db)
+                main.logstatus_flash("Exported %s.", filename)
+                util.start_file(filename)
+            except Exception, e:
+                    msg = "Error saving %s:\n\n%s" % \
+                          (filename, traceback.format_exc())
+                    main.logstatus_flash(msg)
+                    wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
 
@@ -2570,28 +2578,25 @@ class DatabasePage(wx.Panel):
             main.logstatus("Exporting %s from %s as %s under %s.",
                            util.plural("chat", chats),
                            self.db.filename, extname.upper(), dirname)
-            errormsg = False
+            errormsg, filename = False, None
             try:
                 for chat in chats:
                     main.status("Exporting %s", chat["title_long_lc"])
                     wx.GetApp().Yield()
                     if chat["message_count"] or not do_all:
                         f = "Skype %s.%s" % (chat["title_long_lc"], extname)
-                        f = os.path.join(db_dirname, util.safe_filename(f))
-                        f = util.unique_path(f)
+                        f = os.path.join(dirname, util.safe_filename(f))
+                        filename = util.unique_path(f)
                         messages = self.db.get_messages(chat)
-                        if export.export_chat(chat, messages, f, self.db):
-                            filenames.append(f)
-                        else:
-                            errormsg = 'An error occurred when saving "%s".' % f
-                            break # break for chat in chats
+                        export.export_chat(chat, messages, filename, self.db)
+                        filenames.append(filename)
                     else:
-                        main.log("Skipping %s: no messages.",
+                        main.log("Skipping exporting %s: no messages.",
                                  chat["title_long_lc"])
             except Exception, e:
-                errormsg = "Error saving %s as %s: %s" % \
-                           (util.plural("chat", chats),
-                            extname.upper(), e)
+                errormsg = "Error saving %s when exporting %s:\n\n%s" % \
+                           (filename, util.plural("chat", chats),
+                            traceback.format_exc())
             busy.Close()
             if not errormsg:
                 main.logstatus_flash("Exported %s from %s as %s under %s.",
@@ -2599,10 +2604,7 @@ class DatabasePage(wx.Panel):
                                      self.db.filename, extname.upper(), dirname)
                 util.start_file(dirname if len(filenames) > 1 else filenames[0])
             else:
-                main.logstatus_flash(
-                    "Failed to export %s from %s as %s under %s.",
-                    util.plural("chat", chats), self.db.filename,
-                    extname.upper(), dirname)
+                main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -2637,16 +2639,17 @@ class DatabasePage(wx.Panel):
                 self.stc_history.SetFilter(filter_backup)
                 if msgs:
                     main.logstatus("Filtering and exporting to %s.", filename)
-                    if export.export_chat(self.chat, msgs, filename, self.db):
-                        main.logstatus_flash("Exported %s.", filename)
-                        util.start_file(filename)
-                    else:
-                        main.logstatus_flash("Error exporting to %s.", filename)
-                        wx.MessageBox("Error exporting to \"%s\"." % filename,
-                                      conf.Title, wx.OK | wx.ICON_WARNING)
+                    export.export_chat(self.chat, msgs, filename, self.db)
+                    main.logstatus_flash("Exported %s.", filename)
+                    util.start_file(filename)
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
                                   conf.Title, wx.OK | wx.ICON_INFORMATION)
+            except:
+                errormsg = ("Error saving %s:\n\n%s" %
+                            (filename, traceback.format_exc()))
+                main.logstatus_flash(errormsg)
+                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
 
@@ -3254,8 +3257,8 @@ class DatabasePage(wx.Panel):
                     "HTML document (*.html)|*.html|" \
                     "CSV spreadsheet (*.csv)|*.csv"
                 grid_source.Table.SeekAhead(True)
-            default = "Skype - %s" % namebase
-            self.dialog_savefile.Filename = util.safe_filename(default)
+            title = "Skype - %s" % namebase
+            self.dialog_savefile.Filename = util.safe_filename(title)
             self.dialog_savefile.Message = "Save table as"
             if wx.ID_OK == self.dialog_savefile.ShowModal():
                 filename = self.dialog_savefile.GetPath()
@@ -3264,21 +3267,20 @@ class DatabasePage(wx.Panel):
                 extname = exts[self.dialog_savefile.FilterIndex]
                 if not filename.lower().endswith(".%s" % extname):
                     filename += ".%s" % extname
-                busy = controls.BusyPanel(
-                       self, "Exporting \"%s\"." % filename)
+                busy = controls.BusyPanel(self, "Exporting \"%s\"." % filename)
                 main.status("Exporting \"%s\".", filename)
                 try:
-                    export_result = export.export_grid(grid_source,
-                        filename, default, self.db, sql, table)
-                finally:
-                    busy.Close()
-                if export_result:
+                    export.export_grid(grid_source, filename, title,
+                                       self.db, sql, table)
                     main.logstatus_flash("Exported %s.", filename)
                     util.start_file(filename)
-                else:
-                    main.logstatus_flash("Error exporting to %s.", filename)
-                    wx.MessageBox("Error exporting to \"%s\"." % filename,
-                                  conf.Title, wx.OK | wx.ICON_WARNING)
+                except:
+                    msg = "Error saving %s:\n\n%s" % \
+                          (filename, traceback.format_exc())
+                    main.logstatus_flash(msg)
+                    wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                finally:
+                    busy.Close()
 
 
     def on_keydown_sql(self, event):

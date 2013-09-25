@@ -8,9 +8,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2013
+@modified    22.09.2013
 ------------------------------------------------------------------------------
 """
+import cgi
 import collections
 import copy
 import cStringIO
@@ -2208,18 +2209,17 @@ class MessageParser(object):
                         elem[index] = table # Replace <quote> element in parent
                     elif "ss" == subelem.tag: # Emoticon
                         if html.get("export", False):
-                            emot_type = subelem.get("type")
-                            emot = subelem.text.replace("&", "&amp;")
+                            emot, emot_type = subelem.text, subelem.get("type")
+                            template, vals = "<span>%s</span>", [emot]
                             if hasattr(emoticons, emot_type):
-                                template = "<span class=\"emoticon %s\" " \
-                                           "title=\"%s\">%s</span>"
                                 data = emoticons.EmoticonData[emot_type]
                                 title = data["title"]
                                 if data["strings"][0] != data["title"]:
                                     title += " " + data["strings"][0]
-                                span_str = template % (emot_type, title, emot)
-                            else:
-                                span_str = "<span>%s</span>" % emot
+                                template = "<span class=\"emoticon %s\" " \
+                                           "title=\"%s\">%s</span>"
+                                vals = [emot_type, title, emot]
+                            span_str = template % tuple(map(cgi.escape, vals))
                             span = xml.etree.cElementTree.fromstring(span_str)
                             span.tail = subelem.tail
                             elem[index] = span # Replace <ss> element in parent
