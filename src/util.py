@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    14.09.2013
+@modified    03.11.2013
 ------------------------------------------------------------------------------
 """
 import locale
@@ -43,19 +43,30 @@ def safe_filename(filename):
     return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "", filename)
 
 
-def format_bytes(size, precision=2):
-    """Returns a formatted byte size (e.g. 421.45 MB)."""
+def format_bytes(size, precision=2, max_units=True):
+    """
+    Returns a formatted byte size (e.g. "421.45 MB" or "421,451,273 bytes").
+
+    @param   precision  number of decimals to leave after converting to
+                        maximum units
+    @param   max_units  whether to convert value to corresponding maximum
+                        unit, or leave as bytes and add thousand separators
+    """
     formatted = "0 bytes"
     size = int(size)
     if size:
-        log = math.floor(math.log(size, 1024))
-        formatted = "%.*f" % (precision, size / math.pow(1024, log))
-        if formatted.endswith("0"): formatted = formatted[:-1]
-        if formatted.endswith("0"): formatted = formatted[:-1]
-        if formatted.endswith("."): formatted = formatted[:-1]
-        formatted += " " + ["byte" if 1 == size else "bytes",
-            "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
-        ][int(log)]
+        byteunit = "byte" if 1 == size else "bytes"
+        if max_units:
+            UNITS = [byteunit, "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+            log = min(len(UNITS) - 1, math.floor(math.log(size, 1024)))
+            formatted = "%.*f" % (precision, size / math.pow(1024, log))
+            while formatted.endswith("0"): formatted = formatted[:-1]
+            if formatted.endswith("."): formatted = formatted[:-1]
+            formatted += " " + UNITS[int(log)]
+        else:
+            formatted = "".join([x + ("," if i and not i % 3 else "")
+                                 for i, x in enumerate(str(size)[::-1])][::-1])
+            formatted += " " + byteunit
     return formatted
 
 
@@ -202,7 +213,7 @@ def start_file(filepath):
 
 
 def is_os_64bit():
-    """Returns whether the operating system is 64-bit (only MSW for now)."""
+    """Returns whether the operating system is 64-bit (Windows-only)."""
     if 'PROCESSOR_ARCHITEW6432' in os.environ:
         return True
     return os.environ['PROCESSOR_ARCHITECTURE'].endswith('64')
@@ -328,10 +339,28 @@ def get_locale_day_date(dt):
 
 
 def path_to_url(path, encoding="utf-8"):
-    """Returns the local file path as a URL."""
+    """
+    Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
+    """
     if isinstance(path, unicode):
         path = path.encode(encoding)
-    url = urllib.pathname2url(path)
+
+    if not ":" in path:
+        # No drive specifier, just convert slashes and quote the name
+        if path[:2] == "\\\\":
+            path = "\\\\" + path
+        url = urllib.quote("/".join(path.split("\\")))
+    else:
+        parts = path.split(":")
+        url = ""
+
+        if len(parts[0]) == 1: # Looks like a proper drive, e.g. C:\
+            url = "///" + urllib.quote(parts[0].upper()) + ":"
+            parts = parts[1:]
+        components = ":".join(parts).split("\\")
+        for part in filter(None, components):
+            url += "/" + urllib.quote(part)
+
     url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
     return url
 

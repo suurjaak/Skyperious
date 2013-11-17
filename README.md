@@ -43,12 +43,13 @@ In database comparison, two databases can be scanned for differences,
 and you can merge results from one to the other wholesale, or browse and
 copy specific chats and contacts.
 
-Skyperious has been tested under Windows XP, Windows Vista, Windows 7 and
-Ubuntu Linux. In source code form, it should work wherever Python and required
-Python packages are installed.
+Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
+Ubuntu Linux, and reported to work under OS X. In source code form, it
+should work wherever Python and the required Python packages are installed.
 
-If running from source code, launch skyperious.bat under Windows, or
-skyperious.sh where shell scripts are supported, or execute 'python src\main.py'
+If running from source code, launch skyperious.bat under Windows,
+or skyperious.sh where shell scripts are supported,
+or execute 'python src\main.py'.
 
 
 Dependencies
@@ -61,10 +62,12 @@ If running from source code, Skyperious needs Python 2.6+ and the following
   (http://www.pythonware.com/products/pil/)
 
 The following 3rd-party Python packages are used for convenient date period
-choices in chat history, and for importing contacts, not strictly required:
+choices in chat history, for importing contacts, and for Excel workbook export,
+but are not strictly required:
 
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
 * Skype4Py (https://github.com/awahlig/skype4py)
+* XlsxWriter (https://github.com/jmcnamara/XlsxWriter)
 
 Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
 Python 3 is not supported.
@@ -74,8 +77,6 @@ Attribution
 -----------
 
 Skyperious includes source from the following 3rd-party Python libraries:
-* BeautifulSoup 3.2.1
-  (http://www.crummy.com/software/BeautifulSoup)
 * pyparsing 2.0.1
   (http://pyparsing.wikispaces.com/)
 * step, Simple Template Engine for Python
@@ -91,6 +92,12 @@ Default avatar icon from:
 Several icons from:
   Fugue Icons, (c) 2010 Yusuke Kamiyamane,
   http://p.yusukekamiyamane.com/
+
+Skyperious binaries are compiled with PyInstaller 2.1,
+http://www.pyinstaller.org
+
+Skyperious installers are created with Nullsoft Scriptable Install System 2.4.6,
+http://nsis.sourceforge.net/
 
 
 License

@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    24.08.2013
+@modified    16.11.2013
 ------------------------------------------------------------------------------
 """
 import base64
 import datetime
-import functools
 import hashlib
+import HTMLParser
 import os
 import re
 import sys
@@ -23,10 +23,7 @@ import time
 import traceback
 import urllib
 import urllib2
-import urlparse
 import wx
-
-from third_party import BeautifulSoup
 
 import conf
 import controls
@@ -53,18 +50,18 @@ def check_newest_version(callback=None):
                        () if up-to-date, None if query failed
     """
     global update_window, url_opener
+    result = ()
     update_window = True
     try:
         main.log("Checking for new version at %s.", conf.DownloadURL)
-        urlfile = url_opener.open(conf.DownloadURL)
-        soup = BeautifulSoup.BeautifulSoup(urlfile)
-        result = ()
-        links = soup("a")[:3] # [setup, 64-bit setup, zipped source]
+        html = url_opener.open(conf.DownloadURL).read()
+        links = re.findall("<a[^>]*\shref=['\"](.+)['\"][^>]*>", html, re.I)
+        links = [urllib.basejoin(conf.DownloadURL, x) for x in links[:3]]
         if links:
             # Determine release types
             linkmap = {} # {"src": link, "x86": link, "x64": link}
             for link in links:
-                link_text = link.text.lower()
+                link_text = link.lower()
                 if link_text.endswith(".zip"):
                     linkmap["src"] = link
                 elif link_text.endswith(".exe") and "_x64" in link_text:
@@ -72,49 +69,36 @@ def check_newest_version(callback=None):
                 elif link_text.endswith(".exe"):
                     linkmap["x86"] = link
 
-            # Determine the current installation type
-            prog_text = sys.argv[0].lower()
-            if not prog_text.endswith(".exe"):
-                install_type = "src"
-            elif util.is_os_64bit() and "program files\\" in prog_text:
-                install_type = "x64"
-            else:
-                install_type = "x86"
-
+            install_type = get_install_type()
             link = linkmap[install_type]
             # Extract version number like 1.3.2a from skyperious_1.3.2a_x64.exe
-            version = (re.findall("(\d[\da-z.]+)", link.text) + [None])[0]
-            if version != conf.Version:
-                try:
-                    # Convert version to integer, like 1.3.2 to 10320
-                    strip = functools.partial(re.sub, "[^\d]", "")
-                    nums1 = map(int, map(strip, conf.Version.split(".")))[::-1]
-                    nums2 = map(int, map(strip, version.split(".")))[::-1]
-                    nums1[0:0] = [0] * (3 - len(nums1)) # zero-pad if version
-                    nums2[0:0] = [0] * (3 - len(nums2)) # like 1.4 or just 2
-                    canonic1 = sum((x * 100 ** i) for i, x in enumerate(nums1))
-                    canonic2 = sum((x * 100 ** i) for i, x in enumerate(nums2))
-                    if canonic1 >= canonic2:
-                        version = None
-                except:
-                    pass
+            version = (re.findall("(\d[\da-z.]+)", link) + [None])[0]
+            try:
+                if version != conf.Version \
+                and canonic_version(conf.Version) >= canonic_version(version):
+                    version = None
+            except: pass
             if version and version != conf.Version:
                 main.log("Newest %s version is %s.", install_type, version)
                 changes = ""
                 try:
                     main.log("Reading changelog from %s.", conf.ChangelogURL)
-                    urlfile = url_opener.open(conf.ChangelogURL)
-                    soup = BeautifulSoup.BeautifulSoup(urlfile)
-                    re_search = re.compile("v%s," % version, re.IGNORECASE)
-                    h = soup.find('h4', text=re_search)
-                    items = [i.string.strip() for i in h.findNext("ul")]
-                    changes = "\n".join("- " + i for i in filter(None, items))
-                    if changes:
-                        changes = "Changes in %s\n\n%s" % (h, changes)
+                    html = url_opener.open(conf.ChangelogURL).read()
+                    match = re.search("<h4[^>]*>(v%s,.*)</h4\s*>" % version,
+                                      html, re.I)
+                    if match:
+                        ul = html[match.end(0):html.find("</ul", match.end(0))]
+                        lis = re.findall("(<li[^>]*>(.+)</li\s*>)+", ul, re.I)
+                        items = [re.sub("<[^>]+>", "", x[1]) for x in lis]
+                        items = map(HTMLParser.HTMLParser().unescape, items)
+                        changes = "\n".join("- " + i.strip() for i in items)
+                        if changes:
+                            title = match.group(1)
+                            changes = "Changes in %s\n\n%s" % (title, changes)
                 except:
                     main.log("Failed to read changelog.\n\n%s.",
                              traceback.format_exc())
-                url = urlparse.urljoin(conf.DownloadURL, link["href"])
+                url = urllib.basejoin(conf.DownloadURL, link)
                 result = (version, url, changes)
     except:
         main.log("Failed to retrieve new version from %s.\n\n%s",
@@ -159,7 +143,7 @@ def download_and_install(url):
                 is_cancelled = not dlg_progress.Update(percent, msg)
                 if is_cancelled:
                     break # break while len(buf)
-                wx.Yield()
+                wx.YieldIfNeeded()
                 buf = urlfile.read(BLOCKSIZE)
         dlg_progress.Destroy()
         update_window = None
@@ -197,30 +181,7 @@ def reporting_write(write):
         text = "".join(cached)[:100000]
         if text:
             main.log(text)
-            if conf.ErrorReportsAutomatic:
-                # Set severe constraints on error sending to avoid creating
-                # a busy idiot.
-                today = datetime.date.today().strftime("%Y%m%d")
-                conf.ErrorsReportedOnDay = conf.ErrorsReportedOnDay or {}
-                reports_today = conf.ErrorsReportedOnDay.get(today, 0)
-                text_hashed = "%s\n\n%s" % (conf.Version, text)
-                hash = hashlib.sha1(text_hashed).hexdigest()
-                if hash not in conf.ErrorReportHashes \
-                and reports_today < conf.ErrorReportsPerDay:
-                    reports_today += 1
-                    conf.ErrorReportHashes.append(hash)
-                    conf.ErrorsReportedOnDay[today] = reports_today
-                    # Keep configuration in reasonable size
-                    if len(conf.ErrorReportHashes) > conf.ErrorsStoredMax:
-                        conf.ErrorReportHashes = \
-                            conf.ErrorReportHashes[-conf.ErrorHashesMax:]
-                    if len(conf.ErrorsReportedOnDay) > conf.ErrorsStoredMax:
-                        days = sorted(conf.ErrorsReportedOnDay.keys())
-                        # Prune older days from dictionary
-                        for day in days[:len(days) - conf.ErrorsStoredMax]:
-                            del conf.ErrorsReportedOnDay[day]
-                    conf.save()
-                    send_report(text, "error")
+            report_error(text)
         cached[:] = []
     def cache_text(string):
         if not cached:
@@ -247,7 +208,7 @@ def take_screenshot():
         rect.height       += title_bar_height + border_width
 
     window.Raise()
-    wx.Yield()
+    wx.YieldIfNeeded()
     dc = wx.ScreenDC()
     bmp = wx.EmptyBitmap(rect.width, rect.height)
     dc_bmp = wx.MemoryDC()
@@ -257,6 +218,33 @@ def take_screenshot():
     return bmp
 
 
+def report_error(text):
+    """Reports the error, if error reporting is enabled and below limit."""
+    if conf.ErrorReportsAutomatic:
+        # Set severe constraints on error sending to avoid creating
+        # a busy idiot.
+        today = datetime.date.today().strftime("%Y%m%d")
+        conf.ErrorsReportedOnDay = conf.ErrorsReportedOnDay or {}
+        reports_today = conf.ErrorsReportedOnDay.get(today, 0)
+        text_hashed = "%s\n\n%s" % (conf.Version, text)
+        hash = hashlib.sha1(text_hashed).hexdigest()
+        if hash not in conf.ErrorReportHashes \
+        and reports_today < conf.ErrorReportsPerDay:
+            reports_today += 1
+            conf.ErrorReportHashes.append(hash)
+            conf.ErrorsReportedOnDay[today] = reports_today
+            # Keep configuration in reasonable size
+            if len(conf.ErrorReportHashes) > conf.ErrorsStoredMax:
+                conf.ErrorReportHashes = \
+                    conf.ErrorReportHashes[-conf.ErrorHashesMax:]
+            if len(conf.ErrorsReportedOnDay) > conf.ErrorsStoredMax:
+                days = sorted(conf.ErrorsReportedOnDay.keys())
+                # Prune older days from dictionary
+                for day in days[:len(days) - conf.ErrorsStoredMax]:
+                    del conf.ErrorsReportedOnDay[day]
+            conf.save()
+            send_report(text, "error")
+
 
 def send_report(content, type, screenshot=""):
     """Posts feedback or error data to the report web service."""
@@ -264,13 +252,35 @@ def send_report(content, type, screenshot=""):
     try:
         data = {"content": content.encode("utf-8"), "type": type,
                 "screenshot": base64.b64encode(screenshot),
-                "version": conf.Version}
+                "version": "%s-%s" % (conf.Version, get_install_type())}
         url_opener.open(conf.ReportURL, urllib.urlencode(data))
         main.log("Sent %s report to %s (%s).", type, conf.ReportURL, content)
     except:
         main.log("Failed to send %s to %s.\n\n%s", type, conf.ReportURL,
                  traceback.format_exc())
 
+
+def get_install_type():
+    """Returns the current Skyperious installation type (src|x64|x86)."""
+    prog_text = sys.argv[0].lower()
+    if not prog_text.endswith(".exe"):
+        result = "src"
+    elif util.is_os_64bit() and "program files\\" in prog_text:
+        result = "x64"
+    else:
+        result = "x86"
+    return result
+
+
+def canonic_version(v):
+    """Returns a numeric version representation: "1.3.2a" to 10301,99885."""
+    nums = [int(re.sub("[^\d]", "", x)) for x in v.split(".")][::-1]
+    nums[0:0] = [0] * (3 - len(nums)) # Zero-pad if version like 1.4 or just 2
+    # Like 1.4a: subtract 1 and add fractions to last number to make < 1.4
+    if re.findall("\d+([\D]+)$", v):
+        ords = map(ord, re.findall("\d+([\D]+)$", v)[0])
+        nums[0] += sum(x / (65536. ** (i + 1)) for i, x in enumerate(ords)) - 1
+    return sum((x * 100 ** i) for i, x in enumerate(nums))
 
 
 class FeedbackDialog(wx.Dialog):

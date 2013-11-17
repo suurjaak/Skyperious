@@ -55,7 +55,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    22.09.2013
+@modified    11.11.2013
 ------------------------------------------------------------------------------
 """
 import collections
@@ -97,7 +97,7 @@ class BusyPanel(wx.Window):
         self.CenterOnParent()
         self.Show()
         parent.Refresh()
-        wx.GetApp().Yield(True) # Allow display to refresh
+        wx.YieldIfNeeded()
 
 
     def Close(self):
@@ -165,6 +165,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         self._press = False # Whether button is being mouse pressed
         self._align = style & (wx.ALIGN_RIGHT | wx.ALIGN_CENTER)
         self._enabled = True
+        self._size = self.Size
 
         # Wrapped texts for both label and note
         self._text_label = None
@@ -210,9 +211,6 @@ class NoteButton(wx.PyPanel, wx.Button):
             h1 = 10 + self._bmp.Size.height + 10
             h2 = 10 + self._extent_label[1] + 10 + self._extent_note[1] + 10
             h  = max(h1, h2)
-            w1 = 10 + self._bmp.Size.width + 10 + self._extent_label[0] + 10
-            w2 = 10 + self._bmp.Size.width + 10 + self._extent_note[0] + 10
-            w  = max(w1, w2)
         size = wx.Size(w, h)
         return size
 
@@ -344,7 +342,9 @@ class NoteButton(wx.PyPanel, wx.Button):
 
     def OnSize(self, event):
         """Handler for size event, resizes texts and repaints control."""
-        wx.CallAfter(lambda: (self and (self.WrapTexts(), self.Refresh())))
+        if event.Size != self._size:
+            self._size = event.Size
+            wx.CallAfter(lambda: (self and (self.WrapTexts(), self.InvalidateBestSize())))
         event.Skip()
 
 
@@ -1993,6 +1993,10 @@ class SearchableStyledTextCtrl(wx.PyPanel):
             b.SetBottomEndColour    (self.BUTTON_BGCOLOUR_BOTTOM)
             b.SetPressedTopColour   (self.BUTTON_BGCOLOUR_MIDDLE)
             b.SetPressedBottomColour(self.BUTTON_BGCOLOUR_BOTTOM)
+        # Linux tweak: as GradientButtons get their background from their
+        # parent, and backgrounds might not propagate well through the window
+        # hierarchy, set the parent background to a guaranteed proper one.
+        panel.BackgroundColour = self._label_search.BackgroundColour
 
         self._cb_case = wx.CheckBox(parent=panel, label=self.CB_CASE_LABEL)
         self._cb_wholeword = wx.CheckBox(

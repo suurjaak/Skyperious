@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.09.2013
+@modified    16.11.2013
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -153,15 +153,14 @@ class SkypeDatabase(object):
                                               check_same_thread=False)
             self.connection.row_factory = self.row_factory
             self.connection.text_factory = str
-            rows = self.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type = 'table'"
-            ).fetchall()
+            rows = self.execute("SELECT name, sql FROM sqlite_master "
+                                "WHERE type = 'table'").fetchall()
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception, e:
             if log_error:
-                main.log("Error opening database %s.\n\n%s.", filename,
-                         traceback.format_exc())
+                main.log("Error opening database %s.\n\n%s",
+                         filename, traceback.format_exc())
             self.close()
             raise
 
@@ -173,9 +172,8 @@ class SkypeDatabase(object):
             self.id = self.account["skypename"]
         except Exception, e:
             if log_error:
-                main.log("Error getting account information from %s (%s).",
-                    filename, e
-                )
+                main.log("Error getting account information from %s.\n\n%s",
+                         filename, traceback.format_exc())
 
 
     def __str__(self):
@@ -183,11 +181,78 @@ class SkypeDatabase(object):
             return self.filename
 
 
+    def check_integrity(self):
+        """Checks SQLite database integrity, returning a list of errors."""
+        result = []
+        rows = self.execute("PRAGMA integrity_check").fetchall()
+        if len(rows) != 1 or "ok" != rows[0]["integrity_check"].lower():
+            result = [r["integrity_check"] for r in rows]
+        return result
+
+
+    def recover_data(self, filename):
+        """
+        Recovers as much data from this database to a new database as possible.
+        
+        @return  a list of encountered errors, if any
+        """
+        result = []
+        with open(filename, "w") as _: pass # Truncate file
+        self.execute("ATTACH DATABASE ? AS new", (filename, ))
+        # Create structure for all tables
+        for t in filter(lambda x: x.get("sql"), self.tables_list):
+            if t["name"].lower().startswith("sqlite_"): continue # Internal use
+            sql  = t["sql"].replace("CREATE TABLE ", "CREATE TABLE new.")
+            self.execute(sql)
+        # Copy data from all tables
+        for t in filter(lambda x: x.get("sql"), self.tables_list):
+            if t["name"].lower().startswith("sqlite_"): continue # Internal use
+            sql = "INSERT INTO new.%(name)s SELECT * FROM main.%(name)s" % t
+            try:
+                self.execute(sql)
+            except Exception as e:
+                result.append(repr(e))
+                main.log("Error copying table %s from %s to %s.\n\n%s",
+                         t["name"], self.filename, filename,
+                         traceback.format_exc())
+        # Create indexes
+        indexes = []
+        try:
+            sql = "SELECT * FROM sqlite_master WHERE TYPE = ?"
+            indexes = self.execute(sql, ("index", )).fetchall()
+        except Exception as e:
+            result.append(repr(e))
+            main.log("Error getting indexes from %s.\n\n%s",
+                     self.filename, traceback.format_exc())
+        for i in filter(lambda x: x.get("sql"), indexes):
+            sql  = i["sql"].replace("CREATE INDEX ", "CREATE INDEX new.")
+            try:
+                self.execute(sql)
+            except Exception as e:
+                result.append(repr(e))
+                main.log("Error creating index %s for %s.\n\n%s",
+                         i["name"], filename, traceback.format_exc())
+        self.execute("DETACH DATABASE new")
+        return result
+
+
     def clear_cache(self):
         """Clears all the currently cached rows."""
         self.table_rows.clear()
         self.table_objects.clear()
         self.get_tables(True)
+
+
+    def update_accountinfo(self):
+        """Refreshes Skype account information."""
+        try:
+            self.account = self.execute("SELECT *, "
+                "COALESCE(fullname, displayname, skypename, '') AS name, "
+                "skypename AS identity FROM accounts LIMIT 1").fetchone()
+            self.id = self.account["skypename"]
+        except Exception, e:
+            main.log("Error getting account information from %s.\n\n%s",
+                     filename, traceback.format_exc())
 
 
     def register_consumer(self, consumer):
@@ -345,6 +410,68 @@ class SkypeDatabase(object):
                 self.tables_list = tables_list
 
         return self.tables_list
+
+
+    def get_general_statistics(self, full=True):
+        """
+        Get up-to-date general statistics raw from the database.
+
+        @param   full  whether to return full statistics, or only tables
+                       and last chat
+        """
+        result = collections.defaultdict(str)
+        if self.account:
+            result.update({"name": self.account.get("name"),
+                           "skypename": self.account.get("skypename")})
+        for k, table in [("chats", "Conversations"), ("messages", "Messages"),
+                       ("contacts", "Contacts"), ("transfers", "Transfers")]:
+            res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
+            result[k] = next(res, {}).get("count")
+
+        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
+            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
+            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
+            "WHERE m.type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68) "
+            "ORDER BY m.timestamp DESC LIMIT 1")
+        msg_last = next(res, None)
+        if msg_last:
+            if msg_last.get("timestamp"):
+                dt = datetime.datetime.fromtimestamp(msg_last["timestamp"])
+                result["lastmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
+            result["lastmessage_from"] = msg_last["from_dispname"]
+            result["lastmessage_skypename"] = msg_last["author"]
+            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_last["chat_type"]
+                     else "chat with %s") % msg_last["chat_title"]
+            result["lastmessage_chat"] = title
+            result["lastmessage_chattype"] = msg_last["chat_type"]
+        if not full:
+            return result
+
+        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
+            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
+            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
+            "WHERE m.type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68) "
+            "ORDER BY m.timestamp ASC LIMIT 1")
+        msg_first = next(res, None)
+        if msg_first:
+            if msg_first.get("timestamp"):
+                dt = datetime.datetime.fromtimestamp(msg_first["timestamp"])
+                result["firstmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
+            result["firstmessage_from"] = msg_first["from_dispname"]
+            result["firstmessage_skypename"] = msg_first["author"]
+            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_first["chat_type"]
+                     else "chat with %s") % msg_first["chat_title"]
+            result["firstmessage_chat"] = title
+            result["firstmessage_chattype"] = msg_first["chat_type"]
+
+        for i in range(2):
+            row = self.execute("SELECT COUNT(*) AS count FROM Messages "
+                "WHERE author %s= :skypename AND "
+                "type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68)"
+                % "!="[i], result).fetchone()
+            result["messages_" + ("to", "from")[i]] = row["count"]
+
+        return result
 
 
     def get_messages(self, chat=None, ascending=True,
@@ -862,16 +989,14 @@ class SkypeDatabase(object):
     def save_unsaved_grids(self):
         """Saves all data in unsaved grids."""
         for table, grid_data in self.table_grids.items():
-            if grid_data.IsChanged():
-                grid_data.SaveChanges()
+            grid_data.SaveChanges() if grid_data.IsChanged() else None
 
 
     def update_fileinfo(self):
         """Updates database file size and modification information."""
         self.filesize = os.path.getsize(self.filename)
-        self.last_modified = datetime.datetime.fromtimestamp(
-            os.path.getmtime(self.filename)
-        )
+        mod_timestamp = os.path.getmtime(self.filename)
+        self.last_modified = datetime.datetime.fromtimestamp(mod_timestamp)
 
 
     def ensure_backup(self):
@@ -1555,9 +1680,10 @@ class TableBase(wx.grid.PyGridTableBase):
             for n in ["newblob", "defaultblob",
             "row_changedblob", "cell_changedblob"]:
                 self.attrs[n].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
+        # Sanity check, UI controls can still be referring to a previous table
+        col = min(col, len(self.columns) - 1)
 
         blob = "blob" if (self.columns[col]["type"].lower() == "blob") else ""
-
         attr = self.attrs["default%s" % blob]
         if row < len(self.rows_current):
             if self.rows_current[row]["__changed__"]:
@@ -1824,7 +1950,10 @@ class MessageParser(object):
     REPLACE_ENTITIES = { "&apos;": "'" }
 
     """Regex for checking if string ends with any HTML entity, like "&lt;"."""
-    ENTITY_CHECK_RGX = re.compile(".*(&[#\\w]{2,};)$")
+    ENTITY_CHECKBEHIND_RGX = re.compile(".*(&[#\\w]{2,};)$")
+
+    """Regex for checking if string starts with any HTML entity, like "&lt;"."""
+    ENTITY_CHECKAHEAD_RGX = re.compile("^(&[#\\w]{2,};).*")
 
     """Regex for replacing raw emoticon texts with emoticon tags."""
     EMOTICON_RGX = re.compile("(%s)" % "|".join(
@@ -1844,20 +1973,25 @@ class MessageParser(object):
 
     """
     Replacer callback for raw emoticon text. Must check whether the preceding
-    text up to the first emoticon char is not an HTML entity, e.g. "(&lt;)",
-    and whether emoticon start and preceding text or emoticon end and
-    following text is not alphanumeric.
+    text up to the first or following text from the last emoticon char is not
+    an HTML entity, e.g. "(&lt;)" or ":&quot;", and whether emoticon start and
+    preceding text or emoticon end and following text is not alphanumeric.
     """
     EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
         (emoticons.EmoticonStrings[m.group(1)], m.group(1))
         if m.group(1) in emoticons.EmoticonStrings
-        and (m.group(1)[:1] != ";"
-             or not MessageParser.ENTITY_CHECK_RGX.match(
+        and (m.group(1)[:1] != ";" # Check HTML entity end, like '&lt;('
+             or not MessageParser.ENTITY_CHECKBEHIND_RGX.match(
                 m.string[max(0, m.start(1) - 7):m.start(1) + 1]))
+        and (m.group(1)[-1:] != "&" # Check for HTML entity start, like ':&gt;'
+             or not MessageParser.ENTITY_CHECKAHEAD_RGX.match(
+                m.string[m.end(1) - 1:m.end(1) + 5]))
         and (m.group(1)[:1] not in string.ascii_letters
+             # Letter at start: check for not being the end a word, like 'max('
              or MessageParser.EMOTICON_CHECKBEHIND_RGX.match(
                 m.string[max(0, m.start(1) - 16):m.start(1)]))
         and (m.group(1)[-1:] not in string.ascii_letters
+             # Letter at end: check for not being the start a word, like ':psi'
              or MessageParser.EMOTICON_CHECKAHEAD_RGX.match(
                 m.string[m.start(1) + len(m.group(1)):m.start(1) + 32]))
         else m.group(1))
@@ -2297,7 +2431,7 @@ class MessageParser(object):
                 self.stats["counts"][author]["smses"] += 1
                 self.stats["counts"][author]["smschars"] += \
                     len(self.stats["last_message"])
-            if MESSAGES_TYPE_CALL == m["type"]:
+            elif MESSAGES_TYPE_CALL == m["type"]:
                 self.stats["calls"] += 1
                 self.stats["counts"][author]["calls"] += 1
                 if not call_durations and "__call_durations" in m:

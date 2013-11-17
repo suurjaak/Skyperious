@@ -1292,7 +1292,7 @@ import conf
 <font size="2" face="Tahoma">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
 <img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
-<b>{{conf.Title}} version {{conf.Version}}</b>, released {{conf.VersionDate}}.<br /><br />
+<b>{{conf.Title}} version {{conf.Version}}</b>, {{conf.VersionDate}}.<br /><br />
 
 {{conf.Title}} is written in Python, released as free open source software
 under the MIT License.
@@ -1306,20 +1306,20 @@ under the MIT License.
 
 {{conf.Title}} has been built using the following open source software:
 <ul>
-  <li>wxPython 2.9.4, <a href="http://wxpython.org">wxpython.org</a></li>
-  <li>BeautifulSoup 3.2.1, <a href="http://crummy.com/software/BeautifulSoup">
-      crummy.com/software/BeautifulSoup</a></li>
+  <li>wxPython 2.9.5, <a href="http://wxpython.org">wxpython.org</a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
   <li>pyparsing 2.0.1,
       <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
+  <li>XlsxWriter 0.4.8, <a href="https://github.com/jmcnamara/XlsxWriter">
+          github.com/jmcnamara/XlsxWriter</a></li>
   <li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">
       pypi.python.org/pypi/python-dateutil</a></li>
   <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
       github.com/awahlig/skype4py</a></li>
 %if getattr(sys, 'frozen', False):
   <li>Python 2.7.5, <a href="http://www.python.org">www.python.org</a></li>
-  <li>PyInstaller 2.0, <a href="http://www.pyinstaller.org">
+  <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">
       www.pyinstaller.org</a></li>
 %endif
 </ul><br /><br /><br />
@@ -1370,7 +1370,7 @@ import conf
         <a href="page:tables"><img src="memory:HelpTables.png" /></a>
       </td><td width="10"></td><td valign="center">
         Browse, filter and change database tables,<br />
-        export as HTML, SQL INSERT-statements or CSV.
+        export as HTML, SQL INSERT-statements or spreadsheet.
       </td></tr><tr><td nowrap align="center">
         <a href="page:tables"><b><font color="black">Data tables</font></b></a><br />
     </td></tr></table>
@@ -1384,7 +1384,7 @@ import conf
         Read Skype chats,
         view statistics and word clouds, <br />
         filter by content, date or author,<br />
-        export as HTML, TXT or CSV.
+        export as HTML, TXT or spreadsheet.
       </td></tr><tr><td nowrap align="center">
         <a href="page:chats"><b><font color="black">Chats</font></b></a><br />
     </td></tr></table>
@@ -1394,7 +1394,7 @@ import conf
         <a href="page:sql"><img src="memory:HelpSQL.png" /></a>
       </td><td width="10"></td><td valign="center">
         Make direct SQL queries in the database,<br />
-        export results as HTML or CSV.
+        export results as HTML or spreadsheet.
       </td></tr><tr><td nowrap align="center">
         <a href="page:sql"><b><font color="black">SQL window</font></b></a><br />
     </td></tr></table>
@@ -1405,7 +1405,9 @@ import conf
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:info"><img src="memory:HelpInfo.png" /></a>
       </td><td width="10"></td><td valign="center">
-        See information about the Skype account in this file.
+        See information about the Skype account in this file,<br />
+        view general database statistics,<br />
+        check database integrity for corruption and recovery.
       </td></tr><tr><td nowrap align="center">
         <a href="page:info"><b><font color="black">Information</font></b></a>
     </td></tr></table>
@@ -1575,9 +1577,10 @@ import conf
     </td>
     <td bgcolor="white">
       <br /><br />
-      When performing search on all columns of all database tables, use the keyword
-      <font color="#006600"><code>table:name</code></font> to constrain results
-      to specific tables only.<br /><br />
+      When performing search on all columns of all database tables
+      (the fourth option on the search toolbar),
+      use the keyword <font color="#006600"><code>table:name</code></font>
+      to constrain results to specific tables only.<br /><br />
       Search from more than one table by adding more
       <font color="#006600"><code>table:</code></font> keywords, or exclude certain
       tables by adding a <font color="#006600"><code>-table:</code></font> keyword.

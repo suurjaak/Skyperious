@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    13.09.2013
+@modified    02.11.2013
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -83,7 +83,7 @@ class WorkerThread(threading.Thread):
 
     def yield_ui(self):
         """Allows UI to respond to user input."""
-        try: wx.SafeYield()
+        try: wx.YieldIfNeeded()
         except: pass
 
 

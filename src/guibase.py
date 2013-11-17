@@ -4,7 +4,7 @@ GUI frame templates.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    15.09.2013
+@modified    16.11.2013
 """
 import os
 import wx
@@ -194,14 +194,15 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
                 wx.EVT_CLOSE,
                 lambda e: (
                     e.Skip(),
-                    self.menu_inspect.SetText("Show &widget inspector")
+                    hasattr(self, "menu_inspect")
+                    and self.menu_inspect.SetText("Show &widget inspector")
                 )
             )
         else:
             self.widget_inspector._frame.Close()
-        self.menu_inspect.Text = "%s &widget inspector" % (
-            "Hide" if visible else "Show"
-        )
+        if hasattr(self, "menu_inspect"):
+            self.menu_inspect.Text = "%s &widget inspector" % \
+                                     ("Hide" if visible else "Show")
 
 
     def on_recent_file(self, event):
