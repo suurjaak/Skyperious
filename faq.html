@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Skyperious | Frequently Asked Questions</title>
+    
+    <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-30919338-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Skyperious</h1>
+        <p>Skype SQLite database viewer and merger</p>
+        <p class="view">
+          <a href="index.html">Index</a><br />
+          <a href="downloads.html">Downloads</a><br />
+          <a href="screens.html">Screenshots</a><br />
+          <a href="faq.html">FAQ</a><br />
+          <a href="changelog.html">Changelog</a><br />
+          <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
+        </p>
+        <ul>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3-src.zip">Download <strong>Source</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h2>Frequently Asked Questions</h2>
+
+        <ul>
+          <li><a href="#q01">Can I merge chat history from another operating system?</a></li>
+          <li><a href="#q02">How do I synchronize chat history between different computers?</a></li>
+          <li><a href="#q03">Can I use Skyperious on OS X?</a></li>
+          <li><a href="#q04">Is there any way to keep chat history in sync automatically on all my devices?</a></li>
+          <li><a href="#q05">Can I restore messages from *.dbb files that I have from an older computer?</a></li>
+          <li><a href="#q06">Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</a></li>
+          <li><a href="#q07">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
+          <li><a href="#q08">Why does the database file size remain the same after deleting something?</a></li>
+        </ul>
+        <br />
+        <hr />
+
+
+        <h3><a name="q01"></a>Can I merge chat history from another operating system?</h3>
+        <p>
+          Yes, the .db files are the same on all platforms: Windows, OS X, Linux,
+          Android and iOS.
+        </p>
+        <br />
+
+
+        <h3><a name="q02"></a>How do I synchronize chat history between different computers?</h3>
+        <p>
+          You will need to get their Skype files onto one computer, merge them
+          there, and copy the resulting file back.<br />
+          Select one database on Skyperious main screen, click "Compare and merge" and
+          choose the second database. In the comparison tab, click "Scan differences
+          between left and right". Scanning will take some time, as it has to go
+          through every chat in either database and compare all messages. Once ready,
+          you can see an overview of the differences in chats and contacts, and
+          choose to merge them into either database.<br />
+          Afterwards, copy the updated file back to its Skype folder.<br />
+          <br />
+          <b>!</b> The databases should belong to the same Skype account.<br />
+          <br />
+          <b>!</b> Shut down Skype before starting, if one of the files is
+          currently used by Skype.
+        </p>
+        <br />
+
+
+        <h3><a name="q03"></a>Can I use Skyperious on OS X?</h3>
+        <p>
+          Yes, in source code form. You will need to install a number of required packages.
+          Here is an example of doing this with <a href="http://brew.sh/">Homebrew</a>:
+
+          <ul>
+          <li>install Homebrew</li>
+          <li>install Python: open a terminal and run &nbsp;<code>brew install python</code></li>
+          <li>run &nbsp;<code>brew install PIL</code> (or &nbsp;<code>brew install Pillow</code>)</li>
+          <li>install wxPython 2.9 (or 2.8), with a suitable binary from <a href="http://wxpython.org/download.php">wxpython.org/download.php</a></li>
+          </ul>
+
+          The following packages are not strictly required,
+          but provide additional functionality like Excel export or contact import:
+          <ul>
+          <li><code>brew install XlsxWriter</code></li>
+          <li><code>brew install Skype4Py</code></li>
+          <li><code>brew install python-dateutil</code></li>
+          </ul>
+
+          Download and extract the Skyperious source, and launch &nbsp;<code>skyperious.sh</code>.
+          Or open a terminal in the extracted source directory and run
+          &nbsp;<code>python src\main.py</code>.
+        </p>
+        <br />
+
+
+        <h3><a name="q04"></a>Is there any way to keep chat history in sync automatically on all my devices?</h3>
+        <p>
+          Not really. If one of the devices is logged in all the time, it
+          will keep the others in sync - mostly, but not always.<br />
+          <br />
+          Merging the databases from time to time seems the simplest option.
+        </p>
+        <br />
+
+
+        <h3><a name="q05"></a>Can I restore messages from *.dbb files that I have from an older computer?</h3>
+        <p>
+          Not directly, Skyperious does not work with *.dbb files. It is an old proprietary format
+          that was in use prior to Skype version 4. However, Skype can automatically convert them 
+          to the current format. Try the following:<br />
+          <ul>
+          <li>shut down Skype</li>
+          <li>move your current Skype account folder elsewhere (for example, on Windows 7,
+              it is C:\Users\username\AppData\Roaming\Skype\skypename)</li>
+          <li>copy the older Skype account folder contents to the current Skype folder</li>
+          <li>launch Skype and log in to your account - this should convert the .dbb
+              files to a main.db file</li>
+          <li>shut down Skype</li>
+          <li>copy the new main.db elsewhere and restore the original Skype folder</li>
+          </ul>
+        </p>
+        <br />
+
+
+        <h3><a name="q06"></a>Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</h3>
+        <p>
+          No, it only works with Skype.
+        </p>
+        <br />
+
+
+        <h3><a name="q07"></a>Why are non-English letters like &Aring; not visible in CSV export?</h3>
+        <p>
+          CSV by specification does not support non-ASCII letters, so they get
+          converted to question marks. Export to an Excel spreadsheet will keep all characters.
+        </p>
+        <br />
+
+
+        <h3><a name="q08"></a>Why does the database file size remain the same after deleting something?</h3>
+        <p>
+          SQLite usually wipes the deleted data clean instead of rebuilding the file
+          on each change. If you still want the file size to go down immediately,
+          execute <code>VACUUM</code> in SQL window. 
+        </p>
+        <br />
+
+        <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+        <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+        <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+
+
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/suurjaak">Erki Suurjaak</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
