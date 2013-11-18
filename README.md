@@ -8,16 +8,13 @@ You can open local Skype SQLite databases and look at their contents:
 - search across all messages and contacts
 - browse chat history and export as HTML, see chat statistics
 - import contacts from a CSV file to your Skype contacts
-- view any database table and export their data
+- view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
-
-You can also compare two Skype databases, scan for differences in chats and 
-contacts, and copy them from one database to another. As Skype uses local files
-to store conversation history, older messages tend to be lost when computers
-get upgraded or changed; and message history can even differ on currently
-active computers. Skyperious can restore the missing conversations into your
-current message database.
+and
+- synchronize messages in two Skype databases: keep chat history up-to-date on
+  different computers, or restore missing messages from older files into the
+  current one
 
 Additionally, Skyperious doubles as a useful database browser for any SQLite file.
 
@@ -45,7 +42,7 @@ copy specific chats and contacts.
 
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
 Ubuntu Linux, and reported to work under OS X. In source code form, it
-should work wherever Python and the required Python packages are installed.
+should run wherever Python and the required Python packages are installed.
 
 If running from source code, launch skyperious.bat under Windows,
 or skyperious.sh where shell scripts are supported,
@@ -61,13 +58,13 @@ If running from source code, Skyperious needs Python 2.6+ and the following
 * Python Imaging Library, required by wxPython
   (http://www.pythonware.com/products/pil/)
 
-The following 3rd-party Python packages are used for convenient date period
-choices in chat history, for importing contacts, and for Excel workbook export,
-but are not strictly required:
+The following 3rd-party Python packages are not strictly required,
+but provide additional functionality like Excel export,
+contact import, and convenient date period choices in chat history:
 
-* dateutil (http://pypi.python.org/pypi/python-dateutil)
-* Skype4Py (https://github.com/awahlig/skype4py)
 * XlsxWriter (https://github.com/jmcnamara/XlsxWriter)
+* Skype4Py (https://github.com/awahlig/skype4py)
+* dateutil (http://pypi.python.org/pypi/python-dateutil)
 
 Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
 Python 3 is not supported.
