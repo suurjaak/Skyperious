@@ -50,138 +50,138 @@
 
         <h4>v2.3, 2013-11-17:</h4>
         <ul>
-          <li>added Excel export;</li>
-          <li>added option to export multiple chats to a single Excel workbook;</li>
-          <li>added database corruption detection and recovery;</li>
-          <li>added more statistics to database information page;</li>
-          <li>fixed exporting from MSN Live accounts;</li>
-          <li>fixed handling file transfer messages with unsupported filenames;</li>
-          <li>fixed concurrency errors during merging;</li>
-          <li>improved emoticon parsing;</li>
-          <li>improved Linux compatibility;</li>
-          <li>a number of minor bugfixes and UI changes;</li>
-          <li>increased error reporting;</li>
-          <li>upgraded wxPython from 2.9.4 to 2.9.5;</li>
-          <li>upgraded PyInstaller from 2.0 to 2.1;</li>
-          <li>dropped BeautifulSoup dependency.</li>
+          <li>added Excel export</li>
+          <li>added option to export multiple chats to a single Excel workbook</li>
+          <li>added database corruption detection and recovery</li>
+          <li>added more statistics to database information page</li>
+          <li>fixed exporting from MSN Live accounts</li>
+          <li>fixed handling file transfer messages with unsupported filenames</li>
+          <li>fixed concurrency errors during merging (issue #11)</li>
+          <li>improved emoticon parsing</li>
+          <li>improved Linux compatibility</li>
+          <li>a number of minor bugfixes and UI changes</li>
+          <li>increased error reporting</li>
+          <li>upgraded wxPython from 2.9.4 to 2.9.5</li>
+          <li>upgraded PyInstaller from 2.0 to 2.1</li>
+          <li>dropped BeautifulSoup dependency</li>
         </ul>
         <br />
 
         <h4>v2.2, 2013-09-25:</h4>
         <ul>
-          <li>fixed errors in exporting larger chats as HTML (issue #10);</li>
-          <li>fixed an error in exporting selected database chats (issue #9);</li>
-          <li>improved parsing exotic emoticons;</li>
-          <li>made SQL editor auto-complete drop-down disappear on deleting text;</li>
-          <li>tweak to disable dragging in database list;</li>
-          <li>improved error reporting on export.</li>
+          <li>fixed errors in exporting larger chats as HTML (issue #10)</li>
+          <li>fixed an error in exporting selected database chats (issue #9)</li>
+          <li>improved parsing exotic emoticons</li>
+          <li>made SQL editor auto-complete drop-down disappear on deleting text</li>
+          <li>tweak to disable dragging in database list</li>
+          <li>improved error reporting on export</li>
         </ul>
         <br />
 
         <h4>v2.1.2, 2013-09-20:</h4>
         <ul>
-          <li>Fixed bugs on error reporting (issue #9);</li>
-          <li>fixed an annoyance with SQL window auto-complete popup remaining on top of other windows;</li>
-          <li>minor UI tweaks.</li>
+          <li>Fixed bugs on error reporting (issue #9)</li>
+          <li>fixed an annoyance with SQL window auto-complete popup remaining on top of other windows</li>
+          <li>minor UI tweaks</li>
         </ul>
         <br />
 
         <h4>v2.1.1, 2013-09-19:</h4>
         <ul>
-          <li>fixed a bug in merging large chats.</li>
+          <li>fixed a bug in merging large chats</li>
         </ul>
         <br />
 
         <h4>v2.1, 2013-09-18:</h4>
         <ul>
-          <li>support for exporting and comparing very large chats;</li>
-          <li>fixed errors on selecting chat participants in chat history;</li>
-          <li>fixed errors for chats with empty names;</li>
-          <li>fixed data grids freezing if moving mouse over certain BLOB fields;</li>
-          <li>added partner skypename to chat lists' People column for 1:1 chats;</li>
-          <li>started remembering last active page in database tabs;</li>
-          <li>improved exporting binary data as SQL from database tables;</li>
-          <li>improved wxMac compatibility.</li>
+          <li>support for exporting and comparing very large chats</li>
+          <li>fixed errors on selecting chat participants in chat history</li>
+          <li>fixed errors for chats with empty names</li>
+          <li>fixed data grids freezing if moving mouse over certain BLOB fields</li>
+          <li>added partner skypename to chat lists' People column for 1:1 chats</li>
+          <li>started remembering last active page in database tabs</li>
+          <li>improved exporting binary data as SQL from database tables</li>
+          <li>improved wxMac compatibility</li>
         </ul>
         <br />
 
         <h4>v2.0, 2013-09-08:</h4>
         <ul>
-          <li>added a Google-like query syntax to message search;</li>
-          <li>redesigned application front page as a separate list and detail view;</li>
-          <li>redesigned "Merge all" page, added progress bars, set as first in merge tab;</li>
-          <li>fixed memory problems on comparing very large databases;</li>
-          <li>added auto-complete and drop-down history to search;</li>
-          <li>added option for searching over all database tables;</li>
-          <li>added date:from..to keyword to search syntax;</li>
-          <li>added option to exclude search results with -"dash in front";</li>
-          <li>started remembering last search results on reopening database;</li>
-          <li>set search as the first page in database tab;</li>
-          <li>added welcome text and detailed search help to database tab;</li>
-          <li>added message edited/removed flags to HTML export;</li>
-          <li>started showing "/me" messages;</li>
-          <li>started using * as a wildcard in search queries;</li>
-          <li>highlighted wildcard matches in search results;</li>
-          <li>added skypenames to repeating new contact names in merge results;</li>
-          <li>added number of contact groups to merge results list;</li>
-          <li>added recognizing PRAGMA and EXPLAIN queries in SQL window;</li>
-          <li>fixed merging all file transfers;</li>
-          <li>fixed showing "Removed X from this conversation" messages;</li>
-          <li>started escaping SQLite wildcards % and _ in search;</li>
-          <li>improved accessing corrupt SQLite databases;</li>
-          <li>update check scheduled to run in the background;</li>
-          <li>removed single instance functionality as unnecessary;</li>
-          <li>improved message parsing;</li>
-          <li>improved Linux and wx 2.8 compatibility;</li>
-          <li>moved third-party libraries to separate directory.</li>
+          <li>added a Google-like query syntax to message search</li>
+          <li>redesigned application front page as a separate list and detail view</li>
+          <li>redesigned "Merge all" page, added progress bars, set as first in merge tab</li>
+          <li>fixed memory problems on comparing very large databases</li>
+          <li>added auto-complete and drop-down history to search</li>
+          <li>added option for searching over all database tables</li>
+          <li>added date:from..to keyword to search syntax</li>
+          <li>added option to exclude search results with -"dash in front"</li>
+          <li>started remembering last search results on reopening database</li>
+          <li>set search as the first page in database tab</li>
+          <li>added welcome text and detailed search help to database tab</li>
+          <li>added message edited/removed flags to HTML export</li>
+          <li>started showing "/me" messages</li>
+          <li>started using * as a wildcard in search queries</li>
+          <li>highlighted wildcard matches in search results</li>
+          <li>added skypenames to repeating new contact names in merge results</li>
+          <li>added number of contact groups to merge results list</li>
+          <li>added recognizing PRAGMA and EXPLAIN queries in SQL window</li>
+          <li>fixed merging all file transfers</li>
+          <li>fixed showing "Removed X from this conversation" messages</li>
+          <li>started escaping SQLite wildcards % and _ in search</li>
+          <li>improved accessing corrupt SQLite databases</li>
+          <li>update check scheduled to run in the background</li>
+          <li>removed single instance functionality as unnecessary</li>
+          <li>improved message parsing</li>
+          <li>improved Linux and wx 2.8 compatibility</li>
+          <li>moved third-party libraries to separate directory</li>
         </ul>
         <br />
 
         <h4>v1.5.1, 2013-06-21:</h4>
         <ul>
-          <li>fixed showing Facebook/MSN avatar images in chat HTML export;</li>
-          <li>not showing author name for consecutive messages in chat HTML export;</li>
-          <li>emoticon texts shown transparently over icon in chat HTML export;</li>
-          <li>fixed message times in chat HTML/TXT export (was showing hour:second);</li>
-          <li>improved message and emoticon parsing;</li>
-          <li>fixed wrong items shown in file transfers under chat statistics;</li>
-          <li>minor changes in UI layout and logic.</li>
+          <li>fixed showing Facebook/MSN avatar images in chat HTML export</li>
+          <li>not showing author name for consecutive messages in chat HTML export</li>
+          <li>emoticon texts shown transparently over icon in chat HTML export</li>
+          <li>fixed message times in chat HTML/TXT export (was showing hour:second)</li>
+          <li>improved message and emoticon parsing</li>
+          <li>fixed wrong items shown in file transfers under chat statistics</li>
+          <li>minor changes in UI layout and logic</li>
         </ul>
         <br />
 
         <h4>v1.5, 2013-06-17:</h4>
         <ul>
-          <li>animated emoticons in HTML export;</li>
-          <li>highlight multiple word cloud items in HTML export;</li>
-          <li>install option to associate Skyperious with *.db files;</li>
-          <li>search results limit raised from 400 to 1000;</li>
-          <li>SQL window last text reloaded on opening same database;</li>
-          <li>option to hide log window;</li>
-          <li>improved support for Python 2.6 + wx 2.8;</li>
-          <li>dateutil and Skype4Py modules included optionally when running from source;</li>
-          <li>fixed issues with formatting emoticons in older message texts;</li>
-          <li>fixed opening corrupt SQLite databases;</li>
-          <li>fixed word cloud calculation failing under certain odds;</li>
-          <li>fixed bug with disabling multiple instances;</li>
-          <li>moved source files under src/.</li>
+          <li>animated emoticons in HTML export</li>
+          <li>highlight multiple word cloud items in HTML export</li>
+          <li>install option to associate Skyperious with *.db files</li>
+          <li>search results limit raised from 400 to 1000</li>
+          <li>SQL window last text reloaded on opening same database</li>
+          <li>option to hide log window</li>
+          <li>improved support for Python 2.6 + wx 2.8</li>
+          <li>dateutil and Skype4Py modules included optionally when running from source</li>
+          <li>fixed issues with formatting emoticons in older message texts</li>
+          <li>fixed opening corrupt SQLite databases</li>
+          <li>fixed word cloud calculation failing under certain odds</li>
+          <li>fixed bug with disabling multiple instances</li>
+          <li>moved source files under src/</li>
         </ul>
         <br />
 
         <h4>v1.4, 2013-06-09:</h4>
         <ul>
-          <li>added statistics and word cloud to chat HTML exports;</li>
-          <li>added option to export selected chats only;</li>
-          <li>added calls to chat statistics;</li>
-          <li>added support for automatic updates;</li>
-          <li>added possibility to send feedback;</li>
-          <li>added option for automatic error reporting;</li>
-          <li>statistics for chat text collected from text messages only;</li>
-          <li>rearranged program menus;</li>
-          <li>started using templates for generating content;</li>
-          <li>updated license information for used and included software;</li>
-          <li>upgraded BeautifulSoup from 3.2.0 to 3.2.1;</li>
-          <li>updated 48x48 and 64x64 icons;</li>
-          <li>multiple minor fixes and re-factorings.</li>
+          <li>added statistics and word cloud to chat HTML exports</li>
+          <li>added option to export selected chats only</li>
+          <li>added calls to chat statistics</li>
+          <li>added support for automatic updates</li>
+          <li>added possibility to send feedback</li>
+          <li>added option for automatic error reporting</li>
+          <li>statistics for chat text collected from text messages only</li>
+          <li>rearranged program menus</li>
+          <li>started using templates for generating content</li>
+          <li>updated license information for used and included software</li>
+          <li>upgraded BeautifulSoup from 3.2.0 to 3.2.1</li>
+          <li>updated 48x48 and 64x64 icons</li>
+          <li>multiple minor fixes and re-factorings</li>
         </ul>
         <br />
 
