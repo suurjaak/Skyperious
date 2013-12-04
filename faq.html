@@ -54,8 +54,9 @@
           <li><a href="#q04">Is there any way to keep chat history in sync automatically on all my devices?</a></li>
           <li><a href="#q05">Can I restore messages from *.dbb files that I have from an older computer?</a></li>
           <li><a href="#q06">Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</a></li>
-          <li><a href="#q07">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
-          <li><a href="#q08">Why does the database file size remain the same after deleting something?</a></li>
+          <li><a href="#q07">Do you plan to add support for doing X/Y/Z?</a></li>
+          <li><a href="#q08">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
+          <li><a href="#q09">Why does the database file size remain the same after deleting something?</a></li>
         </ul>
         <br />
         <hr />
@@ -152,7 +153,15 @@
         <br />
 
 
-        <h3><a name="q07"></a>Why are non-English letters like &Aring; not visible in CSV export?</h3>
+        <h3><a name="q07"></a>Do you plan to add support for doing X/Y/Z?</h3>
+        <p>
+          I might add the support, if the requested functionality seems useful, 
+          and more people write to ask for it.
+        </p>
+        <br />
+
+
+        <h3><a name="q08"></a>Why are non-English letters like &Aring; not visible in CSV export?</h3>
         <p>
           CSV by specification does not support non-ASCII letters, so they get
           converted to question marks. Export to an Excel spreadsheet will keep all characters.
@@ -160,13 +169,14 @@
         <br />
 
 
-        <h3><a name="q08"></a>Why does the database file size remain the same after deleting something?</h3>
+        <h3><a name="q09"></a>Why does the database file size remain the same after deleting something?</h3>
         <p>
           SQLite usually wipes the deleted data clean instead of rebuilding the file
           on each change. If you still want the file size to go down immediately,
           execute <code>VACUUM</code> in SQL window. 
         </p>
         <br />
+
 
         <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
         <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
