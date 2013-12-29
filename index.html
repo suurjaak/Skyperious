@@ -77,19 +77,20 @@ Once added to the database list, a file can be opened for browsing, searching
 and exporting, or compared with another database for merging.
 </p><p>
 Searching an opened database supports a simple Google-like query syntax. 
-You can use keywords to search among specific authors or chats only, or from
-certain dates only. Search supports wildcards, exact phrases, grouping,
-excluding, and either-or queries.
+You can use keywords to search among specific authors or chats only
+(<code>from:john chat:links</code>), or from certain dates only 
+(<code>date:2010..2013</code>). Search supports wildcards, exact phrases,
+grouping, excluding, and either-or queries.
 </p><p>
-In database comparison, two databases can be scanned for differences,
-and you can merge results from one to the other wholesale, or browse and
-copy specific chats and contacts.
+In database comparison, you can scan one database for messages not found in
+the other, and copy all detected messages to the other database. Or you can 
+browse and copy specific chats and contacts.
 </p>
 <br />
 <p>
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
-Ubuntu Linux, and reported to work under OS X. In source code form, it should
-run wherever Python and required Python packages are installed.
+Ubuntu Linux, and reported to work under OS X and Windows 8. In source code form,
+it should run wherever Python and required Python packages are installed.
 </p>
 
 
@@ -97,8 +98,8 @@ run wherever Python and required Python packages are installed.
 
 Skyperious has been built using the following open-source software:
 <ul>
-<li>Python 2.7.5, <a href="http://www.python.org">www.python.org</a></li>
-<li>wxPython 2.9.5, <a href="http://wxpython.org">wxpython.org</a></li>
+<li>Python 2.7.6, <a href="http://www.python.org">www.python.org</a></li>
+<li>wxPython 3.0.0, <a href="http://wxpython.org">wxpython.org</a></li>
 <li>step, Simple Template Engine for Python, <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
 <li>pyparsing 2.0.1, <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
 <li>XlsxWriter 0.4.8, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
@@ -122,7 +123,7 @@ released under the Skype Component License 1.0.</p>
 <h2>Dependencies</h2>
 
 <p>In source code form, Skyperious needs Python 2.6+ (<a href="http://www.python.org">www.python.org</a>)
-and wxPython 2.9 (<a href="http://wxpython.org/">http://wxpython.org/</a>). *</p>
+and wxPython 2.9+ (<a href="http://wxpython.org/">http://wxpython.org/</a>). *</p>
 
 The following 3rd-party Python packages are not strictly required,
 but provide additional functionality like Excel export,
@@ -142,7 +143,7 @@ contact import, and convenient date period choices in chat history:
 
 <p>(The MIT License)</p>
 
-<p>Copyright (C) 2011-2013 by Erki Suurjaak</p>
+<p>Copyright (C) 2011-2014 by Erki Suurjaak</p>
 
 <p>Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -154,13 +155,13 @@ furnished to do so, subject to the following conditions:</p>
 <p>The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.</p>
 
-<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.</p>
+<p>The software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and noninfringement. In no event shall the
+authors or copyright holders be liable for any claim, damages or other
+liability, whether in an action of contract, tort or otherwise, arising from,
+out of or in connection with the software or the use or other dealings in
+the software.</p>
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/suurjaak">Erki Suurjaak</a></p>
