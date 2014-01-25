@@ -83,15 +83,15 @@ A `vagrant up` will do the following:
 Steps for using the Vagrantfile:
 
 1. `vagrant up`
-#. A VirtuaBox window will appear
-#. Wait until `vagrant up` finishes setting up the VM
-#. Log into the console as the user 'vagrant', password 'vagrant'
-#. Run `startx -- :1`
-#. Now you are in ubuntu desktop env
-#. Open a terminal
-#. `cd /vagrant`
-#. ./skyperious.sh &`
-#. et voilà
+2. A VirtuaBox window will appear
+3. Wait until `vagrant up` finishes setting up the VM
+4. Log into the console as the user 'vagrant', password 'vagrant'
+5. Run `startx -- :1`
+6. Now you are in ubuntu desktop env
+7. Open a terminal
+8. `cd /vagrant`
+9. ./skyperious.sh &`
+10. et voilà
 
 You'd better place your skype DB files in the root of the project (where the Vagrantfile is)
 so that they are accessible within the VM in `/vagrant`.
