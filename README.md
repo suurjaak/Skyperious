@@ -90,7 +90,7 @@ Steps for using the Vagrantfile:
 6. Now you are in ubuntu desktop env
 7. Open a terminal
 8. `cd /vagrant`
-9. ./skyperious.sh &`
+9. `./skyperious.sh &`
 10. et voilà
 
 You'd better place your skype DB files in the root of the project (where the Vagrantfile is)
