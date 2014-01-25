@@ -1,0 +1,7 @@
+PIL
+Skype4Py
+XlsxWriter
+
+# The following are dependencies that are installed via aptitude
+#wxPython
+#python-dateutil
