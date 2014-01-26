@@ -24,6 +24,49 @@ Making a backup of the database file is recommended before making any changes.
 Screenshots and Windows binaries at http://suurjaak.github.com/Skyperious.
 
 
+Setup
+-----
+
+On Windows
+^^^^^^^^^^^
+
+Just download and launch the latest setup.exe from http://suurjaak.github.io/Skyperious/downloads.html.
+
+On Linux/Mac
+^^^^^^^^^^^^
+
+If you are on Ubuntu, you can run the Bash script `setup-ubuntu.sh` (needs `sudo`), which will install all the dependencies on your local system.
+
+If you are not on Ubuntu, or prefer not to install the dependencies locally, there's a Vagrantfile (see http://www.vagrantup.com) for you.
+
+Pre-requisites:
+
+- VirtualBox (https://www.virtualbox.org/wiki/Downloads)
+- Vagrant (http://www.vagrantup.com/downloads.html)
+
+A `vagrant up` will do the following:
+
+- download a default vagrant box with ubuntu precise32 (no GUI)
+- install Skyperious' dependencies
+- install ubuntu desktop environment
+
+Steps for using the Vagrantfile:
+
+1. `vagrant up`
+2. A VirtuaBox window will appear
+3. Wait until `vagrant up` finishes setting up the VM
+4. Log into the console as the user 'vagrant', password 'vagrant'
+5. Run `startx -- :1`
+6. Now you are in ubuntu desktop env
+7. Open a terminal
+8. `cd /vagrant`
+9. `./skyperious.sh &`
+10. et voilà
+
+You'd better place your skype DB files in the root of the project (where the Vagrantfile is)
+so that they are accessible within the VM in `/vagrant`.
+
+
 Using The Program
 -----------------
 
@@ -48,41 +91,6 @@ should run wherever Python and the required Python packages are installed.
 If running from source code, launch skyperious.bat under Windows,
 or skyperious.sh where shell scripts are supported,
 or execute 'python src\main.py'.
-
-
-Vagrant
--------
-
-Skyperious comes also with a Vagrantfile, which means you can run it in a local VM
-avoiding the hassle of installing its dependencies on your PC.
-
-Pre-requisites:
-
-- VirtualBox (https://www.virtualbox.org/wiki/Downloads)
-- Vagrant (http://www.vagrantup.com/downloads.html)
-
-A `vagrant up` will do the following:
-
-- download a default vagrant box with ubuntu precise32 (no GUI)
-- install Skyperious' dependencies
-- install ubuntu desktop environment
-
-
-Steps for using the Vagrantfile:
-
-1. `vagrant up`
-2. A VirtuaBox window will appear
-3. Wait until `vagrant up` finishes setting up the VM
-4. Log into the console as the user 'vagrant', password 'vagrant'
-5. Run `startx -- :1`
-6. Now you are in ubuntu desktop env
-7. Open a terminal
-8. `cd /vagrant`
-9. `./skyperious.sh &`
-10. et voilà
-
-You'd better place your skype DB files in the root of the project (where the Vagrantfile is)
-so that they are accessible within the VM in `/vagrant`.
 
 
 Dependencies
