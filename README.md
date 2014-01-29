@@ -32,7 +32,7 @@ Just download and launch the latest setup.exe from http://suurjaak.github.io/Sky
 
 ### On Linux/Mac
 
-If you are on Ubuntu, you can run the Bash script `setup-ubuntu.sh` (needs `sudo`), which will install all the dependencies on your local system.
+If you are on Ubuntu, you can run the Bash script `setup-ubuntu.sh` which can be found in the `packaging/` dir (needs `sudo`); it will install all the dependencies on your local system.
 
 If you are not on Ubuntu, or prefer not to install the dependencies locally, there's a Vagrantfile (see http://www.vagrantup.com) for you.
 
