@@ -1,0 +1,116 @@
+Skyperious 3.0
+==============
+
+Skyperious is a Skype database viewer and merger, written in Python.
+
+You can open local Skype SQLite databases and look at their contents:
+
+- search across all messages and contacts
+- browse chat history and export as HTML, see chat statistics
+- import contacts from a CSV file to your Skype contacts
+- view any database table and export their data, fix database corruption
+- change, add or delete data in any table
+- execute direct SQL queries
+and
+- synchronize messages in two Skype databases: keep chat history up-to-date on
+  different computers, or restore missing messages from older files into the
+  current one
+
+Additionally, it doubles as a useful database browser for any SQLite file.
+Also, a command line interface is available with key functions like
+exporting, searching, and merging. 
+
+Making a backup of the database file is recommended before making any changes.
+
+Screenshots and Windows binaries at http://suurjaak.github.com/Skyperious/screens.html.
+
+
+Using The Program
+-----------------
+
+Skyperious can look through user directories and detect Skype databases
+automatically, or you can select files yourself from any folder.
+A database file can be opened for browsing, searching and exporting, or
+compared with another database for merging.
+
+Searching an opened database supports a simple Google-like query syntax. 
+You can use keywords to search among specific authors or chats only
+(from:john chat:links), or from certain dates only (`date:2010..2013`).
+Search supports wildcards, exact phrases, grouping, excluding,
+and either-or queries.
+
+In database comparison, you can scan one database for messages not found in
+the other, and copy all detected messages to the other database. Or you can
+browse and copy specific chats and contacts.
+
+Skyperious offers a number of options from the command line:
+  export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
+  search "query" FILE        search Skype databases for messages or data
+  merge FILE1 FILE2          merge two or more Skype databases into a new database
+  diff FILE1 FILE2           compare chat history in two Skype databases
+  gui [FILE]                 launch Skyperious graphical program (default option)
+
+
+Skyperious has been tested under Windows 7, Windows Vista, Windows XP, and 
+reported to work under Windows 8.
+
+
+Attribution
+-----------
+
+Skyperious has been built using the following open-source software:
+- Python 2.7.6 (http://www.python.org)
+- wxPython 3.0.0 (http://www.wxpython.org)
+- Pillow 2.3.0 (https://pypi.python.org/pypi/Pillow)
+- pyparsing 2.0.1 (http://pyparsing.wikispaces.com/)
+- step, Simple Template Engine for Python (https://github.com/dotpy/step)
+- XlsxWriter 0.5.3 (https://github.com/jmcnamara/XlsxWriter)
+- dateutil 2.2, (http://pypi.python.org/pypi/python-dateutil)
+- Skype4Py, (https://github.com/awahlig/skype4py)
+- pyinstaller 2.1 (http://www.pyinstaller.org/)
+
+Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
+released under the Skype Component License 1.0.
+
+Default avatar icon from:
+  Fancy Avatars, (c) 2009 Brandon Mathis,
+  http://brandonmathis.com/projects/fancy-avatars/
+
+Several icons from:
+  Fugue Icons, (c) 2010 Yusuke Kamiyamane,
+  http://p.yusukekamiyamane.com/
+
+Includes fonts Carlito Regular and Carlito bold,
+https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
+
+Installer created with Nullsoft Scriptable Install System 3.0a2,
+http://nsis.sourceforge.net/
+
+
+License
+-------
+
+(The MIT License)
+
+Copyright (C) 2011-2014 by Erki Suurjaak
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+The software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and noninfringement. In no event shall the
+authors or copyright holders be liable for any claim, damages or other
+liability, whether in an action of contract, tort or otherwise, arising from,
+out of or in connection with the software or the use or other dealings in
+the software.
+
+
+For licenses of included libraries, see "3rd-party licenses.txt".

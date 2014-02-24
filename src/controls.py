@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
+
 Stand-alone GUI components for wx:
 
 - BusyPanel(wx.Window):
   Primitive hover panel with a message that stays in the center of parent
   window.
+
+- EntryDialog(wx.Dialog):
+  Non-modal text entry dialog with auto-complete dropdown, appears in lower
+  right corner.
 
 - NonModalOKDialog(wx.Dialog):
   A simple non-modal dialog with an OK button, stays on top of parent.
@@ -55,7 +60,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    11.11.2013
+@modified    24.02.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -72,6 +77,8 @@ import wx.lib.agw.gradientbutton
 import wx.lib.agw.shapedbutton
 import wx.lib.embeddedimage
 import wx.lib.mixins.listctrl
+import wx.lib.newevent
+import wx.lib.wordwrap
 import wx.stc
 
 
@@ -101,10 +108,12 @@ class BusyPanel(wx.Window):
 
 
     def Close(self):
-        self.Hide()
-        self.Parent.Refresh()
-        self.Destroy()
-
+        try:
+            self.Hide()
+            self.Parent.Refresh()
+            self.Destroy()
+        except Exception: pass
+        
 
 
 class NonModalOKDialog(wx.Dialog):
@@ -133,6 +142,118 @@ class NonModalOKDialog(wx.Dialog):
     def OnClose(self, event):
         self.Close()
         event.Skip()
+
+
+
+class EntryDialog(wx.Dialog):
+    """
+    Non-modal text entry dialog with auto-complete dropdown, appears in lower
+    right corner.
+    Fires a wx.EVT_COMMAND_ENTER event on pressing Enter or button.
+    """
+    HIDE_TIMEOUT = 1500 # Milliseconds to wait for hiding after losing focus
+
+    def __init__(self, parent, title, label="", value="", emptyvalue="", tooltip="", choices=[]):
+        """
+        @param   title       dialog window title
+        @param   label       label before text entry, if any
+        @param   value       default value of text entry
+        @param   emptyvalue  gray text shown in text box if empty and unfocused
+        @param   tooltip     tooltip shown for enter button
+        """
+        style = wx.CAPTION | wx.CLOSE_BOX | wx.STAY_ON_TOP
+        wx.Dialog.__init__(self, parent=parent, title=title, style=style)
+        self._hider = None # Hider callback wx.Timer
+
+        if label:
+            label_text = self._label = wx.StaticText(self, label=label)
+        text = self._text = TextCtrlAutoComplete(
+            self, description=emptyvalue, size=(200, -1),
+            style=wx.TE_PROCESS_ENTER)
+        tb = wx.ToolBar(parent=self, style=wx.TB_FLAT | wx.TB_NODIVIDER)
+
+        text.Value = value
+        text.SetChoices(choices)
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_GO_FORWARD, wx.ART_TOOLBAR,
+                                       (16, 16))
+        tb.SetToolBitmapSize(bmp.Size)
+        tb.AddLabelTool(wx.ID_FIND, "", bitmap=bmp, shortHelp=tooltip)
+        tb.Realize()
+
+        self.Bind(wx.EVT_ACTIVATE, self._OnActivate, self)
+        text.Bind(wx.EVT_KEY_DOWN, self._OnKeyDown)
+        self.Bind(wx.EVT_TEXT_ENTER, self._OnSearch, text)
+        self.Bind(wx.EVT_TOOL, self._OnSearch, id=wx.ID_FIND)
+        self.Bind(wx.EVT_LIST_DELETE_ALL_ITEMS, self._OnClearChoices, text)
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_top = wx.BoxSizer(wx.HORIZONTAL)
+        if label:
+            sizer_top.Add(label_text, flag=wx.ALIGN_CENTER_VERTICAL |
+                          wx.LEFT, border=5)
+        sizer_top.Add(text, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=5)
+        sizer_top.Add(tb, flag=wx.LEFT | wx.RIGHT |
+                      wx.ALIGN_CENTER_VERTICAL, border=5)
+        self.Sizer.Add(sizer_top, flag=wx.GROW | wx.TOP | wx.BOTTOM, border=5)
+        self.Fit()
+        x, y, w, h = wx.GetClientDisplayRect()
+        self.Position = (x + w - self.Size.width, y + h - self.Size.height)
+        self._pos_last = self.Position
+        self._displayrect_last = (x, y, w, h)
+
+
+
+    def Show(self, show=True):
+        """Shows or hides the window, and raises it if shown."""
+        if show:
+            x, y, w, h = wx.GetClientDisplayRect()
+            if (x, y, w, h) != self._displayrect_last:     # Display size has
+                self.Position = (x + w - self.Size.width,  # changed, move to
+                                 y + h - self.Size.height) # screen corner.
+                self._displayrect_last = (x, y, w, h)
+            self.Raise()
+            self._text.SetFocus()
+        wx.Dialog.Show(self, show)
+
+
+    def GetValue(self):
+        """Returns the text box value."""
+        return self._text.Value
+    def SetValue(self, value):
+        """Sets the text box value."""
+        self._text.Value = value
+    Value = property(GetValue, SetValue)
+
+
+    def SetChoices(self, choices):
+        """Sets the auto-complete choices for text box."""
+        self._text.SetChoices(choices)
+
+
+    def _OnActivate(self, event):
+        if not (event.Active or self._hider):
+            self._hider = wx.CallLater(self.HIDE_TIMEOUT, self.Hide)
+        elif event.Active and self._hider: # Kill the hiding timeout, if any
+            self._hider.Stop()
+            self._hider = None
+
+
+    def _OnKeyDown(self, event):
+        if wx.WXK_ESCAPE == event.KeyCode and not self._text.IsDropDownShown():
+            self.Hide()
+        event.Skip()
+
+
+    def _OnSearch(self, event):
+        findevent = wx.CommandEvent(wx.wxEVT_COMMAND_ENTER, self.GetId())
+        wx.PostEvent(self, findevent)
+
+
+    def _OnClearChoices(self, event):
+        choice = wx.MessageBox("Clear search history?", self.Title,
+                               wx.OK | wx.CANCEL | wx.ICON_QUESTION)
+        if wx.OK == choice:
+            self._text.SetChoices([])
 
 
 
@@ -188,16 +309,10 @@ class NoteButton(wx.PyPanel, wx.Button):
         self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
 
         self.SetCursor(self._cursor_hover)
+        fgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT)
+        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        self.ForegroundColour, self.BackgroundColour = fgcolour, bgcolour
         self.WrapTexts()
-        if not NoteButton.BMP_MARQUEE:
-            NoteButton.BMP_MARQUEE = wx.EmptyBitmap(2, 2)
-            dc_bmp = wx.MemoryDC()
-            dc_bmp.SelectObject(NoteButton.BMP_MARQUEE)
-            dc_bmp.Background = wx.Brush(self.BackgroundColour)
-            dc_bmp.Clear()
-            dc_bmp.Pen = wx.Pen(self.ForegroundColour)
-            dc_bmp.DrawPointList([(0, 1), (1, 0)])
-            dc_bmp.SelectObject(wx.NullBitmap)
 
 
     def GetMinSize(self):
@@ -212,6 +327,7 @@ class NoteButton(wx.PyPanel, wx.Button):
             h2 = 10 + self._extent_label[1] + 10 + self._extent_note[1] + 10
             h  = max(h1, h2)
         size = wx.Size(w, h)
+
         return size
 
 
@@ -236,8 +352,8 @@ class NoteButton(wx.PyPanel, wx.Button):
         if self.IsThisEnabled():
             dc.TextForeground = self.ForegroundColour
         else:
-            colour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
-            dc.TextForeground = colour
+            graycolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+            dc.TextForeground = graycolour
         dc.Pen = PEN(dc.TextForeground)
         dc.Clear()
 
@@ -302,14 +418,22 @@ class NoteButton(wx.PyPanel, wx.Button):
         dc.Font = self.Font
         dc.DrawText(self._text_note, x, y)
 
-        if is_focused or not self.Enabled:
+        if is_focused or not self.IsThisEnabled():
             # Draw simple border around button
             dc.Brush = wx.TRANSPARENT_BRUSH
-            dc.Pen = wx.BLACK_PEN if self.Enabled else wx.GREY_PEN
             dc.DrawRectangle(0, 0, width, height)
 
             # Button is focused: draw focus marquee.
             if is_focused:
+                if not NoteButton.BMP_MARQUEE:
+                    NoteButton.BMP_MARQUEE = wx.EmptyBitmap(2, 2)
+                    dc_bmp = wx.MemoryDC()
+                    dc_bmp.SelectObject(NoteButton.BMP_MARQUEE)
+                    dc_bmp.Background = wx.Brush(self.BackgroundColour)
+                    dc_bmp.Clear()
+                    dc_bmp.Pen = wx.Pen(self.ForegroundColour)
+                    dc_bmp.DrawPointList([(0, 1), (1, 0)])
+                    dc_bmp.SelectObject(wx.NullBitmap)
                 pen = PEN(dc.TextForeground, 1, wx.STIPPLE)
                 pen.Stipple, dc.Pen = NoteButton.BMP_MARQUEE, pen
                 dc.DrawRectangle(4, 4, width - 8, height - 8)
@@ -321,17 +445,19 @@ class NoteButton(wx.PyPanel, wx.Button):
         label = self._label
         self._text_label = label
         self._text_note = self._note
+        WORDWRAP = wx.lib.wordwrap.wordwrap
         if width > 20 and height > 20:
-            WORDWRAP = wx.lib.wordwrap.wordwrap
             dc = wx.ClientDC(self)
-            dc.Font = self.Font
-            x = 10 + self._bmp.Size.width + 10
-            self._text_note = WORDWRAP(self._text_note, width - 10 - x, dc)
-            dc.Font = wx.Font(dc.Font.PointSize, dc.Font.Family, dc.Font.Style,
-                              wx.FONTWEIGHT_BOLD, face=dc.Font.FaceName)
-            self._text_label = WORDWRAP(self._text_label, width - 10 - x, dc)
-            self._extent_label = dc.GetMultiLineTextExtent(self._text_label)
-            self._extent_note = dc.GetMultiLineTextExtent(self._text_note)
+        else: # Not properly sized yet: assume a reasonably fitting size
+            dc, width, height = wx.MemoryDC(), 500, 100
+        dc.Font = self.Font
+        x = 10 + self._bmp.Size.width + 10
+        self._text_note = WORDWRAP(self._text_note, width - 10 - x, dc)
+        dc.Font = wx.Font(dc.Font.PointSize, dc.Font.Family, dc.Font.Style,
+                          wx.FONTWEIGHT_BOLD, face=dc.Font.FaceName)
+        self._text_label = WORDWRAP(self._text_label, width - 10 - x, dc)
+        self._extent_label = dc.GetMultiLineTextExtent(self._text_label)
+        self._extent_note = dc.GetMultiLineTextExtent(self._text_note)
 
 
     def OnPaint(self, event):
@@ -344,7 +470,8 @@ class NoteButton(wx.PyPanel, wx.Button):
         """Handler for size event, resizes texts and repaints control."""
         if event.Size != self._size:
             self._size = event.Size
-            wx.CallAfter(lambda: (self and (self.WrapTexts(), self.InvalidateBestSize())))
+            wx.CallAfter(lambda: self and (self.WrapTexts(), self.Refresh(),
+                         self.InvalidateBestSize(), self.Parent.Layout()))
         event.Skip()
 
 
@@ -446,13 +573,14 @@ class NoteButton(wx.PyPanel, wx.Button):
         return result
 
 
-
     def GetLabel(self):
         return self._label
     def SetLabel(self, label):
-        self._label = label
-        self.WrapTexts()
-        self.Refresh()
+        if label != self._label:
+            self._label = label
+            self.WrapTexts()
+            self.InvalidateBestSize()
+            self.Refresh()
     Label = property(GetLabel, SetLabel)
 
 
@@ -460,6 +588,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         if note != self._note:
             self._note = note
             self.WrapTexts()
+            self.InvalidateBestSize()
             self.Refresh()
     def GetNote(self):
         return self._note
@@ -535,7 +664,7 @@ class RangeSlider(wx.PyPanel):
     A horizontal slider with two markers for selecting a value range. Supports
     numeric and date/time values.
     """
-    BACKGROUND_COLOUR       = wx.Colour(255, 255, 255)
+    BACKGROUND_COLOUR       = None
     BAR_ARROW_BG_COLOUR     = wx.Colour(212, 208, 200)
     BAR_ARROW_FG_COLOUR     = wx.Colour(0,     0,   0)
     BAR_COLOUR1             = wx.Colour(255, 255, 255) # Scrollbar buttons background
@@ -583,8 +712,10 @@ class RangeSlider(wx.PyPanel):
                        values, see LabelFormat
         """
         wx.PyPanel.__init__(self, parent, id, pos, size,
-            style | wx.FULL_REPAINT_ON_RESIZE, name
-        )
+                            style | wx.FULL_REPAINT_ON_RESIZE, name)
+        if not RangeSlider.BACKGROUND_COLOUR:
+            bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+            RangeSlider.BACKGROUND_COLOUR = bgcolour
 
         # Fill unassigned range and values with other givens, or assign
         # a default date range.
@@ -594,8 +725,7 @@ class RangeSlider(wx.PyPanel):
             now = datetime.datetime.now().date()
             rng = (now - datetime.timedelta(days=3*365), now)
             vals = (now - datetime.timedelta(days=2*365),
-                now - datetime.timedelta(days=1*365),
-            )
+                    now - datetime.timedelta(days=1*365), )
         elif not vals:
             vals = rng
 
@@ -626,16 +756,15 @@ class RangeSlider(wx.PyPanel):
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
         self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
-        self.SetToolTipString(
-            "Double-click on marker or scrollbar to maximize/restore values."
-        )
+        self.SetToolTipString("Double-click on marker or scrollbar to "
+                              "maximize/restore values.")
 
 
     def GetLabelFormat(self):
         return self._fmt
     def SetLabelFormat(self, label_format):
         self._fmt = label_format
-    LabelFormat = property(GetLabelFormat, SetLabelFormat, doc= \
+    LabelFormat = property(GetLabelFormat, SetLabelFormat, doc=
         """
         Format string or function used for formatting values. Format strings
         are used as common Python format strings, except for date or time
@@ -649,14 +778,14 @@ class RangeSlider(wx.PyPanel):
         return self._vals(0)
     def SetLeftValue(self, value):
         return self.SetValue(wx.LEFT, value)
-    LeftValue = property(GetLeftValue, SetLeftValue, doc= \
+    LeftValue = property(GetLeftValue, SetLeftValue, doc=
         "The left position value. Cannot get greater than the right value."
     )
     def GetRightValue(self):
         return self._vals(1)
     def SetRightValue(self, value, refresh=True):
         return self.SetValue(wx.RIGHT, value, refresh)
-    RightValue = property(GetRightValue, SetRightValue, doc= \
+    RightValue = property(GetRightValue, SetRightValue, doc=
         "The right position value. Cannot get smaller than the left value."
     )
 
@@ -691,7 +820,7 @@ class RangeSlider(wx.PyPanel):
             self._vals[i] = value
         if refresh and self._vals != self._vals_prev:
             self.Refresh()
-    Values = property(GetValues, SetValues, doc= \
+    Values = property(GetValues, SetValues, doc=
                       "See `GetValues` and `SetValues`.")
 
 
@@ -744,7 +873,7 @@ class RangeSlider(wx.PyPanel):
                 self.SetValue(i, self._rng[i])
         if refresh and former_rng != self._rng:
             self.Refresh()
-    Range = property(GetRange, SetRange, doc= \
+    Range = property(GetRange, SetRange, doc=
         """
         The current value range of the control. Setting the range as outside of
         current selection causes selection to be reset to range edges.
@@ -800,10 +929,9 @@ class RangeSlider(wx.PyPanel):
         if self.Enabled:
             dc.SetTextForeground(self.LABEL_COLOUR)
         else:
-            dc.SetTextForeground(
-                wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
-            )
-        if not filter(None, self._rng):
+            graycolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+            dc.SetTextForeground(graycolour)
+        if not any(filter(None, self._rng)):
             return
 
         PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
@@ -840,7 +968,7 @@ class RangeSlider(wx.PyPanel):
 
         # Draw current selection background, edge and scrollbar
         self._bar_arrow_areas = None
-        if filter(None, self._vals):
+        if any(filter(None, self._vals)):
             value_rect = wx.Rect(-1, selection_top, -1, selection_height)
             for i in range(2):
                 marker_delta = self._vals[i] - self._rng[0]
@@ -1355,6 +1483,7 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
         self._last_scroll_pos = [0, 0]
         self._last_scroll_range = [0, 0]
 
+
     def _OnSize(self, event):
         """
         Handler for sizing the HtmlWindow, sets new scroll position based
@@ -1395,200 +1524,260 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
 
 class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
     """
-    A sortable list view that can be batch-populated, autosizes its columns.
+    A sortable list view that can be batch-populated, autosizes its columns,
+    can be filtered by string value matched on any row column.
     """
 
     def __init__(self, *args, **kwargs):
         wx.ListView.__init__(self, *args, **kwargs)
         wx.lib.mixins.listctrl.ColumnSorterMixin.__init__(self, 0)
-        self.itemDataMap = {}
-        self._data_map = {}
+        self.itemDataMap = {} # {item_id: [values], } for ColumnSorterMixin
+        self._data_map = {} # {item_id: row dict, } currently visible data
+        self._id_rows = [] # [(item_id, {row dict}), ] all data items
+        self._columns = [] # [(name, label), ]
+        self._filter = "" # Filter string
+        self._col_widths = {} # {col_index: width, }
+        self._col_maxwidth = -1 # Maximum width for auto-sized columns
+        # Remember row colour attributes { item_id: {SetItemTextColour: x,
+        # SetItemBackgroundColour: y, }, }
+        self._row_colours = collections.defaultdict(dict)
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
         self._formatters = collections.defaultdict(frmt)
 
 
-    def Populate(self, column_map, rows, formatters={}):
+    def SetColumnFormatters(self, formatters):
         """
-        Populates the control with rows and columns. Re-selects the previously
-        selected row, if any.
+        Sets the functions used for formatting displayed column values.
 
-        @param   column_map  [(column name, column title), ]
-        @param   rows        a list of dicts, will be used in sorting
-        @param   formatters  a map of formatting functions to apply on
-                             column values
+        @param   formatters  {col_name: function(rowdict, col_name), }
         """
-        selected_text = None
-        selected_index = self.GetFirstSelected()
-        if selected_index >= 0:
-            selected_text = self.GetItemText(selected_index)
-        selected_index = -1
-        self.Freeze()
-        self.ClearAll()
+        self._formatters.clear()
         if formatters:
             self._formatters.update(formatters)
 
-        col_index = 0
+
+    def Populate(self, rows):
+        """
+        Populates the control with rows, clearing previous data, if any.
+        Re-selects the previously selected row, if any.
+
+        @param   rows        a list of data dicts
+        """
+        self._col_widths.clear()
+        self._row_colours.clear()
+        self._id_rows = [(wx.NewId(), r) for r in rows]
+        self.RefreshRows()
+
+
+    def AppendRow(self, data):
+        """
+        Appends the specified data to the control as a new row.
+
+        @param   data     item data dictionary
+        """
+        item_id = wx.NewId()
+        if self._RowMatchesFilter(data):
+            columns = [c[0] for c in self._columns]
+            index = self.ItemCount
+            col_value = self._formatters[columns[0]](data, columns[0])
+            self.InsertStringItem(index, col_value)
+            for i, col_name in enumerate(columns[1:]):
+                col_value = self._formatters[col_name](data, col_name)
+                self.SetStringItem(index, i + 1, col_value)
+                self._col_widths[col_name] = max(
+                    self._col_widths.get(col_name, 0), len(col_value))
+            self.SetItemData(index, item_id)
+            self.itemDataMap[item_id] = [data[c] for c in columns]
+            self._data_map[item_id] = data
+            self.SetItemImage(index, -1)
+            self.SetItemColumnImage(index, 0, -1)
+        self._id_rows.append((item_id, data))
+
+
+    def GetFilter(self):
+        return self._filter
+    def SetFilter(self, value, force_refresh=False):
+        """
+        Sets the text to filter list by. Any row not containing the text in any
+        column will be hidden.
+
+        @param   force_refresh  if True, all content is refreshed even if
+                                filter value did not change
+        """
+        if force_refresh or value != self._filter:
+            if force_refresh:
+                self._col_widths.clear()
+            self._filter = value
+            if self._id_rows:
+                self.RefreshRows()
+
+
+    def RefreshRows(self):
+        """
+        Clears the list and inserts all unfiltered rows, auto-sizing the 
+        columns.
+        """
+        selected_ids, selected = [], self.GetFirstSelected()
+        while selected >= 0:
+            selected_ids.append(self.GetItemData(selected))
+            selected = self.GetNextSelected(selected)
+
+        # Store row colour attributes
+        for i in range(self.ItemCount):
+            t, b = self.GetItemTextColour(i), self.GetItemBackgroundColour(i)
+            id = self.GetItemData(i)
+            for func, value in [(self.SetItemTextColour, t),
+                                (self.SetItemBackgroundColour, b)]:
+                if wx.NullColour != value:
+                    self._row_colours[id][func] = value
+                elif func in self._row_colours[id]:
+                    del self._row_colours[id][func]
+            if id in self._row_colours and not self._row_colours[id]:
+                del self._row_colours[id]
+
+        self.Freeze()
+        wx.ListView.DeleteAllItems(self)
+        # To map list item data ID to row, ListView allows only integer per row
+        row_data_map = {} # {item_id: {row dict}, }
+        item_data_map = {} # {item_id: [row values], }
         # For measuring by which to set column width: header or value
         header_lengths = {} # {col_name: integer}
         col_lengths = {} # {col_name: integer}
-        self.SetColumnCount(len(column_map))
-        item_data_map = {}
-        for col_name, col_label in column_map:
-            # Keep space for sorting arrows, to decrease display changes.
-            self.InsertColumn(col_index, col_label + "  ")
+        for col_name, col_label in self._columns:
+            # Keep space for sorting arrows.
             col_lengths[col_name] = 0
-            header_lengths[col_name] = len(col_label + "  ")
-            col_index += 1
-        # To map list item data ID to row, ListCtrl allows only integer per row
-        row_data_map = {}
-        row_index = 0
-        for row in rows:
-            col_name = column_map[0][0]
+            header_lengths[col_name] = (6 + self.GetTextExtent(col_label)[0]
+                                            / self.GetTextExtent("n")[0])
+        index = 0
+        for item_id, row in self._id_rows:
+            if not self._RowMatchesFilter(row):
+                continue # continue for index, (item_id, row) in enumerate(..)
+            col_name = self._columns[0][0]
             col_value = self._formatters[col_name](row, col_name)
             # Keep space for the 0 (icon) column, to decrease display changes.
-            col_lengths[col_name] = \
-                max(col_lengths[col_name], len(col_value) + 3)
-            self.InsertStringItem(row_index, col_value)
-            row_id = row_index
-            self.SetItemData(row_index, row_id)
-            item_data_map[row_id] = {0: row[col_name]}
-            row_data_map[row_id] = row
-            self.SetItemImage(row_index, -1)
-            if selected_text == col_value:
-                selected_index = row_index
-            row_index += 1
-        row_index = 0
-        # Adding all cols in one pass can mix up values between rows (wx bug?).
-        for row in rows:
+            col_lengths[col_name] = max(col_lengths[col_name],
+                                        len(col_value) + 3)
+            self.InsertStringItem(index, col_value)
+            self.SetItemData(index, item_id)
+            self.SetItemImage(index, -1)
+            self.SetItemColumnImage(index, 0, -1)
+            item_data_map[item_id] = {0: row[col_name]}
+            row_data_map[item_id] = row
             col_index = 1 # First was already inserted
-            row_id = row_index
-            for col_name, col_label in column_map[col_index:]:
+            for col_name, col_label in self._columns[col_index:]:
                 col_value = self._formatters[col_name](row, col_name)
                 col_lengths[col_name] = max(col_lengths[col_name],
                                             len(col_value))
-                self.SetStringItem(row_index, col_index, col_value)
-                item_data_map[row_id][col_index] = row.get(col_name)
+                self.SetStringItem(index, col_index, col_value)
+                item_data_map[item_id][col_index] = row.get(col_name)
                 col_index += 1
-            self.SetItemColumnImage(row_index, 0, -1)
-            row_index += 1
-        col_index = 0
-        for col_name, col_label in column_map:
-            self.SetColumnWidth(col_index,
-                wx.LIST_AUTOSIZE if (
-                    not col_index \
-                    or (col_lengths[col_name] > header_lengths[col_name])
-                ) else header_lengths[col_name] * self.GetTextExtent("n")[0]
-                #wx.LIST_AUTOSIZE_USEHEADER
-            )
-            col_index += 1
+            index += 1
         self._data_map = row_data_map
         self.itemDataMap = item_data_map
-        self._column_map = column_map
-        if selected_index >= 0:
-            self.Select(selected_index)
-        self.Thaw()
-
-
-
-    def PopulateRow(self, index, columns, data):
-        """
-        Populates the control row with specified data.
-
-        @param   index    row index
-        @param   columns  a list of column names in column order
-        @param   data     item data dictionary
-        """
-        item_id = id(index)
-        col_value = self._formatters[columns[0]](data, columns[0])
-        self.InsertStringItem(index, col_value)
-        for i, col_name in enumerate(columns[1:]):
-            col_value = self._formatters[col_name](data, col_name)
-            self.SetStringItem(index, i + 1, col_value)
-        self.SetItemData(index, item_id)
-        self.itemDataMap[item_id] = [data[c] for c in columns]
-        self._data_map[item_id] = data
-
-
-    def RefreshItems(self):
-        """
-        Refreshes the content of all rows. Re-selects the previously selected
-        row, if any.
-        """
-        selected_text = None
-        selected_index = self.GetFirstSelected()
-        if selected_index >= 0:
-            selected_text = self.GetItemText(selected_index)
-        selected_index = -1
-
-        # For measuring by which to set column width: header or value
-        header_lengths = {} # {col_name: integer}
-        col_lengths = {} # {col_name: integer}
-        for col_name, col_label in self._column_map:
-            # Keep space for sorting arrows, to decrease display changes.
-            col_lengths[col_name] = 0
-            header_lengths[col_name] = len(col_label + "  ")
-        self.Freeze()
-        for row_index in range(self.ItemCount):
-            row = self._data_map[self.GetItemData(row_index)]
+        if self._id_rows and not self._col_widths:
+            if self._col_maxwidth > 0:
+                for col_name, width in col_lengths.items():
+                    col_lengths[col_name] = min(width, self._col_maxwidth)
             col_index = 0
-            for col_name, col_label in self._column_map:
-                col_value = self._formatters[col_name](row, col_name)
-                col_lengths[col_name] = \
-                    max(col_lengths[col_name], len(col_value))
-                self.SetStringItem(row_index, col_index, col_value)
-                self.itemDataMap[self.GetItemData(row_index)][col_index] = \
-                    row[col_name] if col_name in row else None
-                if selected_text == col_value:
-                    selected_index = row_index
-                col_index += 1
-        col_index = 0
-        for col_name, col_label in self._column_map:
-            self.SetColumnWidth(col_index,
-                wx.LIST_AUTOSIZE if (
-                    not col_index \
-                    or (col_lengths[col_name] > header_lengths[col_name])
-                ) else header_lengths[col_name] * self.GetTextExtent("w")[0]
+            for col_name, col_label in self._columns:
+                self.SetColumnWidth(col_index,
+                    wx.LIST_AUTOSIZE
+                    if (col_lengths[col_name] > header_lengths[col_name])
+                    else header_lengths[col_name] * self.GetTextExtent("n")[0])
                 #wx.LIST_AUTOSIZE_USEHEADER
-            )
-            col_index += 1
-        if selected_index >= 0:
-            self.Select(selected_index)
+                col_index += 1
+            if self._col_maxwidth > 0:
+                widths = self.GetColumnWidths()
+                for i, w in [(i, w) for i, w in enumerate(widths)
+                             if w > self._col_maxwidth]:
+                    self.SetColumnWidth(i, 300)
+            self._col_widths = dict(enumerate(self.GetColumnWidths()))
+        elif self._col_widths:
+            for col, width in self._col_widths.items():
+                self.SetColumnWidth(col, width)
+        if self.GetSortState()[0] >= 0:
+            self.SortListItems(*self.GetSortState())
+
+        if selected_ids or self._row_colours:
+            idindx = dict((self.GetItemData(i), i)
+                          for i in range(self.ItemCount))
+        for item_id, attrs in self._row_colours.items(): # Re-colour rows
+            if item_id not in idindx: continue
+            [func(idindx[item_id], value) for func, value in attrs.items()]
+        if selected_ids: # Re-select the previously selected items
+            [self.Select(idindx[i]) for i in selected_ids if i in idindx]
+
         self.Thaw()
 
 
-    def GetItemMappedData(self, row):
-        """Returns the data mapped to the specified row."""
-        data = None
-        data_id = self.GetItemData(row)
+    def ResetColumnWidths(self):
+        """Resets the stored column widths, triggering a fresh autolayout."""
+        self._col_widths.clear()
+
+
+    def DeleteItem(self, index):
+        """Deletes the row at the specified index."""
+        data_id = self.GetItemData(index)
+        data = self._data_map.get(data_id)
+        del self._data_map[data_id]
+        self._id_rows.remove((data_id, data))
+        return wx.ListView.DeleteItem(self, index)
+
+
+    def DeleteAllItems(self):
+        """Deletes all items data and clears the list."""
+        self.itemDataMap = {}
+        self._data_map = {}
+        self._id_rows = []
+        self._row_colours.clear()
+        self.Freeze()
+        result = wx.ListView.DeleteAllItems(self)
+        self.Thaw()
+        return result
+
+
+    def GetItemCountFull(self):
+        """Returns the full row count, including items hidden by filter."""
+        return len(self._id_rows)
+
+
+    def SetColumnsMaxWidth(self, width):
+        """Sets the maximum width for all columns, used in auto-size."""
+        self._col_maxwidth = width
+
+
+    def SetColumns(self, columns):
+        """
+        Sets the list columns, clearing current columns if any.
+
+        @param   columns  [(column name, column label), ]
+        """
+        self.ClearAll()
+        self.SetColumnCount(len(columns))
+        for i, (name, label) in enumerate(columns):
+            # Keep space for sorting arrows.
+            self.InsertColumn(i + 1, label + "  ")
+        self._columns = columns
+
+
+    def GetItemMappedData(self, index):
+        """Returns the data mapped to the specified row index."""
+        data_id = self.GetItemData(index)
         data = self._data_map.get(data_id)
         return data
-
-
-    def OnSortOrderChanged(self):
-        """
-        Callback called after sort order has changed (whenever user
-        clicked column header), refreshes column header sort direction info.
-        """
-        ARROWS = {True: u" ↓", False: u" ↑"}
-        for i in range(self.ColumnCount):
-            col_item = self.GetColumn(i)
-            if i == self._col:
-                new_item = wx.ListItem()
-                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
-                new_item.Text = u"%s%s" % (t, ARROWS[self._colSortFlag[i]])
-                self.SetColumn(i, new_item)
-            elif filter(lambda i: i in col_item.Text, ARROWS.values()):
-                # Remove the previous sort arrow
-                new_item = wx.ListItem()
-                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
-                new_item.Text = t
-                self.SetColumn(i, new_item)
 
 
     def GetListCtrl(self):
         """Required by ColumnSorterMixin."""
         return self
+
+
+    def SortListItems(self, col=-1, ascending=1):
+        """Sorts the list items on demand."""
+        wx.lib.mixins.listctrl.ColumnSorterMixin.SortListItems(
+            self, col, ascending)
+        self.OnSortOrderChanged()
 
 
     def GetColumnSorter(self):
@@ -1599,7 +1788,43 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         sorter = self.__ColumnSorter if hasattr(self, "itemDataMap") \
             else wx.lib.mixins.listctrl.ColumnSorterMixin.GetColumnSorter(self)
         return sorter
-            
+
+
+    def OnSortOrderChanged(self):
+        """
+        Callback called by ColumnSorterMixin after sort order has changed
+        (whenever user clicked column header), refreshes column header sort
+        direction info.
+        """
+        ARROWS = {True: u" ↓", False: u" ↑"}
+        col_sorted, ascending = self.GetSortState()
+        for i in range(self.ColumnCount):
+            col_item = self.GetColumn(i)
+            if i == col_sorted:
+                new_item = wx.ListItem()
+                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
+                new_item.Text = u"%s%s" % (t, ARROWS[ascending])
+                self.SetColumn(i, new_item)
+            elif any(filter(lambda i: i in col_item.Text, ARROWS.values())):
+                # Remove the previous sort arrow, if any
+                new_item = wx.ListItem()
+                t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
+                new_item.Text = t
+                self.SetColumn(i, new_item)
+
+
+    def _RowMatchesFilter(self, row):
+        """Returns whether the row dict matches the current filter."""
+        result = True
+        if self._filter:
+            result = False
+            pattern = re.escape(self._filter)
+            for col_name, col_label in self._columns:
+                col_value = self._formatters[col_name](row, col_name)
+                if re.search(pattern, col_value, re.I):
+                    result = True
+                    break
+        return result
 
 
     def __ColumnSorter(self, key1, key2):
@@ -1688,7 +1913,11 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
         self.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
 
-        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, "face:%s" % self.FONT_FACE)
+        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, 
+                          "face:%s,back:%s" % (self.FONT_FACE,
+                          bgcolour.GetAsString(wx.C2S_HTML_SYNTAX)))
+        self.StyleClearAll() # Apply the new default style to all styles
         self.StyleSetSpec(wx.stc.STC_SQL_DEFAULT, "face:%s" % self.FONT_FACE)
         self.StyleSetSpec(wx.stc.STC_SQL_STRING, "fore:#FF007F") # "
         self.StyleSetSpec(wx.stc.STC_SQL_CHARACTER, "fore:#FF007F") # "
@@ -1707,12 +1936,12 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         # + - * / % = ! ^ & . , ; <> () [] {}
         self.StyleSetSpec(wx.stc.STC_SQL_OPERATOR, "fore:#0000FF")
         # --...
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINE, "back:#AAFFAA")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINE, "fore:#008000")
         # #...
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINEDOC, "back:#FF0000")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINEDOC, "fore:#008000")
         # /*...*/
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENT, "back:#AAFFAA")
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOC, "back:#AAFFAA")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENT, "fore:#008000")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOC, "fore:#008000")
         self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORD, "back:#AAFFAA")
         self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORDERROR, "back:#AAFFAA")
 
@@ -1812,10 +2041,10 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                             self.AddText(char)
                     else:
                         text += char
-                        if (len(text) >= self.AUTOCOMP_LEN) and filter(
+                        if (len(text) >= self.AUTOCOMP_LEN) and any(filter(
                             lambda x: x.upper().startswith(text),
                             self.autocomps_total
-                        ):
+                        )):
                             do_autocomp = True
                             current_pos = self.GetCurrentPos() - 1
                             while chr(self.GetCharAt(current_pos)).isalnum():
@@ -1880,7 +2109,7 @@ class SearchableStyledTextCtrl(wx.PyPanel):
     SEARCH_NOMATCH_FGCOLOUR = wx.NamedColour("#FFFFFF")
 
     """Font colour of descriptive text in the search box."""
-    SEARCH_DESCRIPTIVE_COLOUR = wx.NamedColour("#808080")
+    SEARCH_DESCRIPTIVE_COLOUR = None # Postpone to after wx.App creation
 
     """Text to be displayed in the search box when it"s empty and unfocused."""
     SEARCH_DESCRIPTIVE_TEXT = "Search for.."
@@ -1941,6 +2170,9 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         wx.PyPanel.__init__(self, parent=parent, pos=pos,
             size=size, style=style | wx.TAB_TRAVERSAL
         )
+        if not SearchableStyledTextCtrl.SEARCH_DESCRIPTIVE_COLOUR:
+            desccolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_DESKTOP)
+            SearchableStyledTextCtrl.SEARCH_DESCRIPTIVE_COLOUR = desccolour
 
         self._search_direction = wx.DOWN if (searchDirection == wx.DOWN) \
                                  else wx.UP
@@ -2228,12 +2460,11 @@ class SearchableStyledTextCtrl(wx.PyPanel):
                 flags |= wx.stc.STC_FIND_REGEXP
             nomatch = self.FindNext(text, flags, self._search_direction) < 0
         if text != self.SEARCH_DESCRIPTIVE_TEXT:
-            self._edit.SetBackgroundColour(self.SEARCH_NOMATCH_BGCOLOUR \
-                if nomatch else wx.WHITE
-            )
-            self._edit.SetForegroundColour(self.SEARCH_NOMATCH_FGCOLOUR \
-                if nomatch else self.ForegroundColour
-            )
+            bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+            self._edit.SetBackgroundColour(self.SEARCH_NOMATCH_BGCOLOUR
+                if nomatch else bgcolour)
+            self._edit.SetForegroundColour(self.SEARCH_NOMATCH_FGCOLOUR
+                if nomatch else self.ForegroundColour)
             self._edit.Refresh() # Repaint text box colours
 
 
@@ -2353,6 +2584,11 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         return attr
 
 
+    STC = property(lambda s: s._stc)
+
+
+
+TabLeftDClickEvent, EVT_TAB_LEFT_DCLICK = wx.lib.newevent.NewEvent()
 
 class TabbedHtmlWindow(wx.PyPanel):
     """
@@ -2362,16 +2598,17 @@ class TabbedHtmlWindow(wx.PyPanel):
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=wx.html.HW_DEFAULT_STYLE,
                  name=wx.html.HtmlWindowNameStr):
-        wx.PyPanel.__init__(
-            self, parent=parent, pos=pos, size=size, style=style
-        )
+        wx.PyPanel.__init__(self, parent, pos=pos, size=size, style=style)
         # [{"title", "content", "id", "info", "scrollpos", "scrollrange"}]
         self._tabs = []
         self._default_page = ""      # Content shown on the blank page
         self._delete_callback = None # Function called after deleting a tab
+        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        tabcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        self.BackgroundColour = bgcolour
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
-        self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
+        notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
             parent=self, size=(-1, 27),
             agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
                      wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
@@ -2379,28 +2616,40 @@ class TabbedHtmlWindow(wx.PyPanel):
                      wx.lib.agw.flatnotebook.FNB_VC8)
         self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
 
-        self.Sizer.Add(self._notebook, flag=wx.GROW)
+        self.Sizer.Add(notebook, flag=wx.GROW)
         self.Sizer.Add(self._html, proportion=1, flag=wx.GROW)
 
-        # Monkey-patch object with contained HtmlWindow attributes
-        for name in ["Scroll", "GetScrollRange", "GetScrollPos"]:
-            setattr(self, name, getattr(self._html, name))
-
         self._html.Bind(wx.EVT_SIZE, self._OnSize)
-        self._notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._OnChangeTab)
-        self._notebook.Bind(
-            wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CLOSING,
-            self._OnDeleteTab)
-        self._notebook.Bind(
-            wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_DROPPED,
-            self._OnDropTab)
-
+        notebook.GetTabArea().Bind(wx.EVT_LEFT_DCLICK, self._OnLeftDClickTabArea)
+        notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._OnChangeTab)
+        notebook.Bind(wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CLOSING,
+                      self._OnDeleteTab)
+        notebook.Bind(wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_DROPPED,
+                      self._OnDropTab)
         self._html.Bind(wx.EVT_SCROLLWIN, self._OnScroll)
 
-        self._CreateTab(0, "") # Make default empty tab
-        self._notebook.Size = (self._notebook.Size[0], 27) # Room for tabs only
+        notebook.SetActiveTabColour(bgcolour)
+        notebook.SetTabAreaColour(tabcolour)
+        try: notebook._pages.GetSingleLineBorderColour = notebook.GetActiveTabColour
+        except: pass # Hack to get uniform background colour
 
+        # Monkey-patch object with HtmlWindow and FlatNotebook attributes
+        for name in ["Scroll", "GetScrollRange", "GetScrollPos",
+                     "GetBackgroundColour", "SetBackgroundColour"]:
+            setattr(self, name, getattr(self._html, name))
+        for name in ["GetTabAreaColour", "SetTabAreaColour"]:
+            setattr(self, name, getattr(self._notebook, name))
+
+        self._CreateTab(0, "") # Make default empty tab in notebook with no text
         self.Layout()
+
+
+    def _OnLeftDClickTabArea(self, event):
+        """Fires a TabLeftDClickEvent if a tab header was double-clicked."""
+        area = self._notebook.GetTabArea()
+        where, tab = area.HitTest(event.GetPosition())
+        if wx.lib.agw.flatnotebook.FNB_TAB == where and tab < len(self._tabs):
+            wx.PostEvent(self, TabLeftDClickEvent(Data=self._tabs[tab]))
 
 
     def _OnSize(self, event):
@@ -2420,8 +2669,7 @@ class TabbedHtmlWindow(wx.PyPanel):
             # Execute scroll later as something resets it after this handler
             try:
                 wx.CallLater(50, lambda:
-                    self.Scroll(*tab["scrollpos"]) if self else None
-                )
+                             self.Scroll(*tab["scrollpos"]) if self else None)
             except:
                 pass # CallLater fails if not called from the main thread
         event.Skip() # Allow event to propagate to wx handler
@@ -2474,7 +2722,7 @@ class TabbedHtmlWindow(wx.PyPanel):
             if 1 == nb.GetPageCount(): # Was the only page,
                 nb.SetPageText(0, "")  # reuse as default empty tab
                 event.Veto()
-                self._html.SetPage(self._default_page)
+                self._SetPage(self._default_page)
                 # Default empty tab has no closing X: remove X from tab style
                 style = nb.GetAGWWindowStyleFlag()
                 style ^= wx.lib.agw.flatnotebook.FNB_X_ON_TAB
@@ -2488,10 +2736,17 @@ class TabbedHtmlWindow(wx.PyPanel):
 
     def _CreateTab(self, index, title):
         """Creates a new tab in the tab container at specified index."""
-        p = wx.Panel(parent=self, size=(0,0)) # Dummy empty window as notebook
-        p.Hide()                              # needs to have something to hold
+        p = wx.Panel(parent=self, size=(0,0)) 
+        p.Hide() # Dummy empty window as notebook needs something to hold
         self._notebook.InsertPage(index, page=p, text=title, select=True)
-        
+
+
+    def _SetPage(self, content):
+        """Sets current HTML page content."""
+        self._html.SetPage(content)
+        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self._html.SetBackgroundColour(bgcolour)
+
 
     def SetDeleteCallback(self, callback):
         """Sets the function called after deleting a tab, with tab data."""
@@ -2501,7 +2756,7 @@ class TabbedHtmlWindow(wx.PyPanel):
     def SetDefaultPage(self, content):
         self._default_page = content
         if not self._tabs:
-            self._html.SetPage(self._default_page)
+            self._SetPage(self._default_page)
 
 
     def InsertTab(self, index, title, id, content, info):
@@ -2523,7 +2778,7 @@ class TabbedHtmlWindow(wx.PyPanel):
             self._notebook.SetAGWWindowStyleFlag(style)
 
         self._html.Freeze()
-        self._html.SetPage(tab["content"])
+        self._SetPage(tab["content"])
         self._html.Thaw()
 
 
@@ -2531,11 +2786,6 @@ class TabbedHtmlWindow(wx.PyPanel):
         """Returns the data of the tab with the specified ID, or None."""
         result = next((x for x in self._tabs if x["id"] == id), None)
         return result
-
-
-    def SetTabAreaColour(self, colour):
-        """Sets background colour of the area behind the tabs."""
-        self._notebook.SetTabAreaColour(colour)
 
 
     def SetTabDataByID(self, id, title, content, info, new_id=None):
@@ -2554,7 +2804,7 @@ class TabbedHtmlWindow(wx.PyPanel):
             self._notebook.Refresh()
             if self._tabs[self._notebook.GetSelection()] == tab:
                 self._html.Freeze()
-                self._html.SetPage(tab["content"])
+                self._SetPage(tab["content"])
                 self._html.Scroll(*tab["scrollpos"])
                 self._html.Thaw()
 
@@ -2564,7 +2814,7 @@ class TabbedHtmlWindow(wx.PyPanel):
         tab = self._tabs[index]
         self._notebook.SetSelection(index)
         self._html.Freeze()
-        self._html.SetPage(tab["content"])
+        self._SetPage(tab["content"])
         self._html.Scroll(*tab["scrollpos"])
         self._html.Thaw()
 
@@ -2575,7 +2825,7 @@ class TabbedHtmlWindow(wx.PyPanel):
         index = self._tabs.index(tab)
         self._notebook.SetSelection(index)
         self._html.Freeze()
-        self._html.SetPage(tab["content"])
+        self._SetPage(tab["content"])
         self._html.Scroll(*tab["scrollpos"])
         self._html.Thaw()
 
@@ -2606,10 +2856,10 @@ class TextCtrlAutoComplete(wx.TextCtrl):
     http://wxpython-users.1045709.n5.nabble.com/TextCtrlAutoComplete-td2348906.html
     """
     DROPDOWN_COUNT_PER_PAGE = 8
-    DROPDOWN_TEXT_COLOUR = "gray"
     DROPDOWN_CLEAR_TEXT = "Clear search history"
     DROPDOWN_CLEAR_COLOUR = "blue"
-    DESCRIPTION_COLOUR = "gray"
+    DROPDOWN_TEXT_COLOUR = None # Postpone to after wx.App creation
+    DESCRIPTION_COLOUR = None # Postpone to after wx.App creation
 
 
     def __init__(self, parent, choices=None, description="",
@@ -2624,6 +2874,11 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             kwargs["style"] = wx.TE_PROCESS_ENTER
         wx.TextCtrl.__init__(self, parent, **kwargs)
         self._text_colour = self.GetForegroundColour()
+
+        if not TextCtrlAutoComplete.DROPDOWN_TEXT_COLOUR:
+            graycolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+            TextCtrlAutoComplete.DROPDOWN_TEXT_COLOUR = graycolour
+            TextCtrlAutoComplete.DESCRIPTION_COLOUR = graycolour
 
         self._choices = [] # Ordered case-insensitively
         self._choices_lower = [] # Cached lower-case choices
@@ -2641,7 +2896,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self._listbox = wx.ListCtrl(self._listwindow, pos=(0, 0),
                                         style=wx.BORDER_SIMPLE | wx.LC_REPORT
                                         | wx.LC_SINGLE_SEL | wx.LC_NO_HEADER)
-        except AttributeError, e:
+        except AttributeError:
             # Probably Mac, where wx.PopupWindow does not exist yet as of 2013.
             self._listbox = self._listwindow = None
 
@@ -2717,7 +2972,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         visibility on/off if clicking same spot in textbox.
         """
         if (self.GetInsertionPoint() == self._lastinsertionpoint):
-            self.ShowDropDown(not self._listwindow.IsShown())
+            self.ShowDropDown(not self._listwindow.Shown)
         event.Skip()
 
 
@@ -2771,7 +3026,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             return event.Skip()
 
         skip = True
-        visible = self._listwindow.IsShown()
+        visible = self._listwindow.Shown
         selected = self._listbox.GetFirstSelected()
         selected_new = None
         if event.KeyCode in [wx.WXK_DOWN, wx.WXK_UP]:
@@ -2900,7 +3155,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
 
     def ShowDropDown(self, show=True):
         """Toggles the dropdown list visibility on/off."""
-        if show and self._choices and self._listwindow:
+        if show and self.IsShownOnScreen() and self._choices and self._listwindow:
             size = self._listwindow.GetSize()
             width, height = self.Size.width - 3, self.Size.height
             x, y = self.ClientToScreenXY(0, height - 2)
@@ -2920,6 +3175,11 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self._listwindow.Hide()
 
 
+    def IsDropDownShown(self):
+        """Returns whether the dropdown window is currently shown."""
+        return self._listwindow.Shown
+
+
     def GetValue(self):
         """
         Returns the current value in the text field, or empty string if filled
@@ -2933,5 +3193,6 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         """Sets the value in the text entry field."""
         self.SetForegroundColour(self._text_colour)
         self._description_on = False
+        self._ignore_textchange = True
         return wx.TextCtrl.SetValue(self, value)
     Value = property(GetValue, SetValue)

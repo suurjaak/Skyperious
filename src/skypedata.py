@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.11.2013
+@modified    19.02.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -29,14 +29,20 @@ import textwrap
 import time
 import traceback
 import urllib
-import wx
-import wx.lib.wordwrap
-import wx.grid
 import xml.etree.cElementTree
+
+from PIL import Image, ImageFile
+try:
+    import wx
+except ImportError:
+    pass # Most functionality works without wx
+
+from third_party import step
 
 import conf
 import emoticons
 import main
+import templates
 import util
 import wordcloud
 
@@ -146,7 +152,6 @@ class SkypeDatabase(object):
         self.tables_list = None # Ordered list of table items
         self.table_rows = {}    # {"tablename1": [..], }
         self.table_objects = {} # {"tablename1": {id1: {rowdata1}, }, }
-        self.table_grids = {}   # {"tablename1": TableBase, }
         self.update_fileinfo()
         try:
             self.connection = sqlite3.connect(self.filename,
@@ -157,7 +162,7 @@ class SkypeDatabase(object):
                                 "WHERE type = 'table'").fetchall()
             for row in rows:
                 self.tables[row["name"].lower()] = row
-        except Exception, e:
+        except Exception:
             if log_error:
                 main.log("Error opening database %s.\n\n%s",
                          filename, traceback.format_exc())
@@ -170,7 +175,7 @@ class SkypeDatabase(object):
                 "skypename AS identity FROM accounts LIMIT 1"
             ).fetchone()
             self.id = self.account["skypename"]
-        except Exception, e:
+        except Exception:
             if log_error:
                 main.log("Error getting account information from %s.\n\n%s",
                          filename, traceback.format_exc())
@@ -200,12 +205,12 @@ class SkypeDatabase(object):
         with open(filename, "w") as _: pass # Truncate file
         self.execute("ATTACH DATABASE ? AS new", (filename, ))
         # Create structure for all tables
-        for t in filter(lambda x: x.get("sql"), self.tables_list):
+        for t in filter(lambda x: x.get("sql"), self.tables_list or []):
             if t["name"].lower().startswith("sqlite_"): continue # Internal use
             sql  = t["sql"].replace("CREATE TABLE ", "CREATE TABLE new.")
             self.execute(sql)
         # Copy data from all tables
-        for t in filter(lambda x: x.get("sql"), self.tables_list):
+        for t in filter(lambda x: x.get("sql"), self.tables_list or []):
             if t["name"].lower().startswith("sqlite_"): continue # Internal use
             sql = "INSERT INTO new.%(name)s SELECT * FROM main.%(name)s" % t
             try:
@@ -250,7 +255,7 @@ class SkypeDatabase(object):
                 "COALESCE(fullname, displayname, skypename, '') AS name, "
                 "skypename AS identity FROM accounts LIMIT 1").fetchone()
             self.id = self.account["skypename"]
-        except Exception, e:
+        except Exception as e:
             main.log("Error getting account information from %s.\n\n%s",
                      filename, traceback.format_exc())
 
@@ -279,12 +284,11 @@ class SkypeDatabase(object):
         if hasattr(self, "connection"):
             try:
                 self.connection.close()
-            except:
+            except Exception:
                 pass
             del self.connection
             self.connection = None
-        for attr in ["tables", "tables_list", "table_rows",
-        "table_grids", "table_objects"]:
+        for attr in ["tables", "tables_list", "table_rows", "table_objects"]:
             if hasattr(self, attr):
                 delattr(self, attr)
                 setattr(self, attr, None if ("tables_list" == attr) else {})
@@ -299,14 +303,6 @@ class SkypeDatabase(object):
                          ("\nParameters: %s" % params) if params else "")
             result = self.connection.execute(sql, params)
         return result
-
-
-    def execute_select(self, sql):
-        """
-        Returns a TableBase instance initialized with the results of the query.
-        """
-        grid = TableBase.from_query(self, sql)
-        return grid
 
 
     def execute_action(self, sql):
@@ -339,7 +335,7 @@ class SkypeDatabase(object):
                                      "WHERE timestamp > ?", [now]
                                     ).fetchone()["count"]
                 result = (count, datetime.datetime.fromtimestamp(maxtimestamp))
-            except:
+            except Exception:
                 pass
 
         return result
@@ -377,7 +373,7 @@ class SkypeDatabase(object):
         @param   refresh     if True, information including rowcounts is
                              refreshed
         @param   this_table  if set, only information for this table is
-                                refreshed
+                             refreshed
         """
         if self.is_open() and (refresh or self.tables_list is None):
             sql = "SELECT name, sql FROM sqlite_master WHERE type = 'table' " \
@@ -389,9 +385,14 @@ class SkypeDatabase(object):
             tables_list = []
             for row in rows:
                 table = row
-                table["rows"] = self.execute(
-                    "SELECT COUNT(*) AS count FROM %s" % table["name"], log=False
-                ).fetchone()["count"]
+                try:
+                    res = self.execute("SELECT COUNT(*) AS count FROM %s" %
+                                       table["name"], log=False)
+                    table["rows"] = res.fetchone()["count"]
+                except sqlite3.DatabaseError:
+                    table["rows"] = 0
+                    main.log("Error getting %s row count for %s.\n\n%s",
+                             table, self.filename, traceback.format_exc())
                 # Here and elsewhere in this module - table names are turned to
                 # lowercase when used as keys.
                 tables[table["name"].lower()] = table
@@ -554,7 +555,6 @@ class SkypeDatabase(object):
         strings.
         """
         result = {}
-        #print cursor.description
         for idx, col in enumerate(cursor.description):
             name = col[0]
             result[name] = row[idx]
@@ -565,7 +565,7 @@ class SkypeDatabase(object):
             elif datatype is str or datatype is unicode:
                 try:
                     result[name] = str(result[name]).decode("utf-8")
-                except:
+                except Exception:
                     result[name] = str(result[name]).decode("latin1")
         return result
 
@@ -645,7 +645,7 @@ class SkypeDatabase(object):
         return conversations
 
 
-    def get_conversations_stats(self, chats):
+    def get_conversations_stats(self, chats, log=True):
         """
         Collects statistics for all conversations and fills in the values:
         {"first_message_timestamp": int, "first_message_datetime": datetime,
@@ -656,7 +656,7 @@ class SkypeDatabase(object):
 
         @param   chats  list of chats, as returned from get_conversations()
         """
-        if chats and len(chats) > 1:
+        if log and chats:
             main.log("Statistics collection starting (%s).", self.filename)
         stats = []
         participants = {}
@@ -678,6 +678,7 @@ class SkypeDatabase(object):
                 "GROUP BY convo_id", and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
+            chat["message_count"] = 0
             if chat["id"] in stats:
                 stamptodate = datetime.datetime.fromtimestamp
                 data = stats[chat["id"]]
@@ -687,9 +688,8 @@ class SkypeDatabase(object):
                 if data["last_message_timestamp"]:
                     data["last_message_datetime"] = \
                         stamptodate(data["last_message_timestamp"])
-                    
                 chat.update(data)
-        if chats and len(chats) > 1:
+        if log and chats:
             main.log("Statistics collected (%s).", self.filename)
 
 
@@ -749,14 +749,14 @@ class SkypeDatabase(object):
 
         @param   identity  skypename or pstnnumber
         """
-        name = identity
+        name = ""
         self.get_contacts()
         if identity == self.id:
             name = self.account["name"]
         elif identity in self.table_objects["contacts"]:
             name = self.table_objects["contacts"][identity]["name"]
+        name = name or identity
         return name
-
 
 
     def get_table_rows(self, table):
@@ -953,43 +953,16 @@ class SkypeDatabase(object):
             if "columns" in self.tables[table]:
                 table_columns = self.tables[table]["columns"]
             else:
-                res = self.execute("PRAGMA table_info(%s)" % table, log=False)
                 table_columns = []
-                for row in res.fetchall():
-                    table_columns.append(row)
+                try:
+                    res = self.execute("PRAGMA table_info(%s)" % table, log=False)
+                    for row in res.fetchall():
+                        table_columns.append(row)
+                except sqlite3.DatabaseError:
+                    main.log("Error getting %s column data for %s.\n\n%s",
+                             table, self.filename, traceback.format_exc())
                 self.tables[table]["columns"] = table_columns
         return table_columns
-
-
-    def get_table_data(self, table):
-        """
-        Returns a TableBase instance initialized with the contents of the
-        specified table.
-        Uses already retrieved cached values if possible.
-        """
-        table = table.lower()
-        if table not in self.table_grids:
-            self.table_grids[table] = TableBase.from_table(self, table)
-
-        return self.table_grids[table]
-
-
-    def get_unsaved_grids(self):
-        """
-        Returns a list of table names that have a grid where changes have not
-        been saved after changing.
-        """
-        tables = []
-        for table, grid_data in self.table_grids.items():
-            if grid_data.IsChanged():
-                tables.append(table)
-        return tables
-
-
-    def save_unsaved_grids(self):
-        """Saves all data in unsaved grids."""
-        for table, grid_data in self.table_grids.items():
-            grid_data.SaveChanges() if grid_data.IsChanged() else None
 
 
     def update_fileinfo(self):
@@ -1128,10 +1101,8 @@ class SkypeDatabase(object):
             chat_vals = ", ".join(["?"] * len(chat_fields))
             timestamp_earliest = source_chat["creation_timestamp"] \
                                  or sys.maxsize
-            for i, m in enumerate(messages):
-                if not isinstance(m, dict):
-                    sql = "SELECT * FROM messages WHERE id = ?"
-                    m = source_db.execute(sql, (m, )).fetchone()
+
+            for i, m in enumerate(source_db.message_iterator(messages)):
                 # Insert corresponding Chats entry, if not present
                 if (m["chatname"] not in chatrows_present
                 and m["chatname"] in chatrows_source):
@@ -1325,6 +1296,27 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
 
 
+    def message_iterator(self, lst):
+        """
+        Yields message rows from the list. If the list consists of message IDs,
+        executes queries on the Messages table and yields result rows.
+        """
+        if not lst:
+            return
+        if isinstance(lst[0], dict):
+            for m in lst:
+                yield m
+        else:
+            for ids in [lst[i:i+999] for i in range(0, len(lst), 999)]:
+                # Divide into chunks: SQLite can take up to 999 parameters.
+                idstr = ", ".join(":id%s" % (j+1) for j in range(len(ids)))
+                s = "id IN (%s)" % idstr
+                p = dict(("id%s" % (j+1), x) for j, x in enumerate(ids))
+                res = self.get_messages(additional_sql=s, additional_params=p)
+                for m in res:
+                    yield m
+
+
     def save_row(self, table, row):
         """
         Updates the row in the database or inserts it if not existing.
@@ -1415,529 +1407,6 @@ class SkypeDatabase(object):
 
 
 
-class TableBase(wx.grid.PyGridTableBase):
-    """
-    Table base for wx.grid.Grid, can take its data from a single table, or from
-    the results of any SELECT query.
-    """
-
-    """How many rows to seek ahead for query grids."""
-    SEEK_CHUNK_LENGTH = 100
-
-    @classmethod
-    def from_query(cls, db, sql):
-        """
-        Constructs a TableBase instance from a full SQL query.
-
-        @param   db   SkypeDatabase instance
-        @param   sql  the SQL query to execute
-        """
-        self = cls()
-        self.is_query = True
-        self.db = db
-        self.sql = sql
-        self.row_iterator = self.db.execute(sql)
-        # Fill column information
-        self.columns = []
-        for idx, col in enumerate(self.row_iterator.description or []):
-            coldata = {"name": col[0], "type": "TEXT"}
-            self.columns.append(coldata)
-
-        # Doing some trickery here: we can only know the row count when we have
-        # retrieved all the rows, which is preferrable not to do at first,
-        # since there is no telling how much time it can take. Instead, we
-        # update the row count chunk by chunk.
-        self.row_count = self.SEEK_CHUNK_LENGTH
-        # ID here is a unique value identifying rows in this object,
-        # no relation to table data
-        self.idx_all = [] # An ordered list of row identifiers in rows_all
-        self.rows_all = {} # Unfiltered, unsorted rows {id: row, }
-        self.rows_current = [] # Currently shown (filtered/sorted) rows
-        self.iterator_index = -1
-        self.sort_ascending = False
-        self.sort_column = None # Index of column currently sorted by
-        self.filters = {} # {col: value, }
-        self.attrs = {} # {"new": wx.grid.GridCellAttr, }
-        try:
-            self.SeekToRow(self.SEEK_CHUNK_LENGTH - 1)
-        except Exception, e:
-            pass
-        # Seek ahead on rows and get column information from there
-        if self.rows_current:
-            for coldata in self.columns:
-                name = coldata["name"]
-                if type(self.rows_current[0][name]) in [int, long, bool]:
-                    coldata["type"] = "INTEGER"
-                elif type(self.rows_current[0][name]) in [float]:
-                    coldata["type"] = "REAL"
-        return self
-
-
-    @classmethod
-    def from_table(cls, db, table, where="", order=""):
-        """
-        Constructs a TableBase instance from a single table.
-
-        @param   db     SkypeDatabase instance
-        @param   table  name of table
-        @param   where  SQL WHERE clause, without "where" (e.g. "a=b AND c<3")
-        @param   order  full SQL ORDER clause (e.g. "ORDER BY a DESC, b ASC")
-        """
-        self = cls()
-        self.is_query = False
-        self.db = db
-        self.table = table
-        self.where = where
-        self.order = order
-        self.columns = db.get_table_columns(table)
-        self.row_count = list(db.execute(
-            "SELECT COUNT(*) AS rows FROM %s %s %s" % (table, where, order)
-        ))[0]["rows"]
-        # ID here is a unique value identifying rows in this object,
-        # no relation to table data
-        self.idx_all = [] # An ordered list of row identifiers in rows_all
-        self.rows_all = {} # Unfiltered, unsorted rows {id: row, }
-        self.rows_current = [] # Currently shown (filtered/sorted) rows
-        self.idx_changed = set() # set of indices for changed rows in rows_all
-        self.rows_backup = {} # For changed rows {id: original_row, }
-        self.idx_new = [] # Unsaved added row indices
-        self.rows_deleted = {} # Uncommitted deleted rows {id: deleted_row, }
-        self.row_iterator = db.execute(
-            "SELECT * FROM %s %s %s"
-            % (table, "WHERE %s" % where if where else "", order)
-        )
-        self.iterator_index = -1
-        self.sort_ascending = False
-        self.sort_column = None # Index of column currently sorted by
-        self.filters = {} # {col: value, }
-        self.attrs = {} # {"new": wx.grid.GridCellAttr, }
-        return self
-
-
-    def GetColLabelValue(self, col):
-        label = self.columns[col]["name"]
-        if col == self.sort_column:
-            label += u" ↑" if self.sort_ascending else u" ↓"
-        if col in self.filters:
-            if "TEXT" == self.columns[col]["type"]:
-                label += "\nlike \"%s\"" % self.filters[col]
-            else:
-                label += "\n= %s" % self.filters[col]
-        return label
-
-
-    def GetNumberRows(self):
-        result = self.row_count
-        if self.filters:
-            result = len(self.rows_current)
-        return result
-
-
-    def GetNumberCols(self):
-        return len(self.columns)
-
-
-    def SeekAhead(self, to_end=False):
-        """
-        Seeks ahead on the query cursor, by the chunk length or until the end.
-
-        @param   to_end  if True, retrieves all rows
-        """
-        seek_count = self.row_count + self.SEEK_CHUNK_LENGTH - 1
-        if to_end:
-            seek_count = sys.maxsize
-        self.SeekToRow(seek_count)
-
-
-    def SeekToRow(self, row):
-        """Seeks ahead on the row iterator to the specified row."""
-        rows_before = len(self.rows_all)
-        row_initial = row
-        while self.row_iterator and (self.iterator_index < row):
-            rowdata = None
-            try:
-                rowdata = self.row_iterator.next()
-            except Exception, e:
-                pass
-            if rowdata:
-                idx = id(rowdata)
-                rowdata["__id__"] = idx
-                rowdata["__changed__"] = False
-                rowdata["__new__"] = False
-                rowdata["__deleted__"] = False
-                self.rows_all[idx] = rowdata
-                self.rows_current.append(rowdata)
-                self.idx_all.append(idx)
-                self.iterator_index += 1
-            else:
-                self.row_iterator = None
-        if self.is_query:
-            if (self.row_count != self.iterator_index + 1):
-                self.row_count = self.iterator_index + 1
-                self.NotifyViewChange(rows_before)
-
-
-    def GetValue(self, row, col):
-        value = None
-        if row < self.row_count:
-            self.SeekToRow(row)
-            if row < len(self.rows_current):
-                value = self.rows_current[row][self.columns[col]["name"]]
-                if type(value) is buffer:
-                    value = str(value).decode("latin1")
-        if value and "BLOB" == self.columns[col]["type"]:
-            # Blobs need special handling, as the text editor does not
-            # support control characters or null bytes.
-            value = value.encode("unicode-escape")
-        return value if value is not None else ""
-
-
-    def GetRow(self, row):
-        """Returns the data dictionary of the specified row."""
-        value = None
-        if row < self.row_count:
-            self.SeekToRow(row)
-            if row < len(self.rows_current):
-                value = self.rows_current[row]
-        return value
-
-
-    def SetValue(self, row, col, val):
-        if not (self.is_query) and (row < self.row_count):
-            accepted = False
-            col_value = None
-            if "INTEGER" == self.columns[col]["type"]:
-                if not val: # Set column to NULL
-                    accepted = True
-                else:
-                    try:
-                        # Allow user to enter a comma for decimal separator.
-                        valc = val.replace(",", ".")
-                        col_value = float(valc) if ("." in valc) else int(val)
-                        accepted = True
-                    except:
-                        pass
-            elif "BLOB" == self.columns[col]["type"]:
-                # Blobs need special handling, as the text editor does not
-                # support control characters or null bytes.
-                try:
-                    col_value = val.decode("unicode-escape")
-                    accepted = True
-                except: # Entered text is not valid escaped Unicode, discard
-                    pass
-            else:
-                col_value = val
-                accepted = True
-            if accepted:
-                self.SeekToRow(row)
-                data = self.rows_current[row]
-                idx = data["__id__"]
-                if not data["__new__"]:
-                    if idx not in self.rows_backup:
-                        # Backup only existing rows, new rows will be dropped
-                        # on rollback anyway.
-                        self.rows_backup[idx] = data.copy()
-                    data["__changed__"] = True
-                    self.idx_changed.add(idx)
-                data[self.columns[col]["name"]] = col_value
-                if self.View: self.View.Refresh()
-
-
-    def IsChanged(self):
-        """Returns whether there is uncommitted changed data in this grid."""
-        result = (
-            0 < len(self.idx_changed) + len(self.idx_new)
-            + len(self.rows_deleted.items())
-        )
-        return result
-
-
-    def GetChangedInfo(self):
-        """Returns an info string about the uncommited changes in this grid."""
-        infolist = []
-        values = {
-            "new": len(self.idx_new), "changed": len(self.idx_changed),
-            "deleted": len(self.rows_deleted.items()),
-        }
-        for label, count in values.items():
-            if count:
-                infolist.append("%s %s row%s"
-                    % (count, label, "s" if count != 1 else ""))
-        return ", ".join(infolist)
-
-
-    def GetAttr(self, row, col, kind):
-        if not self.attrs:
-            for n in ["new", "default", "row_changed", "cell_changed",
-            "newblob", "defaultblob", "row_changedblob", "cell_changedblob"]:
-                self.attrs[n] = wx.grid.GridCellAttr()
-            for n in ["new", "newblob"]:
-                self.attrs[n].SetBackgroundColour(conf.GridRowInsertedColour)
-            for n in ["row_changed", "row_changedblob"]:
-                self.attrs[n].SetBackgroundColour(conf.GridRowChangedColour)
-            for n in ["cell_changed", "cell_changedblob"]:
-                self.attrs[n].SetBackgroundColour(conf.GridCellChangedColour)
-            for n in ["newblob", "defaultblob",
-            "row_changedblob", "cell_changedblob"]:
-                self.attrs[n].SetEditor(wx.grid.GridCellAutoWrapStringEditor())
-        # Sanity check, UI controls can still be referring to a previous table
-        col = min(col, len(self.columns) - 1)
-
-        blob = "blob" if (self.columns[col]["type"].lower() == "blob") else ""
-        attr = self.attrs["default%s" % blob]
-        if row < len(self.rows_current):
-            if self.rows_current[row]["__changed__"]:
-                idx = self.rows_current[row]["__id__"]
-                value = self.rows_current[row][self.columns[col]["name"]]
-                backup = self.rows_backup[idx][self.columns[col]["name"]]
-                if backup != value:
-                    attr = self.attrs["cell_changed%s" % blob]
-                else:
-                    attr = self.attrs["row_changed%s" % blob]
-            elif self.rows_current[row]["__new__"]:
-                attr = self.attrs["new%s" % blob]
-        attr.IncRef()
-        return attr
-
-
-    def InsertRows(self, row, numRows):
-        """Inserts new, unsaved rows at position 0 (row is ignored)."""
-        rows_before = len(self.rows_current)
-        for i in range(numRows):
-            # Construct empty dict from column names
-            rowdata = dict((col["name"], None) for col in self.columns)
-            idx = id(rowdata)
-            rowdata["__id__"] = idx
-            rowdata["__changed__"] = False
-            rowdata["__new__"] = True
-            rowdata["__deleted__"] = False
-            # Insert rows at the beginning, so that they can be edited
-            # immediately, otherwise would need to retrieve all rows first.
-            self.idx_all.insert(0, idx)
-            self.rows_current.insert(0, rowdata)
-            self.rows_all[idx] = rowdata
-            self.idx_new.append(idx)
-        self.row_count += numRows
-        self.NotifyViewChange(rows_before)
-
-
-    def DeleteRows(self, row, numRows):
-        """Deletes rows from a specified position."""
-        if row + numRows - 1 < self.row_count:
-            self.SeekToRow(row + numRows - 1)
-            rows_before = len(self.rows_current)
-            for i in range(numRows):
-                data = self.rows_current[row]
-                idx = data["__id__"]
-                del self.rows_current[row]
-                if idx in self.rows_backup:
-                    # If row was changed, switch to its backup data
-                    data = self.rows_backup[idx]
-                    del self.rows_backup[idx]
-                    self.idx_changed.remove(idx)
-                if not data["__new__"]:
-                    # Drop new rows on delete, rollback can't restore them.
-                    data["__changed__"] = False
-                    data["__deleted__"] = True
-                    self.rows_deleted[idx] = data
-                else:
-                    self.idx_new.remove(idx)
-                    self.idx_all.remove(idx)
-                    del self.rows_all[idx]
-                self.row_count -= numRows
-            self.NotifyViewChange(rows_before)
-
-
-    def NotifyViewChange(self, rows_before):
-        """
-        Notifies the grid view of a change in the underlying grid table if
-        current row count is different.
-        """
-        if self.View:
-            args = None
-            rows_now = len(self.rows_current)
-            if rows_now < rows_before:
-                args = [
-                    self,
-                    wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED,
-                    rows_now,
-                    rows_before - rows_now
-                ]
-            elif rows_now > rows_before:
-                args = [
-                    self,
-                    wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED,
-                    rows_now - rows_before
-                ]
-            if args:
-                self.View.ProcessTableMessage(wx.grid.GridTableMessage(*args))
-
-
-
-    def AddFilter(self, col, val):
-        """
-        Adds a filter to the grid data on the specified column. Ignores the
-        value if invalid for the column (e.g. a string for an integer column).
-
-        @param   col   column index
-        @param   val   a simple value for filtering. For numeric columns, the
-                       value is matched exactly, and for text columns,
-                       matched by substring.
-        """
-        accepted_value = None
-        if "INTEGER" == self.columns[col]["type"]:
-            try:
-                # Allow user to enter a comma for decimal separator.
-                accepted_value = float(val.replace(",", ".")) \
-                                 if ("." in val or "," in val) \
-                                 else int(val)
-            except ValueError:
-                pass
-        else:
-            accepted_value = val
-        if accepted_value is not None:
-            self.filters[col] = accepted_value
-            self.Filter()
-
-
-    def RemoveFilter(self, col):
-        """Removes filter on the specified column, if any."""
-        if col in self.filters:
-            del self.filters[col]
-        self.Filter()
-
-
-    def ClearFilter(self, refresh=True):
-        """Clears all added filters."""
-        self.filters.clear()
-        if refresh:
-            self.Filter()
-
-
-    def ClearSort(self, refresh=True):
-        """Clears current sort."""
-        self.sort_column = None
-        if refresh:
-            self.rows_current[:].sort(
-                key=lambda x: self.idx_all.index(x["__id__"])
-            )
-            if self.View:
-                self.View.ForceRefresh()
-
-
-    def Filter(self):
-        """
-        Filters the grid table with the currently added filters.
-        """
-        self.SeekToRow(self.row_count - 1)
-        rows_before = len(self.rows_current)
-        del self.rows_current[:]
-        for idx in self.idx_all:
-            row = self.rows_all[idx]
-            if not row["__deleted__"] and self._is_row_unfiltered(row):
-                self.rows_current.append(row)
-        if self.sort_column is not None:
-            pass#if self.View: self.View.Fit()
-        else:
-            self.sort_ascending = not self.sort_ascending
-            self.SortColumn(self.sort_column)
-        self.NotifyViewChange(rows_before)
-
-
-    def SortColumn(self, col):
-        """
-        Sorts the grid data by the specified column, reversing the previous
-        sort order, if any.
-        """
-        self.SeekToRow(self.row_count - 1)
-        self.sort_ascending = not self.sort_ascending
-        self.sort_column = col
-        compare = cmp
-        if 0 <= col < len(self.columns):
-            col_name = self.columns[col]["name"]
-            def compare(a, b):
-                aval, bval = a[col_name], b[col_name]
-                aval = aval.lower() if hasattr(aval, "lower") else aval
-                bval = bval.lower() if hasattr(bval, "lower") else bval
-                return cmp(aval, bval)
-        self.rows_current.sort(cmp=compare, reverse=self.sort_ascending)
-        if self.View:
-            self.View.ForceRefresh()
-
-
-    def SaveChanges(self):
-        """
-        Saves the rows that have been changed in this table. Undo information
-        is destroyed.
-        """
-        # Save all existing changed rows
-        for idx in self.idx_changed.copy():
-            row = self.rows_all[idx]
-            self.db.update_row(self.table, row, self.rows_backup[idx])
-            row["__changed__"] = False
-            self.idx_changed.remove(idx)
-            del self.rows_backup[idx]
-        # Save all newly inserted rows
-        pk = [c["name"] for c in self.columns if c["pk"]][0]
-        for idx in self.idx_new[:]:
-            row = self.rows_all[idx]
-            row[pk] = self.db.insert_row(self.table, row)
-            row["__new__"] = False
-            self.idx_new.remove(idx)
-        # Deleted all newly deleted rows
-        for idx, row in self.rows_deleted.copy().items():
-            self.db.delete_row(self.table, row)
-            del self.rows_deleted[idx]
-            del self.rows_all[idx]
-            self.idx_all.remove(idx)
-        if self.View: self.View.Refresh()
-
-
-    def UndoChanges(self):
-        """Undoes the changes made to the rows in this table."""
-        rows_before = len(self.rows_current)
-        # Restore all changed row data from backup
-        for idx in self.idx_changed.copy():
-            row = self.rows_backup[idx]
-            row["__changed__"] = False
-            self.rows_all[idx].update(row)
-            self.idx_changed.remove(idx)
-            del self.rows_backup[idx]
-        # Discard all newly inserted rows
-        for idx in self.idx_new[:]:
-            row = self.rows_all[idx]
-            del self.rows_all[idx]
-            if row in self.rows_current: self.rows_current.remove(row)
-            self.idx_new.remove(idx)
-            self.idx_all.remove(idx)
-        # Undelete all newly deleted items
-        for idx, row in self.rows_deleted.items():
-            row["__deleted__"] = False
-            del self.rows_deleted[idx]
-            if self._is_row_unfiltered(row):
-                self.rows_current.append(row)
-            self.row_count += 1
-        self.NotifyViewChange(rows_before)
-        if self.View: self.View.Refresh()
-
-
-    def _is_row_unfiltered(self, rowdata):
-        """
-        Returns whether the row is not filtered out by the current filtering
-        criteria, if any.
-        """
-        is_unfiltered = True
-        for col, filter_value in self.filters.items():
-            column_data = self.columns[col]
-            if "INTEGER" == column_data["type"]:
-                is_unfiltered &= (filter_value == rowdata[column_data["name"]])
-            elif "TEXT" == column_data["type"]:
-                str_value = (rowdata[column_data["name"]] or "").lower()
-                is_unfiltered &= str_value.find(filter_value.lower()) >= 0
-        return is_unfiltered
-
-
-
 class MessageParser(object):
     """A Skype message parser, able to collect statistics from its input."""
 
@@ -1947,7 +1416,7 @@ class MessageParser(object):
     TEXT_MAXWIDTH = 79
 
     """HTML entities in the body to be replaced before feeding to xml.etree."""
-    REPLACE_ENTITIES = { "&apos;": "'" }
+    REPLACE_ENTITIES = {"&apos;": "'"}
 
     """Regex for checking if string ends with any HTML entity, like "&lt;"."""
     ENTITY_CHECKBEHIND_RGX = re.compile(".*(&[#\\w]{2,};)$")
@@ -2008,40 +1477,23 @@ class MessageParser(object):
     """Mapping known failure reason codes to """
     FAILURE_REASONS = {"1": "Failed", "4": "Not enough Skype Credit."}
 
-    """HTML template for quote elements in body."""
-    HTML_QUOTE_TEMPLATE = "<table cellpadding='0' cellspacing='0'><tr>" \
-                          "<td valign='top'>" \
-                          "<font color='%(grey)s' size='7'>&quot;|</font>" \
-                          "</td><td><br />" \
-                          "<font color='%(grey)s'>{EMDASH} </font></td>" \
-                          "</tr></table>" % {"grey": conf.HistoryGreyColour}
 
-    """Export HTML template for quote elements in body."""
-    HTML_QUOTE_TEMPLATE_EXPORT = "<table class='quote'><tr>" \
-                                 "<td><span>&#8223;</span></td>" \
-                                 "<td><br /><span class='grey'>" \
-                                 "{EMDASH} </span></td>" \
-                                 "</tr></table>"
-
-
-    def __init__(self, db, chat=None, stats=False):
+    def __init__(self, db, chat=None, stats=False, wrapfunc=None):
         """
-        @param   db     SkypeDatabase instance for additional queries
-        @param   chat   chat being parsed
-        @param   stats  whether to collect message statistics
+        @param   db        SkypeDatabase instance for additional queries
+        @param   chat      chat being parsed
+        @param   stats     whether to collect message statistics
+        @param   wrapfunc  multi-line text wrap function, if any
         """
         self.db = db
-        self.dc = wx.MemoryDC()
-        self.dc.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.NORMAL,
-            face=conf.HistoryFontName)
-        )
-        self.textwrapper = textwrap.TextWrapper(width=self.TEXT_MAXWIDTH,
-            expand_tabs=False, replace_whitespace=False,
-            break_long_words=False, break_on_hyphens=False
-        )
         self.chat = chat
         self.stats = None
         self.emoticons_unique = set()
+        self.wrapfunc = wrapfunc
+        self.textwrapfunc = textwrap.TextWrapper(width=self.TEXT_MAXWIDTH,
+            expand_tabs=False, replace_whitespace=False,
+            break_long_words=False, break_on_hyphens=False
+        ).wrap # Text format output is wrapped with a fixed-width font
         if stats:
             self.stats = {"smses": 0, "transfers": [], "calls": 0,
                           "messages": 0, "counts": {}, "total": 0,
@@ -2052,46 +1504,20 @@ class MessageParser(object):
                           "info_items": []}
 
 
-    def make_xml(self, text, message):
-        """Creates an xml.etree.cElementTree node from the text."""
-        result = None
-        TAG = "<xml>%s</xml>"
-        try:
-            result = xml.etree.cElementTree.fromstring(TAG % text)
-        except Exception, e:
-            text = self.SAFEBYTE_RGX.sub(self.SAFEBYTE_REPL, text)
-            try:
-                main.log("Doing 2nd try for parsing \"%s\" (%s).", text, e)
-                result = xml.etree.cElementTree.fromstring(TAG % text)
-            except Exception, e:
-                try:
-                    text = text.replace("&", "&amp;")
-                    main.log("Doing 3rd try for parsing \"%s\" (%s).", text, e)
-                    result = xml.etree.cElementTree.fromstring(TAG % text)
-                except Exception, e:
-                    result = xml.etree.cElementTree.fromstring(TAG % "")
-                    result.text = text
-                    main.log("Error parsing message %s, body \"%s\" (%s).", 
-                             message["id"], text, e)
-        return result
-
-
-    def parse(self, message, rgx_highlight=None, html=None, text=None):
+    def parse(self, message, rgx_highlight=None, output=None):
         """
         Parses the specified Skype message and returns the message body as
         DOM, HTML or TXT.
 
         @param   message        message data dict
         @param   rgx_highlight  regex for finding text to highlight, if any
-        @param   html           if set, returned value is an assembled HTML
-                                string instead of a DOM element, argument
-                                contains data for wrapping long words, as:
-                                {"w": pixel width}. Negative or zero width
-                                will skip wrapping.
-        @param   text           if set, returned value is a plaintext
-                                representation of the message body, argument
-                                can specify to not wrap lines, as:
-                                {"wrap": False}. By default lines are wrapped.
+        @param   output         dict with output options:
+                                "format": "html" returns an HTML string 
+                                                 including author and timestamp
+                                "format": "text" returns message body plaintext
+                                "wrap": False    whether to wrap long lines
+                                "export": False  whether output is for export,
+                                                 using another content template
         @return                 a string if html or text specified, 
                                 or xml.etree.cElementTree.Element containing
                                 message body, with "xml" as the root tag and
@@ -2100,371 +1526,441 @@ class MessageParser(object):
         """
         result = None
         dom = None
-        call_durations = {} # {identity: duration in seconds, }
+        is_html = output and "html" == output.get("format")
 
         if "dom" in message:
             dom = message["dom"] # Cached DOM already exists
-        if not dom:
-            body = message["body_xml"] or ""
-
-            for entity, value in self.REPLACE_ENTITIES.items():
-                body = body.replace(entity, value)
-            body = body.encode("utf-8")
-            if message["type"] == MESSAGES_TYPE_MESSAGE and "<" not in body \
-            and self.EMOTICON_CHARS_RGX.search(body):
-                # Replace emoticons with <ss> tags if message appears to
-                # have no XML (probably in older format).
-                body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
-            dom = self.make_xml(body, message)
-
-            if MESSAGES_TYPE_SMS == message["type"]:
-                # SMS body can be plaintext, or can be XML. Relevant tags:
-                # <sms alt="It's hammer time."><status>6</status>
-                # <failurereason>0</failurereason><targets>
-                # <target status="6">+555011235</target></targets><body>
-                # <chunk id="0">te</chunk><chunk id="1">xt</chunk></body>
-                # <encoded_body>text</encoded_body></sms>
-                if dom.find("sms") is not None: # Body is XML data
-                    if dom.find("*/encoded_body") is not None:
-                        # Message has all content in a single element
-                        elem = dom.find("*/encoded_body")
-                        encoded_body = xml.etree.cElementTree.tostring(elem)
-                        body = encoded_body[14:-15] # Drop <encoded_body> tags
-                    elif dom.find("*/body/chunk") is not None:
-                        # Message content is in <body>/<chunk> elements
-                        chunks = {}
-                        for c in dom.findall("*/body/chunk"):
-                            chunks[int(c.get("id"))] = c.text
-                        body = "".join([v for k, v in sorted(chunks.items())])
-                    else:
-                        # Fallback, message content is in <sms alt="content"
-                        body = dom.find("sms").get("alt")
-                    body = body.encode("utf-8")
-                # Replace text emoticons with <ss>-tags if body not XML.
-                if "<" not in body and self.EMOTICON_CHARS_RGX.search(body):
-                    body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
-                status_text = " SMS"
-                status = dom.find("*/failurereason")
-                if status is not None and status.text in self.FAILURE_REASONS:
-                    status_text += ": %s" % self.FAILURE_REASONS[status.text]
-                dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
-                                    (status_text, body), message)
-            elif MESSAGES_TYPE_FILE == message["type"]:
-                transfers = self.db.get_transfers()
-                files = dict((f["chatmsg_index"], f) for f in transfers
-                             if f["chatmsg_guid"] == message["guid"])
-                if not files:
-                    # No rows in Transfers, try to find data from message body
-                    # and create replacements for Transfers fields
-                    for f in dom.findall("*/file"):
-                        files[int(f.get("index"))] = {
-                            "filename": f.text, "filepath": "",
-                            "filesize": f.get("size"),
-                            "partner_handle": message["author"],
-                            "partner_dispname": message["from_dispname"],
-                            "starttime": message["timestamp"],
-                            "type": (TRANSFER_TYPE_OUTBOUND 
-                                     if message["author"] == self.db.id
-                                     else TRANSFER_TYPE_INBOUND)}
-                message["__files"] = [f for i, f in sorted(files.items())]
-                dom.clear()
-                dom.text = "Sent file" + ("s " if len(files) > 1 else " ")
-                a = None
-                for i in sorted(files.keys()):
-                    if len(dom) > 0:
-                        a.tail = ", "
-                    f = files[i]
-                    h = util.path_to_url(f["filepath"] or f["filename"])
-                    a = xml.etree.cElementTree.SubElement(dom, "a", {"href": h})
-                    a.text = f["filename"]
-                if a is not None:
-                    a.tail = "."
-            elif MESSAGES_TYPE_CONTACTS == message["type"]:
-                self.db.get_contacts()
-                get_name = self.db.get_contact_name
-                contacts = sorted([get_name(i.get("f") or i.get("s"))
-                                   for i in dom.findall("*/c")])
-                dom.clear()
-                dom.text = "Sent contact" + (len(contacts) > 1 and "s " or " ")
-                for i in contacts:
-                    if len(dom) > 0:
-                        b.tail = ", "
-                    b = xml.etree.cElementTree.SubElement(dom, "b")
-                    b.text = i["name"] if type(i) is dict else i
-                b.tail = "."
-            elif MESSAGES_TYPE_TOPIC == message["type"]:
-                if dom.text:
-                    dom.text = \
-                        "Changed the conversation topic to \"%s\"." % dom.text
-                    if not dom.text.endswith("."):
-                        dom.text += "."
-                else:
-                    dom.text = "Changed the conversation picture."
-            elif MESSAGES_TYPE_CALL == message["type"]:
-                for elem in dom.getiterator("part"):
-                    identity = elem.get("identity")
-                    duration = elem.findtext("duration")
-                    if identity and duration:
-                        try:
-                            call_durations[identity] = int(duration)
-                        except:
-                            pass
-                    message["__call_durations"] = call_durations
-                dom.clear()
-                elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
-                elm_stat.text = " Call"
-            elif MESSAGES_TYPE_CALL_END == message["type"]:
-                dom.clear()
-                elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
-                elm_stat.text = " Call ended"
-            elif MESSAGES_TYPE_LEAVE == message["type"]:
-                dom.text = "%s has left the conversation." \
-                            % message["from_dispname"]
-            elif message["type"] in [MESSAGES_TYPE_PARTICIPANTS,
-            MESSAGES_TYPE_REMOVE, MESSAGES_TYPE_SHARE_DETAIL]:
-                names = sorted([self.db.get_contact_name(i)
-                                for i in message["identities"].split(" ")])
-                dom.clear()
-                dom.text = "Added "
-                if MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
-                    dom.text = "Has shared contact details with "
-                for i in names:
-                    if len(dom) > 0:
-                        b.tail = ", "
-                    b = xml.etree.cElementTree.SubElement(dom, "b")
-                    b.text = i["name"] if type(i) is dict else i
-                b.tail = "."
-                if MESSAGES_TYPE_REMOVE == message["type"]:
-                    dom.text = "Removed "
-                    b.tail = " from this conversation."
-            elif message["type"] in [MESSAGES_TYPE_INFO, MESSAGES_TYPE_MESSAGE]:
-                if message["edited_timestamp"] and not message["body_xml"]:
-                    elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
-                    elm_sub.text = MESSAGE_REMOVED_TEXT
-
-            # Process Skype message quotation tags, assembling a simple
-            # <quote>text<special>footer</special></quote> element.
-            # element
-            for quote in dom.findall("quote"):
-                quote.text = quote.text or ""
-                for i in quote.findall("legacyquote"):
-                    # <legacyquote> contains preformatted timestamp and author
-                    if i.tail:
-                        quote.text += i.tail
-                    quote.remove(i)
-                footer = quote.get("authorname") or ""
-                if quote.get("timestamp"):
-                    footer += (", %s" if footer else "%s") % \
-                        datetime.datetime.fromtimestamp(
-                            int(quote.get("timestamp"))
-                        ).strftime("%d.%m.%Y %H:%M")
-                if footer:
-                    elm_sub = xml.etree.cElementTree.SubElement(quote, "quotefrom")
-                    elm_sub.text = footer
-                quote.attrib.clear() # Drop the numerous data attributes
+        if dom is None:
+            dom = self.parse_message_dom(message)
             message["dom"] = dom # Cache DOM
-        if dom is not None and (rgx_highlight or html):
-            # Create a copy, as we will modify the contents
+
+        if dom is not None and is_html: # Create a copy, HTML will mutate dom
             dom = copy.deepcopy(dom)
-        if dom is not None and rgx_highlight:
+        if dom is not None and rgx_highlight and is_html:
+            self.highlight_text(dom, rgx_highlight)
 
-            def highlight(match):
-                b = xml.etree.cElementTree.Element("b")
-                b.text = match.group(0)
-                return xml.etree.cElementTree.tostring(b)
-
-            parent_map = dict(
-                (c, p) for p in dom.getiterator() for c in p
-            )
-            rgx_highlight_split = re.compile("<b>")
-            # Highlight substrings in <b>-tags
-            for i in dom.getiterator():
-                if "b" == i.tag:
-                    continue
-                for j, t in [(0, i.text), (1, i.tail)]:
-                    if t:
-                        highlighted = rgx_highlight.sub(
-                            lambda x: "<b>%s<b>" % x.group(0), t)
-                        parts = rgx_highlight_split.split(highlighted)
-                        if len(parts) > 1:
-                            if j:
-                                i.tail = ""
-                                index_insert = list(parent_map[i]).index(i) + 1
-                            else:
-                                i.text = ""
-                                index_insert = 0
-                            b = None
-                            for i_part, part in enumerate(parts):
-                                if i_part % 2:
-                                    # Highlighted text, wrap in <b>
-                                    b = xml.etree.cElementTree.Element("b")
-                                    b.text = part
-                                    if j: # Processing i.tail
-                                        parent_map[i].insert(index_insert, b)
-                                    else: # Processing i.text
-                                        i.insert(index_insert, b)
-                                    index_insert += 1
-                                else:
-                                    # Non-highlighted text, append to tail/text
-                                    if j: # Processing i.tail
-                                        if b is not None: #
-                                            b.tail = part
-                                        else:
-                                            i.tail = (i.tail or "") + part
-                                    else: # Processing i.text
-                                        if b is not None: #
-                                            b.tail = part
-                                        else:
-                                            i.text = part
-
-        if dom is not None and html is not None:
-            greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
-            if html.get("export", False):
-                greytag, greyattr, greyval = "span", "class", "grey"
-            for elem in dom.getiterator():
-                index = 0
-                for subelem in elem:
-                    if "quote" == subelem.tag:
-                        elem_quotefrom = subelem.find("quotefrom")
-                        # Replace quote tags with a formatted subtable
-                        template = self.HTML_QUOTE_TEMPLATE
-                        if html.get("export", False):
-                            template = self.HTML_QUOTE_TEMPLATE_EXPORT
-                        table = xml.etree.cElementTree.fromstring(template)
-                        # Select last, content cell
-                        cell = table.findall("*/td")[-1]
-                        cell.find(greytag).text += elem_quotefrom.text
-                        subelem.remove(elem_quotefrom)
-                        cell.text = subelem.text
-                        # Insert all children before the last font element
-                        len_orig = len(cell)
-                        [cell.insert(len(cell) - len_orig, i) for i in subelem]
-                        table.tail = subelem.tail
-                        elem[index] = table # Replace <quote> element in parent
-                    elif "ss" == subelem.tag: # Emoticon
-                        if html.get("export", False):
-                            emot, emot_type = subelem.text, subelem.get("type")
-                            template, vals = "<span>%s</span>", [emot]
-                            if hasattr(emoticons, emot_type):
-                                data = emoticons.EmoticonData[emot_type]
-                                title = data["title"]
-                                if data["strings"][0] != data["title"]:
-                                    title += " " + data["strings"][0]
-                                template = "<span class=\"emoticon %s\" " \
-                                           "title=\"%s\">%s</span>"
-                                vals = [emot_type, title, emot]
-                            span_str = template % tuple(map(cgi.escape, vals))
-                            span = xml.etree.cElementTree.fromstring(span_str)
-                            span.tail = subelem.tail
-                            elem[index] = span # Replace <ss> element in parent
-                    elif subelem.tag in ["msgstatus", "bodystatus"]:
-                        subelem.tag = greytag
-                        subelem.set(greyattr, greyval)
-                        # Add whitespace before next content
-                        subelem.tail = " " + (subelem.tail or "")
-                    elif "a" == subelem.tag:
-                        subelem.set("target", "_blank")
-                        if html.get("export", False):
-                            href = subelem.get("href").encode("utf-8")
-                            subelem.set("href", urllib.quote(href, ":/=?&#"))
-                    index += 1
-                if html.get("w", 0) <= 0:
-                    continue # Skip word-wrapping if no real width given
-                for name, value in [("text", elem.text), ("tail", elem.tail)]:
-                    if value:
-                        w = wx.lib.wordwrap.wordwrap(value, html["w"], self.dc)
-                        setattr(elem, name, w)
-            try:
-                # Discard <?xml ..?><xml> tags from start, </xml> from end
-                result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
-            except Exception, e:
-                # If ElementTree.tostring fails, try converting all text
-                # content from UTF-8 to Unicode.
-                main.log("Exception for %s: %s", message["body_xml"], e)
-                for elem in dom.findall("*"):
-                    for attr in ["text", "tail"]:
-                        val = getattr(elem, attr)
-                        if val and isinstance(val, str):
-                            try:
-                                val = val.decode("utf-8")
-                                setattr(elem, attr, val)
-                            except Exception, e:
-                                main.log("Error decoding %s value \"%s\" (type "
-                                    "%s) of %s for \"%s\": %s", attr, val,
-                                    type(val), elem, message["body_xml"], e
-                                )
-                try:
-                    result = \
-                        xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
-                except Exception, e:
-                    main.log("Failed to parse the message \"%s\" from %s.",
-                        message["body_xml"], message["author"]
-                    )
-                    raise e
-            # emdash workaround, cElementTree won't handle unknown entities
-            result = result.replace("{EMDASH}", "&mdash;") \
-                           .replace("\n", "<br />")
-        elif dom is not None and text is not None:
+        if dom is not None and is_html:
+            result = self.dom_to_html(dom, output)
+        elif dom is not None and output and "text" == output.get("format"):
             result = self.dom_to_text(dom)
-            if not isinstance(text, dict) or text.get("wrap", True):
-                linelists = map(self.textwrapper.wrap, result.split("\n"))
+            if output.get("wrap"):
+                linelists = map(self.textwrapfunc, result.split("\n"))
                 ll = "\n".join(j if j else "" for i in linelists for j in i)
                 # Force DOS linefeeds
                 result = re.sub("([^\r])\n", lambda m: m.group(1) + "\r\n", ll)
         else:
             result = dom
 
-        # Collect statistics
-        if self.stats:
-            author_stats = collections.defaultdict(lambda: 0)
-            author, m = message["author"], message
-            self.stats["last_message"] = ""
-            if m["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
-                self.collect_dom_stats(message["dom"])
-                message["body_txt"] = self.stats["last_message"]
-            if m["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_CALL,
-                             MESSAGES_TYPE_FILE, MESSAGES_TYPE_MESSAGE] \
-            and author not in self.stats["counts"]:
-                self.stats["counts"][author] = author_stats.copy()
-            if MESSAGES_TYPE_SMS == m["type"]:
-                self.stats["smses"] += 1
-                self.stats["counts"][author]["smses"] += 1
-                self.stats["counts"][author]["smschars"] += \
-                    len(self.stats["last_message"])
-            elif MESSAGES_TYPE_CALL == m["type"]:
-                self.stats["calls"] += 1
-                self.stats["counts"][author]["calls"] += 1
-                if not call_durations and "__call_durations" in m:
-                    call_durations = m["__call_durations"]
-                for identity, duration in call_durations.items():
-                    if identity not in self.stats["counts"]:
-                        self.stats["counts"][identity] = author_stats.copy()
-                    self.stats["counts"][identity]["calldurations"] += duration
-                self.stats["callmaxdurations"] += \
-                    max(call_durations.values() + [0])
-            elif MESSAGES_TYPE_FILE == m["type"]:
-                files = m.get("__files")
-                if files is None:
-                    transfers = self.db.get_transfers()
-                    filedict = dict((f["chatmsg_index"], f) for f in transfers
-                                    if f["chatmsg_guid"] == m["guid"])
-                    files = [f for i, f in sorted(filedict.items)]
-                    m["__files"] = files
-                self.stats["transfers"].extend(files)
-                self.stats["counts"][author]["files"] += len(files)
-                self.stats["counts"][author]["bytes"] += \
-                    sum([int(i["filesize"]) for i in files])
-            elif MESSAGES_TYPE_MESSAGE == m["type"]:
-                self.stats["messages"] += 1
-                self.stats["counts"][author]["messages"] += 1
-                self.stats["counts"][author]["chars"] += \
-                    len(self.stats["last_message"])
-            if not self.stats["startdate"]:
-                self.stats["startdate"] = m["datetime"]
-            self.stats["enddate"] = m["datetime"]
-            self.stats["total"] += 1
-
+        self.stats and self.collect_message_stats(message)
         return result
+
+
+    def parse_message_dom(self, message):
+        """
+        Parses the body of the Skype message according to message type.
+
+        @param   message  message data dict
+        @return           ElementTree instance
+        """
+        body = message["body_xml"] or ""
+
+        for entity, value in self.REPLACE_ENTITIES.items():
+            body = body.replace(entity, value)
+        body = body.encode("utf-8")
+        if (message["type"] == MESSAGES_TYPE_MESSAGE and "<" not in body
+        and self.EMOTICON_CHARS_RGX.search(body)):
+            # Replace emoticons with <ss> tags if message appears to
+            # have no XML (probably in older format).
+            body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
+        dom = self.make_xml(body, message)
+
+        if MESSAGES_TYPE_SMS == message["type"]:
+            # SMS body can be plaintext, or can be XML. Relevant tags:
+            # <sms alt="It's hammer time."><status>6</status>
+            # <failurereason>0</failurereason><targets>
+            # <target status="6">+555011235</target></targets><body>
+            # <chunk id="0">te</chunk><chunk id="1">xt</chunk></body>
+            # <encoded_body>text</encoded_body></sms>
+            if dom.find("sms") is not None: # Body is XML data
+                if dom.find("*/encoded_body") is not None:
+                    # Message has all content in a single element
+                    elem = dom.find("*/encoded_body")
+                    encoded_body = xml.etree.cElementTree.tostring(elem)
+                    body = encoded_body[14:-15] # Drop <encoded_body> tags
+                elif dom.find("*/body/chunk") is not None:
+                    # Message content is in <body>/<chunk> elements
+                    chunks = {}
+                    for c in dom.findall("*/body/chunk"):
+                        chunks[int(c.get("id"))] = c.text
+                    body = "".join([v for k, v in sorted(chunks.items())])
+                else:
+                    # Fallback, message content is in <sms alt="content"
+                    body = dom.find("sms").get("alt")
+                body = body.encode("utf-8")
+            # Replace text emoticons with <ss>-tags if body not XML.
+            if "<" not in body and self.EMOTICON_CHARS_RGX.search(body):
+                body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
+            status_text = " SMS"
+            status = dom.find("*/failurereason")
+            if status is not None and status.text in self.FAILURE_REASONS:
+                status_text += ": %s" % self.FAILURE_REASONS[status.text]
+            dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
+                                (status_text, body), message)
+        elif MESSAGES_TYPE_FILE == message["type"] \
+        or (MESSAGES_TYPE_INFO == message["type"]
+        and "<files" in message["body_xml"]):
+            transfers = self.db.get_transfers()
+            files = dict((f["chatmsg_index"], f) for f in transfers
+                         if f["chatmsg_guid"] == message["guid"])
+            if not files:
+                # No rows in Transfers, try to find data from message body
+                # and create replacements for Transfers fields
+                for f in dom.findall("*/file"):
+                    files[int(f.get("index"))] = {
+                        "filename": f.text, "filepath": "",
+                        "filesize": f.get("size"),
+                        "partner_handle": message["author"],
+                        "partner_dispname": message["from_dispname"],
+                        "starttime": message["timestamp"],
+                        "type": (TRANSFER_TYPE_OUTBOUND 
+                                 if message["author"] == self.db.id
+                                 else TRANSFER_TYPE_INBOUND)}
+            message["__files"] = [f for i, f in sorted(files.items())]
+            dom.clear()
+            dom.text = "sent " if MESSAGES_TYPE_INFO == message["type"] \
+                       else "Sent "
+            dom.text += ("files " if len(files) > 1 else "file ")
+            a = None
+            for i in sorted(files.keys()):
+                if len(dom) > 0:
+                    a.tail = ", "
+                f = files[i]
+                h = util.path_to_url(f["filepath"] or f["filename"])
+                a = xml.etree.cElementTree.SubElement(dom, "a", {"href": h})
+                a.text = f["filename"]
+            if a is not None:
+                a.tail = "."
+        elif MESSAGES_TYPE_CONTACTS == message["type"]:
+            self.db.get_contacts()
+            get_name = self.db.get_contact_name
+            contacts = sorted([get_name(i.get("f") or i.get("s"))
+                               for i in dom.findall("*/c")])
+            dom.clear()
+            dom.text = "Sent contact" + (len(contacts) > 1 and "s " or " ")
+            for i in contacts:
+                if len(dom) > 0:
+                    b.tail = ", "
+                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b.text = i["name"] if type(i) is dict else i
+            b.tail = "."
+        elif MESSAGES_TYPE_TOPIC == message["type"]:
+            if dom.text:
+                dom.text = "Changed the conversation topic to \"%s\"." \
+                           % dom.text
+                if not dom.text.endswith("."):
+                    dom.text += "."
+            else:
+                dom.text = "Changed the conversation picture."
+        elif MESSAGES_TYPE_CALL == message["type"]:
+            for elem in dom.getiterator("part"):
+                identity = elem.get("identity")
+                duration = elem.findtext("duration")
+                if identity and duration:
+                    calldurations = message.get("__calldurations", {})
+                    try:
+                        calldurations[identity] = int(duration)
+                        message["__calldurations"] = calldurations
+                    except (TypeError, ValueError):
+                        pass
+            dom.clear()
+            elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
+            elm_stat.text = " Call"
+        elif MESSAGES_TYPE_CALL_END == message["type"]:
+            dom.clear()
+            elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
+            elm_stat.text = " Call ended"
+        elif MESSAGES_TYPE_LEAVE == message["type"]:
+            dom.text = "%s has left the conversation." \
+                        % message["from_dispname"]
+        elif message["type"] in [MESSAGES_TYPE_PARTICIPANTS,
+        MESSAGES_TYPE_REMOVE, MESSAGES_TYPE_SHARE_DETAIL]:
+            names = sorted([self.db.get_contact_name(i)
+                            for i in message["identities"].split(" ")])
+            dom.clear()
+            dom.text = "Added "
+            if MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
+                dom.text = "Has shared contact details with "
+            for i in names:
+                if len(dom) > 0:
+                    b.tail = ", "
+                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b.text = i["name"] if type(i) is dict else i
+            b.tail = "."
+            if MESSAGES_TYPE_REMOVE == message["type"]:
+                dom.text = "Removed "
+                b.tail = " from this conversation."
+        elif message["type"] in [MESSAGES_TYPE_INFO, MESSAGES_TYPE_MESSAGE]:
+            if message["edited_timestamp"] and not message["body_xml"]:
+                elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
+                elm_sub.text = MESSAGE_REMOVED_TEXT
+
+        # Process Skype message quotation tags, assembling a simple
+        # <quote>text<special>footer</special></quote> element.
+        # element
+        for quote in dom.findall("quote"):
+            quote.text = quote.text or ""
+            for i in quote.findall("legacyquote"):
+                # <legacyquote> contains preformatted timestamp and author
+                if i.tail:
+                    quote.text += i.tail
+                quote.remove(i)
+            footer = quote.get("authorname") or ""
+            if quote.get("timestamp"):
+                footer += (", %s" if footer else "%s") % \
+                    datetime.datetime.fromtimestamp(
+                        int(quote.get("timestamp"))
+                    ).strftime("%d.%m.%Y %H:%M")
+            if footer:
+                elm_sub = xml.etree.cElementTree.SubElement(quote, "quotefrom")
+                elm_sub.text = footer
+            quote.attrib.clear() # Drop the numerous data attributes
+        return dom
+
+
+    def make_xml(self, text, message):
+        """Returns a new xml.etree.cElementTree node from the text."""
+        result = None
+        TAG = "<xml>%s</xml>"
+        try:
+            result = xml.etree.cElementTree.fromstring(TAG % text)
+        except Exception:
+            text = self.SAFEBYTE_RGX.sub(self.SAFEBYTE_REPL, text)
+            try:
+                result = xml.etree.cElementTree.fromstring(TAG % text)
+            except Exception:
+                try:
+                    text = text.replace("&", "&amp;")
+                    result = xml.etree.cElementTree.fromstring(TAG % text)
+                except Exception as e:
+                    result = xml.etree.cElementTree.fromstring(TAG % "")
+                    result.text = text
+                    main.log("Error parsing message %s, body \"%s\" (%s).", 
+                             message["id"], text, e)
+        return result
+
+
+    def highlight_text(self, dom, rgx_highlight):
+        """Wraps text matching regex in any dom element in <b> nodes."""
+        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        rgx_highlight_split = re.compile("<b>")
+        repl_highlight = lambda x: "<b>%s<b>" % x.group(0) 
+        # Highlight substrings in <b>-tags
+        for i in dom.getiterator():
+            if "b" == i.tag:
+                continue # continue for i in dom.getiterator()
+            for j, t in enumerate([i.text, i.tail]):
+                if not t:
+                    continue # continue for j, t in enumerate(..)
+                highlighted = rgx_highlight.sub(repl_highlight, t)
+                parts = rgx_highlight_split.split(highlighted)
+                if len(parts) < 2:
+                    continue # continue for j, t in enumerate(..)
+                index_insert = (list(parent_map[i]).index(i) + 1) if j else 0
+                setattr(i, "tail" if j else "text", "")
+                b = None
+                for k, part in enumerate(parts):
+                    if k % 2: # Text to highlight, wrap in <b>
+                        b = xml.etree.cElementTree.Element("b")
+                        b.text = part
+                        if j: # Processing i.tail
+                            parent_map[i].insert(index_insert, b)
+                        else: # Processing i.text
+                            i.insert(index_insert, b)
+                        index_insert += 1
+                    else: # Other text, append to tail/text
+                        if j: # Processing i.tail
+                            if b is not None: #
+                                b.tail = part
+                            else:
+                                i.tail = (i.tail or "") + part
+                        else: # Processing i.text
+                            if b is not None:
+                                b.tail = part
+                            else:
+                                i.text = part
+
+
+    def dom_to_html(self, dom, output):
+        """Returns an HTML representation of the message body."""
+        greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
+        if output.get("export"):
+            greytag, greyattr, greyval = "span", "class", "grey"
+        for elem in dom.getiterator():
+            index = 0
+            for subelem in elem:
+                if "quote" == subelem.tag:
+                    elem_quotefrom = subelem.find("quotefrom")
+                    # Replace quote tags with a formatted subtable
+                    templ = step.Template(templates.MESSAGE_QUOTE)
+                    template = templ.expand(export=output.get("export"))
+                    template = template.replace("\n", " ").strip()
+                    table = xml.etree.cElementTree.fromstring(template)
+                    # Select last, content cell
+                    cell = table.findall("*/td")[-1]
+                    cell.find(greytag).text += elem_quotefrom.text
+                    subelem.remove(elem_quotefrom)
+                    cell.text = subelem.text
+                    # Insert all children before the last font element
+                    len_orig = len(cell)
+                    [cell.insert(len(cell) - len_orig, i) for i in subelem]
+                    table.tail = subelem.tail
+                    elem[index] = table # Replace <quote> element in parent
+                elif "ss" == subelem.tag: # Emoticon
+                    if output.get("export"):
+                        emot, emot_type = subelem.text, subelem.get("type")
+                        template, vals = "<span>%s</span>", [emot]
+                        if hasattr(emoticons, emot_type):
+                            data = emoticons.EmoticonData[emot_type]
+                            title = data["title"]
+                            if data["strings"][0] != data["title"]:
+                                title += " " + data["strings"][0]
+                            template = "<span class=\"emoticon %s\" " \
+                                       "title=\"%s\">%s</span>"
+                            vals = [emot_type, title, emot]
+                        span_str = template % tuple(map(cgi.escape, vals))
+                        span = xml.etree.cElementTree.fromstring(span_str)
+                        span.tail = subelem.tail
+                        elem[index] = span # Replace <ss> element in parent
+                elif subelem.tag in ["msgstatus", "bodystatus"]:
+                    subelem.tag = greytag
+                    subelem.set(greyattr, greyval)
+                    # Add whitespace before next content
+                    subelem.tail = " " + (subelem.tail or "")
+                elif "a" == subelem.tag:
+                    subelem.set("target", "_blank")
+                    if output.get("export"):
+                        href = subelem.get("href").encode("utf-8")
+                        subelem.set("href", urllib.quote(href, ":/=?&#"))
+                    else: # Wrap content in system link colour
+                        t = "<font color='%s'></font>" % conf.SkypeLinkColour
+                        span = xml.etree.cElementTree.fromstring(t)
+                        span.text = subelem.text
+                        [(span.append(i), subelem.remove(i)) for i in subelem]
+                        subelem.text = ""
+                        subelem.append(span)
+                index += 1
+            if not self.wrapfunc:
+                continue # continue for elem in dom.getiterator()
+            for i, v in enumerate([elem.text, elem.tail]):
+                v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
+        try:
+            # Discard <?xml ..?><xml> tags from start, </xml> from end
+            result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
+        except Exception as e:
+            # If ElementTree.tostring fails, try converting all text
+            # content from UTF-8 to Unicode.
+            main.log("Exception for %s: %s", message["body_xml"], e)
+            for elem in dom.findall("*"):
+                for attr in ["text", "tail"]:
+                    val = getattr(elem, attr)
+                    if val and isinstance(val, str):
+                        try:
+                            setattr(elem, attr, val.decode("utf-8"))
+                        except Exception as e:
+                            main.log("Error decoding %s value \"%s\" (type %s)"
+                                     " of %s for \"%s\": %s", attr, val,
+                                     type(val), elem, message["body_xml"], e)
+            try:
+                result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
+            except Exception:
+                main.log("Failed to parse the message \"%s\" from %s.",
+                         message["body_xml"], message["author"])
+                raise
+        # emdash workaround, cElementTree won't handle unknown entities
+        result = result.replace("{EMDASH}", "&mdash;") \
+                       .replace("\n", "<br />")
+        return result
+
+
+    def dom_to_text(self, dom, tails_new=None):
+        """Returns a plaintext representation of the message DOM."""
+        fulltext = ""
+        to_skip = {} # {element to skip: True, }
+        for elem in dom.getiterator():
+            if elem in to_skip:
+                continue
+            text = elem.text or ""
+            tail = elem.tail or ""
+            subitems = []
+            if "quote" == elem.tag:
+                text = "\"" + text
+                subitems = elem.getchildren()
+            elif "quotefrom" == elem.tag:
+                text = "\"\r\n%s\r\n" % text
+            elif "msgstatus" == elem.tag:
+                text = "[%s]\r\n" % text.strip()
+            elif "ss" == elem.tag:
+                text = elem.text
+            if text:
+                fulltext += text
+            for i in subitems:
+                fulltext += self.dom_to_text(i)
+                to_skip[i] = True
+            if tail:
+                fulltext += tail
+        return fulltext
+
+
+    def add_dict_text(self, dictionary, key, text, inter=" "):
+        """Adds text to an entry in the dictionary."""
+        dictionary[key] += (inter if dictionary[key] else "") + text
+
+
+    def collect_message_stats(self, message):
+        """Adds message statistics to accumulating data."""
+        author_stats = collections.defaultdict(lambda: 0)
+        self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
+        self.stats["enddate"] = message["datetime"]
+        self.stats["total"] += 1
+        self.stats["last_message"] = ""
+        if message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
+            self.collect_dom_stats(message["dom"])
+            message["body_txt"] = self.stats["last_message"] # Export kludge
+        author, len_msg = message["author"], len(self.stats["last_message"])
+        if (message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_CALL,
+            MESSAGES_TYPE_FILE, MESSAGES_TYPE_MESSAGE]
+        and author not in self.stats["counts"]):
+            self.stats["counts"][author] = author_stats.copy()
+
+        if MESSAGES_TYPE_SMS == message["type"]:
+            self.stats["smses"] += 1
+            self.stats["counts"][author]["smses"] += 1
+            self.stats["counts"][author]["smschars"] += len_msg
+        elif MESSAGES_TYPE_CALL == message["type"]:
+            self.stats["calls"] += 1
+            self.stats["counts"][author]["calls"] += 1
+            calldurations = message.get("__calldurations", {})
+            for identity, duration in calldurations.items():
+                if identity not in self.stats["counts"]:
+                    self.stats["counts"][identity] = author_stats.copy()
+                self.stats["counts"][identity]["calldurations"] += duration
+                self.stats["callmaxdurations"] += duration
+        elif MESSAGES_TYPE_FILE == message["type"]:
+            files = message.get("__files")
+            if files is None:
+                transfers = self.db.get_transfers()
+                filedict = dict((f["chatmsg_index"], f) for f in transfers
+                                if f["chatmsg_guid"] == message["guid"])
+                files = [f for i, f in sorted(filedict.items)]
+                message["__files"] = files
+            self.stats["transfers"].extend(files)
+            self.stats["counts"][author]["files"] += len(files)
+            size_files = sum([int(i["filesize"]) for i in files])
+            self.stats["counts"][author]["bytes"] += size_files
+        elif MESSAGES_TYPE_MESSAGE == message["type"]:
+            self.stats["messages"] += 1
+            self.stats["counts"][author]["messages"] += 1
+            self.stats["counts"][author]["chars"] += len_msg
 
 
     def collect_dom_stats(self, dom, tails_new=None):
@@ -2503,40 +1999,6 @@ class MessageParser(object):
                 self.add_dict_text(self.stats, "last_message", tail)
 
 
-    def dom_to_text(self, dom, tails_new=None):
-        """Returns a plaintext representation of the message DOM."""
-        fulltext = ""
-        to_skip = {} # {element to skip: True, }
-        for elem in dom.getiterator():
-            if elem in to_skip:
-                continue
-            text = elem.text or ""
-            tail = elem.tail or ""
-            subitems = []
-            if "quote" == elem.tag:
-                text = "\"" + text
-                subitems = elem.getchildren()
-            elif "quotefrom" == elem.tag:
-                text = "\"\r\n%s\r\n" % text
-            elif "msgstatus" == elem.tag:
-                text = "[%s]\r\n" % text.strip()
-            elif "ss" == elem.tag:
-                text = elem.text
-            if text:
-                fulltext += text
-            for i in subitems:
-                fulltext += self.dom_to_text(i)
-                to_skip[i] = True
-            if tail:
-                fulltext += tail
-        return fulltext
-
-
-    def add_dict_text(self, dictionary, key, text, inter=" "):
-        """Adds text to an entry in the dictionary."""
-        dictionary[key] += (inter if dictionary[key] else "") + text
-
-
     def get_collected_stats(self):
         """
         Returns the statistics collected during message parsing.
@@ -2563,32 +2025,28 @@ class MessageParser(object):
                 period_value = stats["startdate"].strftime("%d.%m.%Y")
             stats["info_items"].append(("Time period", period_value))
         if stats["messages"]:
-            msgs_value  = "%d (%s)" % \
-                (stats["messages"], util.plural("character", stats["chars"]))
+            msgs_value  = "%d (%s)" % (stats["messages"],
+                          util.plural("character", stats["chars"]))
             stats["info_items"].append(("Messages", msgs_value))
         if stats["smses"]:
-            smses_value  = "%d (%s)" % \
-                (stats["smses"], util.plural("character", stats["smschars"]))
+            smses_value  = "%d (%s)" % (stats["smses"],
+                           util.plural("character", stats["smschars"]))
             stats["info_items"].append(("SMSes", smses_value))
         if stats["calls"]:
             calls_value  = "%d (%s)" % (stats["calls"],
                            util.format_seconds(stats["callmaxdurations"]))
             stats["info_items"].append(("Calls", calls_value))
         if stats["calldurations"]:
-            calls_total_value  = util.format_seconds(stats["calldurations"])
-            stats["info_items"].append(("Total time spent in calls",
-                                        calls_total_value))
+            total  = util.format_seconds(stats["calldurations"])
+            stats["info_items"].append(("Total time spent in calls", total))
         if stats["transfers"]:
-            files_value  = "%d (%s)" % \
-                (len(stats["transfers"]), util.format_bytes(stats["bytes"]))
+            files_value  = "%d (%s)" % (len(stats["transfers"]),
+                           util.format_bytes(stats["bytes"]))
             stats["info_items"].append(("Files", files_value))
 
         if delta_date is not None:
             per_day = util.safedivf(stats["messages"], delta_date.days + 1)
-            if per_day == int(per_day): # Drop trailing zeroes
-                per_day = "%d" % per_day
-            else:
-                per_day = "%.1f" % per_day
+            per_day = ("%d" if per_day == int(per_day) else "%.1f") % per_day
             stats["info_items"].append(("Messages per day", per_day))
 
         cloud = wordcloud.get_cloud(stats["cloudtext"], stats["links"])
@@ -2608,7 +2066,7 @@ def is_sqlite_file(filename, path=None):
                 SQLITE_HEADER = "SQLite format 3\00"
                 with open(fullpath, "rb") as f:
                     result = (f.read(len(SQLITE_HEADER)) == SQLITE_HEADER)
-        except:
+        except Exception:
             pass
     return result
 
@@ -2620,9 +2078,8 @@ def detect_databases():
 
     @yield   each value is a list of detected database paths
     """
-
     # First, search system directories for main.db files.
-    search_paths = filter(None, [os.getenv("HOME")])
+    search_paths = list(filter(None, [os.getenv("HOME")]))
     if os.name in ["mac", "posix"]:
         search_paths.append({"mac": "/Users", "posix": "/home"}[os.name])
     elif "nt" == os.name:
@@ -2660,9 +2117,7 @@ def detect_databases():
 
 
 def find_databases(folder):
-    """
-    Yields a list of all Skype databases under the specified folder.
-    """
+    """Yields a list of all Skype databases under the specified folder."""
     for root, dirs, files in os.walk(folder):
         for f in filter(lambda f: is_sqlite_file(f, root), files):
             yield os.path.join(root, f)
@@ -2670,8 +2125,7 @@ def find_databases(folder):
 
 def import_contacts_file(filename):
     """
-    Returns the contacts found in the specified CSV file,
-    as [{"name", "e-mail", "phone"}].
+    Returns contacts found in the CSV file, as [{"name", "e-mail", "phone"}].
     """
     contacts = []
     # GMail CSVs can contain mysterious NULL bytes
@@ -2714,6 +2168,43 @@ def import_contacts_file(filename):
     return contacts
 
 
+def get_avatar_pil(datadict, size=None, keep_aspect_ratio=True):
+    """
+    Returns a PIL.Image for the contact/account avatar, if any.
+
+    @param   datadict           row from Contacts or Accounts
+    @param   size               (width, height) to resize image to, if any
+    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
+                                resizing, filling the outside in white
+    """
+    result = None
+    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
+    if raw:
+        try:
+            data = fix_image_raw(raw)
+            imgparser = ImageFile.Parser(); imgparser.feed(data)
+            img = imgparser.close()
+
+            if size and list(size) != list(img.size):
+                size2, align_pos = list(size), None
+                if img.size[0] < size[0] and img.size[1] < size[1]:
+                    size2 = img.size
+                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+                elif keep_aspect_ratio:
+                    ratio = util.safedivf(img.size[0], img.size[1])
+                    size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
+                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+                if img.size[0] > size[0] or img.size[1] > size[1]:
+                    img.thumbnail(tuple(map(int, size2)), Image.ANTIALIAS)
+                if align_pos:
+                    img, img0 = Image.new(img.mode, size, "white"), img
+                    img.paste(img0, tuple(map(int, align_pos)))
+            result = img
+        except Exception as e:
+            main.log("Error loading avatar image for %s (%s).",
+                     datadict["skypename"], e)
+    return result
+
 
 def get_avatar(datadict, size=None, keep_aspect_ratio=True):
     """
@@ -2731,57 +2222,43 @@ def get_avatar(datadict, size=None, keep_aspect_ratio=True):
             data = fix_image_raw(raw)
             img = wx.ImageFromStream(cStringIO.StringIO(data))
 
-            if size and size[:] != [img.Width, img.Height]:
-                pos, newsize = None, list(size)
+            if size and list(size) != list(img.GetSize()):
+                align_pos, size2 = None, list(size)
                 if keep_aspect_ratio:
                     ratio = util.safedivf(img.Width, img.Height)
-                    i = 0 if ratio < 1 else 1
-                    newsize[i] = newsize[i] / ratio if i \
-                                 else newsize[i] * ratio
-                    pos = ((size[0]-newsize[0]) / 2, (size[1]-newsize[1]) / 2)
-                img = img.ResampleBox(*newsize)
-                if pos:
-                    img.Resize(size, pos, 255, 255, 255)
+                    size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
+                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+                img = img.ResampleBox(*size2)
+                if align_pos:
+                    img.Resize(size, align_pos, 255, 255, 255)
             result = wx.BitmapFromImage(img)
-        except Exception, e:
+        except Exception as e:
             main.log("Error loading avatar image for %s (%s).",
                      datadict["skypename"], e)
     return result
 
 
-def get_avatar_jpg(datadict, max_size=None, keep_aspect_ratio=True):
+def get_avatar_raw(datadict, size=None, keep_aspect_ratio=True, format="PNG"):
     """
-    Returns the JPG data of the contact/account avatar image, if any.
+    Returns the contact/account avatar image, if any, as raw encoded image.
 
     @param   datadict           row from Contacts or Accounts
-    @param   max_size           (width, height) to resize larger image down to,
+    @param   size               (width, height) to resize larger image down to,
                                 if any
     @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
                                 resizing, filling the outside in white
+    @param   format             image format type as supported by PIL
     """
     result = ""
-    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
-    if raw:
-        try:
-            result = fix_image_raw(raw)
-
-            img = wx.ImageFromStream(cStringIO.StringIO(result))
-            if max_size and \
-            (img.Width > max_size[0] or img.Height > max_size[1]):
-                pos, newsize = None, list(max_size)
-                if keep_aspect_ratio:
-                    ratio = util.safedivf(img.Width, img.Height)
-                    i = 0 if ratio < 1 else 1
-                    newsize[i] = newsize[i] / ratio if i \
-                                 else newsize[i] * ratio
-                    pos = ((size[0]-newsize[0]) / 2, (size[1]-newsize[1]) / 2)
-                img = img.ResampleBox(*newsize)
-                if pos:
-                    img.Resize(max_size, pos, 255, 255, 255)
-                result = util.bitmap_to_raw(img)
-        except Exception, e:
-            main.log("Error loading avatar image for %s (%s).",
-                     datadict["skypename"], e)
+    try:
+        img = get_avatar_pil(datadict, size, keep_aspect_ratio)
+        if img:
+            stream = cStringIO.StringIO()
+            img.save(stream, format)
+            result = stream.getvalue()
+    except Exception as e:
+        main.log("Error creating avatar JPG for %s (%s).",
+                 datadict["skypename"], e)
     return result
 
 
@@ -2800,7 +2277,6 @@ def fix_image_raw(raw):
         if raw.startswith("\0"):
             raw = "\xFF" + raw[1:]
     return raw
-
 
 
 

@@ -1,1 +1,1 @@
-@start pythonw src/main.py
+@pythonw "%~dp0\src\main.py" %*

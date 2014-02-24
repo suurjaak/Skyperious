@@ -8,20 +8,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    14.11.2013
+@modified    24.02.2014
 ------------------------------------------------------------------------------
 """
 import collections
-import cStringIO
 import csv
 import datetime
 import os
 import re
 import traceback
-import wx
 
-from third_party import step
-
+from PIL import ImageFile, ImageFont
 try:
     import xlsxwriter
     XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|"
@@ -29,12 +26,21 @@ except ImportError:
     xlsxwriter = None
     XLSX_WILDCARD = ""
 
+from third_party import step
+
 import conf
 import emoticons
+import images
 import main
 import skypedata
 import templates
 import util
+
+try: # Used in measuring text extent for Excel column auto-width.
+    FONT_XLSX = ImageFont.truetype(conf.FontXlsxFile, 15)
+    FONT_XLSX_BOLD = ImageFont.truetype(conf.FontXlsxBoldFile, 15)
+except IOError:
+    FONT_XLSX = FONT_XLSX_BOLD = ImageFont.load_default()
 
 """FileDialog wildcard strings, matching extensions lists and default names."""
 CHAT_WILDCARD = ("HTML document (*.html)|*.html|Text document (*.txt)|*.txt|"
@@ -55,7 +61,7 @@ QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
 QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
 
 
-def export_chats(chats, path, format, db, messages=None, skip=True):
+def export_chats(chats, path, format, db, messages=None, skip=True, progress=None):
     """
     Exports the specified chats from the database under path.
 
@@ -68,6 +74,8 @@ def export_chats(chats, path, format, db, messages=None, skip=True):
     @param   db        SkypeDatabase instance
     @param   messages  list messages to export if a single chat
     @param   skip      whether to skip chats with no messages
+    @param   progress  function called before exporting each chat, with the
+                       number of messages exported so far
     @return            (list of exported filenames, number of chats exported)
     """
     files, count = [], 0
@@ -79,36 +87,41 @@ def export_chats(chats, path, format, db, messages=None, skip=True):
             filename = os.path.join(path, util.safe_filename(filename))
             filename = util.unique_path(filename)
         return filename
-    main.logstatus("Exporting %s from %s %sin %s.",
+    main.logstatus("Exporting %s from %s %sto %s.",
                    util.plural("chat", chats), db.filename,
                    "" if len(format) > 4 else "as %s " % format.upper(),
                    format if len(format) > 4 else path)
 
     if format.lower().endswith(".xlsx"):
         filename = make_filename(chats[0])
-        count = export_chats_xlsx(chats, filename, db, messages, skip)
+        count = export_chats_xlsx(chats, filename, db, messages, skip, progress)
         files.append(filename)
     else:
+        if not os.path.exists(path):
+            os.makedirs(path)
         export_func = (export_chats_xlsx if format.lower().endswith("xlsx")
                        else export_chat_csv if format.lower().endswith("csv")
                        else export_chat_template)
+        message_count = 0
         for chat in chats:
             if skip and not messages and not chat["message_count"]:
                 main.log("Skipping exporting %s: no messages.",
                          chat["title_long_lc"])
-                continue
+                if progress: progress(message_count)
+                continue # continue for chat in chats
             main.status("Exporting %s.", chat["title_long_lc"])
-            wx.SafeYield()
+            if progress: progress(message_count)
             filename = make_filename(chat)
             msgs = messages or db.get_messages(chat)
             chatarg = [chat] if "xlsx" == format.lower() else chat
             export_func(chatarg, filename, db, msgs)
+            message_count += chat["message_count"]
             files.append(filename)
         count = len(files)
     return (files, count)
 
 
-def export_chats_xlsx(chats, filename, db, messages=None, skip=True):
+def export_chats_xlsx(chats, filename, db, messages=None, skip=True, progress=None):
     """
     Exports the chats to a single XLSX file with chats on separate worksheets.
 
@@ -117,18 +130,21 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True):
     @param   db        SkypeDatabase instance
     @param   messages  list of messages to export if a single chat
     @param   skip      whether to skip chats with no messages
+    @param   progress  function called before exporting each chat, with the
+                       number of messages exported so far
     @return            number of chats exported
     """
     count, style = 0, {0: "timestamp", 2: "wrap", 3: "hidden"}
 
     writer = xlsx_writer(filename, autowrap=[2])
+    message_count = 0
     for chat in chats:
         if skip and not messages and not chat["message_count"]:
             main.log("Skipping exporting %s: no messages.",
                      chat["title_long_lc"])
             continue # continue for chat in chats
         main.status("Exporting %s.", chat["title_long_lc"])
-        wx.SafeYield()
+        if progress: progress(message_count)
         parser = skypedata.MessageParser(db, chat=chat, stats=False)
         writer.add_sheet(chat["title"])
         writer.set_header(True)
@@ -137,13 +153,14 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True):
         writer.set_header(False)
         msgs = messages or db.get_messages(chat)
         for i, m in enumerate(msgs):
-            text = parser.parse(m, text={"wrap": False})
+            text = parser.parse(m, output={"format": "text"})
             try:
                 text = text.decode("utf-8")
-            except: pass
+            except UnicodeError: pass
             values = [m["datetime"], m["from_dispname"], text, m["author"]]
             style[1] = "local" if db.id == m["author"] else "remote"
             writer.writerow(values, style)
+        message_count += chat["message_count"]
         count += 1
     writer.close()
     return count
@@ -168,26 +185,33 @@ def export_chat_template(chat, filename, db, messages):
 
         if is_html:
             # Collect chat and participant images.
-            namespace.update({"chat_picture": None, "chat_picture_raw": None,
-                              "participants": [], })
+            namespace.update({"participants": [], "chat_picture_size": None,
+                              "chat_picture_raw": None, })
             if chat["meta_picture"]:
                 raw = skypedata.fix_image_raw(chat["meta_picture"])
-                img = wx.ImageFromStream(cStringIO.StringIO(raw))
-                namespace.update(chat_picture=img, chat_picture_raw=raw)
+                imgparser = ImageFile.Parser(); imgparser.feed(raw)
+                img = imgparser.close()
+                namespace.update(chat_picture_size=img.size,
+                                 chat_picture_raw=raw)
             for p in chat["participants"]:
                 contact = p["contact"].copy()
                 namespace["participants"].append(contact)
-                contact.update(avatar_image_raw="", avatar_image_large_raw="")
+                contact.update(avatar_raw_small="", avatar_raw_large="")
                 bmp = contact.get("avatar_bitmap")
-                if not bmp:
-                    bmp = skypedata.get_avatar(contact, conf.AvatarImageSize)
-                    if bmp:
-                        p["contact"]["avatar_bitmap"] = bmp # Cache resized
-                if bmp:
-                    size = conf.AvatarImageLargeSize
-                    raw_large = skypedata.get_avatar_jpg(contact, size)
-                    contact["avatar_image_raw"] = util.bitmap_to_raw(bmp)
-                    contact["avatar_image_large_raw"] = raw_large
+                raw = contact.get("avatar_raw_small")
+                raw_large = contact.get("avatar_raw_large")
+                if not raw and not bmp:
+                    raw = skypedata.get_avatar_raw(contact, conf.AvatarImageSize)
+                    if raw:
+                        p["contact"]["avatar_raw_small"] = raw
+                raw = bmp and util.wx_bitmap_to_raw(bmp) or raw
+                if raw:
+                    if not raw_large:
+                        size_large = conf.AvatarImageLargeSize
+                        raw_large = skypedata.get_avatar_raw(contact, size_large)
+                        p["contact"]["avatar_raw_large"] = raw_large
+                    contact["avatar_raw_small"] = raw
+                    contact["avatar_raw_large"] = raw_large
 
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
@@ -206,8 +230,8 @@ def export_chat_template(chat, filename, db, messages):
                      if stats.get("startdate") else "",
             "date2": stats["enddate"].strftime("%d.%m.%Y")
                      if stats.get("enddate") else "",
-            "emoticons_used": filter(lambda e: hasattr(emoticons, e),
-                                     parser.emoticons_unique),
+            "emoticons_used": list(filter(lambda e: hasattr(emoticons, e),
+                                     parser.emoticons_unique)),
             "message_count":  stats.get("messages", 0),
         })
 
@@ -217,8 +241,8 @@ def export_chat_template(chat, filename, db, messages):
         with open(filename, "w") as f:
             step.Template(template, strip=False).stream(f, namespace)
     finally:
-        if tmpfile: util.try_until(tmpfile.close, count=1)
-        if tmpname: util.try_until(lambda: os.unlink(tmpname), count=1)
+        if tmpfile: util.try_until(tmpfile.close)
+        if tmpname: util.try_until(lambda: os.unlink(tmpname))
 
 
 def export_chat_csv(chat, filename, db, messages):
@@ -239,10 +263,10 @@ def export_chat_csv(chat, filename, db, messages):
         writer = csv.writer(f, dialect)
         writer.writerow(["Time", "Author", "Message"])
         for i, m in enumerate(messages):
-            text = parser.parse(m, text={"wrap": False})
+            text = parser.parse(m, output={"format": "text"})
             try:
                 text = text.decode("utf-8")
-            except: pass
+            except UnicodeError: pass
             values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
                       m["from_dispname"], text ]
             values = [v.encode("latin1", "replace") for v in values]
@@ -329,14 +353,13 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
 
             result = True
     finally:
-        if f: util.try_until(f.close, count=1)
+        if f: util.try_until(f.close)
     return result
 
 
 
 class xlsx_writer(object):
     """Convenience wrapper for xslxwriter, with csv.Writer-like interface."""
-    FONTNAME       = "Calibri"
     COL_MAXWIDTH   = 100 # In Excel units, 1 == width of "0" in standard font
     ROW_MAXNUM     = 1048576 # Maximum per worksheet
     FMT_DEFAULT    = {"bg_color": "white", "valign": "top"}
@@ -375,16 +398,11 @@ class xlsx_writer(object):
             self._formats[t] = self._workbook.add_format(f)
 
         # For calculating column widths
-        dc_default = wx.MemoryDC()
-        dc_default.Font = wx.Font(11, wx.FONTFAMILY_SWISS,
-            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, face=self.FONTNAME)
-        self._dcs = collections.defaultdict(lambda: dc_default)
-        self._dcs["bold"] = wx.MemoryDC()
-        self._dcs["bold"].Font = wx.Font(11, wx.FONTFAMILY_SWISS,
-            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, face=self.FONTNAME)
-        unit_width_default = self._dcs[None].GetTextExtent("0")[0]
+        self._fonts = collections.defaultdict(lambda: FONT_XLSX)
+        self._fonts["bold"] = FONT_XLSX_BOLD
+        unit_width_default = self._fonts[None].getsize("0")[0]
         self._unit_widths = collections.defaultdict(lambda: unit_width_default)
-        self._unit_widths["bold"] = self._dcs["bold"].GetTextExtent("0")[0]
+        self._unit_widths["bold"] = self._fonts["bold"].getsize("0")[0]
 
         if sheetname: # Create default sheet
             self.add_sheet(sheetname)
@@ -412,7 +430,6 @@ class xlsx_writer(object):
         self._sheets[sheet.name.lower()] = self._sheet = sheet
         self._sheetnames[sheet] = name or sheet.name
         self._col_widths[sheet.name] = collections.defaultdict(lambda: 0)
-        sheet.set_column(0, 50, cell_format=self._formats[None])
         for c in self._autowrap:
             sheet.set_column(c, c, self.COL_MAXWIDTH, self._formats[None])
         self._row = 0
@@ -443,7 +460,7 @@ class xlsx_writer(object):
         @param   merge_cols  how many columns to merge (0 for none)
         @param   autowidth   are the values used to auto-size column max width
         """
-        if self._row and not self._row % self.ROW_MAXNUM: # Sheet full: get new
+        if self._row >= self.ROW_MAXNUM: # Sheet full: start a new one
             name_former = self._sheet.name
             self.add_sheet(self._sheetnames[self._sheet])
             if name_former in self._headers: # Write same header
@@ -457,10 +474,10 @@ class xlsx_writer(object):
             self._sheet.merge_range(self._row, 0, self._row, merge_cols, "", f)
             values = values[0] if values else []
         for c, v in enumerate(values):
-            func = self._writers[type(v)]
+            writefunc = self._writers[type(v)]
             fmt_name = style if isinstance(style, basestring) \
                        else style.get(c, self._format)
-            func(self._row, c, v, self._formats[fmt_name])
+            writefunc(self._row, c, v, self._formats[fmt_name])
             if (merge_cols or not autowidth or "wrap" == fmt_name
             or c in self._autowrap):
                 continue # continue for c, v in enumerate(Values)
@@ -469,7 +486,8 @@ class xlsx_writer(object):
             strval = v if isinstance(v, basestring) \
                      else v.strftime("%Y-%m-%d %H:%M") \
                      if isinstance(v, datetime.datetime) else str(v)
-            pixels = self._dcs[fmt_name].GetMultiLineTextExtent(strval)[0]
+            pixels = max(self._fonts[fmt_name].getsize(x)[0]
+                         for x in strval.split("\n"))
             width = float(pixels) / self._unit_widths[fmt_name] + 1
             if not merge_cols and width > self._col_widths[self._sheet.name][c]:
                 self._col_widths[self._sheet.name][c] = width
@@ -481,9 +499,11 @@ class xlsx_writer(object):
 
         # Auto-size columns with calculated widths
         for sheet in self._workbook.worksheets():
+            c = -1
             for c, w in sorted(self._col_widths[sheet.name].items()):
                 w = min(w, self.COL_MAXWIDTH)
                 sheet.set_column(c, c, w, self._formats[None])
+            sheet.set_column(c + 1, 50, cell_format=self._formats[None])
         self._workbook.set_properties({"comments": "Exported with %s on %s." %
             (conf.Title, datetime.datetime.now().strftime("%d.%m.%Y %H:%M"))})
         self._workbook.close()

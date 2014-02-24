@@ -15,9 +15,13 @@ Parses a Google-like search grammar into SQL for querying a Skype database.
 - "-" immediately before: exclude words, phrases, grouped words and keywords
 - can also provide queries to search all fields in any table
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    22.08.2013
+@modified    22.02.2014
 """
 import calendar
 import collections
@@ -27,7 +31,7 @@ import string
 import traceback
 import warnings
 
-from third_party.pyparsing import *
+from pyparsing import *
 
 import util
 
@@ -44,7 +48,7 @@ ParserElement.enablePackrat() # Speeds up recursive grammar significantly
 
 class SearchQueryParser(object):
 
-    # For naive identification of "chat:xxx" and "from:xxx" keywords
+    # For naive identification of "chat:xyz" and "from:xyz" keywords
     PATTERN_KEYWORD = re.compile("^(-?)(chat|from)\:([^\s]+)$", re.I)
 
 
@@ -63,7 +67,8 @@ class SearchQueryParser(object):
                              ).setResultsName("PLAINWORD")
             anyWord = Group(NotAny('(') + ~FollowedBy(')') + Word(ALLWORDCHARS)
                            ).setResultsName("ANYWORD")
-            keyWord = Group(Combine(Optional("-") + Word(alphas) + Literal(":")
+            keyWord = Group(Combine(Optional("-") + Word(string.ascii_letters)
+                                    + Literal(":")
                                     + (Word(WORDCHARS) | quotedWord))
                            ).setResultsName("KEYWORD")
             notExpr = Group(Suppress("-") + NotAny(string.whitespace)
@@ -101,15 +106,15 @@ class SearchQueryParser(object):
                         specific table, ignoring all Skype-specific keywords,
                         only taking into account the table: keyword
                         {"name": "Table name": "columns[{"name", "pk_id", }, ]}
-        @return         (sql, sql_params, words)
+        @return         (SQL string, SQL parameter dict, word and phrase list)
         """
-        words = [] # All encountered text words and text quotes
+        words = [] # All encountered text words and quoted phrases
         keywords = collections.defaultdict(list) # {"from": [], "chat": [], ..}
         sql_params = {} # Parameters for SQL query {"body_like0": "%word%", ..}
 
         try:
             parse_results = self._grammar.parseString(query, parseAll=True)
-        except Exception, e:
+        except Exception:
             # Grammar parsing failed: do a naive parsing into keywords and words
             split_words = query.lower().split()
 
@@ -121,7 +126,7 @@ class SearchQueryParser(object):
                     split_words.remove(word)
             parse_results = ParseResults(split_words)
 
-        result = self.makeSQL(parse_results, words, keywords, sql_params,
+        result = self._makeSQL(parse_results, words, keywords, sql_params,
                               table=table)
         if table:
             skip_table = False
@@ -141,14 +146,14 @@ class SearchQueryParser(object):
         else:
             if "table" in keywords: del keywords["table"]
             if "-table" in keywords: del keywords["-table"]
-            kw_sql = self.makeKeywordsSQL(keywords, sql_params)
+            kw_sql = self._makeKeywordsSQL(keywords, sql_params)
         if not table and kw_sql:
             result = "%s%s" % ("%s AND " % result if result else "", kw_sql)
 
         return result, sql_params, words
 
 
-    def makeSQL(self, item, words, keywords, sql_params,
+    def _makeSQL(self, item, words, keywords, sql_params,
                 table=None, parent_name=None):
         """
         Returns the ParseResults item as an SQL string, appending
@@ -174,20 +179,20 @@ class SearchQueryParser(object):
                     negation = bool(elements[0])
                     elements = elements[1:] # Drop the optional "-" in front
             elif "QUOTES" == name:
-                elements = self.flatten(elements)
+                elements = self._flatten(elements)
             if do_recurse:
                 for i in elements:
-                    sql = self.makeSQL(i, words, keywords, sql_params,
+                    sql = self._makeSQL(i, words, keywords, sql_params,
                                        table, name)
                     parsed_elements.append(sql)
                 or_names = ["OR_OPERAND", "OR_EXPRESSION"]
                 glue = " OR " if name in or_names else " AND "
-                result, count = self.join_strings(parsed_elements, glue)
+                result, count = self._join_strings(parsed_elements, glue)
                 result = "(%s)"   % result if count > 1 else result
                 result = "NOT %s" % result if negation  else result
         else:
             words.append(item)
-            safe = self.escape(item, ("*" if "QUOTES" != parent_name else ""))
+            safe = self._escape(item, ("*" if "QUOTES" != parent_name else ""))
             if not table:
                 table = {"name": "m", "columns": [{"name": "body_xml"}]}
             i = len(sql_params)
@@ -202,7 +207,7 @@ class SearchQueryParser(object):
         return result
 
 
-    def makeKeywordsSQL(self, keywords, sql_params):
+    def _makeKeywordsSQL(self, keywords, sql_params):
         """
         Returns the keywords as an SQL string, appending SQL parameter values
         to argument dictionary.
@@ -212,7 +217,7 @@ class SearchQueryParser(object):
             kw_sql = ""
             for i, word in enumerate(words):
                 param = add_escape = ""
-                escaped = self.escape(word)
+                escaped = self._escape(word)
                 if len(escaped) > len(word):
                     add_escape = " ESCAPE '%s'" % ESCAPE_CHAR
                 if keyword.endswith("from") or keyword.endswith("chat"):
@@ -232,7 +237,7 @@ class SearchQueryParser(object):
                     date_words, dates = [None] * 2, [None] * 2
                     if ".." not in word:
                         # Single date value given: use strftime matching
-                        ymd = map(util.toint, word.split("-")[:3])
+                        ymd = list(map(util.to_int, word.split("-")[:3]))
                         while len(ymd) < 3: ymd.append(None) # Ensure 3 values
                         if not any(ymd): # No valid values given: skip
                             continue # continue for i, word in enumerate(words)
@@ -250,7 +255,8 @@ class SearchQueryParser(object):
                         # Date range given: use timestamp matching
                         date_words = word.split("..", 1)
                     for j, d in filter(lambda x: x[1], enumerate(date_words)):
-                        ymd = map(util.toint, filter(None, d.split("-")[:3]))
+                        parts = filter(None, d.split("-")[:3])
+                        ymd = list(map(util.to_int, parts))
                         if not ymd or ymd[0] is None:
                             continue # continue for j, d in filter(..
                         while len(ymd) < 3: ymd.append(None) # Ensure 3 values
@@ -281,7 +287,7 @@ class SearchQueryParser(object):
         return result
 
 
-    def flatten(self, items):
+    def _flatten(self, items):
         """
         Flattens the list to a single level, if possible,
         e.g. [[['a', 'b']]] to ['a', 'b'].
@@ -293,7 +299,7 @@ class SearchQueryParser(object):
         return result
 
 
-    def escape(self, item, wildcards=""):
+    def _escape(self, item, wildcards=""):
         """
         Escapes special SQLite characters _% in item.
 
@@ -306,14 +312,14 @@ class SearchQueryParser(object):
         return result
 
 
-    def join_strings(self, strings, glue=" AND "):
+    def _join_strings(self, strings, glue=" AND "):
         """
         Returns the non-empty strings joined together with the specified glue.
 
         @param   glue  separator used as glue between strings 
         @return        (joined string, number of strings actually used)
         """
-        strings = filter(None, strings)
+        strings = list(filter(None, strings))
         return glue.join(strings), len(strings)
 
 
@@ -341,12 +347,12 @@ if "__main__" == __name__:
     import textwrap
 
     parser = SearchQueryParser()
-    # Decorate SearchQueryParser.makeSQL() with a print logger
+    # Decorate SearchQueryParser._makeSQL() with a print logger
     loglines = [] # Cached trace lines
     def makeSQLLogger(func):
         level = [0] # List as workaround: enclosing scope cannot be reassigned
         def inner(item, words, keywords, sql_params, table=None, parent_name=None):
-            txt = "%smakeSQL(<%s> %s, parent_name=%s)" % \
+            txt = "%s_makeSQL(<%s> %s, parent_name=%s)" % \
                   ("  " * level[0], item.__class__.__name__, item, parent_name)
             if hasattr(item, "getName"):
                 txt += ", name=%s" % item.getName()
@@ -358,20 +364,20 @@ if "__main__" == __name__:
             return result
         return inner
     if DO_TRACE:
-        parser.makeSQL = makeSQLLogger(parser.makeSQL)
+        parser._makeSQL = makeSQLLogger(parser._makeSQL)
 
     for i, item in enumerate(TEST_QUERIES):
         del loglines[:]
-        print "\n%s\n" % ("-" * 60) if i else ""
-        print "QUERY:", repr(item)
+        print("\n%s\n" % ("-" * 60) if i else "")
+        print("QUERY: %s" % repr(item))
         d1 = datetime.datetime.now()
         r = parser.Parse(item)
         d2 = datetime.datetime.now()
-        print "\n".join(loglines)
-        print "PARSE DURATION:", d2 - d1
+        print("\n".join(loglines))
+        print("PARSE DURATION: %s" % (d2 - d1))
         try:
             parsetree = parser._grammar.parseString(query, parseAll=True)
-            print "PARSE TREE:", parsetree
+            print("PARSE TREE: %s" % parsetree)
         except:
             pass
         sql, params, words = r
@@ -381,7 +387,7 @@ if "__main__" == __name__:
         wrapper = textwrap.TextWrapper(width=140, subsequent_indent="  ",
                                        replace_whitespace=False,
                                        drop_whitespace=False)
-        print "SQL: ", "\n".join(wrapper.wrap(sql))
-        print "PARAMS: ", "\n".join(wrapper.wrap(repr(params)))
-        print "WORDS: ", repr(words)
-        print "QUERY: ", item
+        print("SQL: %s" % "\n".join(wrapper.wrap(sql)))
+        print("PARAMS: %s" % "\n".join(wrapper.wrap(repr(params))))
+        print("WORDS: %s" % repr(words))
+        print("QUERY: %s" % item)

@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.11.2013
+@modified    24.02.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -19,20 +19,21 @@ import json
 import os
 import sys
 import urllib
-import wx
+
+import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "2.3"
-VersionDate = "17.11.2013"
+Version = "3.0"
+VersionDate = "24.02.2014"
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
     ApplicationDirectory = os.path.dirname(sys.executable)
-    ApplicationFile = os.path.realpath(sys.executable)
+    ResourceDirectory = os.path.join(getattr(sys, "_MEIPASS", ""), "res")
 else:
     ApplicationDirectory = os.path.dirname(os.path.dirname(__file__))
-    ApplicationFile = os.path.join(ApplicationDirectory, "main.py")
+    ResourceDirectory = os.path.join(ApplicationDirectory, "res")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -43,7 +44,8 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessageBody", "SearchInNewTab",
-    "SearchInTables", "SQLWindowTexts", "WindowPosition", "WindowSize",
+    "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
+    "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 
 """---------------------------- FileDirectives: ----------------------------"""
@@ -101,6 +103,15 @@ SearchInTables = False
 
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
+
+"""Whether the program tray icon is used."""
+TrayIconEnabled = True
+
+"""Whether the program checks for updates every UpdateCheckInterval."""
+UpdateCheckAutomatic = True
+
+"""Whether the program has been minimized and hidden."""
+WindowIconized = False
 
 """Main window position, (x, y)."""
 WindowPosition = None
@@ -178,13 +189,42 @@ HistoryFontName = "Tahoma"
 """Font size in chat history."""
 HistoryFontSize = 8
 
+"""Window background colour."""
+BgColour = "#FFFFFF"
+
+"""Text colour."""
+FgColour = "#000000"
+
+"""Main screen background colour."""
+MainBgColour = "#FFFFFF"
+
+"""Widget (button etc) background colour."""
+WidgetColour = "#D4D0C8"
+
+"""Default text colour for chat messages."""
+MessageTextColour = "#202020"
+
 """Foreground colour for gauges."""
 GaugeColour = "#008000"
 
-DBListBackgroundColour = "#ECF4FC"
+"""Disabled text colour."""
+DisabledColour = "#808080"
 
-"""Default colour in chat history."""
-HistoryDefaultColour = "#202020"
+"""Table border colour in search help."""
+HelpBorderColour = "#D4D0C8"
+
+"""Code element text colour in search help."""
+HelpCodeColour = "#006600"
+
+"""Colour for clickable links."""
+LinkColour = "#0000FF"
+
+"""Colour for in-message links in export."""
+ExportLinkColour = "#3399FF"
+
+"""Colours for main screen database list."""
+DBListBackgroundColour = "#ECF4FC"
+DBListForegroundColour = "#000000"
 
 """Background colour of exported chat history."""
 HistoryBackgroundColour = "#8CBEFF"
@@ -202,16 +242,13 @@ HistoryLocalAuthorColour = "#999999"
 HistoryGreyColour = "#999999"
 
 """Colour used for clickable links in chat history"""
-HistoryLinkColour = "#3399FF"
+SkypeLinkColour = "#3399FF"
 
 """Default colour in chat history."""
 HistoryLineColour = "#E4E8ED"
 
 """Descriptive text shown in chat history searchbox."""
 HistorySearchDescription = "Search for.."
-
-"""Colour used for contact field names in search results."""
-ResultContactFieldColour = "#727272"
 
 """Background colour of opened items in lists."""
 ListOpenedBgColour = "pink"
@@ -234,22 +271,8 @@ GridRowInsertedColour = "#88DDFF"
 """Colour set to table/list cells that have been changed."""
 GridCellChangedColour = "#FF7777"
 
-"""Colour set to chat diff list rows with identical sides."""
-DiffIdenticalColour = "#666666"
-
-"""Skyperious homepage URL."""
-HomeUrl = "http://suurjaak.github.com/Skyperious/"
-
 """Background colour for merge page HtmlWindow with scan results."""
 MergeHtmlBackgroundColour = "#ECF4FC"
-
-"""
-Width and height tuple of the avatar image, shown in chat data and export HTML
-statistics."""
-AvatarImageSize = (32, 32)
-
-"""Width and height tuple of the large avatar image, shown in HTML export."""
-AvatarImageLargeSize = (96, 96)
 
 """Colour for messages plot in chat statistics."""
 PlotMessagesColour = "#3399FF"
@@ -266,6 +289,17 @@ PlotFilesColour = "#33DD66"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
+"""Skyperious homepage URL."""
+HomeUrl = "http://suurjaak.github.com/Skyperious/"
+
+"""
+Width and height tuple of the avatar image, shown in chat data and export HTML
+statistics."""
+AvatarImageSize = (32, 32)
+
+"""Width and height tuple of the large avatar image, shown in HTML export."""
+AvatarImageLargeSize = (96, 96)
+
 """Length of the chat statistics plots, in pixels."""
 PlotWidth = 350
 
@@ -274,6 +308,10 @@ StatusFlashLength = 30000
 
 """How many items in the Recent Files menu."""
 MaxRecentFiles = 20
+
+"""Font files used for measuring text extent in export."""
+FontXlsxFile = os.path.join(ResourceDirectory, "Carlito.ttf")
+FontXlsxBoldFile = os.path.join(ResourceDirectory, "CarlitoBold.ttf")
 
 
 def load():
@@ -292,22 +330,19 @@ def load():
                 try:
                     value = json.loads(value_raw)
                     success = True
-                except:
+                except ValueError:
                     pass
-                if not success:
-                    # JSON failed, try to eval it
+                if not success: # JSON failed, try to eval it
                     try:
                         value = eval(value_raw)
-                        success = True
-                    except:
-                        # JSON and eval failed, fall back to string
+                    except SyntaxError: # Fall back to string
                         value = value_raw
-                        success = True
+                    success = True
                 if success:
                     setattr(module, name, value)
-            except:
+            except Exception:
                 pass
-    except Exception, e:
+    except Exception:
         pass # Fail silently
 
 
@@ -319,17 +354,16 @@ def save():
     parser.optionxform = str # Force case-sensitivity on names
     parser.add_section(section)
     try:
-        f = open(ConfigFile, "wb")
-        f.write("# %s configuration autowritten on %s.\n" % (
-            ConfigFile, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        )
+        f, fname = open(ConfigFile, "wb"), util.longpath(ConfigFile)
+        f.write("# %s configuration autowritten on %s.\n" %
+                (fname, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try:
                 value = getattr(module, name)
                 parser.set(section, name, json.dumps(value))
-            except:
+            except Exception:
                 pass
         parser.write(f)
         f.close()
-    except Exception, e:
+    except Exception:
         pass # Fail silently

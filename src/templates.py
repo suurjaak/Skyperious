@@ -8,15 +8,14 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.09.2013
+@modified    22.02.2014
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-import base64, datetime, os, re, string, sys, urllib
-import conf, emoticons, images, skypedata, util
-
+#import base64, datetime, os, re, string, sys, urllib, wx
+#import conf, emoticons, images, skypedata, util
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
@@ -25,8 +24,7 @@ SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 
 """HTML chat history export template."""
-CHAT_HTML = """
-<%
+CHAT_HTML = """<%
 import base64, datetime, urllib
 import conf, emoticons, images, skypedata, util
 %>
@@ -103,14 +101,14 @@ import conf, emoticons, images, skypedata, util
     span.grey {
       color: #999;
     }
-    a, a.visited { color: {{conf.HistoryLinkColour}}; text-decoration: none; cursor: pointer; }
+    a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; cursor: pointer; }
     a:hover, a.visited:hover { text-decoration: underline; }
     #footer {
       text-align: center;
       padding-bottom: 10px;
       color: #666;
     }
-    #header { font-size: 1.1em; font-weight: bold; color: {{conf.HistoryLinkColour}}; }
+    #header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
     #header_table {
       width: 100%;
     }
@@ -360,22 +358,22 @@ import conf, emoticons, images, skypedata, util
 p["avatar_class"] = "avatar__default"
 p["avatar_class_large"] = "avatar_large__default"
 %>
-%if p["avatar_image_large_raw"]:
+%if p["avatar_raw_large"]:
 <%
 id_csssafe = urllib.quote(p["identity"]).replace("%", "___").replace(".", "___").replace("/", "___")
 p["avatar_class_large"] = "avatar_large__" + id_csssafe
 %>
     span.{{p["avatar_class_large"]}} {
-      background: url("data:image/jpg;base64,{{base64.b64encode(p["avatar_image_large_raw"])}}")
+      background: url("data:image/png;base64,{{base64.b64encode(p["avatar_raw_large"])}}")
                   center center no-repeat;
     }
 %endif
-%if p["avatar_image_raw"]:
+%if p["avatar_raw_small"]:
 <%
 p["avatar_class"] = "avatar__" + id_csssafe
 %>
     span.{{p["avatar_class"]}} {
-      background: url("data:image/jpg;base64,{{base64.b64encode(p["avatar_image_raw"])}}")
+      background: url("data:image/png;base64,{{base64.b64encode(p["avatar_raw_small"])}}")
                   center center no-repeat;
     }
 %endif
@@ -383,12 +381,12 @@ p["avatar_class"] = "avatar__" + id_csssafe
     #chat_picture {
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
       display: none;
-%elif chat_picture:
-      background: url("data:image/jpg;base64,{{base64.b64encode(chat_picture_raw)}}") center center no-repeat;
+%elif chat_picture_raw:
+      background: url("data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}") center center no-repeat;
       margin: 0 10px 0 10px;
       display: block;
-      width: {{chat_picture.Width}}px;
-      height: {{chat_picture.Height}}px;
+      width: {{chat_picture_size[0]}}px;
+      height: {{chat_picture_size[1]}}px;
 %endif
     }
 %if emoticons_used:
@@ -595,7 +593,7 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %endif
       </div>
 %endfor
-%elif chat_picture:
+%elif chat_picture_size:
       <span id="chat_picture" title="{{chat["title"]}}"></span>
 %endif
     </td>
@@ -792,7 +790,7 @@ previous_author = None
   </tr>
 %endif
 <%
-text = parser.parse(m, html={"export": True})
+text = parser.parse(m, output={"format": "html", "export": True})
 from_name = m["from_dispname"] if previous_author != m["author"] else ""
 # Info messages like "/me is thirsty" -> author on same line.
 is_info = (skypedata.MESSAGES_TYPE_INFO == m["type"])
@@ -869,10 +867,10 @@ previous_day = m["datetime"].date()
 %endif
 %if skypedata.MESSAGES_TYPE_INFO == m["type"]:
 {{m["datetime"].strftime("%H:%M")}}
-{{m["from_dispname"]}} {{parser.parse(m, text=True)}}
+{{m["from_dispname"]}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %else:
 {{m["datetime"].strftime("%H:%M")}} {{m["from_dispname"]}}:
-{{parser.parse(m, text=True)}}
+{{parser.parse(m, output={"format": "text", "wrap": True})}}
 %endif
 
 %endfor
@@ -895,7 +893,7 @@ import conf, images, util
             background: {{conf.HistoryBackgroundColour}};
             margin: 0px 10px 0px 10px;
         }
-        .header { font-size: 1.1em; font-weight: bold; color: {{conf.HistoryLinkColour}}; }
+        .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
         .header_table {
             width: 100%;
         }
@@ -925,14 +923,14 @@ import conf, images, util
             padding: 5px;
             border: 1px solid #C0C0C0;
         }
-        a, a.visited { color: conf.HistoryLinkColour; text-decoration: none; }
+        a, a.visited { color: conf.ExportLinkColour; text-decoration: none; }
         a:hover, a.visited:hover { text-decoration: underline; }
         .footer {
           text-align: center;
           padding-bottom: 10px;
           color: #666;
         }
-        .header { font-size: 1.1em; font-weight: bold; color: conf.HistoryLinkColour; }
+        .header { font-size: 1.1em; font-weight: bold; color: conf.ExportLinkColour; }
         td { text-align: left; vertical-align: top; }
     </style>
 </head>
@@ -1002,7 +1000,7 @@ if isinstance(value, basestring):
         if isinstance(value, unicode):
             try:
                 value = value.encode("latin1")
-            except:
+            except UnicodeError:
                 value = value.encode("utf-8", errors="replace")
         value = "X'%s'" % value.encode("hex").upper()
     else:
@@ -1026,12 +1024,12 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 STATS_HTML = """<%
 import datetime, urllib
 import conf, skypedata, util
-
 %>
+<font color="{{conf.FgColour}}">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="top"><b>Statistics for currently shown messages in {{chat["title_long_lc"]}}:</b></a></td>
 %if stats.get("wordcloud"):
-  <td align="right"><a href="#cloud">Jump to word cloud</a></td>
+  <td align="right"><a href="#cloud"><font color="{{conf.LinkColour}}">Jump to word cloud</font></a></td>
 %endif
 </tr><tr><td><font size="0">&nbsp;</font></td></tr></table>
 <br />
@@ -1049,7 +1047,7 @@ import conf, skypedata, util
 %if sort_by == name:
       <td><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</td>
 %else:
-      <td><a href="sort://{{name}}">{{label}}</a>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      <td><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</td>
 %endif
 %endif
 %endfor
@@ -1118,16 +1116,16 @@ else:
 <br /><hr />
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="cloud"><b>Word cloud for currently shown messages:</b></a></td>
-  <td align="right"><a href="#top">Back to top</a></td>
+  <td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td>
 </tr></table>
 <br /><br />
 %for word, count, size in stats["wordcloud"]:
-<font color="blue" size="{{size}}"><a href="{{word}}">{{word}}</a> ({{count}}) </font>
+<font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
 %endif
 
 %if stats.get("transfers"):
-<br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top">Back to top</a></td></tr></table><br /><br />
+<br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td></tr></table><br /><br />
 <table width="100%">
 %for f in stats["transfers"]:
 <%
@@ -1138,13 +1136,14 @@ f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d 
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}">{{f["filepath"] or f["filename"]}}</a></font></td>
+    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
     <td align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
   </tr>
 %endfor
 </table>
 %endif
+</font>
 """
 
 
@@ -1162,7 +1161,7 @@ if title_matches:
     <font color="{{conf.HistoryGreyColour}}">{{result_count}}</font>
   </td><td colspan="2">
     <a href="chat:{{chat["id"]}}">
-    <font color="{{conf.HistoryLinkColour}}">{{title}}</font></a><br />
+    <font color="{{conf.SkypeLinkColour}}">{{title}}</font></a><br />
 %if title_matches:
     Title matches.<br />
 %endif
@@ -1182,6 +1181,33 @@ identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace
 """
 
 
+"""TXT template for search result row for a matched chat."""
+SEARCH_ROW_CHAT_TXT = """<%
+import re
+import conf
+
+title = chat["title"]
+if title_matches:
+    title = pattern_replace.sub(lambda x: "**%s**" % x.group(0), title)
+%>
+{{"%3d" % result_count}}. {{title}}
+%if title_matches:
+    Title matches.
+%endif
+%if matching_authors:
+    Participant matches: 
+%for i, c in enumerate(matching_authors):
+<%
+name = c["fullname"] or c["displayname"]
+name_replaced = pattern_replace.sub(wrap_b, name)
+identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace.sub(wrap_b, c["identity"])
+%>
+{{", " if i else ""}}{{name_replaced}}{{identity_replaced}}{{"." if i == len(matching_authors) - 1 else ""}}
+%endfor
+%endif
+"""
+
+
 """HTML template for search result row of a matched contact, HTML table row."""
 SEARCH_ROW_CONTACT_HTML = """<%
 import conf, skypedata
@@ -1191,17 +1217,32 @@ import conf, skypedata
 %endif
 <tr>
   <td align="right" valign="top">
-    <font color="{{conf.HistoryGreyColour}}">{{result_count}}</font>
+    <font color="{{conf.DisabledColour}}">{{result_count}}</font>
   </td><td colspan="2">
-    <font color="{{conf.ResultContactFieldColour}}">{{pattern_replace.sub(wrap_b, contact["name"])}}</font>
+    <font color="{{conf.DisabledColour}}">{{pattern_replace.sub(wrap_b, contact["name"])}}</font>
     <br /><table>
 %for field in filter(lambda x: x in fields_filled, match_fields):
       <tr>
-        <td nowrap valign="top"><font color="{{conf.ResultContactFieldColour}}">{{skypedata.CONTACT_FIELD_TITLES[field]}}</font></td>
+        <td nowrap valign="top"><font color="{{conf.DisabledColour}}">{{skypedata.CONTACT_FIELD_TITLES[field]}}</font></td>
         <td>&nbsp;</td><td>{{fields_filled[field]}}</td>
       </tr>
 %endfor
 </table><br /></td></tr>
+"""
+
+
+"""TXT template for search result row of a matched contact."""
+SEARCH_ROW_CONTACT_TXT = """<%
+import conf, skypedata
+%>
+%if count <= 1 and result_count > 1:
+-------------------------------------------------------------------------------
+%endif
+{{"%3d" % result_count}}. {{title}}
+{{pattern_replace.sub(wrap_b, contact["name"])}}
+%for field in filter(lambda x: x in fields_filled, match_fields):
+  {{"15%s" % skypedata.CONTACT_FIELD_TITLES[field]}}: {{fields_filled[field]}}
+%endfor
 """
 
 
@@ -1220,9 +1261,9 @@ import conf, skypedata
 <%
 after = ""
 if (skypedata.CHATS_TYPE_SINGLE != chat["type"]) or (m["author"] == search["db"].id):
-  after = " in %s" % chat_title
+  after = " in %s" % chat["title_long"]
 %>
-    <a href="message:{{m["id"]}}"><font color="{{conf.HistoryLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
+    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
   </td><td align="right" nowrap>
     &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
   </td>
@@ -1237,12 +1278,26 @@ if (skypedata.CHATS_TYPE_SINGLE != chat["type"]) or (m["author"] == search["db"]
 """
 
 
+"""TXT template for search result item for chat messages."""
+SEARCH_ROW_MESSAGE_TXT = """<%
+import datetime
+import conf, skypedata
+
+after = ""
+if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
+  after = " in %s" % chat["title_long_lc"]
+elif m["author"] == search["db"].id:
+  after = " to %s" % chat["title"]
+%>
+{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{m["from_dispname"]}}{{after}}: {{body}}
+"""
+
 
 """HTML template for search results header, start of HTML table."""
 SEARCH_HEADER_HTML = """<%
 import conf
 %>
-<font size="2" face="{{conf.HistoryFontName}}">
+<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
 Results for "{{escape(text)}}" from {{fromtext}}:
 %if "all tables" != fromtext:
 <br /><br />
@@ -1261,6 +1316,15 @@ SEARCH_ROW_TABLE_HEADER_HTML = """
 <th>{{escape(col["name"])}}</th>
 %endfor
 </tr>
+"""
+
+
+"""TXT template for table search results header."""
+SEARCH_ROW_TABLE_HEADER_TXT = """
+Table {{table["name"]}}:
+%for col in ["#"] + table["columns"]:
+{{col["name"]}}    
+%endfor
 """
 
 
@@ -1283,13 +1347,30 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 """
 
 
-"""Text shown in Help -> About dialog (HTML content)."""
-ABOUT_TEXT = """
+"""TXT template for search result of DB table row."""
+SEARCH_ROW_TABLE_TXT = """<%
+import re
+import conf, templates
+%>
+<tr>
+{{count}}
+%for col in table["columns"]:
 <%
+value = row[col["name"]]
+value = value if value is not None else ""
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+%>
+{{pattern_replace.sub(wrap_b, escape(value))}}
+%endfor
+"""
+
+
+"""Text shown in Help -> About dialog (HTML content)."""
+ABOUT_TEXT = """<%
 import sys
 import conf
 %>
-<font size="2" face="Tahoma">
+<font size="2" face="Tahoma" color="{{conf.FgColour}}">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
 <img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
 <b>{{conf.Title}} version {{conf.Version}}</b>, {{conf.VersionDate}}.<br /><br />
@@ -1299,28 +1380,32 @@ under the MIT License.
 </td></tr></table><br /><br />
 
 
-&copy; 2011-2013, Erki Suurjaak.
-<a href="{{conf.HomeUrl}}">suurjaak.github.com/Skyperious</a><br /><br /><br />
+&copy; 2011-2014, Erki Suurjaak.
+<a href="{{conf.HomeUrl}}"><font color="{{conf.LinkColour}}">suurjaak.github.com/Skyperious</font></a><br /><br /><br />
 
 
 
 {{conf.Title}} has been built using the following open source software:
 <ul>
-  <li>wxPython 2.9.5, <a href="http://wxpython.org">wxpython.org</a></li>
+  <li>wxPython{{" 3.0.0" if getattr(sys, 'frozen', False) else ""}},
+      <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
+  <li>Pillow{{" 2.3.0" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
   <li>step, Simple Template Engine for Python,
-      <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
-  <li>pyparsing 2.0.1,
-      <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
-  <li>XlsxWriter 0.4.8, <a href="https://github.com/jmcnamara/XlsxWriter">
-          github.com/jmcnamara/XlsxWriter</a></li>
-  <li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">
-      pypi.python.org/pypi/python-dateutil</a></li>
+      <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
+      <li>pyparsing{{" 2.0.1" if getattr(sys, 'frozen', False) else ""}}, 
+      <a href="http://pyparsing.wikispaces.com/"><font color="{{conf.LinkColour}}">pyparsing.wikispaces.com</font></a></li>
+  <li>XlsxWriter{{" 0.5.3" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://github.com/jmcnamara/XlsxWriter"><font color="{{conf.LinkColour}}">
+          github.com/jmcnamara/XlsxWriter</font></a></li>
+  <li>dateutil{{" 2.2" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
+      <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
   <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
-      github.com/awahlig/skype4py</a></li>
+      <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.5, <a href="http://www.python.org">www.python.org</a></li>
+  <li>Python 2.7.6, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
   <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">
-      www.pyinstaller.org</a></li>
+      <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br /><br />
 
@@ -1332,37 +1417,45 @@ released under the Skype Component License 1.0.<br /><br />
 
 Default avatar icon from Fancy Avatars, &copy; 2009 Brandon Mathis<br />
 <a href="http://brandonmathis.com/projects/fancy-avatars/">
-brandonmathis.com/projects/fancy-avatars</a><br /><br />
+<font color="{{conf.LinkColour}}">brandonmathis.com/projects/fancy-avatars</font></a><br /><br />
 
 
 Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
-<a href="http://p.yusukekamiyamane.com/">p.yusukekamiyamane.com/</a>
+<a href="http://p.yusukekamiyamane.com/"><font color="{{conf.LinkColour}}">p.yusukekamiyamane.com</font></a>
+<br /><br />
+Includes fonts Carlito Regular and Carlito bold,
+<a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{conf.LinkColour}}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
+%if getattr(sys, 'frozen', False):
+<br /><br />
+Installer created with Nullsoft Scriptable Install System 3.0a2,
+<a href="http://nsis.sourceforge.net/"><font color="{{conf.LinkColour}}">nsis.sourceforge.net</font></a>
+%endif
+
 </font>
 """
 
 
 
 """Contents of the default page on search page."""
-SEARCH_WELCOME_HTML = """
-<%
+SEARCH_WELCOME_HTML = """<%
 import conf
 %>
-<font face="{{conf.HistoryFontName}}" size="2">
+<font face="{{conf.HistoryFontName}}" size="2" color="{{conf.FgColour}}">
 <center>
-<h5><font color="{{conf.HistoryLinkColour}}">Explore the database</font></h5>
+<h5><font color="{{conf.SkypeLinkColour}}">Explore the database</font></h5>
 <table cellpadding="10" cellspacing="0">
 <tr>
   <td>
     <table cellpadding="0" cellspacing="2"><tr><td>
         <img src="memory:HelpSearch.png" />
       </td><td width="10"></td><td valign="center">
-        Search over all Skype messages using a simple Google-like <a href="page:#help">syntax</a>.<br />
+        Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{conf.LinkColour}}">syntax</font></a>.<br />
         <br />
         Or choose other search targets from the toolbar: <br />
         search in contact information, or in chat information, <br />
         or across all database tables.
       </td></tr><tr><td nowrap align="center">
-        <b><font color="black">Search</font></b><br />
+        <b><font color="{{conf.FgColour}}">Search</font></b><br />
     </td></tr></table>
   </td>
   <td>
@@ -1372,7 +1465,7 @@ import conf
         Browse, filter and change database tables,<br />
         export as HTML, SQL INSERT-statements or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:tables"><b><font color="black">Data tables</font></b></a><br />
+        <a href="page:tables"><b><font color="{{conf.FgColour}}">Data tables</font></b></a><br />
     </td></tr></table>
   </td>
 </tr>
@@ -1386,7 +1479,7 @@ import conf
         filter by content, date or author,<br />
         export as HTML, TXT or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:chats"><b><font color="black">Chats</font></b></a><br />
+        <a href="page:chats"><b><font color="{{conf.FgColour}}">Chats</font></b></a><br />
     </td></tr></table>
   </td>
   <td>
@@ -1396,7 +1489,7 @@ import conf
         Make direct SQL queries in the database,<br />
         export results as HTML or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:sql"><b><font color="black">SQL window</font></b></a><br />
+        <a href="page:sql"><b><font color="{{conf.FgColour}}">SQL window</font></b></a><br />
     </td></tr></table>
   </td>
 </tr>
@@ -1409,7 +1502,7 @@ import conf
         view general database statistics,<br />
         check database integrity for corruption and recovery.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:info"><b><font color="black">Information</font></b></a>
+        <a href="page:info"><b><font color="{{conf.FgColour}}">Information</font></b></a>
     </td></tr></table>
   </td>
   <td>
@@ -1419,7 +1512,7 @@ import conf
         Import contacts to Skype from a CSV file,<br />
         like ones exported from MSN or GMail.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:contacts"><b><font color="black">Contacts+</font></b></a>
+        <a href="page:contacts"><b><font color="{{conf.FgColour}}">Contacts+</font></b></a>
     </td></tr></table>
   </td>
 </tr>
@@ -1430,54 +1523,52 @@ import conf
 
 
 """Long help text shown in a separate tab on search page."""
-SEARCH_HELP_LONG = """
-<%
+SEARCH_HELP_LONG = """<%
 import conf
 %>
-<font size="2" face="{{conf.HistoryFontName}}">
+<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
 
 {{conf.Title}} supports a Google-like syntax for searching messages:<br /><br />
 <table><tr><td width="500">
-
-  <table border="0" cellpadding="5" cellspacing="1" bgcolor="#E5E5E5"
+  <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{conf.HelpBorderColour}}"
    valign="top" width="500">
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search for exact word or phrase<br /><br />
-      <font color="#006600"><code>"do re mi"</code></font>
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search for exact word or phrase</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>"do re mi"</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
-      Use quotes (<font color="#006600"><code>"</code></font>) to search for
+      Use quotes (<font color="{{conf.HelpCodeColour}}"><code>"</code></font>) to search for
       an exact phrase or word. Quoted text is searched exactly as entered,
       leaving whitespace as-is and ignoring any wildcard characters.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search for either word<br /><br />
-      <font color="#006600"><code>this OR that</code></font>
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search for either word</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>this OR that</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       To find messages containing at least one of several words,
-      include <font color="#006600"><code>OR</code></font> between the words.
-      <font color="#006600"><code>OR</code></font> works also
+      include <font color="{{conf.HelpCodeColour}}"><code>OR</code></font> between the words.
+      <font color="{{conf.HelpCodeColour}}"><code>OR</code></font> works also
       for phrases and grouped words (but not keywords).
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Group words together<br /><br />
-      <font color="#006600"><code>(these two) OR this<br/>
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Group words together</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>(these two) OR this<br/>
       -(none of these)</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       Surround words with round brackets to group them for <code>OR</code>
       queries or for excluding from results.
@@ -1485,105 +1576,105 @@ import conf
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search for partially matching text<br /><br />
-      <font color="#006600"><code>bas*ball</code></font>
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search for partially matching text</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>bas*ball</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
-      Use an asterisk (<font color="#006600"><code>*</code></font>) to make a
+      Use an asterisk (<font color="{{conf.HelpCodeColour}}"><code>*</code></font>) to make a
       wildcard query: the wildcard will match any text between its front and
       rear characters (including other words).
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search within specific chats<br /><br />
-      <font color="#006600"><code>chat:office<br />
-      chat:"coffee &amp cig"</code></font>
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search within specific chats</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>chat:office<br />
+      chat:"coffee &amp; cig"</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       To find messages from specific chats only, use the keyword
-      <font color="#006600"><code>chat:name</code></font>.<br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>chat:name</code></font>.<br /><br />
       Search from more than one chat by adding more 
-      <font color="#006600"><code>chat:</code></font> keywords.
+      <font color="{{conf.HelpCodeColour}}"><code>chat:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search from specific authors<br /><br />
-      <font color="#006600"><code>from:maria<br />
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search from specific authors</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>from:maria<br />
       from:"john smith"</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       To find messages from specific authors only, use the keyword
-      <font color="#006600"><code>from:name</code></font>.<br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>from:name</code></font>.<br /><br />
       Search from more than one author by adding more
-      <font color="#006600"><code>from:</code></font> keywords.
+      <font color="{{conf.HelpCodeColour}}"><code>from:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Search from specific time periods<br /><br />
-      <font color="#006600"><code>date:2008<br />date:2009-01<br />
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Search from specific time periods</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>date:2008<br />date:2009-01<br />
       date:2005-12-24..2007</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       To find messages from specific time periods, use the keyword
-      <font color="#006600"><code>date:period</code></font> or
-      <font color="#006600"><code>date:periodstart..periodend</code></font>.
+      <font color="{{conf.HelpCodeColour}}"><code>date:period</code></font> or
+      <font color="{{conf.HelpCodeColour}}"><code>date:periodstart..periodend</code></font>.
       For the latter, either start or end can be omitted.<br /><br />
       A date period can be year, year-month, or year-month-day. Additionally,
-      <font color="#006600"><code>date:period</code></font> can use a wildcard
+      <font color="{{conf.HelpCodeColour}}"><code>date:period</code></font> can use a wildcard
       in place of any part, so
-      <font color="#006600"><code>date:*-12-24</code></font> would search for
+      <font color="{{conf.HelpCodeColour}}"><code>date:*-12-24</code></font> would search for
       all messages from the 24th of December.<br /><br />
       Search from a more narrowly defined period by adding more
-      <font color="#006600"><code>date:</code></font> keywords.
+      <font color="{{conf.HelpCodeColour}}"><code>date:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>Exclude words or keywords<br /><br />
-      <font color="#006600"><code>-notthisword<br />-"not this phrase"<br />
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>Exclude words or keywords</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>-notthisword<br />-"not this phrase"<br />
       -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
       -date:2013</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       To exclude certain messages, add a dash
-      (<font color="#006600"><code>-</code></font>) in front of words,
+      (<font color="{{conf.HelpCodeColour}}"><code>-</code></font>) in front of words,
       phrases, grouped words or keywords.
     </td>
   </tr>
   <tr>
-    <td bgcolor="white" width="150">
-      <b>SPECIAL: search specific tables<br /><br />
-      <font color="#006600"><code>table:fromthistable<br />
+    <td bgcolor="{{conf.BgColour}}" width="150">
+      <b>SPECIAL: search specific tables</b><br /><br />
+      <font color="{{conf.HelpCodeColour}}"><code>table:fromthistable<br />
       -table:notfromthistable</code></font>
       <br />
     </td>
-    <td bgcolor="white">
+    <td bgcolor="{{conf.BgColour}}">
       <br /><br />
       When performing search on all columns of all database tables
       (the fourth option on the search toolbar),
-      use the keyword <font color="#006600"><code>table:name</code></font>
+      use the keyword <font color="{{conf.HelpCodeColour}}"><code>table:name</code></font>
       to constrain results to specific tables only.<br /><br />
       Search from more than one table by adding more
-      <font color="#006600"><code>table:</code></font> keywords, or exclude certain
-      tables by adding a <font color="#006600"><code>-table:</code></font> keyword.
+      <font color="{{conf.HelpCodeColour}}"><code>table:</code></font> keywords, or exclude certain
+      tables by adding a <font color="{{conf.HelpCodeColour}}"><code>-table:</code></font> keyword.
       <br />
     </td>
   </tr>
@@ -1596,28 +1687,28 @@ import conf
   <ul>
     <li>search for "flickr.com" from John or Jane in chats named "links":
         <br /><br />
-        <font color="#006600">
+        <font color="{{conf.HelpCodeColour}}">
         <code>flickr.com from:john from:jane chat:links</code></font><br />
     </li>
     <li>search from John Smith up to 2011:<br /><br />
-        <font color="#006600"><code>from:"john smith" date:..2011</code></font>
+        <font color="{{conf.HelpCodeColour}}"><code>from:"john smith" date:..2011</code></font>
         <br />
     </li>
     <li>search for either "John" and "my side" or "Stark" and "your side":
         <br /><br />
-        <font color="#006600">
+        <font color="{{conf.HelpCodeColour}}">
         <code>(john "my side") OR (stark "your side")</code></font><br />
     </li>
     <li>search for either "barbecue" or "grill" in 2012,
         except from June to August:<br /><br />
-        <font color="#006600">
+        <font color="{{conf.HelpCodeColour}}">
         <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
         </font><br />
     </li>
     <li>search for "TPS report" in chats named "office"
         (but not named "backoffice") on the first day of the month in 2012:
         <br /><br />
-        <font color="#006600">
+        <font color="{{conf.HelpCodeColour}}">
         <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
         </font><br />
     </li>
@@ -1626,15 +1717,14 @@ import conf
   <br /><br /><br />
   Search is made on raw Skype message body, so there can be results which do not
   seem to match the query - Skype messages contain more than plain text.<br />
-  For example, searching for <font color="#006600"><code>href</code></font> will match a message with body
-  <code><font color="blue">&lt;a <font color="red">href</font>=<font
-  color="#FF00FF">"http://lmgtfy.com/"</font>&gt;</font>lmgtfy.com<font
-  color="blue">&lt;/a&gt;</font></code>,<br />
-  displayed as <a href="http://lmgtfy.com/">lmgtfy.com</a>.<br /><br />
+  For example, searching for <font color="{{conf.HelpCodeColour}}"><code>href</code></font> will match a message with body
+  <code><font color="{{conf.HelpCodeColour}}">&lt;a href="http://lmgtfy.com/"&gt;lmgtfy.com&lt;/a&gt;</font></code>,<br />
+  displayed as <a href="http://lmgtfy.com/"><font color="{{conf.LinkColour}}">lmgtfy.com</font></a>.<br /><br />
   This can be used for finding specific type of messages, for example
-  <font color="#006600"><code>&lt;sms</code></font> finds SMS messages, <font color="#006600"><code>&lt;file</code></font> finds transfers and <font color="#006600"><code>&lt;quote</code></font>
-  finds quoted messages.
-
+  <font color="{{conf.HelpCodeColour}}"><code>&lt;sms</code></font> finds SMS messages, 
+  <font color="{{conf.HelpCodeColour}}"><code>&lt;file</code></font> finds transfers, 
+  <font color="{{conf.HelpCodeColour}}"><code>&lt;quote</code></font> finds quoted messages,
+  and <font color="{{conf.HelpCodeColour}}"><code>&lt;ss</code></font> finds messages with emoticons.
 
 </td></tr></table>
 </font>
@@ -1649,8 +1739,43 @@ helplink = "Search help"
 if "nt" == os.name: # In Windows, wx.HtmlWindow shows link whitespace quirkily
     helplink = helplink.replace(" ", "_")
 %>
-<font size="2" face="{{conf.HistoryFontName}}" color="gray">
+<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.DisabledColour}}">
 For searching messages from specific chats, add "chat:name", and from specific contacts, add "from:name".
-&nbsp;&nbsp;<a href=\"page:#help\">{{helplink}}</a>.
+&nbsp;&nbsp;<a href=\"page:#help\"><font color="{{conf.LinkColour}}">{{helplink}}</font></a>.
 </font>
+"""
+
+
+"""Database links on merge page."""
+MERGE_DB_LINKS = """<%
+import conf
+%>
+<font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+"""
+
+
+"""HTML template for quote elements in message body."""
+MESSAGE_QUOTE = """
+%if export:
+<table class="quote"><tr>
+    <td><span>&#8223;</span></td>
+    <td><br /><span class="grey">{EMDASH} </span></td>
+</tr></table>
+%else:
+<%
+import conf
+%>
+<table cellpadding="0" cellspacing="0"><tr>
+    <td valign="top"><font color="{{conf.DisabledColour}}" size="7">&quot;|</font></td>
+    <td><br /><font color="{{conf.DisabledColour}}">{EMDASH} </font></td>
+</tr></table>
+%endif
+"""
+
+
+"""Chat row in database diff results list."""
+DIFF_RESULT_ITEM = """<%
+import conf
+%>
+<a href="{{chat["identity"]}}"><font color="{{conf.LinkColour}}">{{chat["title_long"]}}</font></a>
 """

@@ -8,10 +8,17 @@ This file is part of Skyperious - a Skype database viewer and merger.
 Released under the MIT License.
 
 @created     11.06.2013
-@modified    14.09.2013
+@modified    31.01.2014
 ------------------------------------------------------------------------------
 """
-from wx.lib.embeddedimage import PyEmbeddedImage
+try:
+    import wx
+    from wx.lib.embeddedimage import PyEmbeddedImage
+except ImportError:
+    class PyEmbeddedImage(object):
+        """Data stand-in for wx.lib.embeddedimage.PyEmbeddedImage."""
+        def __init__(self, data):
+            self.data = data
 
 
 """Skype emoticon "Angel (angel)"."""

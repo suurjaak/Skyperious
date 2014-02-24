@@ -7,17 +7,23 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    17.11.2013
+@modified    08.02.2014
 ------------------------------------------------------------------------------
 """
-from wx.lib.embeddedimage import PyEmbeddedImage
-import wx
+try:
+    import wx
+    from wx.lib.embeddedimage import PyEmbeddedImage
+except ImportError:
+    class PyEmbeddedImage(object):
+        """Data stand-in for wx.lib.embeddedimage.PyEmbeddedImage."""
+        def __init__(self, data):
+            self.data = data
 
 
 """Returns the application icon bundle, for several sizes and colour depths."""
 def get_appicons():
     icons = wx.IconBundle()
-    [icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) for i in [
+    [icons.AddIcon(i.Icon) for i in [
         Icon16x16_32bit, Icon16x16_8bit, Icon32x32_32bit, Icon32x32_8bit,
         Icon48x48_32bit, Icon48x48_8bit, Icon64x64_32bit, Icon64x64_8bit
     ]]
@@ -450,6 +456,21 @@ ButtonMergeLeft = PyEmbeddedImage(
 )
 
 
+"""Small icon for left merge multi button on merger page."""
+ButtonMergeLeftMulti = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB2ElEQVQ4y8WTMWgTYRTHf9/d"
+    "eUlsS1PFFKpFBJEOlaq3KRK6utqloou4CeLkokMXwTplcQiiLhGngqMdHIJjm6IxCK0FUWIa"
+    "CdV4vV6+u+/uPockpShYnfrg8f7vPfjx4L0H+20CIP/0WxFwejUDSHp6sXx99O7fAAZApNTk"
+    "5ekjZ2emc04cqVN9bRJfulCsD+8JUEHw9cfPMHDdGENHyfd2qFw3ZnhAHFRSntkTEEr5rt7c"
+    "cj1PcWjQtL40XO15iuOjmVwYBDdP3397GGBqvlacmq9d/RPQ6bx8/6HZkGEQ6SjMrK63jE4Y"
+    "JI1mO3sslzofRdHjibmlfCilE0p5e2JuaQciTtwpF4UQDsDY+MhkNJK1FUIcQGuFEHqjtea1"
+    "fT9ScQwwdu6k01hZr2itC58e5kvi6K3F5RvXLjrVbYOPAdS3YhINhoBEw5AtSFsC6OabnYQh"
+    "W8DrNxXgnhX4Pp+VSTWxiSwYzEKsu55o8DV4urvXRMN2CpQFA74PgBVKWVl4tPBPR2MA6Suz"
+    "jvX8RSUUouCWZl+J/7m69MyzZYCktVoIyw9KAFavZwE2kALSQKYXbcDsA9RGbQ3ZXokrT6rA"
+    "OLApdk1n9kC73eyv+jeLAQn4+/6M/AJo6ded0dcRQQAAAABJRU5ErkJggg=="
+)
+
+
 """Small icon for right merge button on merger page."""
 ButtonMergeRight = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
@@ -558,6 +579,28 @@ ButtonSaveAs = PyEmbeddedImage(
     "q10hTiTgg1u6rquiRoMhlUqpYnpXMxJGTIB2hjiU6/TwhDv1eGzmVXXje40xoYophGhGeNcq"
     "wMSfpAxoNLRz+k154Q7Kjby/ZM7ldxqiw4f6YkOFVpDHDe1fU98r/gowAMaC+CTtivcaAAAA"
     "AElFTkSuQmCC"
+)
+
+
+"""Small icon for scan button on merge page."""
+ButtonScanDiff = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAzJJ"
+    "REFUOI2V091rW2UcB/Dv85y3vJ6kWdIloTZpHRjaxq6FqRXXiyzaCo7pbhRRfLnYjS8l/gNe"
+    "Kd45UEGrU2RDigwdtjAJdVPHwItRjGtr2mXdurV1WdpmJk1yznOe8xwvZoMvF+L36nf14Qff"
+    "3484joPdDBw7q0uE5BSJZLlwBgFApqRg2c6s7Tjvzk8+XsM/QnaBvpe+yqiUTI0k48HBRERJ"
+    "7PVD12UYnKG4UeUff7dUZVw8s/jpU+f+BaSe/yLjVZTpowMpz53tW8ifn+Hl9ZLErRZi9/SK"
+    "N159UXp4JI1X3vu+ubbVOFw8+WwbIfuePqHLlJaOpPoiv8zP2UuLl0CUej4eshdTqZ7AxUur"
+    "3dVNdujR7Bh54bkj9LUP8xXLFvuWp16uAQAFN3K9Pl9g8/ZtXLu6jA7P1bcOPRA89dnkO9oH"
+    "x99+4vz0+6EHh/3HL1z4yZmbW8ZYOhGEbeZ2N6BUsGzU41Xni79ySW3k0/3J0siBAyucGx8B"
+    "+Nblcl07ODK0oXpE/vTMD3Yy1KEQ28zuArJlNgddRIFgQnI5t4o9Pfs3h9PpNUUx6+vrC7nG"
+    "lq3v7Pze75G2u5o1c1wlGiyzNdgGhGWAWQySrIFC4z6f1/DsUU0h/IYQgBaoKz6f11AVjRPH"
+    "jVq9BcGNdgsUghW2aluQNc1m6OpnjCmsyqVAgCmBwN2ZMaa0nFi/2++3VzfKgG0W2gC3zNm1"
+    "6oYZDumy133f2OWl7eTC9SvRcll4y2XhXbh+JXp5qZJ0q/eO93Yn5OLNks0tY7ZdY+zg67pE"
+    "aGkodn+kaYBbJghRyl93x+U8ANxYtx6zzOBRv18j4VCA/Fg85zg3zh67ubrySfuQ4qMTGYXK"
+    "3wxE+ryUathpCk4cWYLjQFBmd+humVIbhd9+xuEhDTOnP281mq0nN8qb+fYpx0cnMpTQqU53"
+    "WN/jCWk+1QdCKJpWE5VGxS7X10hUq4jRgU450uHF5IlTOyZjGfLXZ4qPTugEJCcRmhW4+0wU"
+    "pGA7YtZZObNNeOPNaFdCeuSh4aAqQUx9eebO34D/SnxveBzAyVAo2Ix1hrsXiiX8L+BPZD+A"
+    "aQBdAFb/ADonfMWfJE59AAAAAElFTkSuQmCC"
 )
 
 
@@ -1459,6 +1502,30 @@ HelpTables = PyEmbeddedImage(
     "FctyGYFFLrBsJsE545xuDERRBCp55gb0pbRiQSmOKaS4en0KQO/fvmrge+DNQ9cLSI2MMEpo"
     "BqMcgFiQ0FmaCSkAt4ghgJnN8uYAJUTUybAcia1pCLsgpIJngw+PcR9Sjx/+4igaenKyLPsE"
     "q9mX0jpfcPsb0i0aSxTJwvQAAAAASUVORK5CYII="
+)
+
+
+"""Icon between database info on merger page"""
+MergeToRight = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAADv0lEQVRIx+2UTUgrVxiG35OZ"
+    "ycw1arj+3VSiqUhwISW0AcWaUBA3uhFxYxddVnR1sZsgIZtmERCkF4RCQnd2UaSg4A9E7OKi"
+    "dHEx4KYoRdtICA2dyV/zP2fOnC6qIVWvd1Po5r7wcpgz883DOR/fC7zX/y0CAOvr61EAXgA5"
+    "AEkAbzjnPwUCgd//E0AkEjmbnp7+uFar0XK5XNE0rZjJZPKMsbhpmt8Eg0H1seJIJBIFkFhb"
+    "W4u9DWABAMMwwBizGIYhK4rS5XK5hsbHxz/q7+//3DTNH8Lh8GePFRuG4TUMYykcDi89CaCU"
+    "QhAEWK1WCIIASikajYY0MDDwocfj+YQQ8ioUCn0VDAaV1mJKKWZmZryU0qVQKPQoRACAyclJ"
+    "78XFBW5ubv5UVTXHGGvYbDYRgARAcTqdz0ul0nClUpn2+/1Wn89X9Pl8f5mm+eXIyEi/2+3u"
+    "v7i46Pf7/Tg9PU086AEABAIBi2maLwAMcc6nAUw5nU6n2+0epJRKsiyjVCoV0um0pqpqRdd1"
+    "AwDm5+e9hUIBdrsdu7u7Cc55bGNjI/YAcF+rq6t2xthLRVEWxsbGhq1Wq03XdYiiCJvNBqvV"
+    "CkIIOOdQVRWiKKKzs7MJ2dzcjD0JuNPKysoU5/yLvr6+T10ul6Otra3zbd9KkoT29vYmJBqN"
+    "xsR3AWq1GiwWC+r1OrLZLFRVBaUUjLF/migIkCQJkiTBZrNBkiToug5CyNNXtLi4aBdF8aWi"
+    "KAujo6PDhmHYqtUqZFmGLMvNH9TrdTQaDQCAw+HAyclJghAS29raigFA8wQLCwsWQsgLAEOE"
+    "kGnG2JTD4XAODg4OlstlSVEUCIJQSKfTWi6XazZ5YmLCq+s6enp6cHx8nCCExLa3t5tNFgFg"
+    "bm4uyhjzyrIsdHR0WLu7uzt7e3u7OOdttVoNsiw3Li8vk9ls9ooQ8iOA14SQG9M033DO0dXV"
+    "haOjowQhJLazs/OvqRZvB8a7vLzsLZVK0DQN1WoVjUYDgiBA1/XC2dlZUtf1LYvF8u3e3l79"
+    "rnh2dhaSJOHw8DBBCIkdHBw8iAzxLioqlQpSqRQYYxBFEYIg0Kurq3QymfyNEPJ1PB5//UhU"
+    "YH9/P0EIicXj8UfzSATwjFKKYrFoAqDlcrmSyWSKqVQqXygUfr6+vv4un8+rAD4AYLZa07Rf"
+    "TNNMnJ+ffw9AaXnH71YC4LnH43llt9tHOed5wzD+0DTt11wud5bNZltT1ATAABj3TG/dusdu"
+    "bRIAz24tv2Pw+P0TtJjde+Yt63s9rb8BX+/h8JD+o8gAAAAASUVORK5CYII="
 )
 
 

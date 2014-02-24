@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    16.11.2013
+@modified    24.02.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -29,6 +29,7 @@ import conf
 import controls
 import main
 import util
+import wx_accel
 
 """Current update dialog window, if any, for avoiding concurrent updates."""
 update_window = None
@@ -73,13 +74,13 @@ def check_newest_version(callback=None):
             link = linkmap[install_type]
             # Extract version number like 1.3.2a from skyperious_1.3.2a_x64.exe
             version = (re.findall("(\d[\da-z.]+)", link) + [None])[0]
+            main.log("Newest %s version is %s.", install_type, version)
             try:
-                if version != conf.Version \
-                and canonic_version(conf.Version) >= canonic_version(version):
+                if (version != conf.Version
+                and canonic_version(conf.Version) >= canonic_version(version)):
                     version = None
-            except: pass
+            except Exception: pass
             if version and version != conf.Version:
-                main.log("Newest %s version is %s.", install_type, version)
                 changes = ""
                 try:
                     main.log("Reading changelog from %s.", conf.ChangelogURL)
@@ -95,12 +96,12 @@ def check_newest_version(callback=None):
                         if changes:
                             title = match.group(1)
                             changes = "Changes in %s\n\n%s" % (title, changes)
-                except:
+                except Exception:
                     main.log("Failed to read changelog.\n\n%s.",
                              traceback.format_exc())
                 url = urllib.basejoin(conf.DownloadURL, link)
                 result = (version, url, changes)
-    except:
+    except Exception:
         main.log("Failed to retrieve new version from %s.\n\n%s",
                  conf.DownloadURL, traceback.format_exc())
         result = None
@@ -108,7 +109,6 @@ def check_newest_version(callback=None):
     if callback:
         callback(result)
     return result
-
 
 
 def download_and_install(url):
@@ -148,9 +148,9 @@ def download_and_install(url):
         dlg_progress.Destroy()
         update_window = None
         if is_cancelled:
-            main.log("Removing temporary file %s.", filepath)
-            util.try_until(lambda: os.unlink(filepath), count=1)
-            util.try_until(lambda: os.rmdir(tmp_dir), count=1)
+            main.log("Upgrade cancelled, erasing temporary file %s.", filepath)
+            util.try_until(lambda: os.unlink(filepath))
+            util.try_until(lambda: os.rmdir(tmp_dir))
         else:
             main.log("Successfully downloaded %s of %s.",
                      util.format_bytes(filesize), filename)
@@ -165,7 +165,7 @@ def download_and_install(url):
                 util.start_file(filepath)
             update_window = dlg_proceed
             dlg_proceed.Bind(wx.EVT_CLOSE, proceed_handler)
-    except:
+    except Exception:
         main.log("Failed to download new version from %s.\n\n%s", url,
                  traceback.format_exc())
 
@@ -194,27 +194,18 @@ def reporting_write(write):
 
 
 def take_screenshot():
-    """Returns a wx.Bitmap screenshot taken of the main window."""
-    window = wx.GetApp().TopWindow
-    rect   = window.GetRect()
-
-    # adjust widths for Linux (figured out by John Torres 
-    # http://article.gmane.org/gmane.comp.python.wxpython/67327)
-    if "linux2" == sys.platform:
-        client_x, client_y = window.ClientToScreen((0, 0))
-        border_width       = client_x - rect.x
-        title_bar_height   = client_y - rect.y
-        rect.width        += (border_width * 2)
-        rect.height       += title_bar_height + border_width
-
-    window.Raise()
+    """Returns a wx.Bitmap screenshot taken of the whole screen."""
     wx.YieldIfNeeded()
-    dc = wx.ScreenDC()
+
+    rect = wx.Rect(0, 0, *wx.DisplaySize())
     bmp = wx.EmptyBitmap(rect.width, rect.height)
+    dc = wx.ScreenDC()
     dc_bmp = wx.MemoryDC()
     dc_bmp.SelectObject(bmp)
     dc_bmp.Blit(0, 0, rect.width, rect.height, dc, rect.x, rect.y)
     dc_bmp.SelectObject(wx.NullBitmap)
+    # Hack to drop screen transparency, wx issue when blitting from screen
+    bmp = wx.BitmapFromIcon(wx.IconFromBitmap(bmp))
     return bmp
 
 
@@ -227,7 +218,8 @@ def report_error(text):
         conf.ErrorsReportedOnDay = conf.ErrorsReportedOnDay or {}
         reports_today = conf.ErrorsReportedOnDay.get(today, 0)
         text_hashed = "%s\n\n%s" % (conf.Version, text)
-        hash = hashlib.sha1(text_hashed).hexdigest()
+        sha1 = hashlib.sha1(text_hashed.encode("latin1", errors="ignore"))
+        hash = sha1.hexdigest()
         if hash not in conf.ErrorReportHashes \
         and reports_today < conf.ErrorReportsPerDay:
             reports_today += 1
@@ -247,7 +239,11 @@ def report_error(text):
 
 
 def send_report(content, type, screenshot=""):
-    """Posts feedback or error data to the report web service."""
+    """
+    Posts feedback or error data to the report web service.
+    
+    @return    True on success, False on failure
+    """
     global url_opener
     try:
         data = {"content": content.encode("utf-8"), "type": type,
@@ -255,9 +251,12 @@ def send_report(content, type, screenshot=""):
                 "version": "%s-%s" % (conf.Version, get_install_type())}
         url_opener.open(conf.ReportURL, urllib.urlencode(data))
         main.log("Sent %s report to %s (%s).", type, conf.ReportURL, content)
-    except:
+        result = True
+    except Exception:
         main.log("Failed to send %s to %s.\n\n%s", type, conf.ReportURL,
                  traceback.format_exc())
+        result = False
+    return result
 
 
 def get_install_type():
@@ -283,12 +282,13 @@ def canonic_version(v):
     return sum((x * 100 ** i) for i, x in enumerate(nums))
 
 
-class FeedbackDialog(wx.Dialog):
+
+class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
     """
     A non-modal dialog for sending feedback with an optional screenshot,
     stays on top of parent.
     """
-    THUMB_SIZE = (150, 90)
+    THUMB_SIZE = (250, 150)
 
     """
     Dialog for entering a message to send to author, can include a screenshot.
@@ -297,6 +297,7 @@ class FeedbackDialog(wx.Dialog):
         wx.Dialog.__init__(self, parent=parent, title="Send feedback",
                           style=wx.CAPTION | wx.CLOSE_BOX |
                                 wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER)
+        wx_accel.AutoAcceleratorMixIn.__init__(self)
         self.MinSize = (460, 460)
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         panel = self.panel = wx.Panel(self)
@@ -318,20 +319,19 @@ class FeedbackDialog(wx.Dialog):
                   flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.GROW)
 
         sizer_lower = wx.BoxSizer(wx.HORIZONTAL)
-        cb = self.cb_bmp = wx.CheckBox(panel, label="Include\nscreenshot")
         bmp = self.bmp = wx.StaticBitmap(panel, size=self.THUMB_SIZE)
-        sizer_lower.Add(cb, flag=wx.ALIGN_BOTTOM)
-        sizer_lower.Add(bmp, border=8, flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
-
-        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
-        self.button_ok = wx.Button(panel, label="Send")
+        sizer_lower.Add(bmp)
+        sizer_controls = wx.GridBagSizer(vgap=8, hgap=8)
+        self.button_ok = wx.Button(panel, label="&Confirm")
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
-        sizer_buttons.Add(self.button_ok, border=8, flag=wx.LEFT | wx.RIGHT)
-        sizer_buttons.Add(self.button_cancel)
+        sizer_controls.Add(self.button_ok, pos=(0, 0))
+        sizer_controls.Add(self.button_cancel, pos=(0, 1))
+        cb = self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
+        sizer_controls.Add(cb, pos=(1, 0), span=(1, 2))
         sizer_lower.AddStretchSpacer()
-        sizer_lower.Add(sizer_buttons, flag=wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
-        sizer.Add(sizer_lower, border=8,
-                  flag=wx.ALL | wx.ALIGN_BOTTOM | wx.GROW)
+        sizer_lower.Add(sizer_controls, flag=wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
+        sizer.Add(sizer_lower, border=8, flag=wx.LEFT | wx.RIGHT |
+                  wx.BOTTOM | wx.ALIGN_BOTTOM | wx.GROW)
 
         self.Sizer.Add(panel, proportion=1, flag=wx.GROW)
         self.Bind(wx.EVT_CHECKBOX, self.OnToggleScreenshot, self.cb_bmp)
@@ -344,6 +344,23 @@ class FeedbackDialog(wx.Dialog):
         self.Refresh()
         self.Size = self.Size # Touch to force correct size
         self.Show()
+
+
+    def _SendReport(self, report_kwargs):
+        """Tries to send report in the background, shows result message."""
+        try_count = 0
+        while try_count < 3 and not send_report(**report_kwargs):
+            try_count += 1
+        if try_count < 3:
+            self.edit_text.Value = ""
+            self.edit_text.SetFocus()
+            self.SetScreenshot(None)
+            text, style = "Feedback sent, thank you!", wx.OK
+        else:        
+            text = "Could not post feedback. Connection problems?"
+            style = wx.OK | wx.ICON_WARNING
+        main.status("")
+        wx.CallLater(500, wx.MessageBox, text, self.Title, style)
 
 
     def SetScreenshot(self, bitmap=None):
@@ -389,16 +406,10 @@ class FeedbackDialog(wx.Dialog):
             text = (text if wx.OK == ok else "")
         if text:
             self.Hide()
-            time.sleep(0.1)
-            kwargs = {"type": "feedback"}
-            kwargs["content"] = text
-            if bmp:
-                kwargs["screenshot"] = util.bitmap_to_raw(bmp)
-            wx.CallAfter(lambda: send_report(**kwargs))
-            wx.MessageBox("Feedback sent, thank you!", self.Title, wx.OK)
-            self.edit_text.Value = ""
-            self.edit_text.SetFocus()
-            self.SetScreenshot(None)
+            kwargs = {"type": "feedback", "content": text}
+            if bmp: kwargs["screenshot"] = util.wx_bitmap_to_raw(bmp)
+            main.status("Submitting feedback..")
+            wx.CallAfter(self._SendReport, kwargs)
 
 
     def OnCancel(self, event):

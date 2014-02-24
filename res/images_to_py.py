@@ -1,6 +1,6 @@
 """
 Simple small script for generating a nicely formatted Python module with
-embedded images and docstrings.
+embedded binary resources and docstrings.
 
 ------------------------------------------------------------------------------
 This file is part of Skyperious - a Skype database viewer and merger.
@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  05.09.2013
+@modified  31.01.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -56,6 +56,8 @@ IMAGES = {
         "Small icon for right merge button on merger page.",
     "ButtonMergeLeft.png":
         "Small icon for left merge button on merger page.",
+    "ButtonMergeLeftMulti.png":
+        "Small icon for left merge multi button on merger page.",
     "ButtonOpen.png":
         "Button for open file on main page.",
     "ButtonOpenA.png":
@@ -66,6 +68,8 @@ IMAGES = {
         "Small icon for remove missing button on start page.",
     "ButtonSaveAs.png":
         "Small icon for save as button on start page.",
+    "ButtonScanDiff.png":
+        "Small icon for scan button on merge page.",
     "ExportClock.png":
         "Clock image icon for new days in exported chat HTML.",
     "ExportEdited.png":
@@ -84,6 +88,8 @@ IMAGES = {
         "Help image on default search page for search page.",
     "HelpSQL.png":
         "Help image on default search page for SQL window page.",
+    "MergeToRight.png":
+        "Icon between database info on merger page",
     "PageChats.png":
         "Icon for the Chats page in a database tab.",
     "PageContacts.png":
@@ -142,8 +148,14 @@ Released under the MIT License.
 @modified    %s
 ------------------------------------------------------------------------------
 %s
-from wx.lib.embeddedimage import PyEmbeddedImage
-import wx
+try:
+    import wx
+    from wx.lib.embeddedimage import PyEmbeddedImage
+except ImportError:
+    class PyEmbeddedImage(object):
+        \"\"\"Data stand-in for wx.lib.embeddedimage.PyEmbeddedImage.\"\"\"
+        def __init__(self, data):
+            self.data = data
 """ % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)
 
 
@@ -155,7 +167,7 @@ def create_py(target):
     icon_parts = [", ".join(icons[4*i:4*i+4]) for i in range(len(icons) / 4)]
     iconstr = ",\n        ".join(icon_parts)
     f.write("\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
-            "    [icons.AddIcon(wx.IconFromBitmap(i.GetBitmap())) "
+            "    [icons.AddIcon(i.Icon) "
             "for i in [\n        %s\n    ]]\n    return icons\n" % (Q3,
         "Returns the application icon bundle, "
         "for several sizes and colour depths.",

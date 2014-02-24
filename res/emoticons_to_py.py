@@ -3,9 +3,13 @@
 Simple small script for generating a nicely formatted Python module with
 embedded Skype emoticon images and docstrings.
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author    Erki Suurjaak
-@created   11.06.2013
-@modified  14.09.2013
+@created   26.01.2014
+@modified  31.01.2014
 """
 import base64
 import datetime
@@ -136,7 +140,14 @@ Released under the MIT License.
 @modified    %s
 ------------------------------------------------------------------------------
 %s
-from wx.lib.embeddedimage import PyEmbeddedImage
+try:
+    import wx
+    from wx.lib.embeddedimage import PyEmbeddedImage
+except ImportError:
+    class PyEmbeddedImage(object):
+        \"\"\"Data stand-in for wx.lib.embeddedimage.PyEmbeddedImage.\"\"\"
+        def __init__(self, data):
+            self.data = data
 """ % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)
 
 

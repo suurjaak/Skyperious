@@ -8,9 +8,11 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    03.11.2013
+@modified    23.02.2014
 ------------------------------------------------------------------------------
 """
+import cStringIO
+import ctypes
 import locale
 import math
 import os
@@ -20,13 +22,17 @@ import subprocess
 import sys
 import tempfile
 import time
-import traceback
 import urllib
-import wx
+
+from PIL import Image
+try:
+    import wx
+except ImportError:
+    pass # Most functionality works without wx
 
 
 def m(o, name, case_insensitive=True):
-    """Returns the members of the object, filtered by name."""
+    """Returns the members of the object or dict, filtered by name."""
     members = o.keys() if isinstance(o, dict) else dir(o)
     if case_insensitive:
         return [i for i in members if name.lower() in i.lower()]
@@ -147,12 +153,12 @@ def cmp_dictlists(list1, list2):
     return result
 
 
-def try_until(func, count=10, sleep=0.5):
+def try_until(func, count=1, sleep=0.5):
     """
     Tries to execute the specified function a number of times.
 
     @param    func   callable to execute
-    @param    count  number of times to try (default 10)
+    @param    count  number of times to try (default 1)
     @param    sleep  seconds to sleep after failed attempts, if any
                      (default 0.5)
     @return          (True, func_result) if success else (False, None)
@@ -165,17 +171,17 @@ def try_until(func, count=10, sleep=0.5):
         try:
             func_result = func()
             result = True
-        except Exception, e:
+        except Exception as e:
             if tries < count and sleep:
                 time.sleep(sleep)
     return result, func_result
 
 
-def toint(value):
+def to_int(value):
     """Returns the value as integer, or None if not integer."""
     try:
         result = int(value)
-    except ValueError, e:
+    except ValueError as e:
         result = None
     return result
 
@@ -200,7 +206,7 @@ def start_file(filepath):
     if "nt" == os.name:
         try:
             os.startfile(filepath)
-        except WindowsError, e:
+        except WindowsError as e:
             if 1155 == e.winerror: # ERROR_NO_ASSOCIATION
                 cmd = "Rundll32.exe SHELL32.dll, OpenAs_RunDLL %s"
                 os.popen(cmd % filepath)
@@ -232,10 +238,8 @@ def htmltag(name, attrs=None, content=None, utf=True):
                          "input", "area", "link"]
     tag = "<%s" % name
     if attrs:
-        tag += " " + " ".join([
-            "%s='%s'" % (k, escape_html(v, utf=utf))
-            for k, v in attrs.items()
-        ])
+        tag += " " + " ".join(["%s='%s'" % (k, escape_html(v, utf=utf))
+                               for k, v in attrs.items()])
     if name not in SELF_CLOSING_TAGS:
     #or (content is not None and str(content)):
         tag += ">%s</%s>" % (escape_html(content, utf=utf), name)
@@ -277,19 +281,33 @@ def divide_delta(td1, td2):
     return us1 / us2
 
 
-def bitmap_to_raw(wx_bmp, file_type=wx.BITMAP_TYPE_JPEG):
+def pil_to_wx_image(pil_image, copy_alpha=True):
+    """Converts a PIL.Image to wx.Image."""
+    wx_image = wx.EmptyImage(*pil_image.size)
+    wx_image.SetData(pil_image.convert("RGB").tostring())
+    if copy_alpha and ("A" == pil_image.mode[-1]):
+        wx_image.SetAlphaData(pil_image.tostring()[3::4])
+    return wx_image
+
+
+def wx_image_to_pil(wx_image, copy_alpha=True):
+    """Converts a wx.Image to PIL.Image."""
+    pil_image = Image.new("RGB", wx_image.GetSize())
+    pil_image.fromstring(wx_image.Data)
+    if wx_image.HasAlpha() and copy_alpha:
+        pil_image = pil_image.convert("RGBA")
+        alpha = Image.fromstring("L", wx_image.GetSize(), wx_image.AlphaData)
+        pil_image.putalpha(alpha)
+    return pil_image
+
+
+def wx_bitmap_to_raw(wx_bitmap, format="PNG"):
     """Returns the wx.Bitmap or wx.Image as raw data of specified type."""
-    result = ""
-    filename = ""
-    try:
-        fd, filename = tempfile.mkstemp()
-        os.close(fd)
-        wx_bmp.SaveFile(filename, file_type)
-        result = open(filename, "rb").read()
-    except:
-        traceback.print_exc()
-    finally:
-        try_until(lambda: os.unlink(filename), 1)
+    stream = cStringIO.StringIO()
+    img = wx_bitmap if isinstance(wx_bitmap, wx.Image) \
+          else wx_bitmap.ConvertToImage()
+    wx_image_to_pil(img).save(stream, format)
+    result = stream.getvalue()
     return result
 
 
@@ -328,11 +346,11 @@ def get_locale_day_date(dt):
         try:
             weekday = weekday.decode(locale.getpreferredencoding())
             weekdate = weekdate.decode(locale.getpreferredencoding())
-        except:
+        except Exception:
             try:
                 weekday = weekday.decode("latin1")
                 weekdate = weekdate.decode("latin1")
-            except:
+            except Exception:
                 pass
     weekday = weekday.capitalize()
     return weekday, weekdate
@@ -372,8 +390,24 @@ def to_unicode(value):
         if isinstance(result, str):
             try:
                 result = unicode(result, locale.getpreferredencoding())
-            except:
+            except Exception:
                 result = unicode(result, "utf-8")
         else:
             x = unicode(x)
+    return result
+
+
+def longpath(path):
+    """Returns the path in long Windows form (not shortened to PROGRA~1)."""
+    result = path
+    try:
+        buf = ctypes.create_unicode_buffer(65536)
+        GetLongPathNameW = ctypes.windll.kernel32.GetLongPathNameW
+        if GetLongPathNameW(unicode(path), buf, 65536):
+            result = buf.value
+        else:
+            head, tail = os.path.split(path)
+            if GetLongPathNameW(unicode(head), buf, 65536):
+                result = os.path.join(buf.value, tail)
+    except Exception: pass
     return result

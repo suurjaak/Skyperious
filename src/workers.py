@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.11.2013
+@modified    22.02.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -18,7 +18,11 @@ import re
 import threading
 import time
 import traceback
-import wx
+
+try:
+    import wx
+except ImportError:
+    pass # Most functionality works without wx
 
 from third_party import step
 
@@ -77,14 +81,14 @@ class WorkerThread(threading.Thread):
     def postback(self, data):
         # Check whether callback is still bound to a valid object instance
         if getattr(self._callback, "__self__", True):
-            time.sleep(0.5) # Feeding results too fast makes GUI unresponsive
             self._callback(data)
 
 
     def yield_ui(self):
         """Allows UI to respond to user input."""
         try: wx.YieldIfNeeded()
-        except: pass
+        except Exception: pass
+
 
 
 class SearchThread(WorkerThread):
@@ -104,26 +108,52 @@ class SearchThread(WorkerThread):
     def run(self):
         self._is_running = True
         # For identifying "chat:xxx" and "from:xxx" keywords
-        template_chat = step.Template(templates.SEARCH_ROW_CHAT_HTML)
-        template_contact = step.Template(templates.SEARCH_ROW_CONTACT_HTML)
-        template_message = step.Template(templates.SEARCH_ROW_MESSAGE_HTML)
-        template_row = step.Template(templates.SEARCH_ROW_TABLE_HTML)
-        template_table = step.Template(templates.SEARCH_ROW_TABLE_HEADER_HTML)
         query_parser = searchparser.SearchQueryParser()
-        wrap_b = lambda x: "<b>%s</b>" % x.group(0)
         result = None
         while self._is_running:
             try:
                 search = self._queue.get()
                 if not search:
                     continue # continue while self._is_running
+
+                is_text_output = ("text" == search.get("output"))
+                wrap_html = None # MessageParser wrap function, for HTML output
+                if is_text_output:
+                    TEMPLATES = {
+                        "chat":    templates.SEARCH_ROW_CHAT_TXT, 
+                        "contact": templates.SEARCH_ROW_CONTACT_TXT,
+                        "message": templates.SEARCH_ROW_MESSAGE_TXT,
+                        "table":   templates.SEARCH_ROW_TABLE_HEADER_TXT,
+                        "row":     templates.SEARCH_ROW_TABLE_TXT, }
+                    wrap_b = lambda x: "**%s**" % x.group(0)
+                    output = {"format": "text"}
+                else:
+                    TEMPLATES = {
+                        "chat":    templates.SEARCH_ROW_CHAT_HTML, 
+                        "contact": templates.SEARCH_ROW_CONTACT_HTML,
+                        "message": templates.SEARCH_ROW_MESSAGE_HTML,
+                        "table":   templates.SEARCH_ROW_TABLE_HEADER_HTML,
+                        "row":     templates.SEARCH_ROW_TABLE_HTML, }
+                    wrap_b = lambda x: "<b>%s</b>" % x.group(0)
+                    output = {"format": "html"}
+                    width = search.get("width", -1)
+                    if width > 0:
+                        dc = wx.MemoryDC()
+                        dc.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.NORMAL,
+                                           face=conf.HistoryFontName))
+                        wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
+                        output["wrap"] = True
+                main.log("Searching for \"%(text)s\" in %(table)s (%(db)s)." %
+                         search)
                 self._stop_work = False
                 self._drop_results = False
-                parser = skypedata.MessageParser(search["db"])
-                # {"html": html with results, "map": link data map}
+
+                parser = skypedata.MessageParser(search["db"],
+                                                 wrapfunc=wrap_html)
+                # {"output": text with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
                 result_type, result_count, count = None, 0, 0
-                result = {"html": "", "map": {},
+                result = {"output": "", "map": {},
                           "search": search, "count": 0}
                 sql, params, match_words = query_parser.Parse(search["text"])
 
@@ -138,6 +168,7 @@ class SearchThread(WorkerThread):
                 chats = search["db"].get_conversations()
                 chats.sort(key=lambda x: x["title"])
                 chat_map = {} # {chat id: {chat data}}
+                template_chat = step.Template(TEMPLATES["chat"])
                 for chat in chats:
                     chat_map[chat["id"]] = chat
                     if "conversations" == search["table"] and match_words:
@@ -157,21 +188,21 @@ class SearchThread(WorkerThread):
                         if title_matches or matching_authors:
                             count += 1
                             result_count += 1
-                            result["html"] += template_chat.expand(locals())
+                            result["output"] += template_chat.expand(locals())
                             key = "chat:%s" % chat["id"]
                             result["map"][key] = {"chat": chat["id"]}
                             if not count % conf.SearchResultsChunk \
                             and not self._drop_results:
                                 result["count"] = result_count
                                 self.postback(result)
-                                result = {"html": "", "map": {},
+                                result = {"output": "", "map": {},
                                           "search": search, "count": 0}
                     if self._stop_work:
                         break # break for chat in chats
-                if result["html"] and not self._drop_results:
+                if result["output"] and not self._drop_results:
                     result["count"] = result_count
                     self.postback(result)
-                    result = {"html": "", "map": {}, "search": search,
+                    result = {"output": "", "map": {}, "search": search,
                               "count": 0}
 
                 # Find contacts with a matching name
@@ -187,6 +218,7 @@ class SearchThread(WorkerThread):
                         "phone_mobile", "homepage", "emails", "about",
                         "mood_text",
                     ]
+                    template_contact = step.Template(TEMPLATES["contact"])
                     for contact in contacts:
                         match = False
                         fields_filled = {}
@@ -200,23 +232,24 @@ class SearchThread(WorkerThread):
                         if match:
                             count += 1
                             result_count += 1
-                            result["html"] += template_contact.expand(locals())
+                            result["output"] += template_contact.expand(locals())
                             if not (self._drop_results
                             or count % conf.SearchResultsChunk):
                                 result["count"] = result_count
                                 self.postback(result)
-                                result = {"html": "", "map": {},
+                                result = {"output": "", "map": {},
                                           "search": search, "count": 0}
                         if self._stop_work:
                             break # break for contact in contacts
-                if result["html"] and not self._drop_results:
+                if result["output"] and not self._drop_results:
                     result["count"] = result_count
                     self.postback(result)
-                    result = {"html": "", "map": {},
+                    result = {"output": "", "map": {},
                               "search": search, "count": 0}
 
                 # Find messages with a matching body
                 if not self._stop_work and "messages" == search["table"]:
+                    template_message = step.Template(TEMPLATES["message"])
                     count, result_type = 0, "messages"
                     chat_messages = {} # {chat id: [message, ]}
                     chat_order = []    # [chat id, ]
@@ -225,30 +258,33 @@ class SearchThread(WorkerThread):
                         ascending=False, use_cache=False)
                     for m in messages:
                         chat = chat_map.get(m["convo_id"])
-                        chat_title = chat["title_long"]
-                        body = parser.parse(m,
-                            pattern_replace if match_words else None,
-                            html={"w": search["window"].Size.width * 5/9})
+                        body = parser.parse(m, pattern_replace if match_words 
+                                            else None, output)
                         count += 1
                         result_count += 1
-                        result["html"] += template_message.expand(locals())
+                        result["output"] += template_message.expand(locals())
                         key = "message:%s" % m["id"]
                         result["map"][key] = {"chat": chat["id"],
                                               "message": m["id"]}
-                        if not count % conf.SearchResultsChunk \
-                        and not self._drop_results:
+                        if is_text_output or (not self._drop_results
+                        and not count % conf.SearchResultsChunk):
                             result["count"] = result_count
                             self.postback(result)
-                            result = {"html": "", "map": {},
+                            result = {"output": "", "map": {},
                                       "search": search, "count": 0}
-                        if self._stop_work or count >= conf.SearchMessagesMax:
+                        if self._stop_work or (not is_text_output
+                        and count >= conf.SearchMessagesMax):
                             break # break for m in messages
 
                 infotext = search["table"]
                 if not self._stop_work and "all tables" == search["table"]:
                     infotext, result_type = "", "table row"
                     # Search over all fields of all tables.
-                    for table in search["db"].tables_list:
+                    template_table = step.Template(TEMPLATES["table"])
+                    template_row = step.Template(TEMPLATES["row"])
+                    for table in search["db"].get_tables():
+                        table["columns"] = search["db"].get_table_columns(
+                            table["name"])
                         sql, params, words = \
                             query_parser.Parse(search["text"], table)
                         if not sql:
@@ -258,12 +294,12 @@ class SearchThread(WorkerThread):
                         row = rows.fetchone()
                         if not row:
                             continue # continue for table in search["db"]..
-                        result["html"] = template_table.expand(locals())
+                        result["output"] = template_table.expand(locals())
                         count = 0
                         while row:
                             count += 1
                             result_count += 1
-                            result["html"] += template_row.expand(locals())
+                            result["output"] += template_row.expand(locals())
                             key = "table:%s:%s" % (table["name"], count)
                             result["map"][key] = {"table": table["name"],
                                                   "row": row}
@@ -271,21 +307,22 @@ class SearchThread(WorkerThread):
                             and not self._drop_results:
                                 result["count"] = result_count
                                 self.postback(result)
-                                result = {"html": "", "map": {},
+                                result = {"output": "", "map": {},
                                           "search": search, "count": 0}
-                            if self._stop_work \
-                            or result_count >= conf.SearchTableRowsMax:
+                            if self._stop_work or (not is_text_output
+                            and result_count >= conf.SearchTableRowsMax):
                                 break # break while row
                             row = rows.fetchone()
                         if not self._drop_results:
-                            result["html"] += "</table>"
+                            if not is_text_output:
+                                result["output"] += "</table>"
                             result["count"] = result_count
                             self.postback(result)
-                            result = {"html": "", "map": {},
+                            result = {"output": "", "map": {},
                                       "search": search, "count": 0}
                         infotext += " (%s)" % util.plural("result", count)
-                        if self._stop_work \
-                        or result_count >= conf.SearchTableRowsMax:
+                        if self._stop_work or (not is_text_output
+                        and result_count >= conf.SearchTableRowsMax):
                             break # break for table in search["db"]..
                     single_table = ("," not in infotext)
                     infotext = "table%s: %s" % \
@@ -295,31 +332,34 @@ class SearchThread(WorkerThread):
                                     util.plural("result", result_count)
                 final_text = "No matches found."
                 if self._drop_results:
-                    result["html"] = ""
+                    result["output"] = ""
                 if result_count:
                     final_text = "Finished searching %s." % infotext
 
                 if self._stop_work:
                     final_text += " Stopped by user."
-                elif "messages" == result_type \
+                elif "messages" == result_type and not is_text_output \
                 and count >= conf.SearchMessagesMax:
                     final_text += " Stopped at %s limit %s." % \
                                   (result_type, conf.SearchMessagesMax)
-                elif "table row" == result_type \
+                elif "table row" == result_type and not is_text_output \
                 and count >= conf.SearchTableRowsMax:
                     final_text += " Stopped at %s limit %s." % \
                                   (result_type, conf.SearchTableRowsMax)
 
-                result["html"] += "</table><br /><br />%s</font>" % final_text
+                result["output"] += "</table><br /><br />%s</font>" % final_text
+                if is_text_output: result["output"] = ""
                 result["done"] = True
                 result["count"] = result_count
                 self.postback(result)
-            except Exception, e:
+                main.log("Search found %(count)s results." % result)
+            except Exception as e:
                 if not result:
                     result = {}
                 result["done"], result["error"] = True, traceback.format_exc()
                 result["error_short"] = "%s: %s" % (type(e).__name__, e.message)
                 self.postback(result)
+
 
 
 class MergeThread(WorkerThread):
@@ -344,28 +384,27 @@ class MergeThread(WorkerThread):
             params = self._queue.get()
             self._stop_work = False
             self._drop_results = False
-            if params and "diff" == params.get("type"):
-                self.work_diff(params)
-            elif params and "merge" == params.get("type"):
-                self.work_merge(params)
+            if params and "diff_left" == params.get("type"):
+                self.work_diff_left(params)
+            elif params and "diff_merge_left" == params.get("type"):
+                self.work_diff_merge_left(params)
+            elif params and "merge_left" == params.get("type"):
+                self.work_merge_left(params)
 
 
-    def work_diff(self, params):
+    def work_diff_left(self, params):
         """
-        Worker branch that compares all chats for differences, posting results
-        back to application.
+        Worker branch that compares all chats on the left side for differences,
+        posting results back to application.
         """
-        # {"htmls": [html result for db1, db2],
-        #  "chats": [differing chats in db1, db2]}
-        result = {"htmls": ["", ""], "chats": [[], []],
-                  "params": params, "index": 0, "type": "diff"}
+        # {"output": "html result for db1, db2",
+        #  "index": currently processed chat index,
+        #  "chats": [differing chats in db1]}
+        result = {"output": "", "chats": [],
+                  "params": params, "index": 0, "type": "diff_left"}
         db1, db2 = params["db1"], params["db2"]
-        chats1 = db1.get_conversations()
+        chats1 = params.get("chats") or db1.get_conversations()
         chats2 = db2.get_conversations()
-        skypenames1 = [i["identity"] for i in db1.get_contacts()]
-        skypenames2 = [i["identity"] for i in db2.get_contacts()]
-        skypenames1.append(db1.id)
-        skypenames2.append(db2.id)
         c1map = dict((c["identity"], c) for c in chats1)
         c2map = dict((c["identity"], c) for c in chats2)
         compared = []
@@ -376,107 +415,198 @@ class MergeThread(WorkerThread):
             c["messages2"] = c2["message_count"] or 0 if c2 else 0
             c["c1"], c["c2"] = c1, c2
             compared.append(c)
-        for c2 in chats2:
-            c1 = c1map.get(c2["identity"])
-            if not c1:
-                c = c2.copy()
-                c["messages1"], c["messages2"] = 0, c["message_count"] or 0
-                c["c1"], c["c2"] = c1, c2
-                compared.append(c)
         compared.sort(key=lambda x: x["title"].lower())
+        info_template = step.Template(templates.DIFF_RESULT_ITEM)
+
         for index, chat in enumerate(compared):
-            diff = self.get_chat_diff(chat, db1, db2)
+            diff = self.get_chat_diff_left(chat, db1, db2)
             if self._stop_work:
                 break # break for index, chat in enumerate(compared)
-            for i in range(2):
-                new_chat = not chat["c1" if i else "c2"]
+            if diff["messages"] \
+            or (chat["message_count"] and diff["participants"]):
+                new_chat = not chat["c2"]
                 newstr = "" if new_chat else "new "
-                info = util.htmltag("a", {"href": chat["identity"]},
-                                    chat["title_long"], utf=False)
+                info = info_template.expand(chat=chat)
                 if new_chat:
                     info += " - new chat"
-                if diff["messages"][i]:
+                if diff["messages"]:
                    info += ", %s" % util.plural("%smessage" % newstr,
-                                                diff["messages"][i])
-                if diff["participants"][i] and newstr:
+                                                diff["messages"])
+                else:
+                    info += ", no messages"
+                if diff["participants"] and not new_chat:
                         info += ", %s" % (
                             util.plural("%sparticipant" % newstr,
-                                        diff["participants"][i]))
-                if diff["messages"][i] or diff["participants"][i]:
-                    info += ".<br />"
-                    result["htmls"][i] += info
-                    result["chats"][i].append({"chat": chat, "diff": diff})
+                                        diff["participants"]))
+                info += ".<br />"
+                result["output"] += info
+                result["chats"].append({"chat": chat, "diff": diff})
+            result["index"] = index
             if not self._drop_results:
+                if index < len(compared) - 1:
+                    result["status"] = ("Scanning %s." % 
+                                        compared[index + 1]["title_long_lc"])
                 self.postback(result)
-                result = {"htmls": ["", ""], "chats": [[], []],
-                          "params": params, "index": index, "type": "diff"}
+                result = {"output": "", "chats": [], "index": index,
+                          "params": params, "type": "diff_left"}
         if not self._drop_results:
             result["done"] = True
             self.postback(result)
 
 
 
-    def work_merge(self, params):
+    def work_diff_merge_left(self, params):
+        """
+        Worker branch that compares all chats on the left side for differences,
+        copies them over to the right, posting progress back to application.
+        """
+        result = {"output": "", "index": 0, "params": params, "chats": [],
+                  "count": 0, "type": "diff_merge_left", }
+        error, e = None, None
+        compared = []
+        db1, db2 = params["db1"], params["db2"]
+        try:
+            chats1 = params.get("chats") or db1.get_conversations()
+            chats2 = db2.get_conversations()
+            c1map = dict((c["identity"], c) for c in chats1)
+            c2map = dict((c["identity"], c) for c in chats2)
+            for c1 in chats1:
+                c2 = c2map.get(c1["identity"])
+                c = c1.copy()
+                c["messages1"] = c1["message_count"] or 0
+                c["messages2"] = c2["message_count"] or 0 if c2 else 0
+                c["c1"], c["c2"] = c1, c2
+                compared.append(c)
+            compared.sort(key=lambda x: x["title"].lower())
+            result["count"] = len(compared)
+            count_messages = 0
+            count_participants = 0
+            for index, chat in enumerate(compared):
+                diff = self.get_chat_diff_left(chat, db1, db2)
+                if self._stop_work:
+                    break # break for index, chat in enumerate(compared)
+                if diff["messages"] \
+                or (chat["message_count"] and diff["participants"]):
+                    chat1 = chat["c1"]
+                    chat2 = chat["c2"]
+                    new_chat = not chat2
+                    if new_chat:
+                        chat2 = chat1.copy()
+                        chat["c2"] = chat2
+                        chat2["id"] = db2.insert_chat(chat2, db1)
+                    if diff["participants"]:
+                        db2.insert_participants(chat2, diff["participants"],
+                                                db1)
+                        count_participants += len(diff["participants"])
+                    if diff["messages"]:
+                        db2.insert_messages(chat2, diff["messages"], db1, chat1,
+                                            self.yield_ui, self.REFRESH_COUNT)
+                        count_messages += len(diff["messages"])
+
+                    newstr = "" if new_chat else "new "
+                    info = "Merged %s" % chat["title_long_lc"]
+                    if new_chat:
+                        info += " - new chat"
+                    if diff["messages"]:
+                        info += ", %s" % util.plural("%smessage" % newstr,
+                                                     diff["messages"])
+                    else:
+                        info += ", no messages"
+                    result["output"] = info + "."
+                    result["diff"] = diff
+                result["index"] = index
+                result["chats"].append(chat)
+                if not self._drop_results:
+                    if index < len(compared) - 1:
+                        result["status"] = ("Scanning %s." % 
+                                            compared[index+1]["title_long_lc"])
+                    self.postback(result)
+                    result = {"output": "", "index": index, "params": params,
+                              "count": len(compared), "type": "diff_merge_left",
+                              "chats": [], }
+        except Exception as e:
+            error = traceback.format_exc()
+        finally:
+            if not self._drop_results:
+                if compared:
+                    info = "Merged %s" % util.plural("new message",
+                                                     count_messages)
+                    if count_participants:
+                        info += " and %s" % util.plural("new participant",
+                                                        count_participants)
+                    info += " \n\nto %s." % db2
+                else:
+                    info = "Nothing new to merge from %s to %s." % (db1, db2)
+                result = {"type": "diff_merge_left", "done": True,
+                          "output": info, "params": params, "chats": [] }
+                if error:
+                    result["error"] = error
+                    if e:
+                        result["error_short"] = "%s: %s" % (
+                                                type(e).__name__, e.message)
+                self.postback(result)
+
+
+    def work_merge_left(self, params):
         """
         Worker branch that merges differences given in params, posting progress
         back to application.
         """
         error, e = None, None
-        db1, db2, info = params["db1"], params["db2"], params["info"]
-        chats, contacts = params["chats"], params["contacts"]
-        source, contactgroups = params["source"], params["contactgroups"]
+        db1, db2 = params["db1"], params["db2"]
+        chats = params["chats"]
+        chats1_count = len(db1.get_conversations())
         count_messages = 0
         count_participants = 0
         try:
-            if contacts:
-                content = util.plural("contact", contacts)
-                self.postback({"type": "merge", "gauge": 0,
-                                "message": "Merging %s." % content})
-                db2.insert_contacts(contacts, db1)
-                self.postback({"type": "merge", "gauge": 100,
-                                "message": "Merged %s." % content})
-            if contactgroups:
-                content = util.plural("contact group", contactgroups)
-                self.postback({"type": "merge", "gauge": 0,
-                                "message": "Merging %s." % content})
-                db2.replace_contactgroups(contactgroups, db1)
-                self.postback({"type": "merge", "gauge": 100,
-                                "message": "Merged %s." % content})
             for index, chat_data in enumerate(chats):
                 if self._stop_work:
                     break # break for i, chat_data in enumerate(chats)
-                chat1 = chat_data["chat"]["c2" if source else "c1"]
-                chat2 = chat_data["chat"]["c1" if source else "c2"]
-                step = -1 if source else 1
-                messages1, messages2 = chat_data["diff"]["messages"][::step]
-                participants, participants2 = \
-                    chat_data["diff"]["participants"][::step]
+                chat1 = chat_data["chat"]["c1"]
+                chat2 = chat_data["chat"]["c2"]
+                messages = chat_data["diff"]["messages"]
+                participants = chat_data["diff"]["participants"]
+                html = "Merged %s" % chat1["title_long_lc"]
+                if not chat2:
+                    html += " - new chat"
+                if messages:
+                    newstr = "" if not chat2 else "new "
+                    html += ", %s" % util.plural("%smessage" % newstr, messages)
+                else:
+                    html += ", no messages"
+                html += "."
                 if not chat2:
                     chat2 = chat1.copy()
-                    chat_data["chat"]["c1" if source else "c2"] = chat2
+                    chat_data["chat"]["c2"] = chat2
                     chat2["id"] = db2.insert_chat(chat2, db1)
                 if participants:
                     db2.insert_participants(chat2, participants, db1)
                     count_participants += len(participants)
-                if messages1:
-                    db2.insert_messages(chat2, messages1, db1, chat1,
+                if messages:
+                    db2.insert_messages(chat2, messages, db1, chat1,
                                         self.yield_ui, self.REFRESH_COUNT)
-                    count_messages += len(messages1)
-                self.postback({"type": "merge", "index": index,
-                                "params": params})
-        except Exception, e:
+                    count_messages += len(messages)
+                if not self._drop_results:
+                    result = {"type": "merge_left", "index": index,
+                              "output": html, "count": chats1_count,
+                              "params": params, "chats": [chat_data["chat"]] }
+                    if index < len(chats) - 1:
+                        result["status"] = ("Merging %s."
+                            % chats[index + 1]["chat"]["title_long_lc"])
+                    self.postback(result)
+        except Exception as e:
             error = traceback.format_exc()
         finally:
             if chats:
+                html = "Merged %s" % util.plural("new message",
+                                                 count_messages)
                 if count_participants:
-                    info += (" and " if info else "") + \
-                            util.plural("participant", count_participants)
-                if count_messages:
-                    info += (" and " if info else "") \
-                        + util.plural("message", count_messages)
+                    html += " and %s" % util.plural("new participant",
+                                                    count_participants)
+                html += " \n\nto %s." % db2
             if not self._drop_results:
-                result = {"type": "merge", "done": True, "info": info,
-                          "source": source, "params": params}
+                result = {"type": "merge_left", "done": True, "output": html,
+                          "params": params}
                 if error:
                     result["error"] = error
                     if e:
@@ -547,7 +677,7 @@ class MergeThread(WorkerThread):
                     if skypedata.MESSAGES_TYPE_LEAVE == m["type"]:
                         t = m["author"]
                 else:
-                    t = parser.parse(m, text={"wrap": False})
+                    t = parser.parse(m, output={"format": "text"})
                 t = t if isinstance(t, str) else t.encode("utf-8")
                 author = (m["author"] or "").encode("utf-8")
                 difftext = "%s-%s-%s" % (author, m["type"], t)
@@ -565,7 +695,7 @@ class MergeThread(WorkerThread):
             for i, (remote_id, m) in enumerate(remote_id_messages):
                 if remote_id in map2:
                     is_match = lambda x: difftexts[m] == difftexts[x]
-                    if not filter(is_match, map2[remote_id]):
+                    if not any(filter(is_match, map2[remote_id])):
                         output.append(m) # Nothing with same remote_id and body
                 else:
                     output.append(m)
@@ -599,6 +729,99 @@ class MergeThread(WorkerThread):
 
         result = { "messages": [message_ids1, message_ids2],
                    "participants": [c1p_diff, c2p_diff] }
+        return result
+
+
+    def get_chat_diff_left(self, chat, db1, db2):
+        """
+        Compares the chat in the two databases and returns the differences from
+        the left as {"messages": [message IDs different in db1],
+                     "participants": [participants different in db1] }.
+        """
+        c = chat
+        participants1 = c["c1"]["participants"] if c["c1"] else []
+        participants2 = c["c2"]["participants"] if c["c2"] else []
+        c2p_map = dict((p["identity"], p) for p in participants2)
+        c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
+        c1m_diff = [] # [(id, datetime), ] messages different in chat 1
+
+        if not c["messages1"]:
+            messages1, messages2 = [], [] # Left side empty, skip all messages
+        elif not c["messages2"]:
+            messages1, messages2 = [], [] # Right side empty, take whole left
+            messages_all = db1.get_messages(c["c1"], use_cache=False)
+            c1m_diff = [(m["id"], m["datetime"]) for m in messages_all]
+        else:
+            messages1 = db1.get_messages(c["c1"], use_cache=False)
+            messages2 = db2.get_messages(c["c2"], use_cache=False)
+            parser1 = skypedata.MessageParser(db1)
+            parser2 = skypedata.MessageParser(db2)
+
+            m1map = {} # {remote_id: [(id, datetime), ], }
+            m2map = {} # {remote_id: [(id, datetime), ], }
+            m1_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
+            m2_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
+            m1bodymap = {} # {author+type+body: [(id, datetime), ], }
+            m2bodymap = {} # {author+type+body: [(id, datetime), ], }
+            difftexts = {} # {(id, datetime): text, }
+
+            # Assemble maps by remote_id and create diff texts. remote_id is
+            # not unique and can easily have duplicates.
+            things = [(messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
+                      (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]
+            for messages, idmap, noidmap, bodymap, parser in things:
+                for i, m in enumerate(messages):
+                    # Avoid keeping whole messages in memory, can run out.
+                    m_cache = (m["id"], m.get("datetime"))
+                    if m["remote_id"]:
+                        if m["remote_id"] not in idmap:
+                            idmap[m["remote_id"]] = []
+                        idmap[m["remote_id"]].append(m_cache)
+                    else:
+                        noidmap.append(m_cache)
+                    # In these messages, parsed body can differ even though
+                    # message is the same: contact names are taken from current
+                    # database values. Using raw values instead.
+                    if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
+                        t = m["identities"]
+                        if skypedata.MESSAGES_TYPE_LEAVE == m["type"]:
+                            t = m["author"]
+                    else:
+                        t = parser.parse(m, output={"format": "text"})
+                    t = t if isinstance(t, str) else t.encode("utf-8")
+                    author = (m["author"] or "").encode("utf-8")
+                    difftext = "%s-%s-%s" % (author, m["type"], t)
+                    difftexts[m_cache]  = difftext
+                    if difftext not in bodymap: bodymap[difftext] = []
+                    bodymap[difftext].append(m_cache)
+                    if i and not i % self.REFRESH_COUNT:
+                        self.yield_ui()
+
+            # Compare assembled remote_id maps between databases and see if
+            # there are no messages with matching body in the other database.
+            remote_id_messages = [(r, j) for r, i in m1map.items() for j in i]
+            for i, (remote_id, m) in enumerate(remote_id_messages):
+                if remote_id in m2map:
+                    is_match = lambda x: (difftexts[m] == difftexts[x])
+                    if not any(filter(is_match, m2map[remote_id])):
+                        c1m_diff.append(m) # Nothing with same remote_id+body
+                else:
+                    c1m_diff.append(m)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
+
+            # For messages with no remote_id-s, compare by author-type-body key
+            # and see if there are no matching messages close in time.
+            for i, m in enumerate(m1_no_remote_ids):
+                potential_matches = m2bodymap.get(difftexts[m], [])
+                if not [m2 for m2 in potential_matches
+                        if self.match_time(m[1], m2[1], 180)]:
+                    c1m_diff.append(m)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
+
+        message_ids1 = [m[0] for m in sorted(c1m_diff, key=lambda x: x[1])]
+        result = { "messages": message_ids1, "participants": c1p_diff }
         return result
 
 
