@@ -36,12 +36,13 @@
           <a href="screens.html">Screenshots</a><br />
           <a href="faq.html">FAQ</a><br />
           <a href="changelog.html">Changelog</a><br />
+          <a href="help.html">Help Texts</a><br />
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_2.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -64,7 +65,10 @@ and
 </li>
 </ul>
 
-<p>Additionally, Skyperious doubles as a useful database browser for any SQLite file.</p>
+<p>
+Additionally, Skyperious doubles as a useful database browser for any SQLite file.<br />
+Also, a command line interface is available with key functions like exporting, searching, and merging. 
+</p>
 
 <p>Making a backup of the database file is recommended before doing any changes like merging.</p>
 
@@ -86,11 +90,84 @@ In database comparison, you can scan one database for messages not found in
 the other, and copy all detected messages to the other database. Or you can 
 browse and copy specific chats and contacts.
 </p>
+<p>
+Skyperious offers a number of options from the command line:
+<pre>
+  export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
+  search "query" FILE        search Skype databases for messages or data
+  merge FILE1 FILE2          merge two or more Skype databases into a new database
+  diff FILE1 FILE2           compare chat history in two Skype databases
+  gui [FILE]                 launch Skyperious graphical program (default option)
+</pre>
+</p>
 <br />
 <p>
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
 Ubuntu Linux, and reported to work under OS X and Windows 8. In source code form,
 it should run wherever Python and required Python packages are installed.
+</p>
+
+
+<h2>Installation</h2>
+
+<h3>Windows</h3>
+
+<p>Download and launch the latest setup.</p>
+
+<h3>Mac</h3>
+
+<ul>
+<li>install <a href="brew.sh">Homebrew</a></li>
+<li>install Python: open a terminal and run <code>brew install python2</code></li>
+<li>install wxPython: run <code>brew install --python wxmac --devel</code><br />
+(or use a suitable binary from <a href="http://wxpython.org/download.php">wxpython.org/download.php</a>)</li>
+<li>run <code>brew install PIL</code> (or <code>brew install Pillow</code>)</li>
+<li>run <code>brew install pyparsing</code></li>
+<li>run <code>brew install python-dateutil</code></li>
+<li>run <code>brew install Skype4Py</code></li>
+<li>run <code>brew install XlsxWriter</code></li>
+</ul>
+
+<p>Download and extract the Skyperious source, launch skyperious.sh.</p>
+
+<h3>Ubuntu/Debian</h3>
+
+<ul>
+<li>run <code>sudo aptitude install wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev</code></li>
+<li>run <code>sudo aptitude install python-wxgtk2.8 python-wxtools</code></li>
+<li>run <code>sudo aptitude install python-pip</code></li>
+<li>download and extract the Skyperious source</li>
+<li>open a terminal in the extracted directory</li>
+<li>run <code>sudo pip install -r requirements</code></li>
+</ul>
+<p>Launch skyperious.sh.</p>
+
+
+<h2>Dependencies</h2>
+
+<p>If running from source code, Skyperious needs Python 2.7 or 2.6 (<a href="http://www.python.org">www.python.org</a>),<br />
+and the following 3rd-party Python packages:
+<ul>
+<li>wxPython 2.9+ (<a href="http://wxpython.org/">http://wxpython.org/</a>) *</li>
+<li>Pillow (<a href="https://pypi.python.org/pypi/Pillow">pypi.python.org/pypi/Pillow</a>)<br />
+  or PIL, the Python Imaging Library (<a href="http://www.pythonware.com/products/pil/">www.pythonware.com/products/pil</a>)</li>
+<li>pyparsing (<a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a>)</li>
+</ul>
+</p>
+
+<p>If wxPython is not available, the command line interface will function regardless.</p>
+
+The following 3rd-party Python packages are not strictly required,
+but provide additional functionality like Excel export,
+contact import, and convenient date period choices in chat history:
+<ul>
+<li>XlsxWriter, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
+<li>Skype4Py, <a href="https://github.com/awahlig/skype4py">github.com/awahlig/skype4py</a></li>
+<li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
+</ul>
+
+<p>* Skyperious can also run under wxPython 2.8.12+, with some layout quirks.<br />
+&nbsp;&nbsp; Python 2.6 will need the argparse library. Python 3 is currently not supported.
 </p>
 
 
@@ -102,8 +179,8 @@ Skyperious has been built using the following open-source software:
 <li>wxPython 3.0.0, <a href="http://wxpython.org">wxpython.org</a></li>
 <li>step, Simple Template Engine for Python, <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
 <li>pyparsing 2.0.1, <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
-<li>XlsxWriter 0.5.2, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
-<li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
+<li>XlsxWriter 0.5.3, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
+<li>dateutil 2.2, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
 <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">github.com/awahlig/skype4py</a></li>
 <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">www.pyinstaller.org</a></li>
 </ul>
@@ -118,25 +195,6 @@ released under the Skype Component License 1.0.</p>
 <p>Several icons from:
   Fugue Icons, &copy; 2010 Yusuke Kamiyamane,
   <a href="http://p.yusukekamiyamane.com/">http://p.yusukekamiyamane.com/</a></p>
-
-
-<h2>Dependencies</h2>
-
-<p>In source code form, Skyperious needs Python 2.6+ (<a href="http://www.python.org">www.python.org</a>)
-and wxPython 2.9+ (<a href="http://wxpython.org/">http://wxpython.org/</a>). *</p>
-
-The following 3rd-party Python packages are not strictly required,
-but provide additional functionality like Excel export,
-contact import, and convenient date period choices in chat history:
-<ul>
-<li>XlsxWriter, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
-<li>Skype4Py, <a href="https://github.com/awahlig/skype4py">github.com/awahlig/skype4py</a></li>
-<li>dateutil, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
-</ul>
-
-<p>* Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
-  Python 3 is not supported.
-</p>
 
 
 <h2>License</h2>

@@ -1,0 +1,364 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Skyperious | Help Texts</title>
+    
+    <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-30919338-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+    <style><!-- code { color: #006600; } --></style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Skyperious</h1>
+        <p>Skype SQLite database viewer and merger</p>
+        <p class="view">
+          <a href="index.html">Index</a><br />
+          <a href="downloads.html">Downloads</a><br />
+          <a href="screens.html">Screenshots</a><br />
+          <a href="faq.html">FAQ</a><br />
+          <a href="changelog.html">Changelog</a><br />
+          <a href="help.html">Help Texts</a><br />
+          <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
+        </p>
+        <ul>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.0-src.zip">Download <strong>Source</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h2>Help Texts</h2>
+
+        <h3>Search Syntax</h3>
+        Skyperious supports a Google-like syntax for searching messages:
+        <br /><br />
+
+        <table>
+        <tr>
+          <td>
+            <b>Search for exact word or phrase</b><br /><br />
+            <code>"do re mi"</code>
+          </td>
+          <td>
+            Use quotes (<code>"</code>) to search for
+            an exact phrase or word. Quoted text is searched exactly as entered,
+            leaving whitespace as-is and ignoring any wildcard characters.
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Search for either word</b><br /><br />
+            <code>this OR that</code>
+            <br />
+          </td>
+          <td>
+            To find messages containing at least one of several words,
+            include <code>OR</code> between the words.
+            <code>OR</code> works also
+            for phrases and grouped words (but not keywords).
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Group words together</b><br /><br />
+            <code>(these two) OR this<br/>
+            -(none of these)</code>
+            <br />
+          </td>
+          <td>
+            Surround words with round brackets to group them for <code>OR</code>
+            queries or for excluding from results.
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Search for partially matching text</b><br /><br />
+            <code>bas*ball</code>
+            <br />
+          </td>
+          <td>
+            Use an asterisk (<code>*</code>) to make a
+            wildcard query: the wildcard will match any text between its front and
+            rear characters (including other words).
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Search within specific chats</b><br /><br />
+            <code>chat:office<br />
+            chat:"coffee &amp; cig"</code>
+            <br />
+          </td>
+          <td>
+            To find messages from specific chats only, use the keyword
+            <code>chat:name</code>.<br /><br />
+            Search from more than one chat by adding more 
+            <code>chat:</code> keywords.
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Search from specific authors</b><br /><br />
+            <code>from:maria<br />
+            from:"john smith"</code>
+            <br />
+          </td>
+          <td>
+            To find messages from specific authors only, use the keyword
+            <code>from:name</code>.<br /><br />
+            Search from more than one author by adding more
+            <code>from:</code> keywords.
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Search from specific time periods</b><br /><br />
+            <code>date:2008<br />date:2009-01<br />
+            date:2005-12-24..2007</code>
+            <br />
+          </td>
+          <td>
+            To find messages from specific time periods, use the keyword
+            <code>date:period</code> or
+            <code>date:periodstart..periodend</code>.
+            For the latter, either start or end can be omitted.<br /><br />
+            A date period can be year, year-month, or year-month-day. Additionally,
+            <code>date:period</code> can use a wildcard
+            in place of any part, so
+            <code>date:*-12-24</code> would search for
+            all messages from the 24th of December.<br /><br />
+            Search from a more narrowly defined period by adding more
+            <code>date:</code> keywords.
+            <br />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Exclude words or keywords</b><br /><br />
+            <code>-notthisword<br />-"not this phrase"<br />
+            -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
+            -date:2013</code>
+            <br />
+          </td>
+          <td>
+            To exclude certain messages, add a dash
+            (<code>-</code>) in front of words,
+            phrases, grouped words or keywords.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>SPECIAL: search specific tables</b><br /><br />
+            <code>table:fromthistable<br />
+            -table:notfromthistable</code>
+            <br />
+          </td>
+          <td>
+            When performing search on all columns of all database tables
+            (the fourth option on the search toolbar),
+            use the keyword <code>table:name</code>
+            to constrain results to specific tables only.<br /><br />
+            Search from more than one table by adding more
+            <code>table:</code> keywords, or exclude certain
+            tables by adding a <code>-table:</code> keyword.
+            <br />
+          </td>
+        </tr>
+        </table>
+        <br />
+
+        <h4>Examples</h4>
+
+        <ul>
+          <li>search for "flickr.com" from John or Jane in chats named "links":<br />
+            <code>flickr.com from:john from:jane chat:links</code>
+            <br /><br />
+          </li>
+          <li>search from John Smith up to 2011:<br />
+            <code>from:"john smith" date:..2011</code>
+            <br /><br />
+          </li>
+          <li>search for either "John" and "my side" or "Stark" and "your side":<br />
+            <code>(john "my side") OR (stark "your side")</code>
+            <br /><br />
+          </li>
+          <li>search for either "barbecue" or "grill" in 2012, except from June to August:<br />
+            <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
+            <br /><br />
+          </li>
+          <li>search for "TPS report" in chats named "office"
+              (but not named "backoffice") on the first day of the month in 2012:<br />
+            <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
+            <br /><br />
+          </li>
+        </ul>
+
+
+        Search is made on raw Skype message body, so there can be results which do not
+        seem to match the query - Skype messages contain more than plain text.<br />
+        For example, searching for <code>href</code> will match a message with body<br />
+        <code>&lt;a href="http://lmgtfy.com/"&gt;lmgtfy.com&lt;/a&gt;</code>,
+        displayed as <a href="http://lmgtfy.com/">lmgtfy.com</a>.<br /><br />
+        This can be used for finding specific type of messages, for example
+        <code>&lt;sms</code> finds SMS messages, <code>&lt;file</code> finds transfers, <code>&lt;quote</code>
+        finds quoted messages, and <code>&lt;ss</code> finds messages with emoticons.
+      </section>
+      <section>
+        <h3>Command Line Help</h3>
+
+        Command-line interface does not require having wx installed,
+        if running from source code.<br />
+        It is likewise available with compiled binaries.
+        <br /><br />
+
+<pre>
+<code>$ python main.py -h</code>
+
+usage: main.py [-h] [--verbose] {export,search,merge,diff,gui} ...
+
+Skyperious - Skype SQLite database viewer and merger.
+
+positional arguments:
+  {export,search,merge,diff,gui}
+    export              export Skype databases as HTML, text or spreadsheet
+    search              search Skype databases for messages or data
+    merge               merge two or more Skype databases into a new database
+    diff                compare chat history in two Skype databases
+    gui                 launch Skyperious graphical program (default option)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --verbose             print detailed progress messages to stderr
+</pre>
+
+
+<pre>
+<code>$ python main.py -h export</code>
+
+usage: main.py export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [--verbose]
+                      FILE [FILE ...]
+
+Export all message history from a Skype database into files under a new
+folder, or a single Excel workbook with chats on separate sheets.
+
+positional arguments:
+  FILE                  one or more Skype databases to export
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t {html,xlsx,csv,txt,xlsx_single}, --type {html,xlsx,csv,txt,xlsx_single}
+                        export type: HTML files (default), Excel workbooks,
+                        CSV spreadsheets, text files, or a single Excel
+                        workbook with separate sheets
+  --verbose             print detailed progress messages to stderr
+</pre>
+
+
+<pre>
+<code>$ python main.py -h search</code>
+
+usage: main.py search [-h] [-t {message,contact,chat,table}] [--verbose]
+                      QUERY FILE [FILE ...]
+
+Search Skype databases for messages, chat or contact information, or table
+data.
+
+positional arguments:
+  QUERY                 search query, with a Google-like syntax, for example:
+                        "this OR that chat:links from:john". More on syntax at
+                        https://suurjaak.github.io/Skyperious/help.html.
+  FILE                  Skype database file(s) to search
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t {message,contact,chat,table}, --type {message,contact,chat,table}
+                        search in message body (default), in contact
+                        information, in chat title and participants, or in any
+                        database table
+  --verbose             print detailed progress messages to stderr
+</pre>
+
+
+<pre>
+<code>$ python main.py -h merge</code>
+
+usage: main.py merge [-h] [--verbose] FILE1 FILE2 [FILE2 ...]
+
+Merge two or more Skype database files into a new database in current
+directory, with a full combined message history. New filename will be chosen
+automatically. Last database in the list will be used as base for comparison.
+
+positional arguments:
+  FILE1       first Skype database
+  FILE2       more Skype databases
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --verbose   print detailed progress messages to stderr
+</pre>
+
+
+<pre>
+<code>$ python main.py -h diff</code>
+
+usage: main.py diff [-h] [--verbose] FILE1 FILE2
+
+Compare two Skype databases for differences in chat history.
+
+positional arguments:
+  FILE1       first Skype database
+  FILE2       second Skype databases
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --verbose   print detailed progress messages to stderr
+</pre>
+
+<pre>
+<code>$ python main.py -h gui</code>
+
+usage: main.py gui [-h] [FILE [FILE ...]]
+
+positional arguments:
+  FILE        Skype database to open on startup, if any
+
+optional arguments:
+  -h, --help  show this help message and exit
+</pre>
+
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/suurjaak">Erki Suurjaak</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
