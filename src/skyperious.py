@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.02.2014
+@modified    28.02.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -5247,7 +5247,7 @@ class MergerPage(wx.Panel):
             self.is_merging = False
             self.page_merge_chats.Enabled = True
             self.page_merge_contacts.Enabled = True
-            db2.clear_cache()
+            self.db2.clear_cache()
             self.stc_diff1.ClearAll()
             self.list_chats.DeleteAllItems()
             self.list_contacts.DeleteAllItems()
