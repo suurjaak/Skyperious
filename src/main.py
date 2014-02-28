@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.02.2014
+@modified    28.02.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -579,12 +579,11 @@ class ProgressBar(threading.Thread):
     A simple ASCII progress bar with a ticker thread, drawn like
     '[---------\   36%            ] Progressing text..'.
     """
-    CR = "\r" if sys.platform.lower().startswith("win") else chr(27) + "[A"
 
     def __init__(self, max=100, value=0, min=0, width=30, forechar="-",
                  backchar=" ", foreword="", afterword="", interval=1):
         """
-        Creates a new progress bar.
+        Creates a new progress bar, without drawing it yet.
 
         @param   max        progress bar maximum value, 100%
         @param   value      progress bar initial value
@@ -636,7 +635,7 @@ class ProgressBar(threading.Thread):
 
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
-        print ProgressBar.CR, self.bar,
+        print "\r" + self.bar,
 
 
     def run(self):
