@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    08.02.2014
+@modified    01.03.2014
 ------------------------------------------------------------------------------
 """
 try:
@@ -468,22 +468,6 @@ ButtonMergeLeftMulti = PyEmbeddedImage(
     "W8DrNxXgnhX4Pp+VSTWxiSwYzEKsu55o8DV4urvXRMN2CpQFA74PgBVKWVl4tPBPR2MA6Suz"
     "jvX8RSUUouCWZl+J/7m69MyzZYCktVoIyw9KAFavZwE2kALSQKYXbcDsA9RGbQ3ZXokrT6rA"
     "OLApdk1n9kC73eyv+jeLAQn4+/6M/AJo6ded0dcRQQAAAABJRU5ErkJggg=="
-)
-
-
-"""Small icon for right merge button on merger page."""
-ButtonMergeRight = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
-    "ZSBJbWFnZVJlYWR5ccllPAAAAdxJREFUeNrEU89LG0EUfrOzmzFrmg1RU6xNr7a3wHrSizdF"
-    "xPZSSiEHkYIHoaT/Q3v0D+jNnqSIIHoKKILgLXvQm4iXlth4cCtL4v6ame2bTUiDVBA8dODj"
-    "zbx575t537whSZLAY4YGjxx6+dM+ZBgDZprAstnUKYUA3TDAzOf7gVTXv6CZ6y0dvPlqSnAf"
-    "cxyGMFCeRUEsvJkdr0iZyK2Dy7B/g/sIIiRwWy3IWRYQQipj1rDpeQIizkMkb/5TAzyxivg6"
-    "6As6nREkW3tRypba7Rh+/vK8KAhOENC+ufl7A5WMzpqaizgGomkW+iqc87Xn4+b0+UWzkGU6"
-    "/9HyLyOf7ygCKWWXIE32/dq7Jdv+vus46GoYGUpzT4bNwrNi6UpoBYJB1P3ddK89ifvfenkO"
-    "mfhYn8f55+rbGbvhSujkGMSoXSgS8CJEKEHiWiOoJNNSq9Y6Fh/Ujxw9vL1NSzgVGTgkBpRV"
-    "CQoYIBgGZtAm3SQXulY9DsV9hrmkuLINPIqUeLX88nvb29h0HtpE+DoOSZvk6SugL19XtbHJ"
-    "VER5tjf1QAJQBBRRQIxS+8MiDFm2OF5fH3xd1VcI1TwBwu/ZSIH0emEIYSIMRXznIEWglOd3"
-    "kEpF/vtv/CPAALHK3R1X0kHKAAAAAElFTkSuQmCC"
 )
 
 

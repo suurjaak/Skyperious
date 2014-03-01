@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  31.01.2014
+@modified  01.03.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -52,8 +52,6 @@ IMAGES = {
         "Large icon for home on start page.",
     "ButtonListDatabase.png":
         "Button for databases in database list.",
-    "ButtonMergeRight.png":
-        "Small icon for right merge button on merger page.",
     "ButtonMergeLeft.png":
         "Small icon for left merge button on merger page.",
     "ButtonMergeLeftMulti.png":
