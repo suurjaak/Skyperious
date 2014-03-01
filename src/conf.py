@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.02.2014
+@modified    01.03.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.0.1a"
-VersionDate = "28.02.2014"
+Version = "3.0.1b"
+VersionDate = "01.03.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -43,13 +43,13 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "ErrorsReportedOnDay", "ErrorReportsAutomatic", "ErrorReportHashes",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
-    "SearchInContacts", "SearchInMessages", "SearchNewTab",
+    "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """Map of directive names from old version to new, to retain on upgrade."""
 FileDirectiveCompatiblity = {
-    "SearchInNewTab" : "SearchNewTab",
+    "SearchIsNewTab" : "SearchUseNewTab",
     "SearchInMessageBody": "SearchInMessages",
 }
 
@@ -101,7 +101,7 @@ SearchInContacts = False
 SearchInMessages = True
 
 """Whether to create a new tab for each search or reuse current."""
-SearchNewTab = True
+SearchUseNewTab = True
 
 """Whether to search in all columns of all tables."""
 SearchInTables = False

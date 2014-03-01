@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.02.2014
+@modified    01.03.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -2088,7 +2088,7 @@ class DatabasePage(wx.Panel):
         tb.ToggleTool(wx.ID_ABOUT, conf.SearchInChatInfo)
         tb.ToggleTool(wx.ID_PREVIEW, conf.SearchInContacts)
         tb.ToggleTool(wx.ID_STATIC, conf.SearchInTables)
-        tb.ToggleTool(wx.ID_NEW, conf.SearchInNewTab)
+        tb.ToggleTool(wx.ID_NEW, conf.SearchUseNewTab)
         for id in [wx.ID_INDEX, wx.ID_ABOUT, wx.ID_PREVIEW, wx.ID_STATIC,
                    wx.ID_NEW]:
             self.Bind(wx.EVT_TOOL, self.on_searchall_toggle_toolbar, id=id)
@@ -3415,7 +3415,7 @@ class DatabasePage(wx.Panel):
             self.label_search.Label = "&Search in tables:"
         self.label_search.ContainingSizer.Layout()
         if wx.ID_NEW == event.Id:
-            conf.SearchInNewTab = event.EventObject.GetToolState(event.Id)
+            conf.SearchUseNewTab = event.EventObject.GetToolState(event.Id)
         elif not event.EventObject.GetToolState(event.Id):
             # All others are radio tools and state might be toggled off by
             # shortkey key adapter
@@ -3544,7 +3544,7 @@ class DatabasePage(wx.Panel):
 
             title = text[:50] + ".." if len(text) > 50 else text
             content = data["partial_html"] + "</table></font>"
-            if conf.SearchInNewTab or not html.GetTabCount():
+            if conf.SearchUseNewTab or not html.GetTabCount():
                 html.InsertTab(0, title, data["id"], content, data)
             else:
                 # Set new ID for the existing reused tab
