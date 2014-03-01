@@ -20,7 +20,7 @@ echo Making EXE for %1.
 pyi-build.exe "%1" >> "makeexe.log" 2>&1
 if exist dist\*.exe (
     for %%E IN (dist\*.exe) do (
-        move %%E "%INITIAL_DIR%" > NUL
+        move %%E "%INITIAL_DIR%" > NUL 2>&1
         echo Created %%~nE.exe for %1.
     )
     del makeexe.log logdict*.final.*.log

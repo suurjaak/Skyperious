@@ -1,7 +1,12 @@
-; Script for NullSoft Scriptable Install System, producing a 32-bit setup.
+; Script for NullSoft Scriptable Install System, producing an executable
+; installer for Skyperious.
+;
+; Expected command-line parameters:
+; /DPRODUCT_VERSION=<program version>
+; /DSUFFIX64=<"_x64" for 64-bit installer>
 ;
 ; @created   13.01.2013
-; @modified  12.02.2014
+; @modified  01.03.2014
 
 ; HM NIS Edit Wizard helper defines
 !define PRODUCT_NAME "Skyperious"
@@ -17,6 +22,7 @@
 
 ; MUI 1.67 compatible ------
 !include "MUI.nsh"
+!include x64.nsh
 !include FileAssociation.nsh
 
 !define MUI_TEXT_WELCOME_INFO_TEXT "This wizard will guide you through the installation of $(^NameDA).$\r$\n$\r$\n$_CLICK"
@@ -51,12 +57,19 @@
 
 RequestExecutionLevel admin
 
-Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "skyperious_${PRODUCT_VERSION}_setup.exe"
 InstallDir "$PROGRAMFILES\Skyperious"
+OutFile "skyperious_${PRODUCT_VERSION}${SUFFIX64}_setup.exe"
+Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
 ShowUnInstDetails show
+
+Function .OnInit
+  ${If} SUFFIX64 != ''
+    StrCpy $INSTDIR "$PROGRAMFILES64\Skyperious"
+  ${EndIf}
+FunctionEnd
+
 
 Section "MainSection" SEC01
   ; Fixes potential problems with uninstalling shortcuts in Windows 7
