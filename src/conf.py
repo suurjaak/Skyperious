@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.02.2014
+@modified    28.02.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.0"
-VersionDate = "24.02.2014"
+Version = "3.0.1a"
+VersionDate = "28.02.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -43,10 +43,15 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "ErrorsReportedOnDay", "ErrorReportsAutomatic", "ErrorReportHashes",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
-    "SearchInContacts", "SearchInMessageBody", "SearchInNewTab",
+    "SearchInContacts", "SearchInMessages", "SearchNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
+"""Map of directive names from old version to new, to retain on upgrade."""
+FileDirectiveCompatiblity = {
+    "SearchInNewTab" : "SearchNewTab",
+    "SearchInMessageBody": "SearchInMessages",
+}
 
 """---------------------------- FileDirectives: ----------------------------"""
 
@@ -93,10 +98,10 @@ SearchInChatInfo = False
 SearchInContacts = False
 
 """Whether to search in message body."""
-SearchInMessageBody = True
+SearchInMessages = True
 
 """Whether to create a new tab for each search or reuse current."""
-SearchInNewTab = True
+SearchNewTab = True
 
 """Whether to search in all columns of all tables."""
 SearchInTables = False
@@ -322,26 +327,26 @@ def load():
     parser.optionxform = str # Force case-sensitivity on names
     try:
         parser.read(ConfigFile)
-        for name in FileDirectives:
+
+        def parse_value(name):
             try: # parser.get can throw an error if not found
                 value_raw = parser.get(section, name)
-                success = False
-                # First, try to interpret as JSON
-                try:
-                    value = json.loads(value_raw)
-                    success = True
-                except ValueError:
-                    pass
-                if not success: # JSON failed, try to eval it
-                    try:
-                        value = eval(value_raw)
-                    except SyntaxError: # Fall back to string
-                        value = value_raw
-                    success = True
-                if success:
-                    setattr(module, name, value)
             except Exception:
-                pass
+                return False, None
+            # First, try to interpret as JSON
+            try:
+                value = json.loads(value_raw)
+            except ValueError: # JSON failed, try to eval it
+                try:
+                    value = eval(value_raw)
+                except SyntaxError: # Fall back to string
+                    value = value_raw
+            return True, value
+
+        for oldname, name in FileDirectiveCompatiblity.items():
+            [setattr(module, name, v) for s, v in [parse_value(oldname)] if s]
+        for name in FileDirectives:
+            [setattr(module, name, v) for s, v in [parse_value(name)] if s]
     except Exception:
         pass # Fail silently
 

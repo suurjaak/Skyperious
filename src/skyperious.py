@@ -2084,7 +2084,7 @@ class DatabasePage(wx.Panel):
         tb.AddSimpleTool(wx.ID_STOP, bitmap=images.ToolbarStopped.Bitmap,
             shortHelpString="Stop current search, if any")
         tb.Realize()
-        tb.ToggleTool(wx.ID_INDEX, conf.SearchInMessageBody)
+        tb.ToggleTool(wx.ID_INDEX, conf.SearchInMessages)
         tb.ToggleTool(wx.ID_ABOUT, conf.SearchInChatInfo)
         tb.ToggleTool(wx.ID_PREVIEW, conf.SearchInContacts)
         tb.ToggleTool(wx.ID_STATIC, conf.SearchInTables)
@@ -3394,24 +3394,24 @@ class DatabasePage(wx.Panel):
     def on_searchall_toggle_toolbar(self, event):
         """Handler for toggling a setting in search toolbar."""
         if wx.ID_INDEX == event.Id:
-            conf.SearchInMessageBody = True
+            conf.SearchInMessages = True
             conf.SearchInTables = False
             conf.SearchInChatInfo = conf.SearchInContacts = False
             self.label_search.Label = "&Search in messages:"
         elif wx.ID_ABOUT == event.Id:
             conf.SearchInChatInfo = True
             conf.SearchInTables = False
-            conf.SearchInMessageBody = conf.SearchInContacts = False
+            conf.SearchInMessages = conf.SearchInContacts = False
             self.label_search.Label = "&Search in chat info:"
         elif wx.ID_PREVIEW == event.Id:
             conf.SearchInContacts = True
             conf.SearchInTables = False
-            conf.SearchInMessageBody = conf.SearchInChatInfo = False
+            conf.SearchInMessages = conf.SearchInChatInfo = False
             self.label_search.Label = "&Search in contacts:"
         elif wx.ID_STATIC == event.Id:
             conf.SearchInTables = True
             conf.SearchInContacts = False
-            conf.SearchInMessageBody = conf.SearchInChatInfo = False
+            conf.SearchInMessages = conf.SearchInChatInfo = False
             self.label_search.Label = "&Search in tables:"
         self.label_search.ContainingSizer.Layout()
         if wx.ID_NEW == event.Id:
@@ -3521,7 +3521,7 @@ class DatabasePage(wx.Panel):
                     "width": html.Size.width * 5/9, "table": "",
                     "partial_html": ""}
             fromtext = "" # "Searching for "text" in fromtext"
-            if conf.SearchInMessageBody:
+            if conf.SearchInMessages:
                 data["table"] = "messages"
                 fromtext = "messages"
             elif conf.SearchInChatInfo:
