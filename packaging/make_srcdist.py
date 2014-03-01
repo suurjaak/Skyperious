@@ -4,7 +4,7 @@ Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  24.02.2014
+@modified  28.02.2014
 """
 import glob
 import os
@@ -53,13 +53,15 @@ if "__main__" == __name__:
         size = 0
         for subdir, wildcard in [("res", "*"),
         (pathjoin("res", "emoticons"), "*"), ("src", "*.py"),
-        (pathjoin("src", "third_party"), "*.py")]:
+        ("packaging", "*"), (pathjoin("src", "third_party"), "*.py")]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)
+            files = filter(lambda x: not x.lower().endswith(".zip"), files)
             size += add_files(zf, files, subdir)
-        size += add_files(zf, ["CHANGELOG.md", "LICENSE.md",  "README.md",
-                               "skyperious.bat", "skyperious.sh"])
+        rootfiles = ["CHANGELOG.md", "LICENSE.md", "README.md",
+                     "requirements.txt", "skyperious.bat", "skyperious.sh"]
+        size += add_files(zf, rootfiles)
         size += add_files(zf, ["skyperious.ini"],
                           subdir_local=os.path.split(PACKAGING_DIR)[-1])
 
