@@ -165,8 +165,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.worker_detection = \
             workers.DetectDatabaseThread(self.on_detect_databases_callback)
         self.Bind(EVT_DETECTION_WORKER, self.on_detect_databases_result)
-        self.Bind(EVT_OPEN_DATABASE,
-                  lambda e: self.load_database_page(os.path.realpath(e.file)))
+        self.Bind(EVT_OPEN_DATABASE, self.on_open_database_event)
 
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
@@ -1268,6 +1267,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if filename:
                 self.update_database_list(filename)
                 self.load_database_page(filename)
+
+
+    def on_open_database_event(self, event):
+        """
+        Handler for OpenDatabaseEvent, updates db list and loads the event
+        database.
+        """
+        filename = os.path.realpath(event.file)
+        self.update_database_list(filename)
+        self.load_database_page(filename)
 
 
     def on_recent_file(self, event):
