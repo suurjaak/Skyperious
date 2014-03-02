@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.03.2014
+@modified    02.03.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -5163,8 +5163,8 @@ class MergerPage(wx.Panel):
                 self.html_report.AppendToPage(
                     "<br /><br />New in %s: %s in %s." % 
                     (self.db1, count_msgs, count_chats))
-                scroll_y = self.html_report.GetScrollPos(wx.VERTICAL)
-                self.html_report.Scroll(0, scroll_y)
+                scrollpos = (0, self.html_report.GetScrollRange(wx.VERTICAL))
+                self.html_report.Scroll(*scrollpos)
             else:
                 self.html_report.SetPage("<body bgcolor='%s'>No new messages."
                     "</body>" % conf.MergeHtmlBackgroundColour)
@@ -5259,10 +5259,12 @@ class MergerPage(wx.Panel):
             if "error" not in result:
                 main.logstatus_flash(info)
                 self.update_gauge(self.gauge_progress, 100, "Merge complete.")
-                scrollpos = (0, self.html_report.GetScrollPos(wx.VERTICAL))
                 text = "<br /><br /> %s" % result["output"]
+                self.html_report.Freeze()
                 self.html_report.AppendToPage(text)
+                scrollpos = (0, self.html_report.GetScrollRange(wx.VERTICAL))
                 self.html_report.Scroll(*scrollpos)
+                self.html_report.Thaw()
                 wx.MessageBox(info, conf.Title, wx.OK | wx.ICON_INFORMATION)
             self.button_merge_all.Note = self.MERGE_BUTTON_NOTE
             self.button_swap.Enabled = True
@@ -5278,7 +5280,11 @@ class MergerPage(wx.Panel):
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
         elif "output" in result and result["output"]:
+            scrollpos = (0, self.html_report.GetScrollPos(wx.VERTICAL))
+            self.html_report.Freeze()
             self.html_report.AppendToPage("<br /> %s" % result["output"])
+            self.html_report.Scroll(*scrollpos)
+            self.html_report.Thaw()
 
 
     def update_gauge(self, gauge, value, message=""):
