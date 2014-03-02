@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    23.02.2014
+@modified    02.03.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -386,14 +386,14 @@ def path_to_url(path, encoding="utf-8"):
 def to_unicode(value):
     """Returns the value as a Unicode string."""
     result = value
-    if not isinstance(result, unicode):
-        if isinstance(result, str):
+    if not isinstance(value, unicode):
+        if isinstance(value, str):
             try:
-                result = unicode(result, locale.getpreferredencoding())
+                result = unicode(value, locale.getpreferredencoding())
             except Exception:
-                result = unicode(result, "utf-8")
+                result = unicode(value, "utf-8", errors="replace")
         else:
-            x = unicode(x)
+            result = unicode(str(value), errors="replace")
     return result
 
 

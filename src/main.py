@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.02.2014
+@modified    02.03.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -109,8 +109,8 @@ ARGUMENTS = {
          "description": "Compare two Skype databases for differences "
                         "in chat history.",
          "arguments": [
-             {"args": ["FILE1"], "help": "first Skype database"},
-             {"args": ["FILE2"], "help": "second Skype databases"},
+             {"args": ["FILE1"], "help": "first Skype database", "nargs": 1},
+             {"args": ["FILE2"], "help": "second Skype databases", "nargs": 1},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -139,7 +139,11 @@ def log(text, *args):
     """
     global deferred_logs, is_cli, is_verbose, window
     now = datetime.datetime.now()
-    finaltext = text % args if args else text
+    try:
+        finaltext = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        finaltext = text % args if args else text
     if "\n" in finaltext: # Indent all linebreaks
         finaltext = finaltext.replace("\n", "\n\t\t")
     msg = "%s.%03d\t%s" % (now.strftime("%H:%M:%S"), now.microsecond / 1000,
@@ -160,7 +164,11 @@ def status(text, *args):
     @param   args  string format arguments, if any, to substitute in text
     """
     global deferred_status, is_cli, is_verbose, window
-    msg = text % args if args else text
+    try:
+        msg = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        msg = text % args if args else text
     if window:
         process_deferreds()
         wx.PostEvent(window, guibase.StatusEvent(text=msg))
@@ -178,7 +186,11 @@ def status_flash(text, *args):
     @param   args  string format arguments, if any, to substitute in text
     """
     global deferred_status, window
-    msg = text % args if args else text
+    try:
+        msg = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        msg = text % args if args else text
     if window:
         process_deferreds()
         wx.PostEvent(window, guibase.StatusEvent(text=msg))
@@ -470,10 +482,13 @@ def run(argv):
     arguments = argparser.parse_args(argv)
 
     if hasattr(arguments, "FILE1") and hasattr(arguments, "FILE2"):
+        arguments.FILE1 = [util.to_unicode(f) for f in arguments.FILE1]
+        arguments.FILE2 = [util.to_unicode(f) for f in arguments.FILE2]
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
         arguments.FILE = sum([(sorted(glob.glob(f)) if "*" in f else [f])
                              for f in arguments.FILE], [])
+        arguments.FILE = [util.to_unicode(f) for f in arguments.FILE]
 
     if "gui" == arguments.command and not is_gui_possible:
         argparser.print_help()
@@ -481,15 +496,15 @@ def run(argv):
               conf.Title)
         sys.exit()
     elif "gui" != arguments.command:
-        # Avoid print encoding errors
-        enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
-        sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
-        sys.stderr = codecs.getwriter(enc)(sys.stderr, "xmlcharrefreplace")
         is_cli = sys.modules["main"].is_cli = True
         is_verbose = sys.modules["main"].is_verbose = arguments.verbose
+        enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
+        if "nt" == os.name: # Avoid print encoding errors under windows
+            sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
+            sys.stderr = codecs.getwriter(enc)(sys.stderr, "xmlcharrefreplace")
 
     if "diff" == arguments.command:
-        run_diff(arguments.FILE1, arguments.FILE2)
+        run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
         run_merge(arguments.FILE)
     elif "export" == arguments.command:
