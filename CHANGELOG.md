@@ -1,8 +1,15 @@
 CHANGELOG
 =========
 
+3.1, 2014-03-02
+---------------
+- fixed a bug in showing merge results;
+- file arguments opened on start-up are added to database list;
+- better Unicode support in command line interface;
+- fixed command line progress bar display under Linux.
+
 3.0, 2014-02-24
------------------
+---------------
 - added tray quick-search popup;
 - added command-line interface, not requiring wxPython;
 - database comparison now works in one direction;
