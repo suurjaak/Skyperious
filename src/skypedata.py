@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.02.2014
+@modified    02.03.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2079,26 +2079,25 @@ def detect_databases():
     @yield   each value is a list of detected database paths
     """
     # First, search system directories for main.db files.
-    search_paths = list(filter(None, [os.getenv("HOME")]))
-    if os.name in ["mac", "posix"]:
-        search_paths.append({"mac": "/Users", "posix": "/home"}[os.name])
-    elif "nt" == os.name:
-        search_paths.append(os.path.join(os.getenv("APPDATA"), "Skype"))
+    if "nt" == os.name:
+        search_paths = [os.path.join(os.getenv("APPDATA"), "Skype")]
         c = os.getenv("SystemDrive") or "C:"
         for path in ["%s\\Users" % c, "%s\\Documents and Settings" % c]:
             if os.path.exists(path):
                 search_paths.append(path)
                 break # break for path in [..]
+    else:
+        search_paths = [os.getenv("HOME"),
+                        "/Users" if "mac" == os.name else "/home"]
+    search_paths = map(util.to_unicode, search_paths)
+
     WINDOWS_APPDIRS = ["application data", "roaming"]
     for search_path in filter(os.path.exists, search_paths):
         main.log("Looking for Skype databases under %s.", search_path)
         for root, dirs, files in os.walk(search_path):
             if os.path.basename(root).lower() in WINDOWS_APPDIRS:
-                # Prune other applications from list to lessen overhead if we
-                # are under "Application Data" or "AppData\Roaming" in Windows.
-                filtered = filter(lambda x: "skype" == x.lower(), dirs)
-                del dirs[:]
-                dirs.extend(filtered)
+                # Skip all else under "Application Data" or "AppData\Roaming".
+                dirs[:] = filter(lambda x: "skype" == x.lower(), dirs)
             results = []
             for f in files:
                 if "main.db" == f.lower() and is_sqlite_file(f, root):
@@ -2106,14 +2105,13 @@ def detect_databases():
             if results: yield results
 
     # Then search current working directory for *.db files.
-    search_paths = [os.getcwd()]
-    for search_path in search_paths:
-        main.log("Looking for Skype databases under %s.", search_path)
-        for root, dirs, files in os.walk(search_path):
-            results = []
-            for f in filter(lambda f: is_sqlite_file(f, root), files):
-                results.append(os.path.realpath(os.path.join(root, f)))
-            if results: yield results
+    search_path = util.to_unicode(os.getcwd())
+    main.log("Looking for Skype databases under %s.", search_path)
+    for root, dirs, files in os.walk(search_path):
+        results = []
+        for f in filter(lambda f: is_sqlite_file(f, root), files):
+            results.append(os.path.realpath(os.path.join(root, f)))
+        if results: yield results
 
 
 def find_databases(folder):
