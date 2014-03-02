@@ -58,6 +58,7 @@ if "__main__" == __name__:
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)
             files = filter(lambda x: not x.lower().endswith(".zip"), files)
+            files = filter(lambda x: not x.lower().endswith(".pyc"), files)
             size += add_files(zf, files, subdir)
         rootfiles = ["CHANGELOG.md", "LICENSE.md", "README.md",
                      "requirements.txt", "skyperious.bat", "skyperious.sh"]
