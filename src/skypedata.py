@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    03.03.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -257,7 +257,7 @@ class SkypeDatabase(object):
             self.id = self.account["skypename"]
         except Exception as e:
             main.log("Error getting account information from %s.\n\n%s",
-                     filename, traceback.format_exc())
+                     self, traceback.format_exc())
 
 
     def register_consumer(self, consumer):
