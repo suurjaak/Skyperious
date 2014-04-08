@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    07.04.2014
+@modified    08.04.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -861,18 +861,22 @@ class ContactSearchThread(WorkerThread):
                     main.log("Searching Skype contact directory for '%s'.",
                              value)
 
-                    for user in search["handler"].search_users(value):
-                        if user.Handle not in found:
-                            result["results"].append(user)
-                            found[user.Handle] = 1
+                    try:
+                        for user in search["handler"].search_users(value):
+                            if user.Handle not in found:
+                                result["results"].append(user)
+                                found[user.Handle] = 1
 
-                        if not (self._drop_results 
-                        or len(result["results"]) % conf.ContactResultsChunk):
-                            self.postback(result)
-                            result = {"search": search, "results": []}
+                            if not (self._drop_results 
+                            or len(result["results"]) % conf.ContactResultsChunk):
+                                self.postback(result)
+                                result = {"search": search, "results": []}
 
-                        if self._stop_work:
-                            break # break for user in search["handler"].searc..
+                            if self._stop_work:
+                                break # break for user in search["handler"].searc..
+                    except Exception as e:
+                        main.log("Error searching Skype contacts:\n\n%s",
+                                 traceback.format_exc())
 
                     if result["results"] and not self._drop_results:
                         self.postback(result)
@@ -880,7 +884,6 @@ class ContactSearchThread(WorkerThread):
 
                     if self._stop_work:
                         break # break for i, value in enumerate(search_values)
-
 
                 if not self._drop_results:
                     result["done"] = True

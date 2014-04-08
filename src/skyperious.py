@@ -2967,6 +2967,11 @@ class DatabasePage(wx.Panel):
                 self.skype_handler.add_to_contacts(c["user"] for c in contacts)
                 main.logstatus_flash("Added %s to your Skype contacts (%s).",
                                      util.plural("person", contacts), info)
+            except Exception as e:
+                msg = "Error adding contacts:\n\n%s" % traceback.format_exc()
+                main.logstatus_flash(msg)
+                wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                wx.CallAfter(support.report_error, msg)
             finally:
                 busy.Close()
 
