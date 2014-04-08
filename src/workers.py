@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.02.2014
+@modified    07.04.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -139,8 +139,8 @@ class SearchThread(WorkerThread):
                     width = search.get("width", -1)
                     if width > 0:
                         dc = wx.MemoryDC()
-                        dc.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.NORMAL,
-                                           face=conf.HistoryFontName))
+                        dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, 
+                            wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
                 main.log("Searching for \"%(text)s\" in %(table)s (%(db)s)." %

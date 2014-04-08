@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    07.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -356,7 +356,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu = wx.Menu()
         item_search = wx.MenuItem(menu, -1, "&Search for..")
         font = item_search.Font
-        font.SetWeight(wx.BOLD)
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
         font.SetFaceName(self.Font.FaceName)
         font.SetPointSize(self.Font.PointSize)
         item_search.Font = font
