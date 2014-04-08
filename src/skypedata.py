@@ -1845,7 +1845,8 @@ class MessageParser(object):
                         t = "<font color='%s'></font>" % conf.SkypeLinkColour
                         span = xml.etree.cElementTree.fromstring(t)
                         span.text = subelem.text
-                        [(span.append(i), subelem.remove(i)) for i in subelem]
+                        for i in list(subelem):
+                            span.append(i), subelem.remove(i)
                         subelem.text = ""
                         subelem.append(span)
                 index += 1
