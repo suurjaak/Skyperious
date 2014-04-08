@@ -273,7 +273,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return
         interval = conf.UpdateCheckInterval
         due_date = datetime.datetime.now() - interval
-        if not support.update_window \
+        if not (conf.WindowIconized or support.update_window) \
         and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
             callback = lambda resp: self.on_check_update_callback(resp, False)
             support.check_newest_version(callback)
