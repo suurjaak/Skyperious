@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.02.2014
+@modified    08.04.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -1260,8 +1260,10 @@ import conf, skypedata
   </td><td valign="top">
 <%
 after = ""
-if (skypedata.CHATS_TYPE_SINGLE != chat["type"]) or (m["author"] == search["db"].id):
-  after = " in %s" % chat["title_long"]
+if (skypedata.CHATS_TYPE_SINGLE != chat["type"]):
+  after = " in %s" % chat["title_long_lc"]
+elif m["author"] == search["db"].id:
+  after = " to %s" % chat["title"]
 %>
     <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
   </td><td align="right" nowrap>
