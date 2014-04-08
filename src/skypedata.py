@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.03.2014
+@modified    08.04.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -943,10 +943,10 @@ class SkypeDatabase(object):
     def get_table_columns(self, table):
         """
         Returns the columns of the specified table, as
-        [{"name": "col1", "type": "INTEGER", }, ] or None if not found.
+        [{"name": "col1", "type": "INTEGER", }, ], or [] if not retrievable.
         """
         table = table.lower()
-        table_columns = None
+        table_columns = []
         if self.is_open() and self.tables_list is None:
             self.get_tables()
         if self.is_open() and table in self.tables:

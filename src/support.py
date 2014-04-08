@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    24.02.2014
+@modified    08.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -39,7 +39,6 @@ feedback_window = None
 
 """URL-opener with Skyperious useragent."""
 url_opener = urllib2.build_opener()
-url_opener.addheaders = [("User-agent", "%s %s" % (conf.Title, conf.Version))]
 
 
 def check_newest_version(callback=None):
@@ -180,9 +179,10 @@ def reporting_write(write):
     def handle_error():
         text = "".join(cached)[:100000]
         if text:
+            text = "An unexpected error has occurred:\n\n%s" % text
             main.log(text)
             report_error(text)
-        cached[:] = []
+        del cached[:]
     def cache_text(string):
         if not cached:
             # CallLater fails if not called from main thread
@@ -415,3 +415,6 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
     def OnCancel(self, event):
         """Handler for cancelling sending feedback, hides the dialog."""
         self.Hide()
+
+
+url_opener.addheaders = [("User-agent", "%s %s (%s)" % (conf.Title, conf.Version, get_install_type()))]

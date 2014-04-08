@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    07.04.2014
+@modified    08.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -2562,8 +2562,9 @@ class DatabasePage(wx.Panel):
         wx.YieldIfNeeded()
         try:
             errors = self.db.check_integrity()
-        finally:
-            busy.Close()
+        except Exception as e:
+            errors = [e.message]
+        busy.Close()
         main.status_flash("")
         if not errors:
             wx.MessageBox("No database errors detected.",
@@ -3343,7 +3344,7 @@ class DatabasePage(wx.Panel):
                     table2 = self.tree_tables.GetItemPyData(item)
                     if table2 and table2.lower() == table["name"].lower():
                         tableitem = item
-                        break # break while item and itek.IsOk()
+                        break # break while table and item and itek.IsOk()
                     item = self.tree_tables.GetNextSibling(item)
                 if tableitem:
                     self.notebook.SetSelection(self.pageorder[self.page_tables])
@@ -3361,6 +3362,7 @@ class DatabasePage(wx.Panel):
                         grid.Table.ClearSort(refresh=False)
                         grid.Table.ClearFilter()
                     # Search for matching row and scroll to it.
+                    table["columns"] = self.db.get_table_columns(table_name)
                     id_fields = [c["name"] for c in table["columns"]
                                  if c.get("pk_id")]
                     if not id_fields: # No primary key fields: take all
