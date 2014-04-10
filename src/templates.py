@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    08.04.2014
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import re

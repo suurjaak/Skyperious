@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.04.2014
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1497,11 +1497,10 @@ class MessageParser(object):
         if stats:
             self.stats = {"smses": 0, "transfers": [], "calls": 0,
                           "messages": 0, "counts": {}, "total": 0,
-                          "calldurations": 0, "callmaxdurations": 0,
                           "startdate": None, "enddate": None, "wordcloud": [],
                           "cloudtext": "", "links": [], "last_message": "",
                           "chars": 0, "smschars": 0, "files": 0, "bytes": 0,
-                          "info_items": []}
+                          "calldurations": 0, "info_items": []}
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1945,7 +1944,7 @@ class MessageParser(object):
                 if identity not in self.stats["counts"]:
                     self.stats["counts"][identity] = author_stats.copy()
                 self.stats["counts"][identity]["calldurations"] += duration
-                self.stats["callmaxdurations"] += duration
+            self.stats["calldurations"] += max(calldurations.values() or [0])
         elif MESSAGES_TYPE_FILE == message["type"]:
             files = message.get("__files")
             if files is None:
@@ -2009,8 +2008,7 @@ class MessageParser(object):
         if not self.stats:
             return {}
         stats = self.stats
-        for k in ["chars", "smschars", "files", "bytes", "calls",
-                  "calldurations"]:
+        for k in ["chars", "smschars", "files", "bytes", "calls"]:
             stats[k] = sum(i[k] for i in stats["counts"].values())
 
         del stats["info_items"][:]
@@ -2035,11 +2033,8 @@ class MessageParser(object):
             stats["info_items"].append(("SMSes", smses_value))
         if stats["calls"]:
             calls_value  = "%d (%s)" % (stats["calls"],
-                           util.format_seconds(stats["callmaxdurations"]))
+                           util.format_seconds(stats["calldurations"]))
             stats["info_items"].append(("Calls", calls_value))
-        if stats["calldurations"]:
-            total  = util.format_seconds(stats["calldurations"])
-            stats["info_items"].append(("Total time spent in calls", total))
         if stats["transfers"]:
             files_value  = "%d (%s)" % (len(stats["transfers"]),
                            util.format_bytes(stats["bytes"]))
