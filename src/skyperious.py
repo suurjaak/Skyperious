@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.04.2014
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -4271,12 +4271,6 @@ class DatabasePage(wx.Panel):
         self.label_title.Label = "Database \"%s\":" % self.db
 
         try:
-            # Populate the chats list
-            self.chats = self.db.get_conversations()
-            for c in self.chats:
-                c["people"] = "" # Set empty data, stats will come later
-            self.list_chats.Populate(self.chats)
-
             # Restore last search text, if any
             if conf.SearchHistory and conf.SearchHistory[-1] != "":
                 self.edit_searchall.Value = conf.SearchHistory[-1]
@@ -4284,6 +4278,8 @@ class DatabasePage(wx.Panel):
                 # Clear the empty search flag
                 conf.SearchHistory = conf.SearchHistory[:-1]
             self.edit_searchall.SetChoices(conf.SearchHistory)
+
+            # Restore last cached search results page
             last_search = conf.LastSearchResults.get(self.db.filename)
             if last_search:
                 title = last_search.get("title", "")
@@ -4291,6 +4287,12 @@ class DatabasePage(wx.Panel):
                 info = last_search.get("info")
                 tabid = wx.NewId() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
+
+            # Populate the chats list
+            self.chats = self.db.get_conversations()
+            for c in self.chats:
+                c["people"] = "" # Set empty data, stats will come later
+            self.list_chats.Populate(self.chats)
 
             wx.CallLater(100, self.load_later_data)
         except Exception as e:

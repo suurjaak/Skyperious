@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    08.04.2014
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -165,10 +165,12 @@ class SearchThread(WorkerThread):
                 pattern_replace = re.compile(patt, re.IGNORECASE)
 
                 # Find chats with a matching title or matching participants
-                chats = search["db"].get_conversations()
-                chats.sort(key=lambda x: x["title"])
-                chat_map = {} # {chat id: {chat data}}
-                template_chat = step.Template(TEMPLATES["chat"])
+                chats = []
+                if search["table"] in ["conversations", "messages"]:
+                    chats = search["db"].get_conversations()
+                    chats.sort(key=lambda x: x["title"])
+                    chat_map = {} # {chat id: {chat data}}
+                    template_chat = step.Template(TEMPLATES["chat"])
                 for chat in chats:
                     chat_map[chat["id"]] = chat
                     if "conversations" == search["table"] and match_words:
