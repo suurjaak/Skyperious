@@ -124,12 +124,12 @@ Launch skyperious.sh.
 
 If you have problems using above methods, you can try using Vagrant.
 
-1. Pre-requisites:
+Pre-requisites:
 
-* [Virtualbox][1] 4.0 or greater.
-* [Vagrant][2] 1.5 or greater.
+- [Virtualbox][1] 4.0 or greater.
+- [Vagrant][2] 1.5 or greater.
 
-2. Clone this project and get it running!
+Clone this project and get it running!
 
 ```
 git clone https://github.com/suurjaak/Skyperious
