@@ -16,13 +16,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # doesn't already exist on the user's system.
   config.vm.box_url = "http://files.vagrantup.com/precise32.box"
 
-  config.vm.provision :shell, :path => "packaging/setup-vagrant.sh"
+  config.vm.provision :shell, :path => "setup-vagrant.sh"
 
   # Share an additional folder to the guest VM. The first argument is
   # the path on the host to the actual folder. The second argument is
   # the path on the guest to mount the folder. And the optional third
   # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
+  config.vm.synced_folder '..', '/vagrant'
 
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
@@ -37,5 +37,4 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   #
   # View the documentation for the provider you're using for more
   # information on available options.
-
 end
