@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    02.03.2014
+@modified    20.04.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -193,10 +193,18 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    base, ext = os.path.splitext(result)
+    head, name = os.path.split(result)
+    base, ext = os.path.splitext(name)
+    if len(name) > 255: # Filesystem limitation
+        name = base[:255 - len(ext) - 2] + ".." + ext
+        result = os.path.join(head, name)
     counter = 2
     while os.path.exists(result):
-        result = "%s (%s)%s" % (base, counter, ext)
+        suffix = " (%s)%s" % (counter, ext)
+        name = base + suffix
+        if len(name) > 255:
+            name = base[:255 - len(suffix) - 2] + ".." + suffix
+        result = os.path.join(head, name)
         counter += 1
     return result
 
