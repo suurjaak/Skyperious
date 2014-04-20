@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.04.2014
+@modified    20.04.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.1.1"
-VersionDate = "08.04.2014"
+Version = "3.1.2"
+VersionDate = "20.04.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -44,8 +44,9 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
-    "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
-    "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
+    "SearchInTables", "SQLWindowTexts", "TemplateExportDb",
+    "TemplateExportFilename", "TrayIconEnabled", "UpdateCheckAutomatic",
+    "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """Map of attribute names from old version to new, retain values on upgrade."""
 FileDirectiveCompatiblity = {
@@ -108,6 +109,19 @@ SearchInTables = False
 
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
+
+"""
+Database export filename template, format will use Skype.Accounts data, or
+{"skypename": db filename} if no account available."""
+TemplateExportDb = "Export from %(fullname)s"
+
+"""
+Chat export filename template, format will use Skype.Conversations data, with
+additional fields like title, title_long, title_long_lc, created_datetime,
+last_activity_datetime, first_message_datetime, last_message_datetime,
+message_count.
+"""
+TemplateExportFilename = "Skype %(title_long_lc)s"
 
 """Whether the program tray icon is used."""
 TrayIconEnabled = True

@@ -40,7 +40,6 @@ import wx.lib.agw.flatmenu
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.ultimatelistctrl
 import wx.lib.newevent
-import wx.lib.scrolledpanel
 import wx.stc
 
 # Core functionality can work without these modules
@@ -657,7 +656,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             help="Check whether a new version of %s is available" % conf.Title)
         menu_feedback = self.menu_feedback = menu_help.Append(id=wx.NewId(),
             text="Send &feedback",
-            help="Send feedback or report errors to program author")
+            help="Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(id=wx.NewId(),
             text="Go to &homepage",
             help="Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
@@ -1079,8 +1078,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
         if do_singlefile:
             db = self.load_database(self.db_filename)
-            base = db.id if db else os.path.basename(self.db_filename)
-            default = "Export from %s" % util.safe_filename(base)
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(self.db_filename)
+            if db and db.account: formatargs.update(db.account)
+            default = util.safe_filename(conf.TemplateExportDb % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -1099,8 +1100,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not error and not do_singlefile:
                 extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
                 format = extname
-                base = db.id or os.path.basename(db.filename)
-                folder = "Export from %s" % util.safe_filename(base)
+                formatargs = collections.defaultdict(str)
+                formatargs["skypename"] = os.path.basename(self.db_filename)
+                if db.account: formatargs.update(db.account)
+                folder = util.safe_filename(conf.TemplateExportDb % formatargs)
                 export_dir = util.unique_path(os.path.join(dirname, folder))
                 try:
                     os.mkdir(export_dir)
@@ -3004,8 +3007,9 @@ class DatabasePage(wx.Panel):
         Handler for clicking to export a chat, displays a save file dialog and
         saves the current messages to file.
         """
-        default = "Skype %s" % self.chat["title_long_lc"]
-        self.dialog_savefile.Filename = util.safe_filename(default)
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = util.safe_filename(conf.TemplateExportFilename % formatargs)
+        self.dialog_savefile.Filename = default
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
@@ -3105,8 +3109,10 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
         if chats and do_singlefile:
-            base = self.db.id or os.path.basename(self.db.filename)
-            default = "Export from %s" % util.safe_filename(base)
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(self.db.filename)
+            formatargs.update(self.db.account or {})
+            default = util.safe_filename(conf.TemplateExportDb % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -3151,7 +3157,8 @@ class DatabasePage(wx.Panel):
         Handler for clicking to export a chat filtering straight to file,
         displays a save file dialog and saves all filtered messages to file.
         """
-        default = "Skype %s" % self.chat["title_long_lc"]
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = conf.TemplateExportFilename % formatargs
         self.dialog_savefile.Filename = util.safe_filename(default)
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
@@ -4768,7 +4775,8 @@ class MergerPage(wx.Panel):
         Handler for clicking to export a chat diff, displays a save file dialog
         and saves the current messages to file.
         """
-        default = "Diff of Skype %s" % self.chat["title_long_lc"]
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = "Diff of %s" % conf.TemplateExportFilename % formatargs
         dialog = wx.FileDialog(parent=self, message="Save new messages",
             defaultDir=os.getcwd(), defaultFile=util.safe_filename(default),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER

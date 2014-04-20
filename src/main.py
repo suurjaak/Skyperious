@@ -333,8 +333,10 @@ def run_export(filenames, format):
     is_xlsx_single = ("xlsx_single" == format)
 
     for db in dbs:
-        base = db.id or os.path.basename(db.filename)
-        basename = "Export from %s" % util.safe_filename(base)
+        formatargs = collections.defaultdict(str)
+        formatargs["skypename"] = os.path.basename(db.filename)
+        formatargs.update(db.account or {})
+        basename = util.safe_filename(conf.TemplateExportDb % formatargs)
         dbstr = "from %s " % db if len(dbs) != 1 else ""
         if is_xlsx_single:
             export_dir = os.getcwd()

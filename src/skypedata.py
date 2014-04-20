@@ -605,9 +605,9 @@ class SkypeDatabase(object):
                 [i.sort(key=lambda x: (x["contact"].get("name", "")).lower())
                  for i in participants.values()]
                 rows = self.execute(
-                    "SELECT *, COALESCE(displayname, meta_topic, '') AS title, "
-                    "NULL AS created_datetime, "
-                    "NULL AS last_activity_datetime "
+                    "SELECT *, "
+                    "COALESCE(displayname, meta_topic, identity) AS title, "
+                    "NULL AS created_datetime, NULL AS last_activity_datetime "
                     "FROM conversations WHERE displayname IS NOT NULL "
                     "ORDER BY last_activity_timestamp DESC"
                 ).fetchall()

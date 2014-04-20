@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    24.02.2014
+@modified    20.04.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -83,7 +83,8 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
         if len(format) > 4: # Filename already given in format
             filename = os.path.join(path, format)
         else:
-            filename = "Skype %s.%s" % (chat["title_long_lc"], format)
+            args = collections.defaultdict(str); args.update(chat)
+            filename = "%s.%s" % (conf.TemplateExportFilename % args, format)
             filename = os.path.join(path, util.safe_filename(filename))
             filename = util.unique_path(filename)
         return filename
