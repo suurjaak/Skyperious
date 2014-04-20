@@ -1852,9 +1852,9 @@ class DatabasePage(wx.Panel):
         )
 
         self.TopLevelParent.page_db_latest = self
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "page = self.page_db_latest # Database tab")
-        self.TopLevelParent.console.run("db = page.db # Skype database")
+        self.TopLevelParent.run_console("db = page.db # Skype database")
 
         self.Layout()
         self.toggle_filter(True)
@@ -4506,9 +4506,9 @@ class MergerPage(wx.Panel):
         notebook.SetPageImage(2, idx3)
 
         self.TopLevelParent.page_merge_latest = self
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "page12 = self.page_merge_latest # Merger tab")
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "db1, db2 = page12.db1, page12.db2 # Chosen Skype databases")
 
         self.Layout()

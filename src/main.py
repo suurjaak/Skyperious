@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    20.04.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -438,14 +438,14 @@ def run_gui(filenames):
     except: pass
 
     # Some debugging support
-    window.console.run("import datetime, os, re, time, sys, wx")
-    window.console.run("# All %s modules:" % conf.Title)
-    window.console.run("import conf, controls, emoticons, export, guibase, "
+    window.run_console("import datetime, os, re, time, sys, wx")
+    window.run_console("# All %s modules:" % conf.Title)
+    window.run_console("import conf, controls, emoticons, export, guibase, "
                        "images, main, searchparser, skypedata, skyperious, "
                        "support, templates, util, wordcloud, workers, "
                        "wx_accel")
 
-    window.console.run("self = main.window # Application main window instance")
+    window.run_console("self = main.window # Application main window instance")
     log("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
