@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2014
+@modified    20.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -77,6 +77,9 @@ OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
 
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
+
+    TRAY_ICON = (images.Icon16x16_32bit if "linux" != sys.platform 
+                 else images.Icon24x24_32bit)
 
     def __init__(self):
         wx.Frame.__init__(self, parent=None, title=conf.Title, size=conf.WindowSize)
@@ -218,7 +221,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.trayicon = wx.TaskBarIcon()
         if conf.TrayIconEnabled:
-            self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+            self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         self.trayicon.Bind(wx.EVT_TASKBAR_LEFT_DCLICK, self.on_toggle_iconize)
         self.trayicon.Bind(wx.EVT_TASKBAR_LEFT_DOWN, self.on_open_tray_search)
         self.trayicon.Bind(wx.EVT_TASKBAR_RIGHT_DOWN, self.on_open_tray_menu)
@@ -325,7 +328,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.WindowPosition = self.Position[:]
             if not conf.TrayIconEnabled:
                 conf.TrayIconEnabled = True
-                self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+                self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         else:
             self.Iconize(False), self.Show(), self.Raise()
 
@@ -339,7 +342,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.TrayIconEnabled = event.IsChecked() if event else True
         self.menu_tray.Check(conf.TrayIconEnabled)
         if conf.TrayIconEnabled:
-            self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+            self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         else:
             self.trayicon.RemoveIcon()
         if conf.WindowIconized:
