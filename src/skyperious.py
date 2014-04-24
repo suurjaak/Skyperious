@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2014
+@modified    24.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -200,7 +200,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 for filename in filenames:
                     self.window.load_database_page(filename)
 
-        self.notebook.DropTarget = FileDrop(self)
+        self.DropTarget = self.notebook.DropTarget = FileDrop(self)
 
         self.MinSize = conf.WindowSizeMin
         if conf.WindowPosition and conf.WindowSize:
