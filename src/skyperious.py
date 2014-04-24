@@ -4312,7 +4312,7 @@ class DatabasePage(wx.Panel):
             main.logstatus_flash(errormsg)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             wx.CallAfter(support.report_error, errormsg)
-        self.update_info_page(reload=False)
+        wx.CallLater(500, self.update_info_page, False)
         wx.CallLater(200, self.load_table_data)
 
 
