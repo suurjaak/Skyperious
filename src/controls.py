@@ -741,6 +741,7 @@ class PropertyDialog(wx.Dialog):
 
     def _GetValueForCtrl(self, value, typeclass):
         """Returns the value in type suitable for appropriate wx control."""
+        value = tuple(value) if isinstance(value, list) else value
         return str(value) if int == typeclass or "wx" in typeclass.__module__ \
                else "" if value is None else value
 

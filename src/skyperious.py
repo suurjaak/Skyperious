@@ -1272,7 +1272,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for opening advanced options, creates the property dialog
         and saves values.
         """
-        dialog = controls.PropertyDialog(self, title="Advanced options")
+         dialog = controls.PropertyDialog(self, title="Advanced options")
         def get_field_doc(name, tree=ast.parse(inspect.getsource(conf))):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
@@ -1294,6 +1294,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK == dialog.ShowModal():
             [setattr(conf, k, v) for k, v in dialog.GetProperties()]
             conf.save()
+            self.MinSize = conf.WindowSizeMin
 
 
     def on_open_database(self, event):

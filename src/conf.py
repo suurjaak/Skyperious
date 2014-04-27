@@ -53,11 +53,11 @@ FileDirectiveCompatiblity = {
     "SearchInMessageBody": "SearchInMessages",
 }
 """List of attributes saved if changed from default."""
-OptionalFileDirectives = ["TemplateExportFilename", "TemplateExportDb",
-    "LogSQL", "WindowSizeMin", "ConsoleHistoryMax", "SearchHistoryMax",
-    "MaxHistoryInitialMessages", "SearchMessagesMax", "SearchTableRowsMax",
-    "SearchResultsChunk", "ContactResultsChunk", "PlotWidth",
-    "StatusFlashLength", "MaxRecentFiles", "UpdateCheckInterval"
+OptionalFileDirectives = ["ConsoleHistoryMax", "ContactResultsChunk", "LogSQL",
+    "MaxHistoryInitialMessages", "MaxRecentFiles", "PlotWidth",
+    "SearchHistoryMax", "SearchMessagesMax", "SearchResultsChunk",
+    "SearchTableRowsMax", "StatusFlashLength", "TemplateExportDb",
+    "TemplateExportFilename", "UpdateCheckInterval", "WindowSizeMin",
 ]
 OptionalFileDirectiveDefaults = {}
 
