@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.04.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -29,9 +29,6 @@ import time
 import traceback
 
 try:
-    import guibase
-    import skyperious
-    import support
     import wx
     is_gui_possible = True
 except ImportError:
@@ -46,6 +43,10 @@ import export
 import skypedata
 import util
 import workers
+if is_gui_possible:
+    import guibase
+    import skyperious
+    import support
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
