@@ -337,7 +337,7 @@ def run_export(filenames, format):
         formatargs = collections.defaultdict(str)
         formatargs["skypename"] = os.path.basename(db.filename)
         formatargs.update(db.account or {})
-        basename = util.safe_filename(conf.TemplateExportDb % formatargs)
+        basename = util.safe_filename(conf.ExportDbTemplate % formatargs)
         dbstr = "from %s " % db if len(dbs) != 1 else ""
         if is_xlsx_single:
             export_dir = os.getcwd()

@@ -64,7 +64,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    25.04.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -676,9 +676,6 @@ class PropertyDialog(wx.Dialog):
         """Lays out the properties, to be called when adding is completed."""
         self.panel.SetupScrolling(scroll_x=False)
         self.sizer_items.AddGrowableCol(1) # Grow ctrl column
-        if self.properties:
-            firstctrl = self.properties[0][-1]
-            firstctrl.SetFocus(), firstctrl.SetSelection(0, 0)
 
 
     def GetProperties(self):

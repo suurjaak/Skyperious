@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.04.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.1.2"
-VersionDate = "25.04.2014"
+Version = "3.1.3"
+VersionDate = "27.04.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -53,11 +53,11 @@ FileDirectiveCompatiblity = {
     "SearchInMessageBody": "SearchInMessages",
 }
 """List of attributes saved if changed from default."""
-OptionalFileDirectives = ["ConsoleHistoryMax", "ContactResultsChunk", "LogSQL",
-    "MaxHistoryInitialMessages", "MaxRecentFiles", "PlotWidth",
-    "SearchHistoryMax", "SearchMessagesMax", "SearchResultsChunk",
-    "SearchTableRowsMax", "StatusFlashLength", "TemplateExportDb",
-    "TemplateExportFilename", "UpdateCheckInterval", "WindowSizeMin",
+OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
+    "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
+    "MaxSearchTableRows", "SearchContactsChunk", "SearchResultsChunk",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
 ]
 OptionalFileDirectiveDefaults = {}
 
@@ -117,13 +117,11 @@ SearchInTables = False
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
 
-"""
-Database export filename template, format can use Skype.Accounts data."""
-TemplateExportDb = u"Export from %(fullname)s"
+"""Chat export filename template, format can use Skype.Conversations data."""
+ExportChatTemplate = u"Skype %(title_long_lc)s"
 
-"""
-Chat export filename template, format can use Skype.Conversations data."""
-TemplateExportFilename = u"Skype %(title_long_lc)s"
+"""Database export filename template, format can use Skype.Accounts data."""
+ExportDbTemplate = u"Export from %(fullname)s"
 
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
@@ -138,7 +136,7 @@ WindowIconized = False
 WindowPosition = None
 
 """Main window size in pixels, [w, h] or [-1, -1] for maximized."""
-WindowSize = [1080, 710]
+WindowSize = (1080, 710)
 
 """---------------------------- /FileDirectives ----------------------------"""
 
@@ -148,10 +146,11 @@ LogEnabled = True
 """Whether to log all SQL statements to log window."""
 LogSQL = False
 
-"""URLs for download list, changelog and submitting feedback."""
+"""URLs for download list, changelog, submitting feedback and homepage."""
 DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
 ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
 ReportURL    = "http://erki.lap.ee/downloads/Skyperious/feedback"
+HomeUrl = "http://suurjaak.github.com/Skyperious/"
 
 """Maximum number of error reports sent per day."""
 ErrorReportsPerDay = 5
@@ -160,16 +159,16 @@ ErrorReportsPerDay = 5
 ErrorsStoredMax = 1000
 
 """Minimum allowed size for the main window, as (width, height)."""
-WindowSizeMin = (600, 400)
+MinWindowSize = (600, 400)
 
 """Console window size in pixels, (width, height)."""
 ConsoleSize = (800, 300)
 
 """Maximum number of console history commands to store."""
-ConsoleHistoryMax = 1000
+MaxConsoleHistory = 1000
 
 """Maximum number of search texts to store."""
-SearchHistoryMax = 500
+MaxSearchHistory = 500
 
 """Days between automatic update checks."""
 UpdateCheckInterval = 7
@@ -186,16 +185,16 @@ MaxTabTitleLength = 60
 """
 Maximum number of messages to show in search results.
 """
-SearchMessagesMax = 500
+MaxSearchMessages = 500
 
 """Maximum number of table rows to show in search results."""
-SearchTableRowsMax = 500
+MaxSearchTableRows = 500
 
 """Number of search results to yield in one chunk from search thread."""
 SearchResultsChunk = 50
 
 """Number of contact search results to yield in one chunk."""
-ContactResultsChunk = 10
+SearchContactsChunk = 10
 
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"
@@ -303,9 +302,6 @@ PlotFilesColour = "#33DD66"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
-"""Skyperious homepage URL."""
-HomeUrl = "http://suurjaak.github.com/Skyperious/"
-
 """
 Width and height tuple of the avatar image, shown in chat data and export HTML
 statistics."""
@@ -315,7 +311,7 @@ AvatarImageSize = (32, 32)
 AvatarImageLargeSize = (96, 96)
 
 """Width of the chat statistics plots, in pixels."""
-PlotWidth = 350
+StatisticsPlotWidth = 350
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000

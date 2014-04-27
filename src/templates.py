@@ -1101,8 +1101,8 @@ else:
   text_cell3 = util.plural(label, count)
 %>
       <table cellpadding="0" width="100%" cellspacing="0"><tr>
-        <td bgcolor="{{colormap[type]}}" width="{{percent * conf.PlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
-        <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.PlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
+        <td bgcolor="{{colormap[type]}}" width="{{percent * conf.StatisticsPlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
+        <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.StatisticsPlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
         <td nowrap="nowrap">&nbsp;{{text_cell3}}</td>
       </tr></table>
 %endfor

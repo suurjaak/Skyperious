@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.04.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -205,7 +205,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.DropTarget = self.notebook.DropTarget = FileDrop(self)
 
-        self.MinSize = conf.WindowSizeMin
+        self.MinSize = conf.MinWindowSize
         if conf.WindowPosition and conf.WindowSize:
             if [-1, -1] != conf.WindowSize:
                 self.Size = conf.WindowSize
@@ -1090,7 +1090,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db and db.account: formatargs.update(db.account)
-            default = util.safe_filename(conf.TemplateExportDb % formatargs)
+            default = util.safe_filename(conf.ExportDbTemplate % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -1112,7 +1112,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 formatargs = collections.defaultdict(str)
                 formatargs["skypename"] = os.path.basename(self.db_filename)
                 if db.account: formatargs.update(db.account)
-                folder = util.safe_filename(conf.TemplateExportDb % formatargs)
+                folder = util.safe_filename(conf.ExportDbTemplate % formatargs)
                 export_dir = util.unique_path(os.path.join(dirname, folder))
                 try:
                     os.mkdir(export_dir)
@@ -1272,7 +1272,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for opening advanced options, creates the property dialog
         and saves values.
         """
-         dialog = controls.PropertyDialog(self, title="Advanced options")
+        dialog = controls.PropertyDialog(self, title="Advanced options")
         def get_field_doc(name, tree=ast.parse(inspect.getsource(conf))):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
@@ -1294,7 +1294,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK == dialog.ShowModal():
             [setattr(conf, k, v) for k, v in dialog.GetProperties()]
             conf.save()
-            self.MinSize = conf.WindowSizeMin
+            self.MinSize = conf.MinWindowSize
 
 
     def on_open_database(self, event):
@@ -2713,7 +2713,7 @@ class DatabasePage(wx.Panel):
         if conf.SearchHistory[-1:] == [""]: # Clear empty search flag
             conf.SearchHistory = conf.SearchHistory[:-1]
         util.add_unique(conf.SearchHistory, self.edit_searchall.Value,
-                        1, conf.SearchHistoryMax)
+                        1, conf.MaxSearchHistory)
 
         # Save last search results HTML
         search_data = self.html_searchall.GetActiveTabData()
@@ -3046,7 +3046,7 @@ class DatabasePage(wx.Panel):
         saves the current messages to file.
         """
         formatargs = collections.defaultdict(str); formatargs.update(self.chat)
-        default = util.safe_filename(conf.TemplateExportFilename % formatargs)
+        default = util.safe_filename(conf.ExportChatTemplate % formatargs)
         self.dialog_savefile.Filename = default
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
@@ -3150,7 +3150,7 @@ class DatabasePage(wx.Panel):
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db.filename)
             formatargs.update(self.db.account or {})
-            default = util.safe_filename(conf.TemplateExportDb % formatargs)
+            default = util.safe_filename(conf.ExportDbTemplate % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -3196,7 +3196,7 @@ class DatabasePage(wx.Panel):
         displays a save file dialog and saves all filtered messages to file.
         """
         formatargs = collections.defaultdict(str); formatargs.update(self.chat)
-        default = conf.TemplateExportFilename % formatargs
+        default = conf.ExportChatTemplate % formatargs
         self.dialog_savefile.Filename = util.safe_filename(default)
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
@@ -3617,7 +3617,7 @@ class DatabasePage(wx.Panel):
 
             self.notebook.SetSelection(self.pageorder[self.page_search])
             util.add_unique(conf.SearchHistory, text.strip(), 1,
-                            conf.SearchHistoryMax)
+                            conf.MaxSearchHistory)
             self.TopLevelParent.dialog_search.Value = conf.SearchHistory[-1]
             self.TopLevelParent.dialog_search.SetChoices(conf.SearchHistory)
             self.edit_searchall.SetChoices(conf.SearchHistory)
@@ -4817,7 +4817,7 @@ class MergerPage(wx.Panel):
         and saves the current messages to file.
         """
         formatargs = collections.defaultdict(str); formatargs.update(self.chat)
-        default = "Diff of %s" % conf.TemplateExportFilename % formatargs
+        default = "Diff of %s" % conf.ExportChatTemplate % formatargs
         dialog = wx.FileDialog(parent=self, message="Save new messages",
             defaultDir=os.getcwd(), defaultFile=util.safe_filename(default),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER

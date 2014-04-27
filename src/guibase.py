@@ -9,7 +9,7 @@ GUI frame template:
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    20.04.2014
+@modified    27.04.2014
 """
 import os
 import wx
@@ -138,7 +138,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
         run_console().
         """
         h = [x for x in self.console.history if x not in self.console_commands]
-        history = h[:conf.ConsoleHistoryMax][::-1]
+        history = h[:conf.MaxConsoleHistory][::-1]
         if history != conf.ConsoleHistoryCommands:
             conf.ConsoleHistoryCommands[:] = history
             conf.save()
