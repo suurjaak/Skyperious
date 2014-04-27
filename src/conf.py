@@ -160,9 +160,9 @@ ErrorReportsPerDay = 5
 ErrorsStoredMax = 1000
 
 """Minimum allowed size for the main window, as (width, height)."""
-WindowSizeMin = (950, 650) if "linux2" != sys.platform else (950, 810)
+WindowSizeMin = (600, 400)
 
-"""Console window size in pixels, (w, h)."""
+"""Console window size in pixels, (width, height)."""
 ConsoleSize = (800, 300)
 
 """Maximum number of console history commands to store."""

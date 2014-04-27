@@ -42,6 +42,7 @@ import wx.lib.agw.flatmenu
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.ultimatelistctrl
 import wx.lib.newevent
+import wx.lib.scrolledpanel
 import wx.stc
 
 # Core functionality can work without these modules
@@ -406,8 +407,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.WindowSize = [-1, -1] if self.IsMaximized() else self.Size[:]
         conf.save()
         event.Skip()
-        l = self.list_db
-        wx.CallAfter(lambda: self and l.SetColumnWidth(0, l.Size.width - 5))
+        l, p = self.list_db, self.panel_db_main.Parent # Right panel scroll
+        fn = lambda: self and (p.Layout(), l.SetColumnWidth(0, l.Size[1] - 5))
+        wx.CallAfter(fn)
 
 
     def on_move(self, event):
@@ -505,7 +507,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             list_db.SetUserLineHeight(int(h * 1.5))
         list_db.Select(0)
 
-        panel_right = wx.Panel(page)
+        panel_right = wx.lib.scrolledpanel.ScrolledPanel(page)
         panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         panel_main = self.panel_db_main = wx.Panel(panel_right)
@@ -581,6 +583,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for c in list(panel_main.Children) + list(panel_detail.Children) + \
         [panel_main, panel_detail]:
            c.BackgroundColour = page.BackgroundColour 
+        panel_right.SetupScrolling(scroll_x=False)
         panel_detail.Hide()
 
         list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
@@ -1284,8 +1287,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             default = conf.OptionalFileDirectiveDefaults.get(name)
             if value is None and default is None:
                 continue # continue for name
-            typeclass = wx.Size if isinstance(value, tuple) else type(value)
-            dialog.AddProperty(name, value, help, default, typeclass)
+            kind = wx.Size if isinstance(value, (tuple, list)) else type(value)
+            dialog.AddProperty(name, value, help, default, kind)
         dialog.Realize()
 
         if wx.ID_OK == dialog.ShowModal():
@@ -1413,8 +1416,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not self.panel_db_detail.Shown:
                 self.panel_db_main.Hide()
                 self.panel_db_detail.Show()
-                self.panel_db_detail.ContainingSizer.Layout()
-                wx.CallAfter(self.panel_db_main.ContainingSizer.Layout)
+                self.panel_db_detail.Parent.Layout()
             if os.path.exists(filename):
                 sz = os.path.getsize(filename)
                 dt = datetime.datetime.fromtimestamp(os.path.getmtime(filename))
@@ -1436,8 +1438,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.db_filename = None
             self.panel_db_main.Show()
             self.panel_db_detail.Hide()
-            self.panel_db_main.ContainingSizer.Layout()
-            wx.CallAfter(self.panel_db_main.ContainingSizer.Layout)
+            self.panel_db_main.Parent.Layout()
         # Save last selected files in db lists, to reselect them on rerun
         del conf.LastSelectedFiles[:]
         selected = self.list_db.GetFirstSelected()
@@ -2505,7 +2506,7 @@ class DatabasePage(wx.Panel):
 
     def create_page_info(self, notebook):
         """Creates a page for seeing general database information."""
-        page = self.page_info = wx.Panel(parent=notebook)
+        page = self.page_info = wx.lib.scrolledpanel.ScrolledPanel(notebook)
         self.pageorder[page] = len(self.pageorder)
         notebook.AddPage(page, "Information")
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -2590,6 +2591,7 @@ class DatabasePage(wx.Panel):
         sizer.Add(panel2, proportion=1, border=5,
                   flag=wx.RIGHT | wx.TOP | wx.BOTTOM | wx.GROW)
         self.update_accountinfo()
+        page.SetupScrolling()
 
 
     def on_check_integrity(self, event):
@@ -4560,7 +4562,7 @@ class MergerPage(wx.Panel):
 
     def create_page_merge_all(self, notebook):
         """Creates a page for merging all chats at once."""
-        page = self.page_merge_all = wx.Panel(parent=notebook)
+        page = self.page_merge_all = wx.lib.scrolledpanel.ScrolledPanel(notebook)
         self.pageorder[page] = len(self.pageorder)
         notebook.AddPage(page, "Merge all")
 
@@ -4613,6 +4615,7 @@ class MergerPage(wx.Panel):
         sizer.Add(html, proportion=1, border=30, flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.GROW)
         sizer_top.AddGrowableCol(0)
         sizer_top.AddGrowableCol(2)
+        page.SetupScrolling()
 
         button_scan.Bind(wx.EVT_BUTTON, self.on_scan_all)
         button_merge.Bind(wx.EVT_BUTTON, self.on_merge_all)
@@ -4673,7 +4676,7 @@ class MergerPage(wx.Panel):
             parent=panel2, style=wx.BORDER_NONE)
         splitter_diff.SetMinimumPaneSize(350)
         panel_stc1 = self.panel_stc1 = wx.Panel(parent=splitter_diff)
-        panel_stc2 = self.panel_stc2 = wx.Panel(parent=splitter_diff)
+        panel_stc2 = self.panel_stc2 = wx.lib.scrolledpanel.ScrolledPanel(splitter_diff)
         panel_stc2.BackgroundColour = conf.BgColour
         sizer_stc1 = panel_stc1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_stc2 = panel_stc2.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4713,6 +4716,7 @@ class MergerPage(wx.Panel):
                                       sashPosition=self.Size.width)
         splitter.SplitHorizontally(panel1, panel2,
                                    sashPosition=self.Size.height / 3)
+        panel_stc2.SetupScrolling()
 
 
     def create_page_merge_contacts(self, notebook):
@@ -4727,7 +4731,7 @@ class MergerPage(wx.Panel):
         )
         splitter.SetMinimumPaneSize(350)
         panel1 = wx.Panel(parent=splitter)
-        panel2 = wx.Panel(parent=splitter)
+        panel2 = wx.lib.scrolledpanel.ScrolledPanel(splitter)
         panel2.BackgroundColour = conf.BgColour
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4786,6 +4790,7 @@ class MergerPage(wx.Panel):
         sizer.AddSpacer(10)
         sizer.Add(splitter, proportion=1, border=5,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
+        panel2.SetupScrolling()
 
 
     def split_panels(self):
