@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2014
+@modified    25.04.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -425,7 +425,6 @@ def run_diff(filename1, filename2):
 def run_gui(filenames):
     """Main GUI program entrance."""
     global deferred_logs, deferred_status, window
-    conf.load()
 
     # Values in some threads would otherwise not be the same
     sys.modules["main"].deferred_logs = deferred_logs
@@ -498,6 +497,7 @@ def run(argv):
               conf.Title)
         sys.exit()
     elif "gui" != arguments.command:
+        conf.load()
         is_cli = sys.modules["main"].is_cli = True
         is_verbose = sys.modules["main"].is_verbose = arguments.verbose
         enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"

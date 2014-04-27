@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2014
+@modified    25.04.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -25,7 +25,7 @@ import util
 """Program title, version number and version date."""
 Title = "Skyperious"
 Version = "3.1.2"
-VersionDate = "20.04.2014"
+VersionDate = "25.04.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -44,15 +44,22 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
-    "SearchInTables", "SQLWindowTexts", "TemplateExportDb",
-    "TemplateExportFilename", "TrayIconEnabled", "UpdateCheckAutomatic",
-    "WindowIconized", "WindowPosition", "WindowSize",
+    "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
+    "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """Map of attribute names from old version to new, retain values on upgrade."""
 FileDirectiveCompatiblity = {
     "SearchInNewTab" : "SearchUseNewTab",
     "SearchInMessageBody": "SearchInMessages",
 }
+"""List of attributes saved if changed from default."""
+OptionalFileDirectives = ["TemplateExportFilename", "TemplateExportDb",
+    "LogSQL", "WindowSizeMin", "ConsoleHistoryMax", "SearchHistoryMax",
+    "MaxHistoryInitialMessages", "SearchMessagesMax", "SearchTableRowsMax",
+    "SearchResultsChunk", "ContactResultsChunk", "PlotWidth",
+    "StatusFlashLength", "MaxRecentFiles", "UpdateCheckInterval"
+]
+OptionalFileDirectiveDefaults = {}
 
 """---------------------------- FileDirectives: ----------------------------"""
 
@@ -111,17 +118,12 @@ SearchInTables = False
 SQLWindowTexts = {}
 
 """
-Database export filename template, format will use Skype.Accounts data, or
-{"skypename": db filename} if no account available."""
-TemplateExportDb = "Export from %(fullname)s"
+Database export filename template, format can use Skype.Accounts data."""
+TemplateExportDb = u"Export from %(fullname)s"
 
 """
-Chat export filename template, format will use Skype.Conversations data, with
-additional fields like title, title_long, title_long_lc, created_datetime,
-last_activity_datetime, first_message_datetime, last_message_datetime,
-message_count.
-"""
-TemplateExportFilename = "Skype %(title_long_lc)s"
+Chat export filename template, format can use Skype.Conversations data."""
+TemplateExportFilename = u"Skype %(title_long_lc)s"
 
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
@@ -143,7 +145,7 @@ WindowSize = [1080, 710]
 """Whether logging to log window is enabled."""
 LogEnabled = True
 
-"""Whether to log all SQL statements."""
+"""Whether to log all SQL statements to log window."""
 LogSQL = False
 
 """URLs for download list, changelog and submitting feedback."""
@@ -157,49 +159,42 @@ ErrorReportsPerDay = 5
 """Maximum number of error hashes and report days to keep."""
 ErrorsStoredMax = 1000
 
-"""Minimum allowed size of the main window (w, h)."""
+"""Minimum allowed size for the main window, as (width, height)."""
 WindowSizeMin = (950, 650) if "linux2" != sys.platform else (950, 810)
 
 """Console window size in pixels, (w, h)."""
 ConsoleSize = (800, 300)
 
-"""Maximum number of commands to store for console history."""
+"""Maximum number of console history commands to store."""
 ConsoleHistoryMax = 1000
 
-"""Maximum number of search texts to remember."""
+"""Maximum number of search texts to store."""
 SearchHistoryMax = 500
 
-"""Time interval to keep between update checks, a datetime.timedelta."""
-UpdateCheckInterval = datetime.timedelta(days=7)
+"""Days between automatic update checks."""
+UpdateCheckInterval = 7
 
 """Date string of last time updates were checked."""
 LastUpdateCheck = None
 
-"""
-Maximum number of messages shown in the chat history initially, before user
-filtering.
-"""
+"""Maximum number of messages shown initially in chat history."""
 MaxHistoryInitialMessages = 1500
 
 """Maximum length of a tab title, overflow will be cut on the left."""
 MaxTabTitleLength = 60
 
 """
-Maximum number of messages to show in search results (wx.html.HtmlWindow has
-trouble showing long documents).
+Maximum number of messages to show in search results.
 """
 SearchMessagesMax = 500
 
 """Maximum number of table rows to show in search results."""
 SearchTableRowsMax = 500
 
-"""How many search results to yield in one chunk from search thread."""
+"""Number of search results to yield in one chunk from search thread."""
 SearchResultsChunk = 50
 
-"""
-How many contact search results to yield in one chunk from contacts search
-thread.
-"""
+"""Number of contact search results to yield in one chunk."""
 ContactResultsChunk = 10
 
 """Name of font used in chat history."""
@@ -319,7 +314,7 @@ AvatarImageSize = (32, 32)
 """Width and height tuple of the large avatar image, shown in HTML export."""
 AvatarImageLargeSize = (96, 96)
 
-"""Length of the chat statistics plots, in pixels."""
+"""Width of the chat statistics plots, in pixels."""
 PlotWidth = 350
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
@@ -361,6 +356,11 @@ def load():
             [setattr(module, name, v) for s, v in [parse_value(oldname)] if s]
         for name in FileDirectives:
             [setattr(module, name, v) for s, v in [parse_value(name)] if s]
+        for name in OptionalFileDirectives:
+            OptionalFileDirectiveDefaults[name] = getattr(module, name, None)
+            success, value = parse_value(name)
+            if success:
+                setattr(module, name, value)
     except Exception:
         pass # Fail silently
 
@@ -380,6 +380,13 @@ def save():
             try:
                 value = getattr(module, name)
                 parser.set(section, name, json.dumps(value))
+            except Exception:
+                pass
+        for name in OptionalFileDirectives:
+            try:
+                value = getattr(module, name, None)
+                if OptionalFileDirectiveDefaults.get(name) != value:
+                    parser.set(section, name, json.dumps(value))
             except Exception:
                 pass
         parser.write(f)

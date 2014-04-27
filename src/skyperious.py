@@ -8,15 +8,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.04.2014
+@modified    26.04.2014
 ------------------------------------------------------------------------------
 """
+import ast
 import base64
 import collections
 import copy
 import cStringIO
 import datetime
 import hashlib
+import inspect
 import math
 import os
 import re
@@ -273,7 +275,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         if not conf.UpdateCheckAutomatic: 
             return
-        interval = conf.UpdateCheckInterval
+        interval = datetime.timedelta(days=conf.UpdateCheckInterval)
         due_date = datetime.datetime.now() - interval
         if not (conf.WindowIconized or support.update_window) \
         and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
@@ -642,6 +644,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_file.AppendMenu(id=wx.NewId(), text="&Recent databases",
             submenu=menu_recent, help="Recently opened databases.")
         menu_file.AppendSeparator()
+        menu_options = self.menu_options = \
+            menu_file.Append(id=wx.NewId(), text="&Advanced options",
+                help="Edit advanced program options")
         menu_iconize = self.menu_iconize = \
             menu_file.Append(id=wx.NewId(), text="Minimize to &tray",
                 help="Minimize %s window to notification area" % conf.Title)
@@ -695,6 +700,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_error_reporting.Check(conf.ErrorReportsAutomatic)
 
         self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
+        self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
         self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
         self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
         self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
@@ -1256,6 +1262,35 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if menu.Size.width < sz_btn.width:
             menu.Size = sz_btn.width, menu.Size.height
         menu.Popup(pt_btn, self)
+
+
+    def on_open_options(self, event):
+        """
+        Handler for opening advanced options, creates the property dialog
+        and saves values.
+        """
+        dialog = controls.PropertyDialog(self, title="Advanced options")
+        def get_field_doc(name, tree=ast.parse(inspect.getsource(conf))):
+            """Returns the docstring immediately before name assignment."""
+            for i, node in enumerate(tree.body):
+                if ast.Assign == type(node) and node.targets[0].id == name and i:
+                    prev = tree.body[i - 1]
+                    if ast.Expr == type(prev) and ast.Str == type(prev.value):
+                        return prev.value.s.strip()
+            return ""
+
+        for name in sorted(conf.OptionalFileDirectives):
+            value, help = getattr(conf, name, None), get_field_doc(name)
+            default = conf.OptionalFileDirectiveDefaults.get(name)
+            if value is None and default is None:
+                continue # continue for name
+            typeclass = wx.Size if isinstance(value, tuple) else type(value)
+            dialog.AddProperty(name, value, help, default, typeclass)
+        dialog.Realize()
+
+        if wx.ID_OK == dialog.ShowModal():
+            [setattr(conf, k, v) for k, v in dialog.GetProperties()]
+            conf.save()
 
 
     def on_open_database(self, event):
