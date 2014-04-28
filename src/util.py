@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    24.04.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -193,18 +193,21 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    head, name = os.path.split(result)
+    if "linux" == sys.platform and isinstance(result, unicode) \
+    and "utf-8" != sys.getfilesystemencoding():
+        result = result.encode("utf-8") # Linux has trouble if locale not UTF-8
+    path, name = os.path.split(result)
     base, ext = os.path.splitext(name)
     if len(name) > 255: # Filesystem limitation
         name = base[:255 - len(ext) - 2] + ".." + ext
-        result = os.path.join(head, name)
+        result = os.path.join(path, name)
     counter = 2
     while os.path.exists(result):
         suffix = " (%s)%s" % (counter, ext)
         name = base + suffix
         if len(name) > 255:
             name = base[:255 - len(suffix) - 2] + ".." + suffix
-        result = os.path.join(head, name)
+        result = os.path.join(path, name)
         counter += 1
     return result
 
