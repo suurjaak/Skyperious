@@ -3963,10 +3963,11 @@ class DatabasePage(wx.Panel):
 
     def on_button_sql(self, event):
         """
-        Handler for clicking to run an SQL query, runs the query, displays its
-        results, if any, and commits changes done, if any.
+        Handler for clicking to run an SQL query, runs the selected text or
+        whole contents, displays its results, if any, and commits changes 
+        done, if any.
         """
-        sql = self.stc_sql.Text.strip()
+        sql = self.stc_sql.SelectedText.strip() or self.stc_sql.Text.strip()
         if sql:
             self.execute_sql(sql)
 
@@ -4419,7 +4420,6 @@ class DatabasePage(wx.Panel):
             errormsg = "Could not load chat list from %s.\n\n%s" % \
                        (self.db, traceback.format_exc())
             main.logstatus_flash(errormsg)
-            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             wx.CallAfter(support.report_error, errormsg)
         wx.CallLater(500, self.update_info_page, False)
         wx.CallLater(200, self.load_tables_data)
@@ -4450,15 +4450,14 @@ class DatabasePage(wx.Panel):
                               self.chat["last_message_datetime"].date()
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
+            main.status_flash("Opened Skype database %s.", self.db)
         except Exception as e:
             if self:
                 errormsg = "Error loading additional data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
-                main.log(errormsg)
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+                main.logstatus_flash(errormsg)
                 wx.CallAfter(support.report_error, errormsg)
         if self:
-            main.status_flash("Opened Skype database %s.", self.db)
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(), l.RefreshRows(),
                                         l.SortListItems(4, 0))
