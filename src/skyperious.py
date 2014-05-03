@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.04.2014
+@modified    03.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1276,7 +1276,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def get_field_doc(name, tree=ast.parse(inspect.getsource(conf))):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
-                if ast.Assign == type(node) and node.targets[0].id == name and i:
+                if i and ast.Assign == type(node) and node.targets[0].id == name:
                     prev = tree.body[i - 1]
                     if ast.Expr == type(prev) and ast.Str == type(prev.value):
                         return prev.value.s.strip()
@@ -1536,7 +1536,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 response = wx.MessageBox(
                     "Some tables in %s have unsaved data (%s).\n\n"
                     "Save changes before closing?" % (
-                        page.db, ", ".join(sorted(g.table for g in unsaved))
+                        page.db, ", ".join(sorted(x.table for x in unsaved))
                     ), conf.Title,
                     wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION
                 )
@@ -2190,8 +2190,13 @@ class DatabasePage(wx.Panel):
 
         panel1 = wx.Panel(parent=splitter)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer1.Add(wx.StaticText(parent=panel1,
-            label="&Tables:"), border=5, flag=wx.LEFT | wx.TOP | wx.BOTTOM)
+        sizer_topleft = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_topleft.Add(wx.StaticText(parent=panel1, label="&Tables:"),
+                          flag=wx.ALIGN_CENTER_VERTICAL)
+        button_refresh = self.button_refresh_tables = \
+            wx.Button(panel1, label="Refresh")
+        sizer_topleft.AddStretchSpacer()
+        sizer_topleft.Add(button_refresh)
         tree = self.tree_tables = wx.gizmos.TreeListCtrl(
             parent=panel1,
             style=wx.TR_DEFAULT_STYLE
@@ -2207,8 +2212,10 @@ class DatabasePage(wx.Panel):
         tree.AddRoot("Loading data..")
         tree.SetMainColumn(0)
         tree.SetColumnAlignment(1, wx.ALIGN_RIGHT)
-        self.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_change_list_tables, tree)
+        self.Bind(wx.EVT_BUTTON, self.on_refresh_tables, button_refresh)
+        self.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_change_tree_tables, tree)
 
+        sizer1.Add(sizer_topleft, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
         sizer1.Add(tree, proportion=1,
                    border=5, flag=wx.GROW | wx.LEFT | wx.TOP | wx.BOTTOM)
 
@@ -2821,6 +2828,64 @@ class DatabasePage(wx.Panel):
         self.button_refresh_fileinfo.Enabled = True
 
 
+    def on_refresh_tables(self, event):
+        """
+        Refreshes the table tree and open table data. Asks for confirmation
+        if there are uncommitted changes.
+        """
+        do_refresh, unsaved = True, self.get_unsaved_grids()
+        if unsaved:
+            response = wx.MessageBox("Some tables have unsaved data (%s).\n\n"
+                "Save before refreshing (changes will be lost otherwise)?"
+                % (", ".join(sorted(x.table for x in unsaved))), conf.Title,
+                wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION)
+            if wx.YES == response:
+                self.save_unsaved_grids()
+            elif wx.CANCEL == response:
+                do_refresh = False
+        if do_refresh:
+            self.db.clear_cache()
+            self.db_grids.clear()
+            self.load_tables_data()
+            if self.grid_table.Table:
+                grid, table_name = self.grid_table, self.grid_table.Table.table
+                scrollpos = map(grid.GetScrollPos, [wx.HORIZONTAL, wx.VERTICAL])
+                cursorpos = grid.GridCursorCol, grid.GridCursorRow
+                self.on_change_table(None)
+                grid.Table = wx.grid.PyGridTableBase() # Clear grid visually
+                grid.Freeze()
+                grid.Table = None # Reset grid data to empty
+
+                tableitem = None
+                table_name = table_name.lower()
+                table = next((t for t in self.db.get_tables()
+                              if t["name"].lower() == table_name), None)
+                item = self.tree_tables.GetNext(self.tree_tables.RootItem)
+                while table and item and item.IsOk():
+                    table2 = self.tree_tables.GetItemPyData(item)
+                    if table2 and table2.lower() == table["name"].lower():
+                        tableitem = item
+                        break # break while table and item and itek.IsOk()
+                    item = self.tree_tables.GetNextSibling(item)
+                if tableitem:
+                    # Only way to create state change in wx.gizmos.TreeListCtrl
+                    class HackEvent(object):
+                        def __init__(self, item): self._item = item
+                        def GetItem(self):        return self._item
+                    self.on_change_tree_tables(HackEvent(tableitem))
+                    self.tree_tables.SelectItem(tableitem)
+                    grid.Scroll(*scrollpos)
+                    grid.SetGridCursor(*cursorpos)
+                else:
+                    self.label_table.Label = ""
+                    for x in [wx.ID_ADD, wx.ID_DELETE, wx.ID_UNDO, wx.ID_SAVE]:
+                        self.tb_grid.EnableTool(x, False)
+                    self.button_reset_grid_table.Enabled = False
+                    self.button_export_table.Enabled = False
+                grid.Thaw()
+                self.page_tables.Refresh()
+
+
     def on_change_import_resultfilter(self, event):
         """
         Handler for changing text in contacts import result filter box,
@@ -3406,7 +3471,7 @@ class DatabasePage(wx.Panel):
                     class HackEvent(object):
                         def __init__(self, item): self._item = item
                         def GetItem(self):        return self._item
-                    self.on_change_list_tables(HackEvent(tableitem))
+                    self.on_change_tree_tables(HackEvent(tableitem))
                     if self.tree_tables.Selection != tableitem:
                         self.tree_tables.SelectItem(tableitem)
                         wx.YieldIfNeeded()
@@ -4056,7 +4121,7 @@ class DatabasePage(wx.Panel):
         self.tb_grid.EnableTool(wx.ID_UNDO, self.grid_table.Table.IsChanged())
 
 
-    def on_change_list_tables(self, event):
+    def on_change_tree_tables(self, event):
         """
         Handler for selecting an item in the tables list, loads the table data
         into the table grid.
@@ -4095,8 +4160,14 @@ class DatabasePage(wx.Panel):
                 self.tb_grid.EnableTool(wx.ID_DELETE, True)
                 self.button_export_table.Enabled = True
                 self.button_reset_grid_table.Enabled = True
-            finally:
                 busy.Close()
+            except Exception as e:
+                busy.Close()
+                errormsg = "Could not load table %s.\n\n%s" % \
+                           (table, traceback.format_exc())
+                main.logstatus_flash(errormsg)
+                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+                wx.CallAfter(support.report_error, errormsg)
 
 
     def on_change_list_chats(self, event):
@@ -4351,7 +4422,7 @@ class DatabasePage(wx.Panel):
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             wx.CallAfter(support.report_error, errormsg)
         wx.CallLater(500, self.update_info_page, False)
-        wx.CallLater(200, self.load_table_data)
+        wx.CallLater(200, self.load_tables_data)
 
 
     def load_later_data(self):
@@ -4395,7 +4466,7 @@ class DatabasePage(wx.Panel):
             wx.CallAfter(self.update_tabheader)
 
 
-    def load_table_data(self):
+    def load_tables_data(self):
         """Loads table data into table tree and SQL editor."""
         try:
             tables = self.db.get_tables()
