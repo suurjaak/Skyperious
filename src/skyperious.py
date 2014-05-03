@@ -4138,7 +4138,7 @@ class DatabasePage(wx.Panel):
             i = self.tree_tables.GetNext(self.tree_tables.RootItem)
             while i:
                 text = self.tree_tables.GetItemText(i).lower()
-                bgcolour = (conf.DBTableOpenedColour if text == table
+                bgcolour = (conf.DBTableOpenedColour if text == lower
                             else conf.BgColour)
                 self.tree_tables.SetItemBackgroundColour(i, bgcolour)
                 i = self.tree_tables.GetNextSibling(i)
