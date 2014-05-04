@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.05.2014
+@modified    04.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -203,7 +203,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 for filename in filenames:
                     self.window.load_database_page(filename)
 
-        self.DropTarget = self.notebook.DropTarget = FileDrop(self)
+        self.DropTarget = FileDrop(self)
+        self.notebook.DropTarget = FileDrop(self)
 
         self.MinSize = conf.MinWindowSize
         if conf.WindowPosition and conf.WindowSize:
