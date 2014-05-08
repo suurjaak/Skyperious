@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  01.03.2014
+@modified  20.04.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -26,6 +26,8 @@ Q3 = '"""'
 APPICONS = {
   "Icon16x16_8bit.png":  "Skyperious application 16x16 icon, 8-bit colour.",
   "Icon16x16_32bit.png": "Skyperious application 16x16 icon, 32-bit colour.",
+  "Icon24x24_8bit.png":  "Skyperious application 24x24 icon, 8-bit colour.",
+  "Icon24x24_32bit.png": "Skyperious application 24x24 icon, 32-bit colour.",
   "Icon32x32_8bit.png":  "Skyperious application 32x32 icon, 8-bit colour.",
   "Icon32x32_32bit.png": "Skyperious application 32x32 icon, 32-bit colour.",
   "Icon48x48_8bit.png":  "Skyperious application 48x48 icon, 8-bit colour.",

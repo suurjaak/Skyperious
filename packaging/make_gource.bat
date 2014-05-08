@@ -1,5 +1,5 @@
-:: Runs Gource on the local Git directory and converts result into mkv video.
-:: Note: intermediary .ppm file can easily be 10G+.
+:: Runs Gource on the local Git directory and converts result into mkv video
+:: with FFmpeg. Note: intermediary .ppm file can easily be 10G+.
 ::
 :: @author    Erki Suurjaak
 :: @created   13.01.2013

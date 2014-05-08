@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    17.06.2012
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -166,11 +166,10 @@ def get_cloud(text, additions=None):
     result = []
     words = re.findall("\w{%s,}" % LENGTH_MIN, text.lower(), re.UNICODE) \
             + (additions or [])
-    import main
-    commons = dict((i, i) for i in get_common_words(words))
+    commons = set(get_common_words(words))
     cloud = collections.defaultdict(lambda: 0)
-    # Add and count all non-common words
-    for i in filter(lambda x: x not in commons, words):
+    # Add and count all non-common and not wholly numeric words
+    for i in filter(lambda x: x not in commons and re.search("\D", x), words):
         cloud[i] += 1
     # Drop rare words and limit the number of words
     count_last = COUNT_MIN

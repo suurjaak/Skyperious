@@ -8,15 +8,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    04.05.2014
 ------------------------------------------------------------------------------
 """
+import ast
 import base64
 import collections
 import copy
 import cStringIO
 import datetime
 import hashlib
+import inspect
 import math
 import os
 import re
@@ -77,6 +79,9 @@ OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
 
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
+
+    TRAY_ICON = (images.Icon16x16_32bit if "linux" != sys.platform 
+                 else images.Icon24x24_32bit)
 
     def __init__(self):
         wx.Frame.__init__(self, parent=None, title=conf.Title, size=conf.WindowSize)
@@ -198,9 +203,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 for filename in filenames:
                     self.window.load_database_page(filename)
 
+        self.DropTarget = FileDrop(self)
         self.notebook.DropTarget = FileDrop(self)
 
-        self.MinSize = conf.WindowSizeMin
+        self.MinSize = conf.MinWindowSize
         if conf.WindowPosition and conf.WindowSize:
             if [-1, -1] != conf.WindowSize:
                 self.Size = conf.WindowSize
@@ -218,7 +224,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.trayicon = wx.TaskBarIcon()
         if conf.TrayIconEnabled:
-            self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+            self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         self.trayicon.Bind(wx.EVT_TASKBAR_LEFT_DCLICK, self.on_toggle_iconize)
         self.trayicon.Bind(wx.EVT_TASKBAR_LEFT_DOWN, self.on_open_tray_search)
         self.trayicon.Bind(wx.EVT_TASKBAR_RIGHT_DOWN, self.on_open_tray_menu)
@@ -271,9 +277,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         if not conf.UpdateCheckAutomatic: 
             return
-        interval = conf.UpdateCheckInterval
+        interval = datetime.timedelta(days=conf.UpdateCheckInterval)
         due_date = datetime.datetime.now() - interval
-        if not support.update_window \
+        if not (conf.WindowIconized or support.update_window) \
         and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
             callback = lambda resp: self.on_check_update_callback(resp, False)
             support.check_newest_version(callback)
@@ -325,7 +331,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.WindowPosition = self.Position[:]
             if not conf.TrayIconEnabled:
                 conf.TrayIconEnabled = True
-                self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+                self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         else:
             self.Iconize(False), self.Show(), self.Raise()
 
@@ -339,7 +345,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.TrayIconEnabled = event.IsChecked() if event else True
         self.menu_tray.Check(conf.TrayIconEnabled)
         if conf.TrayIconEnabled:
-            self.trayicon.SetIcon(images.Icon16x16_32bit.Icon, conf.Title)
+            self.trayicon.SetIcon(self.TRAY_ICON.Icon, conf.Title)
         else:
             self.trayicon.RemoveIcon()
         if conf.WindowIconized:
@@ -356,7 +362,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu = wx.Menu()
         item_search = wx.MenuItem(menu, -1, "&Search for..")
         font = item_search.Font
-        font.SetWeight(wx.BOLD)
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
         font.SetFaceName(self.Font.FaceName)
         font.SetPointSize(self.Font.PointSize)
         item_search.Font = font
@@ -402,8 +408,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.WindowSize = [-1, -1] if self.IsMaximized() else self.Size[:]
         conf.save()
         event.Skip()
-        l = self.list_db
-        wx.CallAfter(lambda: self and l.SetColumnWidth(0, l.Size.width - 5))
+        l, p = self.list_db, self.panel_db_main.Parent # Right panel scroll
+        fn = lambda: self and (p.Layout(), l.SetColumnWidth(0, l.Size[1] - 5))
+        wx.CallAfter(fn)
 
 
     def on_move(self, event):
@@ -501,7 +508,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             list_db.SetUserLineHeight(int(h * 1.5))
         list_db.Select(0)
 
-        panel_right = wx.Panel(page)
+        panel_right = wx.lib.scrolledpanel.ScrolledPanel(page)
         panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         panel_main = self.panel_db_main = wx.Panel(panel_right)
@@ -577,6 +584,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for c in list(panel_main.Children) + list(panel_detail.Children) + \
         [panel_main, panel_detail]:
            c.BackgroundColour = page.BackgroundColour 
+        panel_right.SetupScrolling(scroll_x=False)
         panel_detail.Hide()
 
         list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
@@ -640,6 +648,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_file.AppendMenu(id=wx.NewId(), text="&Recent databases",
             submenu=menu_recent, help="Recently opened databases.")
         menu_file.AppendSeparator()
+        menu_options = self.menu_options = \
+            menu_file.Append(id=wx.NewId(), text="&Advanced options",
+                help="Edit advanced program options")
         menu_iconize = self.menu_iconize = \
             menu_file.Append(id=wx.NewId(), text="Minimize to &tray",
                 help="Minimize %s window to notification area" % conf.Title)
@@ -654,7 +665,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             help="Check whether a new version of %s is available" % conf.Title)
         menu_feedback = self.menu_feedback = menu_help.Append(id=wx.NewId(),
             text="Send &feedback",
-            help="Send feedback or report errors to program author")
+            help="Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(id=wx.NewId(),
             text="Go to &homepage",
             help="Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
@@ -693,6 +704,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_error_reporting.Check(conf.ErrorReportsAutomatic)
 
         self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
+        self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
         self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
         self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
         self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
@@ -1076,8 +1088,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
         if do_singlefile:
             db = self.load_database(self.db_filename)
-            base = db.id if db else os.path.basename(self.db_filename)
-            default = "Export from %s" % util.safe_filename(base)
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(self.db_filename)
+            if db and db.account: formatargs.update(db.account)
+            default = util.safe_filename(conf.ExportDbTemplate % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -1096,8 +1110,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not error and not do_singlefile:
                 extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
                 format = extname
-                base = db.id or os.path.basename(db.filename)
-                folder = "Export from %s" % util.safe_filename(base)
+                formatargs = collections.defaultdict(str)
+                formatargs["skypename"] = os.path.basename(self.db_filename)
+                if db.account: formatargs.update(db.account)
+                folder = util.safe_filename(conf.ExportDbTemplate % formatargs)
                 export_dir = util.unique_path(os.path.join(dirname, folder))
                 try:
                     os.mkdir(export_dir)
@@ -1252,6 +1268,36 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu.Popup(pt_btn, self)
 
 
+    def on_open_options(self, event):
+        """
+        Handler for opening advanced options, creates the property dialog
+        and saves values.
+        """
+        dialog = controls.PropertyDialog(self, title="Advanced options")
+        def get_field_doc(name, tree=ast.parse(inspect.getsource(conf))):
+            """Returns the docstring immediately before name assignment."""
+            for i, node in enumerate(tree.body):
+                if i and ast.Assign == type(node) and node.targets[0].id == name:
+                    prev = tree.body[i - 1]
+                    if ast.Expr == type(prev) and ast.Str == type(prev.value):
+                        return prev.value.s.strip()
+            return ""
+
+        for name in sorted(conf.OptionalFileDirectives):
+            value, help = getattr(conf, name, None), get_field_doc(name)
+            default = conf.OptionalFileDirectiveDefaults.get(name)
+            if value is None and default is None:
+                continue # continue for name
+            kind = wx.Size if isinstance(value, (tuple, list)) else type(value)
+            dialog.AddProperty(name, value, help, default, kind)
+        dialog.Realize()
+
+        if wx.ID_OK == dialog.ShowModal():
+            [setattr(conf, k, v) for k, v in dialog.GetProperties()]
+            conf.save()
+            self.MinSize = conf.MinWindowSize
+
+
     def on_open_database(self, event):
         """
         Handler for open database menu or button, displays a file dialog and
@@ -1372,8 +1418,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not self.panel_db_detail.Shown:
                 self.panel_db_main.Hide()
                 self.panel_db_detail.Show()
-                self.panel_db_detail.ContainingSizer.Layout()
-                wx.CallAfter(self.panel_db_main.ContainingSizer.Layout)
+                self.panel_db_detail.Parent.Layout()
             if os.path.exists(filename):
                 sz = os.path.getsize(filename)
                 dt = datetime.datetime.fromtimestamp(os.path.getmtime(filename))
@@ -1395,8 +1440,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.db_filename = None
             self.panel_db_main.Show()
             self.panel_db_detail.Hide()
-            self.panel_db_main.ContainingSizer.Layout()
-            wx.CallAfter(self.panel_db_main.ContainingSizer.Layout)
+            self.panel_db_main.Parent.Layout()
         # Save last selected files in db lists, to reselect them on rerun
         del conf.LastSelectedFiles[:]
         selected = self.list_db.GetFirstSelected()
@@ -1493,7 +1537,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 response = wx.MessageBox(
                     "Some tables in %s have unsaved data (%s).\n\n"
                     "Save changes before closing?" % (
-                        page.db, ", ".join(sorted(g.table for g in unsaved))
+                        page.db, ", ".join(sorted(x.table for x in unsaved))
                     ), conf.Title,
                     wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION
                 )
@@ -1849,9 +1893,9 @@ class DatabasePage(wx.Panel):
         )
 
         self.TopLevelParent.page_db_latest = self
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "page = self.page_db_latest # Database tab")
-        self.TopLevelParent.console.run("db = page.db # Skype database")
+        self.TopLevelParent.run_console("db = page.db # Skype database")
 
         self.Layout()
         self.toggle_filter(True)
@@ -2147,8 +2191,13 @@ class DatabasePage(wx.Panel):
 
         panel1 = wx.Panel(parent=splitter)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer1.Add(wx.StaticText(parent=panel1,
-            label="&Tables:"), border=5, flag=wx.LEFT | wx.TOP | wx.BOTTOM)
+        sizer_topleft = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_topleft.Add(wx.StaticText(parent=panel1, label="&Tables:"),
+                          flag=wx.ALIGN_CENTER_VERTICAL)
+        button_refresh = self.button_refresh_tables = \
+            wx.Button(panel1, label="Refresh")
+        sizer_topleft.AddStretchSpacer()
+        sizer_topleft.Add(button_refresh)
         tree = self.tree_tables = wx.gizmos.TreeListCtrl(
             parent=panel1,
             style=wx.TR_DEFAULT_STYLE
@@ -2164,8 +2213,10 @@ class DatabasePage(wx.Panel):
         tree.AddRoot("Loading data..")
         tree.SetMainColumn(0)
         tree.SetColumnAlignment(1, wx.ALIGN_RIGHT)
-        self.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_change_list_tables, tree)
+        self.Bind(wx.EVT_BUTTON, self.on_refresh_tables, button_refresh)
+        self.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_change_tree_tables, tree)
 
+        sizer1.Add(sizer_topleft, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
         sizer1.Add(tree, proportion=1,
                    border=5, flag=wx.GROW | wx.LEFT | wx.TOP | wx.BOTTOM)
 
@@ -2464,7 +2515,7 @@ class DatabasePage(wx.Panel):
 
     def create_page_info(self, notebook):
         """Creates a page for seeing general database information."""
-        page = self.page_info = wx.Panel(parent=notebook)
+        page = self.page_info = wx.lib.scrolledpanel.ScrolledPanel(notebook)
         self.pageorder[page] = len(self.pageorder)
         notebook.AddPage(page, "Information")
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -2549,6 +2600,7 @@ class DatabasePage(wx.Panel):
         sizer.Add(panel2, proportion=1, border=5,
                   flag=wx.RIGHT | wx.TOP | wx.BOTTOM | wx.GROW)
         self.update_accountinfo()
+        page.SetupScrolling()
 
 
     def on_check_integrity(self, event):
@@ -2562,8 +2614,9 @@ class DatabasePage(wx.Panel):
         wx.YieldIfNeeded()
         try:
             errors = self.db.check_integrity()
-        finally:
-            busy.Close()
+        except Exception as e:
+            errors = [e.message]
+        busy.Close()
         main.status_flash("")
         if not errors:
             wx.MessageBox("No database errors detected.",
@@ -2668,7 +2721,7 @@ class DatabasePage(wx.Panel):
         if conf.SearchHistory[-1:] == [""]: # Clear empty search flag
             conf.SearchHistory = conf.SearchHistory[:-1]
         util.add_unique(conf.SearchHistory, self.edit_searchall.Value,
-                        1, conf.SearchHistoryMax)
+                        1, conf.MaxSearchHistory)
 
         # Save last search results HTML
         search_data = self.html_searchall.GetActiveTabData()
@@ -2774,6 +2827,64 @@ class DatabasePage(wx.Panel):
             self.edit_info_sha1.Value = self.edit_info_md5.Value = u"%s" % e
         self.button_check_integrity.Enabled = True
         self.button_refresh_fileinfo.Enabled = True
+
+
+    def on_refresh_tables(self, event):
+        """
+        Refreshes the table tree and open table data. Asks for confirmation
+        if there are uncommitted changes.
+        """
+        do_refresh, unsaved = True, self.get_unsaved_grids()
+        if unsaved:
+            response = wx.MessageBox("Some tables have unsaved data (%s).\n\n"
+                "Save before refreshing (changes will be lost otherwise)?"
+                % (", ".join(sorted(x.table for x in unsaved))), conf.Title,
+                wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION)
+            if wx.YES == response:
+                self.save_unsaved_grids()
+            elif wx.CANCEL == response:
+                do_refresh = False
+        if do_refresh:
+            self.db.clear_cache()
+            self.db_grids.clear()
+            self.load_tables_data()
+            if self.grid_table.Table:
+                grid, table_name = self.grid_table, self.grid_table.Table.table
+                scrollpos = map(grid.GetScrollPos, [wx.HORIZONTAL, wx.VERTICAL])
+                cursorpos = grid.GridCursorCol, grid.GridCursorRow
+                self.on_change_table(None)
+                grid.Table = wx.grid.PyGridTableBase() # Clear grid visually
+                grid.Freeze()
+                grid.Table = None # Reset grid data to empty
+
+                tableitem = None
+                table_name = table_name.lower()
+                table = next((t for t in self.db.get_tables()
+                              if t["name"].lower() == table_name), None)
+                item = self.tree_tables.GetNext(self.tree_tables.RootItem)
+                while table and item and item.IsOk():
+                    table2 = self.tree_tables.GetItemPyData(item)
+                    if table2 and table2.lower() == table["name"].lower():
+                        tableitem = item
+                        break # break while table and item and itek.IsOk()
+                    item = self.tree_tables.GetNextSibling(item)
+                if tableitem:
+                    # Only way to create state change in wx.gizmos.TreeListCtrl
+                    class HackEvent(object):
+                        def __init__(self, item): self._item = item
+                        def GetItem(self):        return self._item
+                    self.on_change_tree_tables(HackEvent(tableitem))
+                    self.tree_tables.SelectItem(tableitem)
+                    grid.Scroll(*scrollpos)
+                    grid.SetGridCursor(*cursorpos)
+                else:
+                    self.label_table.Label = ""
+                    for x in [wx.ID_ADD, wx.ID_DELETE, wx.ID_UNDO, wx.ID_SAVE]:
+                        self.tb_grid.EnableTool(x, False)
+                    self.button_reset_grid_table.Enabled = False
+                    self.button_export_table.Enabled = False
+                grid.Thaw()
+                self.page_tables.Refresh()
 
 
     def on_change_import_resultfilter(self, event):
@@ -2966,6 +3077,11 @@ class DatabasePage(wx.Panel):
                 self.skype_handler.add_to_contacts(c["user"] for c in contacts)
                 main.logstatus_flash("Added %s to your Skype contacts (%s).",
                                      util.plural("person", contacts), info)
+            except Exception as e:
+                msg = "Error adding contacts:\n\n%s" % traceback.format_exc()
+                main.logstatus_flash(msg)
+                wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                wx.CallAfter(support.report_error, msg)
             finally:
                 busy.Close()
 
@@ -2995,8 +3111,9 @@ class DatabasePage(wx.Panel):
         Handler for clicking to export a chat, displays a save file dialog and
         saves the current messages to file.
         """
-        default = "Skype %s" % self.chat["title_long_lc"]
-        self.dialog_savefile.Filename = util.safe_filename(default)
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = util.safe_filename(conf.ExportChatTemplate % formatargs)
+        self.dialog_savefile.Filename = default
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
@@ -3096,8 +3213,10 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
         if chats and do_singlefile:
-            base = self.db.id or os.path.basename(self.db.filename)
-            default = "Export from %s" % util.safe_filename(base)
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(self.db.filename)
+            formatargs.update(self.db.account or {})
+            default = util.safe_filename(conf.ExportDbTemplate % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
@@ -3142,7 +3261,8 @@ class DatabasePage(wx.Panel):
         Handler for clicking to export a chat filtering straight to file,
         displays a save file dialog and saves all filtered messages to file.
         """
-        default = "Skype %s" % self.chat["title_long_lc"]
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = conf.ExportChatTemplate % formatargs
         self.dialog_savefile.Filename = util.safe_filename(default)
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
@@ -3343,7 +3463,7 @@ class DatabasePage(wx.Panel):
                     table2 = self.tree_tables.GetItemPyData(item)
                     if table2 and table2.lower() == table["name"].lower():
                         tableitem = item
-                        break # break while item and itek.IsOk()
+                        break # break while table and item and itek.IsOk()
                     item = self.tree_tables.GetNextSibling(item)
                 if tableitem:
                     self.notebook.SetSelection(self.pageorder[self.page_tables])
@@ -3352,7 +3472,7 @@ class DatabasePage(wx.Panel):
                     class HackEvent(object):
                         def __init__(self, item): self._item = item
                         def GetItem(self):        return self._item
-                    self.on_change_list_tables(HackEvent(tableitem))
+                    self.on_change_tree_tables(HackEvent(tableitem))
                     if self.tree_tables.Selection != tableitem:
                         self.tree_tables.SelectItem(tableitem)
                         wx.YieldIfNeeded()
@@ -3361,6 +3481,7 @@ class DatabasePage(wx.Panel):
                         grid.Table.ClearSort(refresh=False)
                         grid.Table.ClearFilter()
                     # Search for matching row and scroll to it.
+                    table["columns"] = self.db.get_table_columns(table_name)
                     id_fields = [c["name"] for c in table["columns"]
                                  if c.get("pk_id")]
                     if not id_fields: # No primary key fields: take all
@@ -3562,7 +3683,7 @@ class DatabasePage(wx.Panel):
 
             self.notebook.SetSelection(self.pageorder[self.page_search])
             util.add_unique(conf.SearchHistory, text.strip(), 1,
-                            conf.SearchHistoryMax)
+                            conf.MaxSearchHistory)
             self.TopLevelParent.dialog_search.Value = conf.SearchHistory[-1]
             self.TopLevelParent.dialog_search.SetChoices(conf.SearchHistory)
             self.edit_searchall.SetChoices(conf.SearchHistory)
@@ -3843,10 +3964,11 @@ class DatabasePage(wx.Panel):
 
     def on_button_sql(self, event):
         """
-        Handler for clicking to run an SQL query, runs the query, displays its
-        results, if any, and commits changes done, if any.
+        Handler for clicking to run an SQL query, runs the selected text or
+        whole contents, displays its results, if any, and commits changes 
+        done, if any.
         """
-        sql = self.stc_sql.Text.strip()
+        sql = self.stc_sql.SelectedText.strip() or self.stc_sql.Text.strip()
         if sql:
             self.execute_sql(sql)
 
@@ -4001,7 +4123,7 @@ class DatabasePage(wx.Panel):
         self.tb_grid.EnableTool(wx.ID_UNDO, self.grid_table.Table.IsChanged())
 
 
-    def on_change_list_tables(self, event):
+    def on_change_tree_tables(self, event):
         """
         Handler for selecting an item in the tables list, loads the table data
         into the table grid.
@@ -4017,7 +4139,7 @@ class DatabasePage(wx.Panel):
             i = self.tree_tables.GetNext(self.tree_tables.RootItem)
             while i:
                 text = self.tree_tables.GetItemText(i).lower()
-                bgcolour = (conf.DBTableOpenedColour if text == table
+                bgcolour = (conf.DBTableOpenedColour if text == lower
                             else conf.BgColour)
                 self.tree_tables.SetItemBackgroundColour(i, bgcolour)
                 i = self.tree_tables.GetNextSibling(i)
@@ -4040,8 +4162,14 @@ class DatabasePage(wx.Panel):
                 self.tb_grid.EnableTool(wx.ID_DELETE, True)
                 self.button_export_table.Enabled = True
                 self.button_reset_grid_table.Enabled = True
-            finally:
                 busy.Close()
+            except Exception as e:
+                busy.Close()
+                errormsg = "Could not load table %s.\n\n%s" % \
+                           (table, traceback.format_exc())
+                main.logstatus_flash(errormsg)
+                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+                wx.CallAfter(support.report_error, errormsg)
 
 
     def on_change_list_chats(self, event):
@@ -4264,12 +4392,6 @@ class DatabasePage(wx.Panel):
         self.label_title.Label = "Database \"%s\":" % self.db
 
         try:
-            # Populate the chats list
-            self.chats = self.db.get_conversations()
-            for c in self.chats:
-                c["people"] = "" # Set empty data, stats will come later
-            self.list_chats.Populate(self.chats)
-
             # Restore last search text, if any
             if conf.SearchHistory and conf.SearchHistory[-1] != "":
                 self.edit_searchall.Value = conf.SearchHistory[-1]
@@ -4277,6 +4399,8 @@ class DatabasePage(wx.Panel):
                 # Clear the empty search flag
                 conf.SearchHistory = conf.SearchHistory[:-1]
             self.edit_searchall.SetChoices(conf.SearchHistory)
+
+            # Restore last cached search results page
             last_search = conf.LastSearchResults.get(self.db.filename)
             if last_search:
                 title = last_search.get("title", "")
@@ -4285,16 +4409,21 @@ class DatabasePage(wx.Panel):
                 tabid = wx.NewId() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
 
+            # Populate the chats list
+            self.chats = self.db.get_conversations()
+            for c in self.chats:
+                c["people"] = "" # Set empty data, stats will come later
+            self.list_chats.Populate(self.chats)
+
             wx.CallLater(100, self.load_later_data)
         except Exception as e:
             wx.CallAfter(self.update_tabheader)
             errormsg = "Could not load chat list from %s.\n\n%s" % \
                        (self.db, traceback.format_exc())
             main.logstatus_flash(errormsg)
-            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             wx.CallAfter(support.report_error, errormsg)
-        self.update_info_page(reload=False)
-        wx.CallLater(200, self.load_table_data)
+        wx.CallLater(500, self.update_info_page, False)
+        wx.CallLater(200, self.load_tables_data)
 
 
     def load_later_data(self):
@@ -4322,15 +4451,14 @@ class DatabasePage(wx.Panel):
                               self.chat["last_message_datetime"].date()
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
+            main.status_flash("Opened Skype database %s.", self.db)
         except Exception as e:
             if self:
                 errormsg = "Error loading additional data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
-                main.log(errormsg)
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+                main.logstatus_flash(errormsg)
                 wx.CallAfter(support.report_error, errormsg)
         if self:
-            main.status_flash("Opened Skype database %s.", self.db)
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(), l.RefreshRows(),
                                         l.SortListItems(4, 0))
@@ -4338,7 +4466,7 @@ class DatabasePage(wx.Panel):
             wx.CallAfter(self.update_tabheader)
 
 
-    def load_table_data(self):
+    def load_tables_data(self):
         """Loads table data into table tree and SQL editor."""
         try:
             tables = self.db.get_tables()
@@ -4494,9 +4622,9 @@ class MergerPage(wx.Panel):
         notebook.SetPageImage(2, idx3)
 
         self.TopLevelParent.page_merge_latest = self
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "page12 = self.page_merge_latest # Merger tab")
-        self.TopLevelParent.console.run(
+        self.TopLevelParent.run_console(
             "db1, db2 = page12.db1, page12.db2 # Chosen Skype databases")
 
         self.Layout()
@@ -4506,7 +4634,7 @@ class MergerPage(wx.Panel):
 
     def create_page_merge_all(self, notebook):
         """Creates a page for merging all chats at once."""
-        page = self.page_merge_all = wx.Panel(parent=notebook)
+        page = self.page_merge_all = wx.lib.scrolledpanel.ScrolledPanel(notebook)
         self.pageorder[page] = len(self.pageorder)
         notebook.AddPage(page, "Merge all")
 
@@ -4559,6 +4687,7 @@ class MergerPage(wx.Panel):
         sizer.Add(html, proportion=1, border=30, flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.GROW)
         sizer_top.AddGrowableCol(0)
         sizer_top.AddGrowableCol(2)
+        page.SetupScrolling()
 
         button_scan.Bind(wx.EVT_BUTTON, self.on_scan_all)
         button_merge.Bind(wx.EVT_BUTTON, self.on_merge_all)
@@ -4619,7 +4748,7 @@ class MergerPage(wx.Panel):
             parent=panel2, style=wx.BORDER_NONE)
         splitter_diff.SetMinimumPaneSize(350)
         panel_stc1 = self.panel_stc1 = wx.Panel(parent=splitter_diff)
-        panel_stc2 = self.panel_stc2 = wx.Panel(parent=splitter_diff)
+        panel_stc2 = self.panel_stc2 = wx.lib.scrolledpanel.ScrolledPanel(splitter_diff)
         panel_stc2.BackgroundColour = conf.BgColour
         sizer_stc1 = panel_stc1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_stc2 = panel_stc2.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4659,6 +4788,7 @@ class MergerPage(wx.Panel):
                                       sashPosition=self.Size.width)
         splitter.SplitHorizontally(panel1, panel2,
                                    sashPosition=self.Size.height / 3)
+        panel_stc2.SetupScrolling()
 
 
     def create_page_merge_contacts(self, notebook):
@@ -4673,7 +4803,7 @@ class MergerPage(wx.Panel):
         )
         splitter.SetMinimumPaneSize(350)
         panel1 = wx.Panel(parent=splitter)
-        panel2 = wx.Panel(parent=splitter)
+        panel2 = wx.lib.scrolledpanel.ScrolledPanel(splitter)
         panel2.BackgroundColour = conf.BgColour
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4732,6 +4862,7 @@ class MergerPage(wx.Panel):
         sizer.AddSpacer(10)
         sizer.Add(splitter, proportion=1, border=5,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
+        panel2.SetupScrolling()
 
 
     def split_panels(self):
@@ -4756,7 +4887,8 @@ class MergerPage(wx.Panel):
         Handler for clicking to export a chat diff, displays a save file dialog
         and saves the current messages to file.
         """
-        default = "Diff of Skype %s" % self.chat["title_long_lc"]
+        formatargs = collections.defaultdict(str); formatargs.update(self.chat)
+        default = "Diff of %s" % conf.ExportChatTemplate % formatargs
         dialog = wx.FileDialog(parent=self, message="Save new messages",
             defaultDir=os.getcwd(), defaultFile=util.safe_filename(default),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER

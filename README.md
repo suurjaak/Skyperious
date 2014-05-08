@@ -97,7 +97,7 @@ http://suurjaak.github.com/Skyperious/downloads.html.
 
 ### Mac ###
 
-* install [Homebrew](brew.sh)
+* install [Homebrew](http://brew.sh)
 * install Python: open a terminal and run `brew install python2`
 * install wxPython: run `brew install --python wxmac --devel`
   (or use a suitable binary from http://wxpython.org/download.php)

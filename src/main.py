@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -29,9 +29,6 @@ import time
 import traceback
 
 try:
-    import guibase
-    import skyperious
-    import support
     import wx
     is_gui_possible = True
 except ImportError:
@@ -46,6 +43,10 @@ import export
 import skypedata
 import util
 import workers
+if is_gui_possible:
+    import guibase
+    import skyperious
+    import support
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
@@ -333,8 +334,10 @@ def run_export(filenames, format):
     is_xlsx_single = ("xlsx_single" == format)
 
     for db in dbs:
-        base = db.id or os.path.basename(db.filename)
-        basename = "Export from %s" % util.safe_filename(base)
+        formatargs = collections.defaultdict(str)
+        formatargs["skypename"] = os.path.basename(db.filename)
+        formatargs.update(db.account or {})
+        basename = util.safe_filename(conf.ExportDbTemplate % formatargs)
         dbstr = "from %s " % db if len(dbs) != 1 else ""
         if is_xlsx_single:
             export_dir = os.getcwd()
@@ -423,7 +426,6 @@ def run_diff(filename1, filename2):
 def run_gui(filenames):
     """Main GUI program entrance."""
     global deferred_logs, deferred_status, window
-    conf.load()
 
     # Values in some threads would otherwise not be the same
     sys.modules["main"].deferred_logs = deferred_logs
@@ -438,14 +440,14 @@ def run_gui(filenames):
     except: pass
 
     # Some debugging support
-    window.console.run("import datetime, os, re, time, sys, wx")
-    window.console.run("# All %s modules:" % conf.Title)
-    window.console.run("import conf, controls, emoticons, export, guibase, "
+    window.run_console("import datetime, os, re, time, sys, wx")
+    window.run_console("# All %s modules:" % conf.Title)
+    window.run_console("import conf, controls, emoticons, export, guibase, "
                        "images, main, searchparser, skypedata, skyperious, "
                        "support, templates, util, wordcloud, workers, "
                        "wx_accel")
 
-    window.console.run("self = main.window # Application main window instance")
+    window.run_console("self = main.window # Application main window instance")
     log("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
@@ -496,6 +498,7 @@ def run(argv):
               conf.Title)
         sys.exit()
     elif "gui" != arguments.command:
+        conf.load()
         is_cli = sys.modules["main"].is_cli = True
         is_verbose = sys.modules["main"].is_verbose = arguments.verbose
         enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"

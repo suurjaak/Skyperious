@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.03.2014
+@modified    08.05.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.1"
-VersionDate = "02.03.2014"
+Version = "3.2"
+VersionDate = "08.05.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -52,6 +52,14 @@ FileDirectiveCompatiblity = {
     "SearchInNewTab" : "SearchUseNewTab",
     "SearchInMessageBody": "SearchInMessages",
 }
+"""List of attributes saved if changed from default."""
+OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
+    "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
+    "MaxSearchTableRows", "SearchContactsChunk", "SearchResultsChunk",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+]
+OptionalFileDirectiveDefaults = {}
 
 """---------------------------- FileDirectives: ----------------------------"""
 
@@ -109,6 +117,12 @@ SearchInTables = False
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
 
+"""Chat export filename template, format can use Skype.Conversations data."""
+ExportChatTemplate = u"Skype %(title_long_lc)s"
+
+"""Database export filename template, format can use Skype.Accounts data."""
+ExportDbTemplate = u"Export from %(fullname)s"
+
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
@@ -122,20 +136,21 @@ WindowIconized = False
 WindowPosition = None
 
 """Main window size in pixels, [w, h] or [-1, -1] for maximized."""
-WindowSize = [1080, 710]
+WindowSize = (1080, 710)
 
 """---------------------------- /FileDirectives ----------------------------"""
 
 """Whether logging to log window is enabled."""
 LogEnabled = True
 
-"""Whether to log all SQL statements."""
+"""Whether to log all SQL statements to log window."""
 LogSQL = False
 
-"""URLs for download list, changelog and submitting feedback."""
+"""URLs for download list, changelog, submitting feedback and homepage."""
 DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
 ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
 ReportURL    = "http://erki.lap.ee/downloads/Skyperious/feedback"
+HomeUrl = "http://suurjaak.github.com/Skyperious/"
 
 """Maximum number of error reports sent per day."""
 ErrorReportsPerDay = 5
@@ -143,50 +158,43 @@ ErrorReportsPerDay = 5
 """Maximum number of error hashes and report days to keep."""
 ErrorsStoredMax = 1000
 
-"""Minimum allowed size of the main window (w, h)."""
-WindowSizeMin = (950, 650) if "linux2" != sys.platform else (950, 810)
+"""Minimum allowed size for the main window, as (width, height)."""
+MinWindowSize = (600, 400)
 
-"""Console window size in pixels, (w, h)."""
+"""Console window size in pixels, (width, height)."""
 ConsoleSize = (800, 300)
 
-"""Maximum number of commands to store for console history."""
-ConsoleHistoryMax = 1000
+"""Maximum number of console history commands to store."""
+MaxConsoleHistory = 1000
 
-"""Maximum number of search texts to remember."""
-SearchHistoryMax = 500
+"""Maximum number of search texts to store."""
+MaxSearchHistory = 500
 
-"""Time interval to keep between update checks, a datetime.timedelta."""
-UpdateCheckInterval = datetime.timedelta(days=7)
+"""Days between automatic update checks."""
+UpdateCheckInterval = 7
 
 """Date string of last time updates were checked."""
 LastUpdateCheck = None
 
-"""
-Maximum number of messages shown in the chat history initially, before user
-filtering.
-"""
+"""Maximum number of messages shown initially in chat history."""
 MaxHistoryInitialMessages = 1500
 
 """Maximum length of a tab title, overflow will be cut on the left."""
 MaxTabTitleLength = 60
 
 """
-Maximum number of messages to show in search results (wx.html.HtmlWindow has
-trouble showing long documents).
+Maximum number of messages to show in search results.
 """
-SearchMessagesMax = 500
+MaxSearchMessages = 500
 
 """Maximum number of table rows to show in search results."""
-SearchTableRowsMax = 500
+MaxSearchTableRows = 500
 
-"""How many search results to yield in one chunk from search thread."""
+"""Number of search results to yield in one chunk from search thread."""
 SearchResultsChunk = 50
 
-"""
-How many contact search results to yield in one chunk from contacts search
-thread.
-"""
-ContactResultsChunk = 10
+"""Number of contact search results to yield in one chunk."""
+SearchContactsChunk = 10
 
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"
@@ -294,9 +302,6 @@ PlotFilesColour = "#33DD66"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
-"""Skyperious homepage URL."""
-HomeUrl = "http://suurjaak.github.com/Skyperious/"
-
 """
 Width and height tuple of the avatar image, shown in chat data and export HTML
 statistics."""
@@ -305,8 +310,8 @@ AvatarImageSize = (32, 32)
 """Width and height tuple of the large avatar image, shown in HTML export."""
 AvatarImageLargeSize = (96, 96)
 
-"""Length of the chat statistics plots, in pixels."""
-PlotWidth = 350
+"""Width of the chat statistics plots, in pixels."""
+StatisticsPlotWidth = 350
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000
@@ -347,6 +352,11 @@ def load():
             [setattr(module, name, v) for s, v in [parse_value(oldname)] if s]
         for name in FileDirectives:
             [setattr(module, name, v) for s, v in [parse_value(name)] if s]
+        for name in OptionalFileDirectives:
+            OptionalFileDirectiveDefaults[name] = getattr(module, name, None)
+            success, value = parse_value(name)
+            if success:
+                setattr(module, name, value)
     except Exception:
         pass # Fail silently
 
@@ -366,6 +376,13 @@ def save():
             try:
                 value = getattr(module, name)
                 parser.set(section, name, json.dumps(value))
+            except Exception:
+                pass
+        for name in OptionalFileDirectives:
+            try:
+                value = getattr(module, name, None)
+                if OptionalFileDirectiveDefaults.get(name) != value:
+                    parser.set(section, name, json.dumps(value))
             except Exception:
                 pass
         parser.write(f)

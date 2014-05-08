@@ -19,6 +19,10 @@ Stand-alone GUI components for wx:
   Inspired by wx.CommandLinkButton, which does not support custom icons
   (at least not of wx 2.9.4).
 
+- PropertyDialog(wx.Dialog):
+  Dialog for displaying an editable property grid. Supports strings,
+  integers, booleans, and tuples interpreted as wx.Size.
+
 - ProgressWindow(wx.Dialog):
   A simple non-modal ProgressDialog, stays on top of parent frame.
 
@@ -60,9 +64,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    24.02.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
+import ast
 import collections
 import datetime
 import locale
@@ -593,6 +598,149 @@ class NoteButton(wx.PyPanel, wx.Button):
     def GetNote(self):
         return self._note
     Note = property(GetNote, SetNote)
+
+
+
+class PropertyDialog(wx.Dialog):
+    """
+    Dialog for displaying an editable property grid. Supports strings,
+    integers, booleans, and wx classes like wx.Size interpreted as tuples.
+    """
+
+    COLOUR_ERROR = wx.RED
+
+    def __init__(self, parent, title):
+        wx.Dialog.__init__(self, parent=parent, title=title,
+                          style=wx.CAPTION | wx.CLOSE_BOX | wx.RESIZE_BORDER)
+        self.properties = [] # [(name, type, orig_val, default, label, ctrl), ]
+
+        panelwrap = wx.Panel(self)
+        panel = self.panel = wx.lib.scrolledpanel.ScrolledPanel(panelwrap)
+
+        button_save = wx.Button(panelwrap, label="Save")
+        button_reset = wx.Button(panelwrap, label="Restore defaults")
+        button_cancel = wx.Button(panelwrap, label="Cancel", id=wx.CANCEL)
+
+        self.Bind(wx.EVT_BUTTON, self._OnSave, button_save)
+        self.Bind(wx.EVT_BUTTON, self._OnReset, button_reset)
+        self.Bind(wx.EVT_BUTTON, self._OnCancel, button_cancel)
+
+        button_save.SetDefault()
+        self.SetEscapeId(wx.CANCEL)
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        panelwrap.Sizer = wx.BoxSizer(wx.VERTICAL)
+        panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_items = self.sizer_items = wx.GridBagSizer(hgap=5, vgap=1)
+
+        panel.Sizer.Add(sizer_items, proportion=1, border=5, flag=wx.GROW | wx.RIGHT)
+        panelwrap.Sizer.Add(panel, proportion=1, border=10, flag=wx.GROW | wx.ALL)
+        [sizer_buttons.Add(b, border=10, flag=wx.LEFT)
+         for b in (button_save, button_reset, button_cancel)]
+        panelwrap.Sizer.Add(sizer_buttons, border=10, flag=wx.ALL | wx.ALIGN_RIGHT)
+        self.Sizer.Add(panelwrap, proportion=1, flag=wx.GROW)
+
+        self.MinSize, self.Size = (320, 180), (420, 420)
+        self.BackgroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+
+
+    def AddProperty(self, name, value, help="", default=None, typeclass=unicode):
+        """Adds a property to the frame."""
+        row = len(self.properties) * 2
+        label = wx.StaticText(self.panel, label=name)
+        if bool == typeclass:
+            ctrl = wx.CheckBox(self.panel)
+            ctrl_flag = wx.ALIGN_CENTER_VERTICAL
+        else:
+            ctrl = wx.TextCtrl(self.panel, style=wx.BORDER_SIMPLE)
+            ctrl_flag = wx.GROW | wx.ALIGN_CENTER_VERTICAL
+        tip = wx.StaticText(self.panel, label=help)
+
+        ctrl.Value = self._GetValueForCtrl(value, typeclass)
+        ctrl.ToolTipString = label.ToolTipString = "Type %s%s." % (
+            typeclass.__name__,
+            "" if default is None else ", default value %s" % (default, ))
+        tip.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+        tipfont, tipfont.PixelSize = tip.Font, (0, 9)
+        tip.Font = tipfont
+
+        self.sizer_items.Add(label, pos=(row, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+        self.sizer_items.Add(ctrl, pos=(row, 1), flag=ctrl_flag)
+        self.sizer_items.Add(tip, pos=(row + 1, 0), span=(1, 2),
+                             flag=wx.BOTTOM, border=3)
+        self.properties.append((name, typeclass, value, default, label, ctrl))
+
+
+    def Realize(self):
+        """Lays out the properties, to be called when adding is completed."""
+        self.panel.SetupScrolling(scroll_x=False)
+        self.sizer_items.AddGrowableCol(1) # Grow ctrl column
+
+
+    def GetProperties(self):
+        """
+        Returns the current legal property values, as [(name, value), ].
+        Illegal values are replaced with initial values.
+        """
+        result = []
+        for name, typeclass, orig, default, label, ctrl in self.properties:
+            value = self._GetValueForType(ctrl.Value, typeclass)
+            result.append((name, orig if value is None else value))
+        return result
+
+
+    def _OnSave(self, event):
+        """
+        Handler for clicking save, checks values and hides the dialog if all 
+        ok, highlights errors otherwise.
+        """
+        all_ok = True
+        for name, typeclass, orig, default, label, ctrl in self.properties:
+            if self._GetValueForType(ctrl.Value, typeclass) is None:
+                all_ok = False
+                label.ForegroundColour = ctrl.ForegroundColour = self.COLOUR_ERROR
+            else:                
+                label.ForegroundColour = ctrl.ForegroundColour = self.ForegroundColour
+        if all_ok:
+            self.Hide()
+            self.IsModal() and self.EndModal(wx.ID_OK)
+        else:
+            self.Refresh()
+
+
+    def _OnReset(self, event):
+        """Handler for clicking reset, restores default values if available."""
+        for name, typeclass, orig, default, label, ctrl in self.properties:
+            if default is not None:
+                ctrl.Value = self._GetValueForCtrl(default, typeclass)
+            if self.COLOUR_ERROR == ctrl.ForegroundColour:
+                label.ForegroundColour = ctrl.ForegroundColour = self.ForegroundColour
+        self.Refresh()
+
+
+    def _OnCancel(self, event):
+        """Handler for clicking cancel, hides the dialog."""
+        self.Hide()
+        self.IsModal() and self.EndModal(wx.ID_CANCEL)
+
+
+    def _GetValueForType(self, value, typeclass):
+        """Returns value in type expected, or None on failure."""
+        try:
+            result = typeclass(value) if "wx" not in typeclass.__module__ \
+                     else tuple(typeclass(*ast.literal_eval(value)))
+            isinstance(result, basestring) and result.strip()[0] # Reject empty
+            return result 
+        except StandardError as e:
+            return None
+
+
+    def _GetValueForCtrl(self, value, typeclass):
+        """Returns the value in type suitable for appropriate wx control."""
+        value = tuple(value) if isinstance(value, list) else value
+        return str(value) if int == typeclass or "wx" in typeclass.__module__ \
+               else "" if value is None else value
 
 
 

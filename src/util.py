@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    02.03.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -193,29 +193,49 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    base, ext = os.path.splitext(result)
+    if "linux" == sys.platform and isinstance(result, unicode) \
+    and "utf-8" != sys.getfilesystemencoding():
+        result = result.encode("utf-8") # Linux has trouble if locale not UTF-8
+    path, name = os.path.split(result)
+    base, ext = os.path.splitext(name)
+    if len(name) > 255: # Filesystem limitation
+        name = base[:255 - len(ext) - 2] + ".." + ext
+        result = os.path.join(path, name)
     counter = 2
     while os.path.exists(result):
-        result = "%s (%s)%s" % (base, counter, ext)
+        suffix = " (%s)%s" % (counter, ext)
+        name = base + suffix
+        if len(name) > 255:
+            name = base[:255 - len(suffix) - 2] + ".." + suffix
+        result = os.path.join(path, name)
         counter += 1
     return result
 
 
 def start_file(filepath):
-    """Tries to open the specified file."""
-    if "nt" == os.name:
-        try:
-            os.startfile(filepath)
-        except WindowsError as e:
-            if 1155 == e.winerror: # ERROR_NO_ASSOCIATION
-                cmd = "Rundll32.exe SHELL32.dll, OpenAs_RunDLL %s"
-                os.popen(cmd % filepath)
-            else:
-                raise
-    elif "mac" == os.name:
-        subprocess.call(("open", filepath))
-    elif "posix" == os.name:
-        subprocess.call(("xdg-open", filepath))
+    """
+    Tries to open the specified file.
+
+    @return  (success, error message)
+    """
+    success, error = True, ""
+    try:
+        if "nt" == os.name:
+            try:
+                os.startfile(filepath)
+            except WindowsError as e:
+                if 1155 == e.winerror: # ERROR_NO_ASSOCIATION
+                    cmd = "Rundll32.exe SHELL32.dll, OpenAs_RunDLL %s"
+                    os.popen(cmd % filepath)
+                else:
+                    raise
+        elif "mac" == os.name:
+            subprocess.call(("open", filepath))
+        elif "posix" == os.name:
+            subprocess.call(("xdg-open", filepath))
+    except Exception as e:
+        success, error = False, repr(e)
+    return success, error
 
 
 def is_os_64bit():

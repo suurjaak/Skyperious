@@ -9,7 +9,7 @@ GUI frame template:
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    19.02.2014
+@modified    27.04.2014
 """
 import os
 import wx
@@ -39,6 +39,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
         self.Bind(EVT_STATUS,   self.on_set_status)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
+        self.console_commands = set() # Commands from run_console()
         self.frame_console = wx.py.shell.ShellFrame(parent=self,
             title=u"%s Console" % conf.Title, size=conf.ConsoleSize)
         self.frame_console.Bind(wx.EVT_CLOSE, self.on_showhide_console)
@@ -122,9 +123,22 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
             wx.CallAfter(self.save_last_command)
 
 
+    def run_console(self, command):
+        """
+        Runs the command in the Python console. Will not be saved to console
+        commands history.
+        """
+        self.console.run(command)
+        self.console_commands.add(command)
+
+
     def save_last_command(self):
-        """Saves the last console command in conf."""
-        history = self.console.history[:conf.ConsoleHistoryMax][::-1]
+        """
+        Saves the last console command in conf, minus the commands given via
+        run_console().
+        """
+        h = [x for x in self.console.history if x not in self.console_commands]
+        history = h[:conf.MaxConsoleHistory][::-1]
         if history != conf.ConsoleHistoryCommands:
             conf.ConsoleHistoryCommands[:] = history
             conf.save()

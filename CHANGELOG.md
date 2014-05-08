@@ -1,6 +1,28 @@
 CHANGELOG
 =========
 
+3.2, 2014-05-08
+---------------
+- added menu item to configure advanced options;
+- added refresh button to database tables page;
+- made chat and database export filenames configuration-based;
+- fixed highlighting links in search results;
+- fixed filename encoding problems under Linux with no locale (issue #18);
+- fixed keeping export filename length in filesystem limit (issue #20);
+- added scroll support to decrease required minimum window size (issue #21);
+- added 24x24 icon for Linux system tray (issue #21);
+- fixed database opening crash in PLD Linux (issue #23);
+- fixed search results falsely highlighting negated query words;
+- fixed errors on searching over tables in non-Skype databases;
+- made entire application window a target for dragged-dropped files;
+- update notification no longer shown when program minimized to tray;
+- "Execute SQL" button in SQL window uses selected text, if any;
+- word cloud text not longer includes wholly numeric words;
+- dropped "Total time spent in calls" from chat statistics as duplicating "Calls";
+- dropped alert messages on opening a non-Skype database;
+- dropped alert messages on failing to open an export file;
+- auto-added console history no longer saved on exit.
+
 3.1, 2014-03-02
 ---------------
 - fixed a bug in showing merge results;

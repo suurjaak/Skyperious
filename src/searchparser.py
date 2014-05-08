@@ -21,7 +21,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    22.02.2014
+@modified    11.04.2014
 """
 import calendar
 import collections
@@ -181,15 +181,16 @@ class SearchQueryParser(object):
             elif "QUOTES" == name:
                 elements = self._flatten(elements)
             if do_recurse:
+                words_ptr = [] if negation else words # No words from negations
                 for i in elements:
-                    sql = self._makeSQL(i, words, keywords, sql_params,
+                    sql = self._makeSQL(i, words_ptr, keywords, sql_params,
                                        table, name)
                     parsed_elements.append(sql)
                 or_names = ["OR_OPERAND", "OR_EXPRESSION"]
                 glue = " OR " if name in or_names else " AND "
                 result, count = self._join_strings(parsed_elements, glue)
                 result = "(%s)"   % result if count > 1 else result
-                result = "NOT %s" % result if negation  else result
+                result = "NOT %s" % result if negation else result
         else:
             words.append(item)
             safe = self._escape(item, ("*" if "QUOTES" != parent_name else ""))

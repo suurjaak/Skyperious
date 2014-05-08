@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.02.2014
+@modified    10.04.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -1101,8 +1101,8 @@ else:
   text_cell3 = util.plural(label, count)
 %>
       <table cellpadding="0" width="100%" cellspacing="0"><tr>
-        <td bgcolor="{{colormap[type]}}" width="{{percent * conf.PlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
-        <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.PlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
+        <td bgcolor="{{colormap[type]}}" width="{{percent * conf.StatisticsPlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
+        <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.StatisticsPlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
         <td nowrap="nowrap">&nbsp;{{text_cell3}}</td>
       </tr></table>
 %endfor
@@ -1260,8 +1260,10 @@ import conf, skypedata
   </td><td valign="top">
 <%
 after = ""
-if (skypedata.CHATS_TYPE_SINGLE != chat["type"]) or (m["author"] == search["db"].id):
-  after = " in %s" % chat["title_long"]
+if (skypedata.CHATS_TYPE_SINGLE != chat["type"]):
+  after = " in %s" % chat["title_long_lc"]
+elif m["author"] == search["db"].id:
+  after = " to %s" % chat["title"]
 %>
     <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
   </td><td align="right" nowrap>

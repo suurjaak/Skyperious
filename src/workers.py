@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.02.2014
+@modified    27.04.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -139,8 +139,8 @@ class SearchThread(WorkerThread):
                     width = search.get("width", -1)
                     if width > 0:
                         dc = wx.MemoryDC()
-                        dc.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.NORMAL,
-                                           face=conf.HistoryFontName))
+                        dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, 
+                            wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
                 main.log("Searching for \"%(text)s\" in %(table)s (%(db)s)." %
@@ -165,10 +165,12 @@ class SearchThread(WorkerThread):
                 pattern_replace = re.compile(patt, re.IGNORECASE)
 
                 # Find chats with a matching title or matching participants
-                chats = search["db"].get_conversations()
-                chats.sort(key=lambda x: x["title"])
-                chat_map = {} # {chat id: {chat data}}
-                template_chat = step.Template(TEMPLATES["chat"])
+                chats = []
+                if search["table"] in ["conversations", "messages"]:
+                    chats = search["db"].get_conversations()
+                    chats.sort(key=lambda x: x["title"])
+                    chat_map = {} # {chat id: {chat data}}
+                    template_chat = step.Template(TEMPLATES["chat"])
                 for chat in chats:
                     chat_map[chat["id"]] = chat
                     if "conversations" == search["table"] and match_words:
@@ -273,7 +275,7 @@ class SearchThread(WorkerThread):
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
                         if self._stop_work or (not is_text_output
-                        and count >= conf.SearchMessagesMax):
+                        and count >= conf.MaxSearchMessages):
                             break # break for m in messages
 
                 infotext = search["table"]
@@ -310,7 +312,7 @@ class SearchThread(WorkerThread):
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
                             if self._stop_work or (not is_text_output
-                            and result_count >= conf.SearchTableRowsMax):
+                            and result_count >= conf.MaxSearchTableRows):
                                 break # break while row
                             row = rows.fetchone()
                         if not self._drop_results:
@@ -322,7 +324,7 @@ class SearchThread(WorkerThread):
                                       "search": search, "count": 0}
                         infotext += " (%s)" % util.plural("result", count)
                         if self._stop_work or (not is_text_output
-                        and result_count >= conf.SearchTableRowsMax):
+                        and result_count >= conf.MaxSearchTableRows):
                             break # break for table in search["db"]..
                     single_table = ("," not in infotext)
                     infotext = "table%s: %s" % \
@@ -339,13 +341,13 @@ class SearchThread(WorkerThread):
                 if self._stop_work:
                     final_text += " Stopped by user."
                 elif "messages" == result_type and not is_text_output \
-                and count >= conf.SearchMessagesMax:
+                and count >= conf.MaxSearchMessages:
                     final_text += " Stopped at %s limit %s." % \
-                                  (result_type, conf.SearchMessagesMax)
+                                  (result_type, conf.MaxSearchMessages)
                 elif "table row" == result_type and not is_text_output \
-                and count >= conf.SearchTableRowsMax:
+                and count >= conf.MaxSearchTableRows:
                     final_text += " Stopped at %s limit %s." % \
-                                  (result_type, conf.SearchTableRowsMax)
+                                  (result_type, conf.MaxSearchTableRows)
 
                 result["output"] += "</table><br /><br />%s</font>" % final_text
                 if is_text_output: result["output"] = ""
@@ -861,18 +863,22 @@ class ContactSearchThread(WorkerThread):
                     main.log("Searching Skype contact directory for '%s'.",
                              value)
 
-                    for user in search["handler"].search_users(value):
-                        if user.Handle not in found:
-                            result["results"].append(user)
-                            found[user.Handle] = 1
+                    try:
+                        for user in search["handler"].search_users(value):
+                            if user.Handle not in found:
+                                result["results"].append(user)
+                                found[user.Handle] = 1
 
-                        if not (self._drop_results 
-                        or len(result["results"]) % conf.ContactResultsChunk):
-                            self.postback(result)
-                            result = {"search": search, "results": []}
+                            if not (self._drop_results 
+                            or len(result["results"]) % conf.SearchContactsChunk):
+                                self.postback(result)
+                                result = {"search": search, "results": []}
 
-                        if self._stop_work:
-                            break # break for user in search["handler"].searc..
+                            if self._stop_work:
+                                break # break for user in search["handler"].searc..
+                    except Exception as e:
+                        main.log("Error searching Skype contacts:\n\n%s",
+                                 traceback.format_exc())
 
                     if result["results"] and not self._drop_results:
                         self.postback(result)
@@ -880,7 +886,6 @@ class ContactSearchThread(WorkerThread):
 
                     if self._stop_work:
                         break # break for i, value in enumerate(search_values)
-
 
                 if not self._drop_results:
                     result["done"] = True
