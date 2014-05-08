@@ -40,14 +40,38 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.1_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.1_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.1-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+        <h4>v3.2, 2014-05-08:</h4>
+        <ul>
+          <li>added menu item to configure advanced options</li>
+          <li>added refresh button to database tables page</li>
+          <li>made chat and database export filenames configuration-based</li>
+          <li>fixed highlighting links in search results</li>
+          <li>fixed filename encoding problems under Linux with no locale (issue #18)</li>
+          <li>fixed keeping export filename length in filesystem limit (issue #20)</li>
+          <li>added scroll support to decrease required minimum window size (issue #21)</li>
+          <li>added 24x24 icon for Linux system tray (issue #21)</li>
+          <li>fixed database opening crash in PLD Linux (issue #23)</li>
+          <li>fixed search results falsely highlighting negated query words</li>
+          <li>fixed errors on searching over tables in non-Skype databases</li>
+          <li>made entire application window a target for dragged-dropped files</li>
+          <li>update notification no longer shown when program minimized to tray</li>
+          <li>"Execute SQL" button in SQL window uses selected text, if any</li>
+          <li>word cloud text not longer includes wholly numeric words</li>
+          <li>dropped "Total time spent in calls" from chat statistics as duplicating "Calls"</li>
+          <li>dropped alert messages on opening a non-Skype database</li>
+          <li>dropped alert messages on failing to open an export file</li>
+          <li>auto-added console history no longer saved on exit</li>
+        </ul>
+        <br />
 
         <h4>v3.1, 2014-03-02:</h4>
         <ul>
