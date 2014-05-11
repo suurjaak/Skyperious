@@ -4,7 +4,7 @@ Running in Vagrant
 Pre-requisites:
 
 - [Virtualbox](https://www.virtualbox.org/) 4.0 or greater.
-- [Vagrant](http://www.vagrantup.com/) 1.5 or greater.
+- [Vagrant](http://www.vagrantup.com/) 1.4 or greater.
 
 Clone this project and get it running:
 
@@ -37,4 +37,4 @@ To have your Skype DB files accessible within the VM, place them in project dire
 ---
 
 Vagrant support provided by [Alberto Scotto](https://github.com/alb-i986) 
-and [Elan Ruusamäe](https://github.com/glensc).
+and [Elan Ruusamï¿½e](https://github.com/glensc).
