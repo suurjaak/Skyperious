@@ -37,4 +37,4 @@ To have your Skype DB files accessible within the VM, place them in project dire
 ---
 
 Vagrant support provided by [Alberto Scotto](https://github.com/alb-i986) 
-and [Elan Ruusam�e](https://github.com/glensc).
+and [Elan Ruusamäe](https://github.com/glensc).
