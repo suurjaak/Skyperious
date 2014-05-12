@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    27.04.2014
+@modified    12.05.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -99,9 +99,8 @@ def format_seconds(seconds, insert=""):
 def plural(word, items=None, with_items=True):
     """
     Returns the word as 'count words', or '1 word' if count is 1,
-    or 'words' if count omitted, or .
+    or 'words' if count omitted.
 
-    @param   word
     @param   items       item collection or count,
                          or None to get just the plural of the word
              with_items  if False, count is omitted from final result
@@ -193,7 +192,7 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    if "linux" == sys.platform and isinstance(result, unicode) \
+    if "linux2" == sys.platform and isinstance(result, unicode) \
     and "utf-8" != sys.getfilesystemencoding():
         result = result.encode("utf-8") # Linux has trouble if locale not UTF-8
     path, name = os.path.split(result)
@@ -335,7 +334,7 @@ def timedelta_seconds(timedelta):
     """Returns the total timedelta duration in seconds."""
     if hasattr(timedelta, "total_seconds"):
         result = timedelta.total_seconds()
-    else:
+    else: # Python 2.6 compatibility
         result = timedelta.days * 24 * 3600 + timedelta.seconds + \
                  timedelta.microseconds / 1000000.
     return result
