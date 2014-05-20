@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.05.2014
+@modified    12.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -80,7 +80,7 @@ OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
 
-    TRAY_ICON = (images.Icon16x16_32bit if "linux" != sys.platform 
+    TRAY_ICON = (images.Icon16x16_32bit if "linux2" != sys.platform 
                  else images.Icon24x24_32bit)
 
     def __init__(self):
@@ -1734,6 +1734,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.Bind(wx.EVT_LIST_DELETE_ALL_ITEMS,
                           self.on_clear_searchall, page.edit_searchall)
         if page:
+            for i in range(1, self.list_db.GetItemCount()):
+                if self.list_db.GetItemText(i) == filename:
+                    self.list_db.Select(i); break # break for i
             for i in range(self.notebook.GetPageCount()):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)

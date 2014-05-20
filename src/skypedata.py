@@ -111,8 +111,8 @@ ACCOUNT_FIELD_TITLES = {
 class SkypeDatabase(object):
     """Access to a Skype database file."""
 
-    """Insert SQL statements for Skype tables."""
-    INSERT_STATEMENTS = {
+    """SQL CREATE statements for Skype tables."""
+    CREATE_STATEMENTS = {
       "accounts": "CREATE TABLE Accounts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, skypename TEXT, fullname TEXT, pstnnumber TEXT, birthday INTEGER, gender INTEGER, languages TEXT, country TEXT, province TEXT, city TEXT, phone_home TEXT, phone_office TEXT, phone_mobile TEXT, emails TEXT, homepage TEXT, about TEXT, profile_timestamp INTEGER, received_authrequest TEXT, displayname TEXT, refreshing INTEGER, given_authlevel INTEGER, aliases TEXT, authreq_timestamp INTEGER, mood_text TEXT, timezone INTEGER, nrof_authed_buddies INTEGER, ipcountry TEXT, given_displayname TEXT, availability INTEGER, lastonline_timestamp INTEGER, capabilities BLOB, avatar_image BLOB, assigned_speeddial TEXT, lastused_timestamp INTEGER, authrequest_count INTEGER, status INTEGER, pwdchangestatus INTEGER, suggested_skypename TEXT, logoutreason INTEGER, skypeout_balance_currency TEXT, skypeout_balance INTEGER, skypeout_precision INTEGER, skypein_numbers TEXT, offline_callforward TEXT, commitstatus INTEGER, cblsyncstatus INTEGER, chat_policy INTEGER, skype_call_policy INTEGER, pstn_call_policy INTEGER, avatar_policy INTEGER, buddycount_policy INTEGER, timezone_policy INTEGER, webpresence_policy INTEGER, owner_under_legal_age INTEGER, phonenumbers_policy INTEGER, voicemail_policy INTEGER, assigned_comment TEXT, alertstring TEXT, avatar_timestamp INTEGER, mood_timestamp INTEGER, type INTEGER, rich_mood_text TEXT, partner_optedout TEXT, service_provider_info TEXT, registration_timestamp INTEGER, nr_of_other_instances INTEGER, synced_email BLOB, set_availability INTEGER, authorized_time INTEGER, sent_authrequest TEXT, sent_authrequest_time INTEGER, sent_authrequest_serial INTEGER, buddyblob BLOB, cbl_future BLOB, node_capabilities INTEGER, node_capabilities_and INTEGER, revoked_auth INTEGER, added_in_shared_group INTEGER, in_shared_group INTEGER, authreq_history BLOB, profile_attachments BLOB, stack_version INTEGER, offline_authreq_id INTEGER, subscriptions TEXT, authrequest_policy INTEGER, ad_policy INTEGER, options_change_future BLOB, verified_email BLOB, verified_company BLOB, partner_channel_status TEXT, cbl_profile_blob BLOB, flamingo_xmpp_status INTEGER, federated_presence_policy INTEGER, liveid_membername TEXT, roaming_history_enabled INTEGER, uses_jcs INTEGER, cobrand_id INTEGER)",
       "alerts": "CREATE TABLE Alerts (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, timestamp INTEGER, partner_name TEXT, is_unseen INTEGER, partner_id INTEGER, partner_event TEXT, partner_history TEXT, partner_header TEXT, partner_logo TEXT, message_content TEXT, message_footer TEXT, meta_expiry INTEGER, message_header_caption TEXT, message_header_title TEXT, message_header_subject TEXT, message_header_cancel TEXT, message_header_later TEXT, message_button_caption TEXT, message_button_uri TEXT, message_type INTEGER, window_size INTEGER, notification_id INTEGER, extprop_hide_from_history INTEGER, chatmsg_guid BLOB, event_flags INTEGER)",
       "appschemaversion": "CREATE TABLE AppSchemaVersion (ClientVersion TEXT NOT NULL, SQLiteSchemaVersion INTEGER NOT NULL, SchemaUpdateType INTEGER NOT NULL)",
@@ -1013,8 +1013,8 @@ class SkypeDatabase(object):
     def create_table(self, table, create_sql=None):
         """Creates the specified table and updates our column data."""
         table = table.lower()
-        if create_sql or (table in self.INSERT_STATEMENTS):
-            self.execute(create_sql or self.INSERT_STATEMENTS[table])
+        if create_sql or (table in self.CREATE_STATEMENTS):
+            self.execute(create_sql or self.CREATE_STATEMENTS[table])
             self.connection.commit()
             row = self.execute("SELECT name, sql FROM sqlite_master "
                                 "WHERE type = 'table' "
