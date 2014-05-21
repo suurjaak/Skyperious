@@ -250,8 +250,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.DBListBackgroundColour = conf.BgColour
             conf.LinkColour = colourhex(wx.SYS_COLOUR_HOTLIGHT)
             conf.SkypeLinkColour = colourhex(wx.SYS_COLOUR_HOTLIGHT)
-            conf.ListOpenedBgColour = colourhex(wx.SYS_COLOUR_INFOBK)
-            conf.DBTableOpenedColour = colourhex(wx.SYS_COLOUR_INFOBK)
             conf.MainBgColour = conf.WidgetColour
             conf.MessageTextColour = conf.FgColour
             conf.HelpCodeColour = colourhex(wx.SYS_COLOUR_HIGHLIGHT)
@@ -4077,10 +4075,8 @@ class DatabasePage(wx.Panel):
                         "s" if tablemap[table]["rows"] != 1 else " "
                     ), 1)
                     if table == self.grid_table.Table.table:
-                        self.tree_tables.SetItemTextColour(
-                            item,
-                            conf.DBTableChangedColour
-                            if self.grid_table.Table.IsChanged() else "black")
+                        self.tree_tables.SetItemBold(item,
+                        self.grid_table.Table.IsChanged())
                 item = self.tree_tables.GetNextSibling(item)
 
 
@@ -4142,9 +4138,7 @@ class DatabasePage(wx.Panel):
             i = self.tree_tables.GetNext(self.tree_tables.RootItem)
             while i:
                 text = self.tree_tables.GetItemText(i).lower()
-                bgcolour = (conf.DBTableOpenedColour if text == lower
-                            else conf.BgColour)
-                self.tree_tables.SetItemBackgroundColour(i, bgcolour)
+                self.tree_tables.SetItemBold(i, text == lower)
                 i = self.tree_tables.GetNextSibling(i)
             main.log("Loading table %s (%s).", table, self.db)
             busy = controls.BusyPanel(self, "Loading table \"%s\"." % table)
@@ -4195,12 +4189,10 @@ class DatabasePage(wx.Panel):
                 index_selected = -1
                 for i in range(self.list_chats.ItemCount):
                     if self.list_chats.GetItemMappedData(i) == self.chat:
-                        self.list_chats.SetItemBackgroundColour(
-                            i, self.list_chats.BackgroundColour)
+                        self.list_chats.SetItemFont(i, self.list_chats.Font)
                     elif self.list_chats.GetItemMappedData(i) == chat:
                         index_selected = i
-                        self.list_chats.SetItemBackgroundColour(
-                            i, conf.ListOpenedBgColour)
+                        self.list_chats.SetItemFont(i, self.list_chats.Font.Bold())
                 if index_selected >= 0:
                     delta = index_selected - scrollpos
                     if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
@@ -5119,12 +5111,10 @@ class MergerPage(wx.Panel):
             # Update item background in chats list
             for i in range(self.list_chats.ItemCount):
                 if self.list_chats.GetItemMappedData(i) == self.chat:
-                    self.list_chats.SetItemBackgroundColour(
-                        i, self.list_chats.BackgroundColour)
+                    self.list_chats.SetItemFont(i, self.list_chats.Font)
                 elif self.list_chats.GetItemMappedData(i) == c:
                     index_selected = i
-                    self.list_chats.SetItemBackgroundColour(
-                        i, conf.ListOpenedBgColour)
+                    self.list_chats.SetItemFont(i, self.list_chats.Font.Bold())
             if index_selected >= 0:
                 delta = index_selected - scrollpos
                 if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:

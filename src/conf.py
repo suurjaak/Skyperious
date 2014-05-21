@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.05.2014
+@modified    21.05.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.2"
-VersionDate = "08.05.2014"
+Version = "3.2.1"
+VersionDate = "21.05.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -263,17 +263,11 @@ HistoryLineColour = "#E4E8ED"
 """Descriptive text shown in chat history searchbox."""
 HistorySearchDescription = "Search for.."
 
-"""Background colour of opened items in lists."""
-ListOpenedBgColour = "pink"
-
 """Foreground colour for error labels."""
 LabelErrorColour = "#CC3232"
 
 """Color set to database table list tables that have been changed."""
-DBTableChangedColour = "red"
-
-"""Color set to the database table list table that is currently open."""
-DBTableOpenedColour = "pink"
+DBTableChangedColour = "blue"
 
 """Colour set to table/list rows that have been changed."""
 GridRowChangedColour = "#FFCCCC"
