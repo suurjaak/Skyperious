@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.05.2014
+@modified    21.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1794,7 +1794,7 @@ class DatabasePage(wx.Panel):
         self.ready_to_close = False
         self.db = db
         self.db.register_consumer(self)
-        self.db_grids = {} # {"tablename": GridTableBase, }
+        self.db_grids = {} # {"tablename": SqliteGridBase, }
         self.memoryfs = memoryfs
         self.skype_handler = skype_handler
         parent_notebook.InsertPage(1, self, title)
@@ -3898,7 +3898,7 @@ class DatabasePage(wx.Panel):
         grid = self.grid_table \
             if event.EventObject == self.button_reset_grid_table \
             else self.grid_sql
-        if grid.Table and isinstance(grid.Table, GridTableBase):
+        if grid.Table and isinstance(grid.Table, SqliteGridBase):
             grid.Table.ClearSort(refresh=False)
             grid.Table.ClearFilter()
             grid.ContainingSizer.Layout() # React to grid size change
@@ -3982,7 +3982,7 @@ class DatabasePage(wx.Panel):
             grid_data = None
             if sql.lower().startswith(("select", "pragma", "explain")):
                 # SELECT statement: populate grid with rows
-                grid_data = GridTableBase.from_query(self.db, sql)
+                grid_data = SqliteGridBase.from_query(self.db, sql)
                 self.grid_sql.SetTable(grid_data)
                 self.button_reset_grid_sql.Enabled = True
                 self.button_export_sql.Enabled = True
@@ -4013,7 +4013,7 @@ class DatabasePage(wx.Panel):
 
     def get_unsaved_grids(self):
         """
-        Returns a list of GridTableBase grids where changes have not been
+        Returns a list of SqliteGridBase grids where changes have not been
         saved after changing.
         """
         return [g for g in self.db_grids.values() if g.IsChanged()]
@@ -4151,7 +4151,7 @@ class DatabasePage(wx.Panel):
             try:
                 grid_data = self.db_grids.get(lower)
                 if not grid_data:
-                    grid_data = GridTableBase.from_table(self.db, table)
+                    grid_data = SqliteGridBase.from_table(self.db, table)
                     self.db_grids[lower] = grid_data
                 self.label_table.Label = "Table \"%s\":" % table
                 self.grid_table.SetTable(grid_data)
@@ -4346,7 +4346,7 @@ class DatabasePage(wx.Panel):
         Handler for clicking a table grid column, sorts table by the column.
         """
         grid = event.GetEventObject()
-        if grid.Table and isinstance(grid.Table, GridTableBase):
+        if grid.Table and isinstance(grid.Table, SqliteGridBase):
             row, col = event.GetRow(), event.GetCol()
             # Remember scroll positions, as grid update loses them
             scroll_hor = grid.GetScrollPos(wx.HORIZONTAL)
@@ -4363,7 +4363,7 @@ class DatabasePage(wx.Panel):
         change the column filter.
         """
         grid = event.GetEventObject()
-        if grid.Table and isinstance(grid.Table, GridTableBase):
+        if grid.Table and isinstance(grid.Table, SqliteGridBase):
             row, col = event.GetRow(), event.GetCol()
             # Remember scroll positions, as grid update loses them
             scroll_hor = grid.GetScrollPos(wx.HORIZONTAL)
@@ -6397,7 +6397,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
 
 
-class GridTableBase(wx.grid.PyGridTableBase):
+class SqliteGridBase(wx.grid.PyGridTableBase):
     """
     Table base for wx.grid.Grid, can take its data from a single table, or from
     the results of any SELECT query.
@@ -6409,7 +6409,7 @@ class GridTableBase(wx.grid.PyGridTableBase):
     @classmethod
     def from_query(cls, db, sql):
         """
-        Constructs a GridTableBase instance from a full SQL query.
+        Constructs a SqliteGridBase instance from a full SQL query.
 
         @param   db   SkypeDatabase instance
         @param   sql  the SQL query to execute
@@ -6435,6 +6435,7 @@ class GridTableBase(wx.grid.PyGridTableBase):
         self.idx_all = [] # An ordered list of row identifiers in rows_all
         self.rows_all = {} # Unfiltered, unsorted rows {id: row, }
         self.rows_current = [] # Currently shown (filtered/sorted) rows
+        self.rowids = {} # SQLite table rowids, not applicable for query
         self.iterator_index = -1
         self.sort_ascending = False
         self.sort_column = None # Index of column currently sorted by
@@ -6458,7 +6459,7 @@ class GridTableBase(wx.grid.PyGridTableBase):
     @classmethod
     def from_table(cls, db, table, where="", order=""):
         """
-        Constructs a GridTableBase instance from a single table.
+        Constructs a SqliteGridBase instance from a single table.
 
         @param   db     SkypeDatabase instance
         @param   table  name of table
@@ -6480,14 +6481,15 @@ class GridTableBase(wx.grid.PyGridTableBase):
         self.idx_all = [] # An ordered list of row identifiers in rows_all
         self.rows_all = {} # Unfiltered, unsorted rows {id: row, }
         self.rows_current = [] # Currently shown (filtered/sorted) rows
+        self.rowids = {} # SQLite table rowids, used for UPDATE and DELETE
         self.idx_changed = set() # set of indices for changed rows in rows_all
         self.rows_backup = {} # For changed rows {id: original_row, }
         self.idx_new = [] # Unsaved added row indices
         self.rows_deleted = {} # Uncommitted deleted rows {id: deleted_row, }
+        self.rowid_name = "ROWID%s" % int(time.time()) # Avoid collisions
         self.row_iterator = db.execute(
-            "SELECT * FROM %s %s %s"
-            % (table, "WHERE %s" % where if where else "", order)
-        )
+            "SELECT rowid AS %s, * FROM %s %s %s" % (self.rowid_name, table, 
+            "WHERE %s" % where if where else "", order))
         self.iterator_index = -1
         self.sort_ascending = False
         self.sort_column = None # Index of column currently sorted by
@@ -6543,6 +6545,9 @@ class GridTableBase(wx.grid.PyGridTableBase):
                 pass
             if rowdata:
                 idx = id(rowdata)
+                if not self.is_query:
+                    self.rowids[idx] = rowdata[self.rowid_name]
+                    del rowdata[self.rowid_name]
                 rowdata["__id__"] = idx
                 rowdata["__changed__"] = False
                 rowdata["__new__"] = False
@@ -6841,25 +6846,39 @@ class GridTableBase(wx.grid.PyGridTableBase):
         is destroyed.
         """
         # Save all existing changed rows
-        for idx in self.idx_changed.copy():
-            row = self.rows_all[idx]
-            self.db.update_row(self.table, row, self.rows_backup[idx])
-            row["__changed__"] = False
-            self.idx_changed.remove(idx)
-            del self.rows_backup[idx]
-        # Save all newly inserted rows
-        pk = [c["name"] for c in self.columns if c["pk"]][0]
-        for idx in self.idx_new[:]:
-            row = self.rows_all[idx]
-            row[pk] = self.db.insert_row(self.table, row)
-            row["__new__"] = False
-            self.idx_new.remove(idx)
-        # Deleted all newly deleted rows
-        for idx, row in self.rows_deleted.copy().items():
-            self.db.delete_row(self.table, row)
-            del self.rows_deleted[idx]
-            del self.rows_all[idx]
-            self.idx_all.remove(idx)
+        try:
+            for idx in self.idx_changed.copy():
+                row = self.rows_all[idx]
+                self.db.update_row(self.table, row, self.rows_backup[idx],
+                                   self.rowids.get(idx))
+                row["__changed__"] = False
+                self.idx_changed.remove(idx)
+                del self.rows_backup[idx]
+            # Save all newly inserted rows
+            pks = [c["name"] for c in self.columns if c["pk"]]
+            col_map = dict((c["name"], c) for c in self.columns)
+            for idx in self.idx_new[:]:
+                row = self.rows_all[idx]
+                insert_id = self.db.insert_row(self.table, row)
+                if len(pks) == 1 and row[pks[0]] in (None, ""):
+                    if "INTEGER" == col_map[pks[0]]["type"]:
+                        # Autoincremented row: update with new value
+                        row[pks[0]] = insert_id
+                    else: # For non-integers, insert returns ROWID
+                        self.rowids[idx] = insert_id
+                row["__new__"] = False
+                self.idx_new.remove(idx)
+            # Deleted all newly deleted rows
+            for idx, row in self.rows_deleted.copy().items():
+                self.db.delete_row(self.table, row, self.rowids.get(idx))
+                del self.rows_deleted[idx]
+                del self.rows_all[idx]
+                self.idx_all.remove(idx)
+        except Exception as e:
+            main.logstatus("Error opening saving changes in %s.\n\n%s",
+                           self.table, traceback.format_exc())
+            wx.MessageBox(unicode(e).capitalize(), conf.Title,
+                          wx.OK | wx.ICON_WARNING)
         if self.View: self.View.Refresh()
 
 

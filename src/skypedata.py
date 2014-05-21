@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2014
+@modified    21.05.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1317,52 +1317,34 @@ class SkypeDatabase(object):
                     yield m
 
 
-    def save_row(self, table, row):
-        """
-        Updates the row in the database or inserts it if not existing.
-
-        @return  ID of the inserted row
-        """
-        if self.is_open():
-            self.ensure_backup()
-            table = table.lower()
-            col_data = self.get_table_columns(table)
-            pk = [c["name"] for c in col_data if c["pk"]][0]
-            exists = self.execute(
-                "SELECT * FROM %s WHERE %s = :%s" % (table, pk, pk), row
-            ).fetchone()
-            if exists:
-                return self.update_row(table, row)
-            else:
-                return self.insert_row(table, row)
-
-
-    def update_row(self, table, row, original_row):
+    def update_row(self, table, row, original_row, rowid=None):
         """
         Updates the table row in the database, identified by its primary key
-        in its original values.
+        in its original values, or the given rowid if table has no primary key.
         """
-        if self.is_open():
-            table = table.lower()
-            main.log("Updating 1 row in table %s, %s.",
-                self.tables[table]["name"], self.filename
-            )
-            self.ensure_backup()
-            col_data = self.get_table_columns(table)
-            pk = [c["name"] for c in col_data if c["pk"]][0]
-            fields = ", ".join([
-                "%(name)s = :%(name)s" % col
-                    for col in col_data
-            ])
-            pk_key = "PK%s" % int(time.time())
-            values = row.copy()
-            values[pk_key] = original_row[pk]
-            self.execute("UPDATE %s SET %s WHERE %s = :%s" % (
-                table, fields, pk, pk_key
-            ), values)
-            self.connection.commit()
-            self.last_modified = datetime.datetime.now()
-            return row[pk]
+        if not self.is_open():
+            return
+        table, where = table.lower(), ""
+        main.log("Updating 1 row in table %s, %s.",
+                 self.tables[table]["name"], self.filename)
+        self.ensure_backup()
+        col_data = self.get_table_columns(table)
+        values, where = row.copy(), ""
+        setsql = ", ".join("%(name)s = :%(name)s" % x for x in col_data)
+        if rowid is not None:
+            pk_key = "PK%s" % int(time.time()) # Avoid existing field collision
+            where, values[pk_key] = "ROWID = :%s" % pk_key, rowid
+        else:
+            for pk in [c["name"] for c in col_data if c["pk"]]:
+                pk_key = "PK%s" % int(time.time())
+                values[pk_key] = original_row[pk]
+                where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
+        if not where:
+            return False # Sanity check: no primary key and no rowid
+        self.execute("UPDATE %s SET %s WHERE %s" % (table, setsql, where),
+                     values)
+        self.connection.commit()
+        self.last_modified = datetime.datetime.now()
 
 
     def insert_row(self, table, row):
@@ -1371,39 +1353,53 @@ class SkypeDatabase(object):
 
         @return  ID of the inserted row
         """
-        if self.is_open():
-            table = table.lower()
-            main.log("Inserting 1 row into table %s, %s.",
-                self.tables[table]["name"], self.filename
-            )
-            self.ensure_backup()
-            col_data = self.get_table_columns(table)
-            fields = [col["name"] for col in col_data]
-            str_cols = ", ".join(fields)
-            str_vals = ":" + ", :".join(fields)
-            row = self.blobs_to_binary(row, fields, col_data)
-            cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)"
-                                  % (table, str_cols, str_vals), row)
-            self.connection.commit()
-            self.last_modified = datetime.datetime.now()
-            return cursor.lastrowid
+        if not self.is_open():
+            return
+        table = table.lower()
+        main.log("Inserting 1 row into table %s, %s.",
+                 self.tables[table]["name"], self.filename)
+        self.ensure_backup()
+        col_data = self.get_table_columns(table)
+        fields = [col["name"] for col in col_data]
+        str_cols = ", ".join(fields)
+        str_vals = ":" + ", :".join(fields)
+        row = self.blobs_to_binary(row, fields, col_data)
+        cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)" %
+                              (table, str_cols, str_vals), row)
+        self.connection.commit()
+        self.last_modified = datetime.datetime.now()
+        return cursor.lastrowid
 
 
-    def delete_row(self, table, row):
+    def delete_row(self, table, row, rowid=None):
         """
         Deletes the table row from the database. Row is identified by its
-        primary key.
+        primary key, or by rowid if no primary key.
+
+        @return   success as boolean
         """
-        if self.is_open():
-            table = table.lower()
-            main.log("Deleting 1 row from table %s, %s.",
-                     self.tables[table]["name"], self.filename)
-            self.ensure_backup()
-            col_data = self.get_table_columns(table)
-            pk = [c["name"] for c in col_data if c["pk"]][0]
-            self.execute("DELETE FROM %s WHERE %s = :%s" % (table, pk, pk), row)
-            self.connection.commit()
-            self.last_modified = datetime.datetime.now()
+        if not self.is_open():
+            return
+        table, where = table.lower(), ""
+        main.log("Deleting 1 row from table %s, %s.",
+                 self.tables[table]["name"], self.filename)
+        self.ensure_backup()
+        col_data = self.get_table_columns(table)
+        values, where = row.copy(), ""
+        if rowid is not None:
+            pk_key = "PK%s" % int(time.time()) # Avoid existing field collision
+            where, values[pk_key] = "ROWID = :%s" % pk_key, rowid
+        else:
+            for pk in [c["name"] for c in col_data if c["pk"]]:
+                pk_key = "PK%s" % int(time.time())
+                values[pk_key] = original_row[pk]
+                where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
+        if not where:
+            return False # Sanity check: no primary key and no rowid
+        self.execute("DELETE FROM %s WHERE %s" % (table, where), values)
+        self.connection.commit()
+        self.last_modified = datetime.datetime.now()
+        return True
 
 
 
