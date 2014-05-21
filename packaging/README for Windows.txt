@@ -1,4 +1,4 @@
-Skyperious 3.1
+Skyperious 3.2
 ==============
 
 Skyperious is a Skype database viewer and merger, written in Python.
