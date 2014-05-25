@@ -1781,3 +1781,8 @@ import conf
 %>
 <a href="{{chat["identity"]}}"><font color="{{conf.LinkColour}}">{{chat["title_long"]}}</font></a>
 """
+
+"""Message template for copying to clipboard."""
+MESSAGE_CLIPBOARD = """
+[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{m["from_dispname"]}}: {{parser.parse(m, output={"format": "text"})}}
+"""

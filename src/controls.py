@@ -64,7 +64,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.04.2014
+@modified    25.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2783,6 +2783,7 @@ class TabbedHtmlWindow(wx.PyPanel):
 
         # Monkey-patch object with HtmlWindow and FlatNotebook attributes
         for name in ["Scroll", "GetScrollRange", "GetScrollPos",
+                     "SelectAll", "SelectionToText",
                      "GetBackgroundColour", "SetBackgroundColour"]:
             setattr(self, name, getattr(self._html, name))
         for name in ["GetTabAreaColour", "SetTabAreaColour"]:

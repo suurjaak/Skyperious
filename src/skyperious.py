@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.05.2014
+@modified    24.05.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1690,9 +1690,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     main.status_flash("Reading Skype database file %s.", db)
                     self.dbs[filename] = db
                     # Add filename to Recent Files menu and conf, if needed
-                    if filename in conf.RecentFiles:
+                    if filename in conf.RecentFiles: # Remove earlier position
                         idx = conf.RecentFiles.index(filename)
-                        self.history_file.RemoveFileFromHistory(idx)
+                        try: self.history_file.RemoveFileFromHistory(idx)
+                        except Exception as e: pass
                     self.history_file.AddFileToHistory(filename)
                     util.add_unique(conf.RecentFiles, filename, -1,
                                     conf.MaxRecentFiles)
@@ -2160,9 +2161,10 @@ class DatabasePage(wx.Panel):
         html.SetDefaultPage(default)
         html.SetDeleteCallback(self.on_delete_tab_callback)
         label_html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                        self.on_click_searchall_result)
+                        self.on_click_html_link)
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                  self.on_click_searchall_result)
+                  self.on_click_html_link)
+        html._html.Bind(wx.EVT_RIGHT_UP, self.on_rightclick_searchall)
         html.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_change_searchall_tab)
         html.Bind(controls.EVT_TAB_LEFT_DCLICK, self.on_dclick_searchall_tab)
         html.SetTabAreaColour(tb.BackgroundColour)
@@ -3418,10 +3420,40 @@ class DatabasePage(wx.Panel):
             self.stc_history.SetFocusSearch()
 
 
-    def on_click_searchall_result(self, event):
+    def on_rightclick_searchall(self, event):
         """
-        Handler for clicking a link in HtmlWindow, opens the link in default
-        browser.
+        Handler for right-clicking in HtmlWindow, sets up a temporary flag for
+        HTML link click handler to check, in order to display a context menu.
+        """
+        self.html_searchall.is_rightclick = True
+        def reset():
+            if self.html_searchall.is_rightclick: # Flag still up: show menu
+                def on_copy(event):
+                    if wx.TheClipboard.Open():
+                        text = self.html_searchall.SelectionToText()
+                        d = wx.TextDataObject(text)
+                        wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+                def on_selectall(event):
+                    self.html_searchall.SelectAll()
+                self.html_searchall.is_rightclick = False
+                menu = wx.Menu()
+                item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+                item_selectall = wx.MenuItem(menu, -1, "&Select all")
+                menu.AppendItem(item_selection)
+                menu.AppendSeparator()
+                menu.AppendItem(item_selectall)
+                item_selection.Enable(bool(self.html_searchall.SelectionToText()))
+                menu.Bind(wx.EVT_MENU, on_copy, id=item_selection.GetId())
+                menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
+                self.html_searchall.PopupMenu(menu)
+        event.Skip(), wx.CallAfter(reset)
+
+
+    def on_click_html_link(self, event):
+        """
+        Handler for clicking a link in HtmlWindow, opens the link inside
+        program or in default browser, opens a popupmenu if right click.
         """
         href = event.GetLinkInfo().Href
         link_data, tab_data = None, None
@@ -3429,29 +3461,99 @@ class DatabasePage(wx.Panel):
             tab_data = self.html_searchall.GetActiveTabData()
         if tab_data and tab_data.get("info"):
             link_data = tab_data["info"]["map"].get(href, {})
-        if link_data or href.startswith("file://"):
-            chat_id = link_data.get("chat")
-            message_id = link_data.get("message")
-            file = link_data.get("file")
-            table_name, row = link_data.get("table"), link_data.get("row")
-            if file or href.startswith("file://"):
-                if file:
-                    filename = file["filepath"] or file["filename"]
-                    path = file["filepath"]
-                else:
-                    filename = path = filepath = urllib.url2pathname(href[5:])
 
+        # Workaround for no separate wx.html.HtmlWindow link right click event
+        if getattr(self.html_searchall, "is_rightclick", False):
+            # Open a pop-up menu with options to copy or select text
+            self.html_searchall.is_rightclick = False
+            def clipboardize(text):
+                if wx.TheClipboard.Open():
+                    d = wx.TextDataObject(text)
+                    wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+            menutitle = None
+            if link_data:
+                msg_id, m = link_data.get("message"), None
+                if msg_id:
+                    menutitle = "C&opy message"
+                    def handler(e):
+                        if msg_id:
+                            m = next(self.db.get_messages(additional_sql="id = :id", 
+                                     additional_params={"id": msg_id}), None)
+                        if m:
+                            t = step.Template(templates.MESSAGE_CLIPBOARD)
+                            p = {"m": m, "parser": skypedata.MessageParser(self.db)}
+                            clipboardize(t.expand(p))
+                else:
+                    chat_id, chat = link_data.get("chat"), None
+                    if chat_id:
+                        chat = next((c for c in self.chats if c["id"] == chat_id), None)
+                    if chat:
+                        if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
+                            menutitle, cliptext = "C&opy contact", chat["identity"]
+                        else:
+                            menutitle, cliptext = "C&opy chat name", chat["title"]
+                        def handler(e):
+                            clipboardize(cliptext)
+                    elif link_data.get("row"):
+                        menutitle = "C&opy row"
+                        def handler(e):
+                            clipboardize(repr(link_data["row"]))
+            else:
+                menutitle = "C&opy link location"
+                if href.startswith("file://"):
+                    href = urllib.url2pathname(href[5:])
+                    if any(href.startswith(x) for x in ["\\\\\\", "///"]):
+                        href = href[3:] # Strip redundant filelink slashes
+                    if isinstance(href, unicode):
+                        # Workaround for wx.html.HtmlWindow double encoding
+                        href = href.encode('latin1', errors="xmlcharrefreplace"
+                               ).decode("utf-8")
+                    menutitle = "C&opy file location"
+                elif href.startswith("mailto:"):
+                    href = href[7:]
+                    menutitle = "C&opy e-mail address"
+                elif any(href.startswith(x) for x in ["callto:", "skype:", "tel:"]):
+                    href = href[href.index(":") + 1:]
+                    menutitle = "C&opy contact"
+                def handler(e):
+                    clipboardize(href)
+            if menutitle:
+                def on_copyselection(event):
+                    clipboardize(self.html_searchall.SelectionToText())
+                def on_selectall(event):
+                    self.html_searchall.SelectAll()
+                menu = wx.Menu()
+                item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+                item_copy = wx.MenuItem(menu, -1, menutitle)
+                item_selectall = wx.MenuItem(menu, -1, "&Select all")
+                menu.AppendItem(item_selection)
+                menu.AppendItem(item_copy)
+                menu.AppendItem(item_selectall)
+                item_selection.Enable(bool(self.html_searchall.SelectionToText()))
+                menu.Bind(wx.EVT_MENU, on_copyselection, id=item_selection.GetId())
+                menu.Bind(wx.EVT_MENU, handler, id=item_copy.GetId())
+                menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
+                self.html_searchall.PopupMenu(menu)
+        elif link_data or href.startswith("file://"):
+            # Open the link, or file, or program internal link to chat or table
+            chat_id = link_data.get("chat")
+            msg_id = link_data.get("message")
+            table_name, row = link_data.get("table"), link_data.get("row")
+            if href.startswith("file://"):
+                filename = path = urllib.url2pathname(href[5:])
+                if any(path.startswith(x) for x in ["\\\\\\", "///"]):
+                    filename = href = path[3:]
                 if path and os.path.exists(path):
                     util.start_file(path)
                 else:
-                    messageBox(
-                        "The file \"%s\" cannot be found on this computer." %
-                        filename, conf.Title, wx.OK | wx.ICON_INFORMATION)
+                    e = "The file \"%s\" cannot be found on this computer." % \
+                        filename
+                    messageBox(e, conf.Title, wx.OK | wx.ICON_INFORMATION)
             elif chat_id:
                 self.notebook.SetSelection(self.pageorder[self.page_chats])
                 c = next((c for c in self.chats if chat_id == c["id"]), None)
                 if c:
-                    self.load_chat(c, center_message_id=message_id)
+                    self.load_chat(c, center_message_id=msg_id)
                     self.show_stats(False)
                     self.stc_history.SetFocus()
             elif table_name and row:
@@ -3502,6 +3604,7 @@ class DatabasePage(wx.Panel):
                             grid.Scroll(x, y)
                             break # break for i in range(self.grid_table..
         elif href.startswith("page:"):
+            # Go to database subpage
             page = href[5:]
             if "#help" == page:
                 html = self.html_searchall
@@ -5773,8 +5876,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._center_message_id =    -1
         # Index of the centered message in _messages
         self._center_message_index = -1
-        self._filelinks = {} # {link end position: file path}
-        self._datelinks = {} # {link end position: two dates, }
+        self._filelinks = {} # {link start position: file path}
+        self._datelinks = {} # {link start position: two dates, }
         self._datelink_last = None # Title of clicked date link, if any
         # Currently set message filter {"daterange": (datetime, datetime),
         # "text": text in message, "participants": [skypename1, ],
@@ -5815,14 +5918,90 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self.SetWrapMode(True)
         self.SetMarginLeft(10)
         self.SetReadOnly(True)
-        self.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
+        self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
+        self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
+        self._stc.Bind(wx.EVT_CONTEXT_MENU, lambda e: None)
         # Hide caret
-        self.SetCaretForeground(conf.BgColour)
-        self.SetCaretWidth(0)
+        self.SetCaretForeground(conf.BgColour), self.SetCaretWidth(0)
 
 
     def SetDatabasePage(self, page):
         self._page = page
+
+
+    def GetUrlAtPosition(self, pos):
+        """"Go back and forth from STC position, return URL and STC range."""
+        url_range = {-1: -1, 1: -1} # { start and end positions }
+        styles_link = [self._styles["link"], self._styles["boldlink"]]
+        for step in url_range:
+            while self._stc.GetStyleAt(pos + step) in styles_link:
+                pos += step
+            url_range[step] = pos
+        url_range[1] += 1
+        startstop = url_range[-1], url_range[1]
+        return self._stc.GetTextRange(*startstop), startstop
+
+
+    def OnMenu(self, event):
+        """
+        Handler for right-clicking (or pressing menu key), opens a custom context
+        menu.
+        """
+        def clipboardize(text):
+            if wx.TheClipboard.Open():
+                d = wx.TextDataObject(text)
+                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+        pos = self._stc.PositionFromPoint(event.Position)
+        msg_id = msg = None
+        pos_msgs = sorted((v, k) for k, v in self._message_positions.items())
+        for i, (m_pos, m_id) in enumerate(pos_msgs):
+            if m_pos[0] <= pos <= m_pos[1]:
+                msg_id = m_id
+                break
+            elif i and pos_msgs[i-1][0][1] < pos and m_pos[0] > pos:
+                msg_id = pos_msgs[i-1][1]
+                break
+            elif m_pos[0] > pos:
+                break
+        if not msg_id and pos_msgs and pos_msgs[-1][0][-1] < pos:
+            msg_id = pos_msgs[-1][1]
+        if msg_id:
+            msg = next((m for m in self._messages_current 
+                        if msg_id == m["id"]), None)
+        menu = wx.Menu()
+        item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+        menu.AppendItem(item_selection)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize(self._stc.SelectedText),
+                  id=item_selection.GetId())
+        item_selection.Enable(bool(self._stc.SelectedText))
+        styles_link = [self._styles["link"], self._styles["boldlink"]]
+        if msg and self._stc.GetStyleAt(pos) in styles_link:
+            # Right-clicked a link inside a message
+            def on_copyurl(event): clipboardize(url)
+            (url, urlrange), urltype = self.GetUrlAtPosition(pos), "link"
+            if urlrange[0] in self._filelinks:
+                url, urltype = self._filelinks[urlrange[0]], "file"
+                if any(url.startswith(x) for x in ["\\\\\\", "///"]):
+                    url = url[3:] # Strip redundant filelink slashes
+                if not isinstance(url, unicode):
+                    url = unicode(url, "utf-8", errors="replace")
+            item_link = wx.MenuItem(menu, -1, "C&opy %s location" % urltype)
+            menu.AppendItem(item_link)
+            menu.Bind(wx.EVT_MENU, on_copyurl, id=item_link.GetId())
+        else:
+            def on_copymsg(event):
+                t = step.Template(templates.MESSAGE_CLIPBOARD)
+                clipboardize(t.expand({"m": msg, "parser": self._parser}))
+            def on_selectall(event): self._stc.SelectAll()
+                
+            item_msg = wx.MenuItem(menu, -1, "C&opy message")
+            item_select = wx.MenuItem(menu, -1, "&Select all")
+            menu.AppendItem(item_msg), menu.AppendItem(item_select)
+            item_msg.Enable(bool(msg))
+            menu.Bind(wx.EVT_MENU, on_copymsg, id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_selectall, id=item_select.GetId())
+        self.PopupMenu(menu)
 
 
     def OnUrl(self, event):
@@ -5834,16 +6013,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         styles_link = [self._styles["link"], self._styles["boldlink"]]
         if stc.GetStyleAt(event.Position) in styles_link:
             # Go back and forth from position and get URL range.
-            url_range = {-1: -1, 1: -1} # { start and end positions }
-            for step in url_range:
-                pos = event.Position
-                while stc.GetStyleAt(pos + step) in styles_link:
-                    pos += step
-                url_range[step] = pos
-            url_range[1] += 1
-            url = stc.GetTextRange(url_range[-1], url_range[1])
+            url, url_range = self.GetUrlAtPosition(event.Position)
             function, params = None, []
-            if url_range[-1] in self._filelinks:
+            if url_range[0] in self._filelinks:
                 def start_file(url):
                     if os.path.exists(url):
                         util.start_file(url)
@@ -5851,8 +6023,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         messageBox("The file \"%s\" cannot be found "
                                    "on this computer." % url,
                                    conf.Title, wx.OK | wx.ICON_INFORMATION)
-                function, params = start_file, [self._filelinks[url_range[-1]]]
-            elif url_range[-1] in self._datelinks:
+                function, params = start_file, [self._filelinks[url_range[0]]]
+            elif url_range[0] in self._datelinks:
                 def filter_range(label, daterange):
                     busy = controls.BusyPanel(self._page or self.Parent,
                                               "Filtering messages.")
@@ -5870,7 +6042,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     finally:
                         busy.Close()
                 function = filter_range
-                params = [url, self._datelinks[url_range[-1]]]
+                params = [url, self._datelinks[url_range[0]]]
             elif url:
                 function, params = webbrowser.open, [url]
             if function:
@@ -6073,10 +6245,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._write_element(dom, rgx_highlight)
 
                 # Store message position for FocusMessage()
-                length_after = self.STC.Length
-                self._message_positions[m["id"]] = (
-                    length_before, length_after - 2
-                )
+                messagepos = (length_before, self.STC.Length - 2)
+                self._message_positions[m["id"]] = messagepos
                 if self._center_message_id == m["id"]:
                     focus_message_id = m["id"]
                 if i and not i % conf.MaxHistoryInitialMessages:
