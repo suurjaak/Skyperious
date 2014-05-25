@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.05.2014
+@modified    25.05.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -510,8 +510,7 @@ class SkypeDatabase(object):
                     sql += " AND m.convo_id = :convo_id"
                     params["convo_id"] = chat["id"]
                 if timestamp_from:
-                    sql += " AND m.timestamp %s :timestamp" % \
-                           (">" if ascending else "<")
+                    sql += " AND m.timestamp %s :timestamp" % "<>"[ascending]
                     params["timestamp"] = timestamp_from
                 if additional_sql:
                     sql += " AND (%s)" % additional_sql
@@ -1052,8 +1051,7 @@ class SkypeDatabase(object):
         SMSes.
 
         @param    messages   list of messages, or message IDs from source_db
-        @param    heartbeat  function called after every @beatcount
-                             messages inserted
+        @param    heartbeat  function called after every @beatcount message
         @param    beatcount  number of messages after which to call heartbeat
         @return              a list of inserted message IDs
         """
@@ -1535,7 +1533,7 @@ class MessageParser(object):
             self.highlight_text(dom, rgx_highlight)
 
         if dom is not None and is_html:
-            result = self.dom_to_html(dom, output)
+            result = self.dom_to_html(dom, output, message)
         elif dom is not None and output and "text" == output.get("format"):
             result = self.dom_to_text(dom)
             if output.get("wrap"):
@@ -1785,7 +1783,7 @@ class MessageParser(object):
                                 i.text = part
 
 
-    def dom_to_html(self, dom, output):
+    def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
