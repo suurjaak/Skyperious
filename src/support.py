@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    08.04.2014
+@modified    30.05.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -111,9 +111,7 @@ def check_newest_version(callback=None):
 
 
 def download_and_install(url):
-    """
-    Downloads and launches the specified file.
-    """
+    """Downloads and launches the specified file."""
     global update_window, url_opener
     try:
         is_cancelled = False
@@ -169,7 +167,6 @@ def download_and_install(url):
                  traceback.format_exc())
 
 
-
 def reporting_write(write):
     """
     Decorates a write(str) method with a handler that collects written text
@@ -192,14 +189,26 @@ def reporting_write(write):
     return cache_text
 
 
-
-def take_screenshot():
-    """Returns a wx.Bitmap screenshot taken of the whole screen."""
+def take_screenshot(fullscreen=True):
+    """Returns a wx.Bitmap screenshot taken of fullscreen or program window."""
     wx.YieldIfNeeded()
+    if fullscreen:
+        rect = wx.Rect(0, 0, *wx.DisplaySize())
+    else:
+        window = wx.GetApp().TopWindow
+        rect   = window.GetRect()
 
-    rect = wx.Rect(0, 0, *wx.DisplaySize())
-    bmp = wx.EmptyBitmap(rect.width, rect.height)
+        # adjust widths for Linux (figured out by John Torres 
+        # http://article.gmane.org/gmane.comp.python.wxpython/67327)
+        if "linux2" == sys.platform:
+            client_x, client_y = window.ClientToScreen((0, 0))
+            border_width       = client_x - rect.x
+            title_bar_height   = client_y - rect.y
+            rect.width        += (border_width * 2)
+            rect.height       += title_bar_height + border_width
+
     dc = wx.ScreenDC()
+    bmp = wx.EmptyBitmap(rect.width, rect.height)
     dc_bmp = wx.MemoryDC()
     dc_bmp.SelectObject(bmp)
     dc_bmp.Blit(0, 0, rect.width, rect.height, dc, rect.x, rect.y)
@@ -241,7 +250,7 @@ def report_error(text):
 def send_report(content, type, screenshot=""):
     """
     Posts feedback or error data to the report web service.
-    
+
     @return    True on success, False on failure
     """
     global url_opener
@@ -321,22 +330,34 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_lower = wx.BoxSizer(wx.HORIZONTAL)
         bmp = self.bmp = wx.StaticBitmap(panel, size=self.THUMB_SIZE)
         sizer_lower.Add(bmp)
-        sizer_controls = wx.GridBagSizer(vgap=8, hgap=8)
+        sizer_controls = wx.BoxSizer(wx.VERTICAL)
         self.button_ok = wx.Button(panel, label="&Confirm")
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
-        sizer_controls.Add(self.button_ok, pos=(0, 0))
-        sizer_controls.Add(self.button_cancel, pos=(0, 1))
-        cb = self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
-        sizer_controls.Add(cb, pos=(1, 0), span=(1, 2))
+        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
+        sizer_buttons.Add(self.button_cancel)
+        sizer_controls.Add(sizer_buttons)
+        self.cb_fullscreen = wx.CheckBox(panel, label="&Full screen")
+        self.button_saveimage = wx.Button(panel, label="Save &image")
+        self.button_saveimage.MinSize = (-1, 20)
+        self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
+        sizer_controls.AddStretchSpacer()
+        sizer_imagectrls = wx.BoxSizer(wx.VERTICAL)
+        sizer_imagectrls.Add(self.button_saveimage, border=8, flag=wx.BOTTOM)
+        sizer_imagectrls.Add(self.cb_fullscreen, border=20, flag=wx.BOTTOM)
+        sizer_controls.Add(sizer_imagectrls, flag=wx.ALIGN_RIGHT)
+        sizer_controls.Add(self.cb_bmp, border=5, flag=wx.TOP)
         sizer_lower.AddStretchSpacer()
-        sizer_lower.Add(sizer_controls, flag=wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
+        sizer_lower.Add(sizer_controls, flag=wx.GROW)
         sizer.Add(sizer_lower, border=8, flag=wx.LEFT | wx.RIGHT |
                   wx.BOTTOM | wx.ALIGN_BOTTOM | wx.GROW)
 
         self.Sizer.Add(panel, proportion=1, flag=wx.GROW)
+        self.Bind(wx.EVT_CHECKBOX, self.OnToggleFullScreen, self.cb_fullscreen)
         self.Bind(wx.EVT_CHECKBOX, self.OnToggleScreenshot, self.cb_bmp)
         self.Bind(wx.EVT_BUTTON, self.OnSend, self.button_ok)
         self.Bind(wx.EVT_BUTTON, self.OnCancel, self.button_cancel)
+        self.Bind(wx.EVT_BUTTON, self.OnSaveImage, self.button_saveimage)
         self.Bind(wx.EVT_CLOSE, self.OnCancel)
 
         self.SetScreenshot(None)
@@ -375,19 +396,23 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         self.cb_bmp.Value = bool(bitmap)
         self.bmp.SetBitmap(thumb)
         self.bmp.Show(self.cb_bmp.Value)
+        self.button_saveimage.Show(self.cb_bmp.Value)
+        self.cb_fullscreen.Show(self.cb_bmp.Value)
 
 
     def OnToggleScreenshot(self, event):
         """Handler for toggling screenshot on/off."""
         if self.cb_bmp.Value:
-            pos = self.Position
-            self.Hide() # Dialog window can interfere with screen copy
-            screenshot = take_screenshot()
-            self.Show()
-            self.Position = pos # Can lose position on hide in Linux
-            self.SetScreenshot(screenshot)
+            self.SetScreenshot(take_screenshot(self.cb_fullscreen.Value))
         self.bmp.Show(self.cb_bmp.Value)
+        self.button_saveimage.Show(self.cb_bmp.Value)
+        self.cb_fullscreen.Show(self.cb_bmp.Value)
         self.Layout()
+
+
+    def OnToggleFullScreen(self, event):
+        """Handler for toggling screenshot size from fullscreen to window."""
+        self.SetScreenshot(take_screenshot(self.cb_fullscreen.Value))
 
 
     def OnSend(self, event):
@@ -412,9 +437,38 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             wx.CallAfter(self._SendReport, kwargs)
 
 
+    def OnSaveImage(self, event):
+        """
+        Handler for clicking to save screenshot, opens a file dialog and
+        saves the image file.
+        """
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H%M")
+        wildcard = "Portable Network Graphics (*.png)" \
+                   "|*.png|Windows bitmap (*.bmp)|*.bmp"
+        dialog = wx.FileDialog(parent=self, message="Save screenshot",
+            defaultFile="%s screenshot %s" % (conf.Title, now),
+            wildcard=wildcard,
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER)
+        if wx.ID_OK == dialog.ShowModal() and dialog.GetPath():
+            frmt = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
+            filename = dialog.GetPath()
+            def callback():
+                try:
+                    self.screenshot.SaveFile(filename, frmt)
+                    main.logstatus("Saved screenshot %s.", filename)
+                    util.start_file(filename)
+                except Exception as e:
+                    base = "Error saving screenshot file"
+                    main.logstatus_flash(base + " %s.\n\n%s", filename, e)
+                    msg = base + "\n\n%s" % filename
+                    wx.MessageBox(msg, self.Title, wx.OK | wx.ICON_WARNING)
+            wx.CallLater(10, callback)
+
+
     def OnCancel(self, event):
         """Handler for cancelling sending feedback, hides the dialog."""
         self.Hide()
 
 
-url_opener.addheaders = [("User-agent", "%s %s (%s)" % (conf.Title, conf.Version, get_install_type()))]
+url_opener.addheaders = [("User-agent", "%s %s (%s)" %
+                          (conf.Title, conf.Version, get_install_type()))]
