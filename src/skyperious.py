@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.05.2014
+@modified    06.06.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4019,13 +4019,12 @@ class DatabasePage(wx.Panel):
         if grid_source.Table:
             if grid_source is self.grid_table:
                 table = self.db.tables[grid_source.Table.table.lower()]["name"]
-                namebase = "table \"%s\"" % table
+                title = "Table - \"%s\"" % table
                 self.dialog_savefile.Wildcard = export.TABLE_WILDCARD
             else:
-                namebase = "SQL query"
+                title = "SQL query"
                 self.dialog_savefile.Wildcard = export.QUERY_WILDCARD
                 grid_source.Table.SeekAhead(True)
-            title = "Skype - %s" % namebase
             self.dialog_savefile.Filename = util.safe_filename(title)
             self.dialog_savefile.Message = "Save table as"
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
