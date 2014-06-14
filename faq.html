@@ -49,21 +49,21 @@
         <h2>Frequently Asked Questions</h2>
 
         <ul>
-          <li><a href="#q01">Can I merge chat history from another operating system?</a></li>
-          <li><a href="#q02">How do I synchronize chat history between different computers?</a></li>
-          <li><a href="#q03">Can I use Skyperious on OS X?</a></li>
-          <li><a href="#q04">Is there any way to keep chat history in sync automatically on all my devices?</a></li>
-          <li><a href="#q05">Can I restore messages from *.dbb files that I have from an older computer?</a></li>
-          <li><a href="#q06">Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</a></li>
-          <li><a href="#q07">Do you plan to add support for doing X/Y/Z?</a></li>
-          <li><a href="#q08">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
-          <li><a href="#q09">Why does the database file size remain the same after deleting something?</a></li>
+          <li><a href="#merge-different">Can I merge chat history from another operating system?</a></li>
+          <li><a href="#sync-computers">How do I synchronize chat history between different computers?</a></li>
+          <li><a href="#osx">Can I use Skyperious on OS X?</a></li>
+          <li><a href="#autosync">Is there any way to keep chat history in sync automatically on all my devices?</a></li>
+          <li><a href="#dbb">Can I restore messages from *.dbb files that I have from an older computer?</a></li>
+          <li><a href="#logs-other">Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</a></li>
+          <li><a href="#xyz">Do you plan to add support for doing X/Y/Z?</a></li>
+          <li><a href="#csv-nonenglish">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
+          <li><a href="#sqlite-size">Why does the database file size remain the same after deleting something?</a></li>
         </ul>
         <br />
         <hr />
 
 
-        <h3><a name="q01"></a>Can I merge chat history from another operating system?</h3>
+        <h3><a name="merge-different"></a>Can I merge chat history from another operating system?</h3>
         <p>
           Yes, the .db files are the same on all platforms: Windows, OS X, Linux,
           Android and iOS.
@@ -71,7 +71,7 @@
         <br />
 
 
-        <h3><a name="q02"></a>How do I synchronize chat history between different computers?</h3>
+        <h3><a name="sync-computers"></a>How do I synchronize chat history between different computers?</h3>
         <p>
           You will need to get their Skype files onto one computer, merge them
           there, and copy the resulting file back.<br />
@@ -91,7 +91,7 @@
         <br />
 
 
-        <h3><a name="q03"></a>Can I use Skyperious on OS X?</h3>
+        <h3><a name="osx"></a>Can I use Skyperious on OS X?</h3>
         <p>
           Yes, in source code form. You will need to install a number of required packages.
           Here is an example of doing this with <a href="http://brew.sh/">Homebrew</a>:
@@ -119,7 +119,7 @@
         <br />
 
 
-        <h3><a name="q04"></a>Is there any way to keep chat history in sync automatically on all my devices?</h3>
+        <h3><a name="autosync"></a>Is there any way to keep chat history in sync automatically on all my devices?</h3>
         <p>
           Not really. If one of the devices is logged in all the time, it
           will keep the others in sync - mostly, but not always.<br />
@@ -129,7 +129,7 @@
         <br />
 
 
-        <h3><a name="q05"></a>Can I restore messages from *.dbb files that I have from an older computer?</h3>
+        <h3><a name="dbb"></a>Can I restore messages from *.dbb files that I have from an older computer?</h3>
         <p>
           Not directly, Skyperious does not work with *.dbb files. It is an old proprietary format
           that was in use prior to Skype version 4. However, Skype can automatically convert them 
@@ -148,7 +148,7 @@
         <br />
 
 
-        <h3><a name="q06"></a>Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</h3>
+        <h3><a name="logs-other"></a>Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</h3>
         <p>
           No, it only works with Skype.<br />
           <br />
@@ -159,7 +159,7 @@
         <br />
 
 
-        <h3><a name="q07"></a>Do you plan to add support for doing X/Y/Z?</h3>
+        <h3><a name="xyz"></a>Do you plan to add support for doing X/Y/Z?</h3>
         <p>
           I might add the support, if the requested functionality seems useful, 
           and more people contact me to ask for it.
@@ -167,7 +167,7 @@
         <br />
 
 
-        <h3><a name="q08"></a>Why are non-English letters like &Aring; not visible in CSV export?</h3>
+        <h3><a name="csv-nonenglish"></a>Why are non-English letters like &Aring; not visible in CSV export?</h3>
         <p>
           CSV by specification does not support non-ASCII letters, so they get
           converted to question marks. Export to an Excel spreadsheet will keep all characters.
@@ -175,7 +175,7 @@
         <br />
 
 
-        <h3><a name="q09"></a>Why does the database file size remain the same after deleting something?</h3>
+        <h3><a name="sqlite-size"></a>Why does the database file size remain the same after deleting something?</h3>
         <p>
           SQLite usually wipes the deleted data clean instead of rebuilding the file
           on each change. If you still want the file size to go down immediately,
