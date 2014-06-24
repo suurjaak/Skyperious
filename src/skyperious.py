@@ -7161,6 +7161,22 @@ class DayHourDialog(wx.Dialog):
 class SkypeHandler(Skype4Py.Skype if Skype4Py else object):
     """A convenience wrapper around Skype4Py functionality."""
 
+    def __init__(self):
+        if Skype4Py:
+            # Hack Skype4Py to avoid uncatchable error on refusing Skype access
+            def attach_override(self, status):
+                try:
+                    self.skype._CallEventHandler("AttachmentStatus", status)
+                    if status == Skype4Py.apiAttachRefused:
+                        wx.CallAfter(wx.MessageBox, "Skype API access failed.", 
+                                     conf.Title, wx.ICON_WARNING)
+                except Exception: pass
+            try:
+                Skype4Py.skype.APINotifier.attachment_changed = attach_override
+            except Exception: pass
+            Skype4Py.Skype.__init__(self)
+
+
     def shutdown(self):
         """Posts a message to the running Skype application to close itself."""
         self.Client.Shutdown()
