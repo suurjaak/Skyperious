@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    10.04.2014
+@modified    24.06.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -161,32 +161,31 @@ def get_cloud(text, additions=None):
     @param   text       text to analyze
     @param   additions  a pre-parsed list of additional words to add
     @return             in descending order of relevance, as
-                        [('word', count, font size), ]
+                        [('word', count, font size 0..7), ]
     """
     result = []
-    words = re.findall("\w{%s,}" % LENGTH_MIN, text.lower(), re.UNICODE) \
-            + (additions or [])
-    commons = set(get_common_words(words))
-    cloud = collections.defaultdict(lambda: 0)
+    words = re.findall("\w{%s,}" % LENGTH_MIN, text.lower(), re.UNICODE)
+    words += additions or []
+    commons = find_commons(words)
     # Add and count all non-common and not wholly numeric words
-    for i in filter(lambda x: x not in commons and re.search("\D", x), words):
-        cloud[i] += 1
-    # Drop rare words and limit the number of words
+    counts = collections.defaultdict(lambda: 0)
+    for w in filter(lambda x: x not in commons and re.search("\D", x), words):
+        counts[w] += 1
+    # Drop rare words, limit total number
     count_last = COUNT_MIN
-    if len(cloud) > WORDS_MAX:
-        count_last = max(count_last, sorted(cloud.values())[WORDS_MAX - 1])
-    cloud = dict((i, cloud[i]) for i in cloud if cloud[i] >= count_last)
-    count_min = min(cloud.values()) if cloud else -1
-    count_max = max(cloud.values()) if cloud else -1
-    for word, count in cloud.items():
-        size = get_word_size(count, count_min, count_max)
-        result.append((word, count, size))
+    if len(counts) > WORDS_MAX:
+        count_last = max(count_last, sorted(counts.values())[WORDS_MAX - 1])
+    counts = dict((w, c) for w, c in counts.items() if c >= count_last)
+    count_min = min(counts.values() or [0])
+    count_max = max(counts.values() or [0])
+    for word, count in counts.items():
+        result.append((word, count, get_size(count, count_min, count_max)))
     result.sort(key=lambda x: x[1], reverse=True) # Sort by count
     result = result[:WORDS_MAX]
     return result
 
 
-def get_word_size(count, count_min, count_max):
+def get_size(count, count_min, count_max):
     """
     Returns the font size for a word.
 
@@ -203,23 +202,20 @@ def get_word_size(count, count_min, count_max):
     return result
 
 
-def get_common_words(words):
+def find_commons(words):
     """
-    Returns the defined common words for the specified words, in the language
+    Returns the common words found from the specified words, in the language
     that matches best the given words.
 
     @param   words  a list of words
-    @return         a list of common words
+    @return         a set of common words found from the words
     """
-    best_matches = []
-    max_matches = 0
+    result = []
+    words = set(words)
+    for commontext in COMMON_WORDS.values():
+        allcommons = set(re.findall("\w+", commontext, re.UNICODE))
+        matches = allcommons & words
+        if len(matches) > len(result):
+            result = matches
 
-    for language, text in COMMON_WORDS.items():
-        commons = set(re.findall("\w+", text, re.UNICODE))
-        match_count = len(commons.intersection(words))
-
-        if match_count > max_matches:
-            best_matches = commons
-            max_matches = match_count
-
-    return best_matches
+    return result
