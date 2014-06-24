@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.06.2014
+@modified    24.06.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1460,15 +1460,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 unsaved_pages[page] = db.filename
         if unsaved_pages:
             response = wx.MessageBox(
-                "There are unsaved changes in data grids\n(%s). "
+                "There are unsaved changes in data grids\n(%s).\n\n"
                 "Save changes before closing?" %
                 "\n".join(textwrap.wrap(", ".join(unsaved_pages.values()))),
                 conf.Title, wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION
             )
-            if wx.YES == response:
-                for page in unsaved_pages:
-                    page.save_unsaved_grids()
             do_exit = (wx.CANCEL != response)
+            if wx.YES == response:
+                do_exit = all(p.save_unsaved_grids() for p in unsaved_pages)
         if do_exit:
             merging_pages = filter(lambda x: x.is_merging, self.merger_pages)
             merging_pages = [p.title for p in merging_pages]
@@ -1540,7 +1539,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION
                 )
                 if wx.YES == response:
-                    page.save_unsaved_grids()
+                    do_close = page.save_unsaved_grids()
                 elif wx.CANCEL == response:
                     do_close = False
             if not do_close:
@@ -2844,7 +2843,7 @@ class DatabasePage(wx.Panel):
                 % (", ".join(sorted(x.table for x in unsaved))), conf.Title,
                 wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION)
             if wx.YES == response:
-                self.save_unsaved_grids()
+                do_refresh = self.save_unsaved_grids()
             elif wx.CANCEL == response:
                 do_refresh = False
         if do_refresh:
@@ -4120,8 +4119,21 @@ class DatabasePage(wx.Panel):
 
 
     def save_unsaved_grids(self):
-        """Saves all data in unsaved table grids."""
-        [g.SaveChanges() for g in self.db_grids.values() if g.IsChanged()]
+        """Saves all data in unsaved table grids, returns success/failure."""
+        result = True
+        for grid in filter(lambda x: x.IsChanged(), self.db_grids.values()):
+            try:
+                grid.SaveChanges()
+            except Exception as e:
+                result = False
+                template = "Error saving table %s in \"%s\".\n\n%%s" % (
+                           grid.table, self.db)
+                msg, msgfull = template % e, template % traceback.format_exc()
+                main.status_flash(msg), main.log(msgfull)
+                wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                wx.CallAfter(support.report_error, msgfull)
+                break # break for grid
+        return result
 
 
     def on_change_table(self, event):
