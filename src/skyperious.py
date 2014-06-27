@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.06.2014
+@modified    27.06.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -288,7 +288,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             except (TypeError, ValueError):
                 pass
         # Schedule a check for due date, should the program run that long.
-        wx.CallLater(util.timedelta_seconds(interval) * 1000, self.update_check)
+        millis = min(sys.maxint, util.timedelta_seconds(interval) * 1000)
+        wx.CallLater(millis, self.update_check)
 
 
     def on_tray_search(self, event):
