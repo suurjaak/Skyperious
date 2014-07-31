@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  20.04.2014
+@modified  26.07.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -23,18 +23,9 @@ TARGET = os.path.join("..", "src", "images.py")
 Q3 = '"""'
 
 """Application icons of different size and colour depth."""
-APPICONS = {
-  "Icon16x16_8bit.png":  "Skyperious application 16x16 icon, 8-bit colour.",
-  "Icon16x16_32bit.png": "Skyperious application 16x16 icon, 32-bit colour.",
-  "Icon24x24_8bit.png":  "Skyperious application 24x24 icon, 8-bit colour.",
-  "Icon24x24_32bit.png": "Skyperious application 24x24 icon, 32-bit colour.",
-  "Icon32x32_8bit.png":  "Skyperious application 32x32 icon, 8-bit colour.",
-  "Icon32x32_32bit.png": "Skyperious application 32x32 icon, 32-bit colour.",
-  "Icon48x48_8bit.png":  "Skyperious application 48x48 icon, 8-bit colour.",
-  "Icon48x48_32bit.png": "Skyperious application 48x48 icon, 32-bit colour.",
-  "Icon64x64_8bit.png":  "Skyperious application 64x64 icon, 8-bit colour.",
-  "Icon64x64_32bit.png": "Skyperious application 64x64 icon, 32-bit colour.",
-}
+APPICONS = dict(("Icon{0}x{0}_{1}bit.png".format(s, b),
+                 "Skyperious application {0}x{0} icon, {1}-bit colour.".format(s, b))
+                for b in [8, 32] for s in [16, 24, 32, 48, 64])
 IMAGES = {
     "AvatarDefault.png":
         "Default avatar image for contacts without one.",

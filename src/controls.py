@@ -732,7 +732,7 @@ class PropertyDialog(wx.Dialog):
                      else tuple(typeclass(*ast.literal_eval(value)))
             isinstance(result, basestring) and result.strip()[0] # Reject empty
             return result 
-        except StandardError as e:
+        except Exception as e:
             return None
 
 

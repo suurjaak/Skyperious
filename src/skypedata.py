@@ -145,7 +145,7 @@ class SkypeDatabase(object):
         self.filename = filename
         self.basefilename = os.path.basename(self.filename)
         self.backup_created = False
-        self.consumers = set() # Registered objects, notified on clearing cache
+        self.consumers = set() # Registered objects using this database
         self.account = None    # Row from table Accounts
         self.id = None   # Accounts.skypename
         self.tables = {} # {"name": {"Name":str, "rows": 0, "columns": []}, }

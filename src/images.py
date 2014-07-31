@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    20.04.2014
+@modified    31.07.2014
 ------------------------------------------------------------------------------
 """
 try:
@@ -72,16 +72,26 @@ Icon24x24_32bit = PyEmbeddedImage(
 
 """Skyperious application 24x24 icon, 8-bit colour."""
 Icon24x24_8bit = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABt0lEQVRIx9WWP2vbUBTFf0+S"
-    "/8lOCF2Ci0vr4GSoO2UIhXyBjIZCl8yleOnSfgXTBvwJAsmQLUtaKGTLkK04QwhJaeJ2KCFN"
-    "qDGYWvU/WdLL1KGWn21FeMgddR73XL1zz5EEgJRSMoUSQggxreb/SmPKZagA24NKw+F91Wb/"
-    "d1/Z4PWTKOVncVKGCEbwpeHw6rhD9a83csKzpkutJ5UEyiva/GmPbQ5w2vS46cngV/Tp2hn6"
-    "/PkDnZj2/7S1rgfowQhcxXLtLJssprTwW5SfHT5Rqdqj7crwBG8Wopi6X7jdX31KFzatCUmU"
-    "BGvzEQppg8Hl6LqS7UubjwqNfG5WOVkC3yyXl0cdvjZdH55JaBysJlkao4cSFcDTGZ29FZNM"
-    "wn/squPxotLm3PKQYaJiKaWxkY+TjvuPnlsuH753qY/wwUT7VkgbFLNRkgOCOBL2rh0O6044"
-    "AlMXvMvFWM9EfJjlSMo/euHTNKHD21xsKHbyxw0WFZ6EQqWFNRCiKoPpQgQj0ATM6oLPN/2J"
-    "3q7w0Lib0cQEzfMzGsVs9C5ZpPHYHC3R+qMIW8smK3NGcCffm2+ymPZvyy1gEpaViewcZQAA"
-    "AABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAB3RJTUUH3gQUEBkMQIv3tAAA"
+    "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAAMAUExURQAAAACt9wC19wi1"
+    "9xi19xi99yG99ym99zG99zHG9znG90LG90rG90rO91rO92PO93vW/4Te/6Xn/63n/8bv/87v"
+    "/873/9b3/973/+////f/////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "////////////////////////////////////////////////////////////////////////"
+    "/zk5v24AAAABdFJOUwBA5thmAAAAjklEQVR42o2SWQ6AIAxEIRAxalwQUy33v6dLXVKo0X7O"
+    "K2lnilJRLPWib+QDYGg0VbcwENyp62pmoL10bQIDhrrrrUYBQD68pMGYAX88MT2mYKHp1mcG"
+    "gfa1kIII9iAOUhC9lZzvqQy0wJiCiB25zNMFyoSBZg+jFMATom6581t3PN2puPoD/jutAN6+"
+    "zwrAjS3DagoRyQAAAABJRU5ErkJggg=="
 )
 
 

@@ -328,7 +328,7 @@ def load():
         parser.read(ConfigFile)
 
         def parse_value(name):
-            try: # parser.get can throw an error if not found
+            try: # parser.get can throw an error if value not found
                 value_raw = parser.get(section, name)
             except Exception:
                 return False, None
@@ -368,17 +368,14 @@ def save():
                 (fname, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try:
-                value = getattr(module, name)
-                parser.set(section, name, json.dumps(value))
-            except Exception:
-                pass
+                parser.set(section, name, json.dumps(getattr(module, name)))
+            except Exception: pass
         for name in OptionalFileDirectives:
             try:
                 value = getattr(module, name, None)
                 if OptionalFileDirectiveDefaults.get(name) != value:
                     parser.set(section, name, json.dumps(value))
-            except Exception:
-                pass
+            except Exception: pass
         parser.write(f)
         f.close()
     except Exception:
