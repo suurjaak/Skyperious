@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.06.2014
+@modified    31.07.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1398,6 +1398,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.label_chats.ForegroundColour = conf.LabelErrorColour
             main.log("Error loading data from %s.\n\n%s", filename,
                      traceback.format_exc())
+        if db and not db.has_consumers():
+            db.close()
+            if filename in self.dbs:
+                del self.dbs[filename]
 
 
     def on_select_list_db(self, event):
@@ -7164,7 +7168,9 @@ class SkypeHandler(Skype4Py.Skype if Skype4Py else object):
 
     def __init__(self):
         if Skype4Py:
-            # Hack Skype4Py to avoid uncatchable error on refusing Skype access
+            # Hack Skype4Py to avoid uncatchable error on refusing Skype access.
+            # The original attach_override raises an exception on refusal, and
+            # as it rises in a callback thread, it cannot be caught otherwise.
             def attach_override(self, status):
                 try:
                     self.skype._CallEventHandler("AttachmentStatus", status)
