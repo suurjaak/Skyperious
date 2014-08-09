@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    19.02.2014
+@modified    09.08.2014
 ------------------------------------------------------------------------------
 """
 import functools
@@ -117,8 +117,10 @@ def collect_shortcuts(control, use_heuristics=True):
             for i in range(ctrl.GetToolsCount() + 1):
                 # wx 2.8 has no functionality for getting tools by index, so
                 # need to gather them by layout position
-                tool = ctrl.FindToolForPosition(i * ctrl.ToolSize[0], 0)
-                toolsmap[repr(tool)] = tool
+                try:
+                    tool = ctrl.FindToolForPosition(i * ctrl.ToolSize[0], 0)
+                    toolsmap[repr(tool)] = tool
+                except Exception: pass # FindTool not implemented in GTK
             for tool in filter(None, toolsmap.values()):
                 text = ctrl.GetToolShortHelp(tool.GetId())
                 parts = re.split("\(Alt-(.)\)", text, maxsplit=1)
@@ -312,8 +314,10 @@ def accelerate(window, use_heuristics=True):
                     # Toolbar shortcuts are defined in their shorthelp texts
                     toolsmap, tb = dict(), target
                     for i in range(tb.GetToolsCount() + 1):
-                        tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
-                        toolsmap[repr(tool)] = tool
+                        try:
+                            tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
+                            toolsmap[repr(tool)] = tool
+                        except Exception: pass # FindTool not implemented in GTK
                     for tool in filter(None, toolsmap.values()):
                         id = tool.GetId()
                         text = tb.GetToolShortHelp(id)
