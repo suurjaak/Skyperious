@@ -64,7 +64,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    25.05.2014
+@modified    05.08.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3034,6 +3034,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         self._ignore_textchange = False # ignore next OnText
         self._skip_autocomplete = False # skip setting textbox value in OnText
         self._lastinsertionpoint = None # For whether to show dropdown on click
+        self._value_last = "" # For resetting to last value on Esc
         self._description = description
         self._description_on = False # Is textbox filled with description?
         if not self.Value:
@@ -3141,6 +3142,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         if self and self.FindFocus() == self:
             if self._description_on:
                 self.Value = ""
+            self._value_last = self.Value
             self.SelectAll()
         elif self:
             if self._description and not self.Value:
@@ -3204,13 +3206,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self.ShowDropDown()
             skip = False
         elif event.KeyCode in [wx.WXK_BACK, wx.WXK_DELETE]:
-            #if self.Value:
             self._skip_autocomplete = True
             self.ShowDropDown()
-        try:
-            keychar = chr(event.KeyCode)
-        except:
-            keychar = str(event.KeyCode)
         if visible:
             if selected_new is not None: # Replace textbox value with new text
                 self._ignore_textchange = True
@@ -3221,6 +3218,11 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             if wx.WXK_ESCAPE == event.KeyCode:
                 self.ShowDropDown(False)
                 skip = False
+        else:
+            if wx.WXK_ESCAPE == event.KeyCode:
+                if self._value_last != self.Value:
+                    self.Value = self._value_last
+                    self.SelectAll()
         if skip:
             event.Skip()
 
