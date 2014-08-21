@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    10.04.2014
+@modified    21.08.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -1449,7 +1449,7 @@ import conf
 <tr>
   <td>
     <table cellpadding="0" cellspacing="2"><tr><td>
-        <img src="memory:HelpSearch.png" />
+        <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
         Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{conf.LinkColour}}">syntax</font></a>.<br />
         <br />
@@ -1457,7 +1457,7 @@ import conf
         search in contact information, or in chat information, <br />
         or across all database tables.
       </td></tr><tr><td nowrap align="center">
-        <b><font color="{{conf.FgColour}}">Search</font></b><br />
+        <a href="page:#search"><b><font color="{{conf.FgColour}}">Search</font></b></a><br />
     </td></tr></table>
   </td>
   <td>
