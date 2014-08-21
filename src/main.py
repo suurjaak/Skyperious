@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.04.2014
+@modified    19.08.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -626,7 +626,7 @@ class ProgressBar(threading.Thread):
         self.percent = None        # Current progress ratio in per cent
         self.value = None          # Current progress bar value
         self.bar = "%s[-%s]%s" % (foreword, " " * (self.width - 3), afterword)
-        self.progresschar = itertools.cycle(["-", "\\", "|", "/"])
+        self.progresschar = itertools.cycle("-\\|/")
         self.is_running = False
         self.update(value, draw=False)
 
