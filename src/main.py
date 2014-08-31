@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.08.2014
+@modified    22.08.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -388,8 +388,6 @@ def run_diff(filename1, filename2):
 
     chats1, chats2 = db1.get_conversations(), db2.get_conversations()
     db1.get_conversations_stats(chats1), db2.get_conversations_stats(chats2)
-    for db in [db1, db2]:
-        db.get_conversations_stats(db.get_conversations())
     bar_total = sum(c["message_count"] for c in chats1)
     bar_text = "%.*s.." % (50, " Scanning %s vs %s" % (db1, db2))
     bar = ProgressBar(max=bar_total, afterword=bar_text)

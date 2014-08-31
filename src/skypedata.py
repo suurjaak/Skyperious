@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.05.2014
+@modified    31.08.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -649,16 +649,13 @@ class SkypeDatabase(object):
         Collects statistics for all conversations and fills in the values:
         {"first_message_timestamp": int, "first_message_datetime": datetime,
          "last_message_timestamp": int, "last_message_datetime": datetime,
-         "participants": [{row from Participants,
-                           "contact": {row from Contacts}}, ],
          "message_count": message count, }.
 
         @param   chats  list of chats, as returned from get_conversations()
         """
         if log and chats:
             main.log("Statistics collection starting (%s).", self.filename)
-        stats = []
-        participants = {}
+        stats = {}
         if self.is_open() and "messages" in self.tables:
             and_str, and_val = "", []
             if chats and len(chats) == 1:
@@ -2039,7 +2036,11 @@ class MessageParser(object):
             per_day = ("%d" if per_day == int(per_day) else "%.1f") % per_day
             stats["info_items"].append(("Messages per day", per_day))
 
-        cloud = wordcloud.get_cloud(stats["cloudtext"], stats["links"])
+
+        options = {"COUNT_MIN": conf.WordCloudCountMin, 
+                   "LENGTH_MIN": conf.WordCloudLengthMin,
+                   "WORDS_MAX": conf.WordCloudWordsMax}
+        cloud = wordcloud.get_cloud(stats["cloudtext"], stats["links"], options)
         stats["wordcloud"] = cloud
         return stats
 

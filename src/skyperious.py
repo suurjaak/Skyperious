@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2014
+@modified    31.08.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1292,7 +1292,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog.Realize()
 
         if wx.ID_OK == dialog.ShowModal():
-            [setattr(conf, k, v) for k, v in dialog.GetProperties()]
+            for k, v in dialog.GetProperties():
+                # Keep numbers in sane regions
+                if type(v) in [int, long]: v = max(1, min(sys.maxint, v))
+                setattr(conf, k, v)
             conf.save()
             self.MinSize = conf.MinWindowSize
 

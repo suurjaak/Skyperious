@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.05.2014
+@modified    31.08.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.2.1"
-VersionDate = "21.05.2014"
+Version = "3.2.2"
+VersionDate = "31.08.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -58,6 +58,7 @@ OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
     "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
     "MaxSearchTableRows", "SearchContactsChunk", "SearchResultsChunk",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
 ]
 OptionalFileDirectiveDefaults = {}
 
@@ -316,6 +317,14 @@ MaxRecentFiles = 20
 """Font files used for measuring text extent in export."""
 FontXlsxFile = os.path.join(ResourceDirectory, "Carlito.ttf")
 FontXlsxBoldFile = os.path.join(ResourceDirectory, "CarlitoBold.ttf")
+
+"""Minimum character length of words to include in word cloud."""
+WordCloudLengthMin = 2
+
+"""Minimum occurrence count for words to be included in word cloud."""
+WordCloudCountMin = 2
+
+WordCloudWordsMax = 100
 
 
 def load():

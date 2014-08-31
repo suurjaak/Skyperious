@@ -64,7 +64,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.08.2014
+@modified    31.08.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -658,9 +658,9 @@ class PropertyDialog(wx.Dialog):
         tip = wx.StaticText(self.panel, label=help)
 
         ctrl.Value = self._GetValueForCtrl(value, typeclass)
-        ctrl.ToolTipString = label.ToolTipString = "Type %s%s." % (
+        ctrl.ToolTipString = label.ToolTipString = "Value of type %s%s." % (
             typeclass.__name__,
-            "" if default is None else ", default value %s" % (default, ))
+            "" if default is None else ", default %s" % repr(default))
         tip.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
         tipfont, tipfont.PixelSize = tip.Font, (0, 9)
         tip.Font = tipfont
@@ -739,7 +739,7 @@ class PropertyDialog(wx.Dialog):
     def _GetValueForCtrl(self, value, typeclass):
         """Returns the value in type suitable for appropriate wx control."""
         value = tuple(value) if isinstance(value, list) else value
-        return str(value) if int == typeclass or "wx" in typeclass.__module__ \
+        return str(value) if typeclass in [int, long]  or "wx" in typeclass.__module__ \
                else "" if value is None else value
 
 
@@ -993,7 +993,6 @@ class RangeSlider(wx.PyPanel):
             limits = (self._vals[1 - i], self._rng[i])
             for confine, limit in zip(confiners, limits):
                 try:    # Confine value between range edge and other marker
-                    former_value = value
                     value = confine(value, limit)
                 except: # Comparison fails if a value of new type is being set
                     self._vals[i] = None

@@ -9,13 +9,11 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    24.06.2014
+@modified    31.08.2014
 ------------------------------------------------------------------------------
 """
 import collections
 import re
-
-import conf
 
 """Default language for common words."""
 DEFAULT_LANGUAGE = "en"
@@ -34,6 +32,8 @@ FONTSIZE_MIN = 0
 
 """Maximum font size for words (for wx.html.HtmlWindow)."""
 FONTSIZE_MAX = 7
+
+OPTIONS = {"COUNT_MIN": COUNT_MIN, "LENGTH_MIN": LENGTH_MIN, "WORDS_MAX": WORDS_MAX}
 
 """A map of languages and common words."""
 COMMON_WORDS = {
@@ -152,7 +152,7 @@ COMMON_WORDS = {
 
 
 
-def get_cloud(text, additions=None):
+def get_cloud(text, additions=None, options=None):
     """
     Returns the word cloud for the specified text. Language of the text is
     autodetected from among English (default), Estonian and Russian, and
@@ -160,11 +160,14 @@ def get_cloud(text, additions=None):
 
     @param   text       text to analyze
     @param   additions  a pre-parsed list of additional words to add
+    @param   options    a dict of options like {"LENGTH_MIN": 3}
     @return             in descending order of relevance, as
                         [('word', count, font size 0..7), ]
     """
+    global OPTIONS
     result = []
-    words = re.findall("\w{%s,}" % LENGTH_MIN, text.lower(), re.UNICODE)
+    if options: OPTIONS.update(options)
+    words = re.findall("\w{%s,}" % OPTIONS["LENGTH_MIN"], text.lower(), re.U)
     words += additions or []
     commons = find_commons(words)
     # Add and count all non-common and not wholly numeric words
@@ -172,16 +175,16 @@ def get_cloud(text, additions=None):
     for w in filter(lambda x: x not in commons and re.search("\D", x), words):
         counts[w] += 1
     # Drop rare words, limit total number
-    count_last = COUNT_MIN
-    if len(counts) > WORDS_MAX:
-        count_last = max(count_last, sorted(counts.values())[WORDS_MAX - 1])
+    count_last = OPTIONS["COUNT_MIN"]
+    if len(counts) > OPTIONS["WORDS_MAX"]:
+        count_last = max(count_last, sorted(counts.values())[OPTIONS["WORDS_MAX"] - 1])
     counts = dict((w, c) for w, c in counts.items() if c >= count_last)
     count_min = min(counts.values() or [0])
     count_max = max(counts.values() or [0])
     for word, count in counts.items():
         result.append((word, count, get_size(count, count_min, count_max)))
     result.sort(key=lambda x: x[1], reverse=True) # Sort by count
-    result = result[:WORDS_MAX]
+    result = result[:OPTIONS["WORDS_MAX"]]
     return result
 
 
@@ -208,7 +211,7 @@ def find_commons(words):
     that matches best the given words.
 
     @param   words  a list of words
-    @return         a set of common words found from the words
+    @return         a set of common words of a language found from the words
     """
     result = []
     words = set(words)
