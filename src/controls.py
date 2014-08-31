@@ -997,7 +997,7 @@ class RangeSlider(wx.PyPanel):
                 except: # Comparison fails if a value of new type is being set
                     self._vals[i] = None
             if self._rng[0] is not None \
-            and not (self._rng[0] < value < self._rng[1]):
+            and not (self._rng[0] <= value <= self._rng[1]):
                 value = self._rng[0] if value < self._rng[0] else self._rng[1]
         self._vals_prev[i] = self._vals[i]
         self._vals[i] = value
