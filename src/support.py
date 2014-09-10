@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    30.05.2014
+@modified    09.09.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -257,7 +257,10 @@ def send_report(content, type, screenshot=""):
     try:
         data = {"content": content.encode("utf-8"), "type": type,
                 "screenshot": base64.b64encode(screenshot),
-                "version": "%s-%s" % (conf.Version, get_install_type())}
+                "version": "%s-%s" % (conf.Version, get_install_type()),
+                "info": "Python " + ".".join(map(str, sys.version_info[:3])) +
+                        "; wx " + ".".join(map(str, wx.VERSION[:4])) +
+                        "; platform " + platform.platform()}
         url_opener.open(conf.ReportURL, urllib.urlencode(data))
         main.log("Sent %s report to %s (%s).", type, conf.ReportURL, content)
         result = True
