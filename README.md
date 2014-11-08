@@ -68,7 +68,6 @@ Dependencies
 If running from source code, Skyperious needs Python 2.7 or 2.6,
 and the following 3rd-party Python packages:
 * Pillow (https://pypi.python.org/pypi/Pillow)
-  or PIL, the Python Imaging Library (http://www.pythonware.com/products/pil/)
 * pyparsing (http://pyparsing.wikispaces.com/)
 * wxPython 2.9+ (http://wxpython.org/)
 
@@ -101,7 +100,7 @@ http://suurjaak.github.com/Skyperious/downloads.html.
 * install Python: open a terminal and run `brew install python2`
 * install wxPython: run `brew install --python wxmac --devel`
   (or use a suitable binary from http://wxpython.org/download.php)
-* run `brew install PIL` (or `brew install Pillow`)
+* run `brew install Pillow`
 * run `brew install pyparsing`
 * run `brew install python-dateutil`
 * run `brew install Skype4Py`

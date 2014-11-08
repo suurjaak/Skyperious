@@ -1,4 +1,4 @@
-PIL
+Pillow
 pyparsing
 python-dateutil
 Skype4Py
