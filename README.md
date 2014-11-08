@@ -110,12 +110,12 @@ Download and extract the Skyperious source, launch skyperious.sh.
 
 ### Ubuntu/Debian ###
 
-* run `sudo aptitude install wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev`
-* run `sudo aptitude install python-wxgtk2.8 python-wxtools`
-* run `sudo aptitude install python-pip`
+* run `sudo apt-get install wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev`
+* run `sudo apt-get install python-wxgtk2.8 python-wxtools`
+* run `sudo apt-get install python-pip`
 * download and extract the Skyperious source
 * open a terminal in the extracted directory
-* run `sudo pip install -r requirements`
+* run `sudo pip install -r requirements.txt`
 
 Launch skyperious.sh.
 
