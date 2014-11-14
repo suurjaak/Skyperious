@@ -948,7 +948,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 shutil.copyfile(original, newpath)
                 success = True
             except Exception as e:
-                main.log("%s when trying to copy %s to %s.",
+                main.log("%r when trying to copy %s to %s.",
                          e, original, newpath)
                 if self.skype_handler and self.skype_handler.is_running():
                     response = wx.MessageBox(
@@ -1369,9 +1369,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         db = None
         try:
             db = self.dbs.get(filename) or skypedata.SkypeDatabase(filename)
-        except Exception as e:
+        except Exception:
             self.label_account.Value = "(database not readable)"
-            self.label_messages.Value = "Error text: %s" % e
+            self.label_messages.Value = "Error text: %s" % util.format_exc(e)
             self.label_account.ForegroundColour = conf.LabelErrorColour 
             self.label_chats.ForegroundColour = conf.LabelErrorColour
             main.log("Error opening %s.\n\n%s", filename,
@@ -1397,7 +1397,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not self.label_account.Value:
                 self.label_account.Value = "(not recognized as a Skype database)"
                 self.label_account.ForegroundColour = conf.LabelErrorColour
-            self.label_chats.Value = "Error text: %s" % e
+            self.label_chats.Value = "Error text: %s" % util.format_exc(e)
             self.label_chats.ForegroundColour = conf.LabelErrorColour
             main.log("Error loading data from %s.\n\n%s", filename,
                      traceback.format_exc())
@@ -1663,7 +1663,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     try:
                         with open(filename, "rb") as f:
                             is_accessible = True
-                    except Exception as e:
+                    except Exception:
                         pass
                     if not is_accessible and self.skype_handler \
                     and self.skype_handler.is_running():
@@ -1700,7 +1700,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     if filename in conf.RecentFiles: # Remove earlier position
                         idx = conf.RecentFiles.index(filename)
                         try: self.history_file.RemoveFileFromHistory(idx)
-                        except Exception as e: pass
+                        except Exception: pass
                     self.history_file.AddFileToHistory(filename)
                     util.add_unique(conf.RecentFiles, filename, -1,
                                     conf.MaxRecentFiles)
@@ -2625,7 +2625,7 @@ class DatabasePage(wx.Panel):
         try:
             errors = self.db.check_integrity()
         except Exception as e:
-            errors = [e.message]
+            errors = e.args[:]
         busy.Close()
         main.status_flash("")
         if not errors:
@@ -2700,8 +2700,7 @@ class DatabasePage(wx.Panel):
                     try:
                         value = str(value)
                         value = "-".join([value[:4], value[4:6], value[6:]])
-                    except Exception as e:
-                        pass
+                    except Exception: pass
                 if value:
                     if "skypeout_balance" == field:
                         value = value / (
@@ -2834,7 +2833,7 @@ class DatabasePage(wx.Panel):
             self.edit_info_sha1.Value = sha1.hexdigest()
             self.edit_info_md5.Value = md5.hexdigest()
         except Exception as e:
-            self.edit_info_sha1.Value = self.edit_info_md5.Value = u"%s" % e
+            self.edit_info_sha1.Value = self.edit_info_md5.Value = util.format_exc(e)
         self.button_check_integrity.Enabled = True
         self.button_refresh_fileinfo.Enabled = True
 
@@ -2935,7 +2934,7 @@ class DatabasePage(wx.Panel):
             try:
                 contacts = skypedata.import_contacts_file(filename)
             except Exception as e:
-                errormsg = "Error reading \"%s\".\n\n%s" % (filename, e)
+                errormsg = "Error reading \"%s\".\n\n%s" % (filename, util.format_exc(e))
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 wx.CallAfter(support.report_error, errormsg)
         if contacts is not None:
@@ -3087,7 +3086,7 @@ class DatabasePage(wx.Panel):
                 self.skype_handler.add_to_contacts(c["user"] for c in contacts)
                 main.logstatus_flash("Added %s to your Skype contacts (%s).",
                                      util.plural("person", contacts), info)
-            except Exception as e:
+            except Exception:
                 msg = "Error adding contacts:\n\n%s" % traceback.format_exc()
                 main.logstatus_flash(msg)
                 wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
@@ -3146,7 +3145,7 @@ class DatabasePage(wx.Panel):
                     messages=messages, skip=False, progress=progressfunc)
                 main.status_flash("Exported %s.", filepath)
                 util.start_file(filepath)
-            except Exception as e:
+            except Exception:
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
@@ -4003,9 +4002,8 @@ class DatabasePage(wx.Panel):
         Handler for clicking to remove sorting and filtering on a grid,
         resets the grid and its view.
         """
-        grid = self.grid_table \
-            if event.EventObject == self.button_reset_grid_table \
-            else self.grid_sql
+        is_table = (event.EventObject == self.button_reset_grid_table)
+        grid = self.grid_table if is_table else self.grid_sql
         if grid.Table and isinstance(grid.Table, SqliteGridBase):
             grid.Table.ClearSort(refresh=False)
             grid.Table.ClearFilter()
@@ -4114,7 +4112,7 @@ class DatabasePage(wx.Panel):
                 col_range = range(grid_data.GetNumberCols())
                 [self.grid_sql.AutoSizeColLabelSize(x) for x in col_range]
         except Exception as e:
-            wx.MessageBox(unicode(e).capitalize(), conf.Title,
+            wx.MessageBox(util.format_exc(e), conf.Title,
                           wx.OK | wx.ICON_WARNING)
 
 
@@ -4134,7 +4132,7 @@ class DatabasePage(wx.Panel):
                 grid.SaveChanges()
             except Exception as e:
                 result = False
-                template = "Error saving table %s in \"%s\".\n\n%%s" % (
+                template = "Error saving table %s in \"%s\".\n\n%%r" % (
                            grid.table, self.db)
                 msg, msgfull = template % e, template % traceback.format_exc()
                 main.status_flash(msg), main.log(msgfull)
@@ -4282,7 +4280,7 @@ class DatabasePage(wx.Panel):
                 self.button_export_table.Enabled = True
                 self.button_reset_grid_table.Enabled = True
                 busy.Close()
-            except Exception as e:
+            except Exception:
                 busy.Close()
                 errormsg = "Could not load table %s.\n\n%s" % \
                            (table, traceback.format_exc())
@@ -4533,7 +4531,7 @@ class DatabasePage(wx.Panel):
             self.list_chats.Populate(self.chats)
 
             wx.CallLater(100, self.load_later_data)
-        except Exception as e:
+        except Exception:
             wx.CallAfter(self.update_tabheader)
             errormsg = "Could not load chat list from %s.\n\n%s" % \
                        (self.db, traceback.format_exc())
@@ -4569,7 +4567,7 @@ class DatabasePage(wx.Panel):
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
             main.status_flash("Opened Skype database %s.", self.db)
-        except Exception as e:
+        except Exception:
             if self:
                 errormsg = "Error loading additional data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
@@ -4616,7 +4614,7 @@ class DatabasePage(wx.Panel):
                 coldata = self.db.get_table_columns(t["name"])
                 fields = [c["name"] for c in coldata]
                 self.stc_sql.AutoCompAddSubWords(t["name"], fields)
-        except Exception as e:
+        except Exception:
             if self:
                 errormsg = "Error loading table data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
@@ -5030,7 +5028,7 @@ class MergerPage(wx.Panel):
                     self.db1, messages=messages, progress=progressfunc)
                 main.logstatus_flash("Exported %s.", filepath)
                 util.start_file(filepath)
-            except Exception as e:
+            except Exception:
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
@@ -5691,7 +5689,7 @@ class MergerPage(wx.Panel):
             self.chats1 = chats1
             self.chats2 = chats2
             wx.CallLater(200, self.load_later_data)
-        except Exception as e:
+        except Exception:
             wx.CallAfter(self.update_tabheader)
             errormsg = "Could not load chat lists from %s and %s.\n\n%s" % \
                        (self.db1, self.db2, traceback.format_exc())
@@ -5856,7 +5854,7 @@ class MergerPage(wx.Panel):
                 main.log("Error loading additional data from %s or %s.\n\n%s",
                          self.db1, self.db2, traceback.format_exc())
                 wx.MessageBox("Error loading additional data from %s or %s."
-                              "\n\nError: %s." % (self.db1, self.db2, e),
+                              "\n\nError: %r." % (self.db1, self.db2, e),
                               conf.Title, wx.OK | wx.ICON_WARNING)
 
         if self:
@@ -6100,7 +6098,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         self._messages.appendleft(m)
                         if m["datetime"].date() < self._filter["daterange"][0]:
                             m_iter = None
-                    except StopIteration as e:
+                    except StopIteration:
                         m_iter = None
         last_dt = self._chat.get("last_message_datetime")
         if self._messages and last_dt \
@@ -6115,7 +6113,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 try:
                     m = m_iter.next()
                     self._messages.append(m)
-                except StopIteration as e:
+                except StopIteration:
                     m_iter = None
 
 
@@ -6361,7 +6359,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                                 in highlighted style
         """
         text = text or ""
-        if type(text) is unicode:
+        if isinstance(text, unicode):
             text = text.encode("utf-8")
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
@@ -6622,7 +6620,7 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
         self.attrs = {} # {"new": wx.grid.GridCellAttr, }
         try:
             self.SeekToRow(self.SEEK_CHUNK_LENGTH - 1)
-        except Exception as e:
+        except Exception:
             pass
         # Seek ahead on rows and get column information from there
         if self.rows_current:
@@ -6720,7 +6718,7 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
             rowdata = None
             try:
                 rowdata = self.row_iterator.next()
-            except Exception as e:
+            except Exception:
                 pass
             if rowdata:
                 idx = id(rowdata)
@@ -7021,10 +7019,8 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
 
     def SaveChanges(self):
         """
-        Saves the rows that have been changed in this table. Undo information
-        is destroyed.
+        Saves the rows that have been changed in this table. Drops undo-cache.
         """
-        # Save all existing changed rows
         try:
             for idx in self.idx_changed.copy():
                 row = self.rows_all[idx]
@@ -7054,9 +7050,9 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
                 del self.rows_all[idx]
                 self.idx_all.remove(idx)
         except Exception as e:
-            main.logstatus("Error opening saving changes in %s.\n\n%s",
+            main.logstatus("Error saving changes in %s.\n\n%s",
                            self.table, traceback.format_exc())
-            wx.MessageBox(unicode(e).capitalize(), conf.Title,
+            wx.MessageBox(util.format_exc(e), conf.Title,
                           wx.OK | wx.ICON_WARNING)
         if self.View: self.View.Refresh()
 

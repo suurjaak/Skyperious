@@ -802,7 +802,7 @@ shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 
 author_class = "remote" if m["author"] != db.id else "local"
 %>
   <tr{{' class="shifted"' if shift_row else ""}}>
-    <td class="author {{author_class}}" colspan="2">{{from_name if not is_info else ""}}</td>
+    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}">{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:

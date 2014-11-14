@@ -117,6 +117,7 @@ ARGUMENTS = {
         }, 
         {"name": "gui",
          "help": "launch Skyperious graphical program (default option)",
+         "description": "Launch Skyperious graphical program (default option)",
          "arguments": [
              {"args": ["FILE"], "nargs": "*",
               "help": "Skype database to open on startup, if any"}, ]

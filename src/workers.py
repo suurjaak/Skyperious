@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    27.04.2014
+@modified    11.09.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -139,17 +139,16 @@ class SearchThread(WorkerThread):
                     width = search.get("width", -1)
                     if width > 0:
                         dc = wx.MemoryDC()
-                        dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, 
+                        dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                             wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
-                main.log("Searching for \"%(text)s\" in %(table)s (%(db)s)." %
-                         search)
+                main.log('Searching "%(text)s" in %(table)s (%(db)s).' % search)
                 self._stop_work = False
                 self._drop_results = False
 
                 parser = skypedata.MessageParser(search["db"],
-                                                 wrapfunc=wrap_html)
+                                                 wrapper=wrap_html)
                 # {"output": text with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
                 result_type, result_count, count = None, 0, 0
@@ -359,7 +358,7 @@ class SearchThread(WorkerThread):
                 if not result:
                     result = {}
                 result["done"], result["error"] = True, traceback.format_exc()
-                result["error_short"] = "%s: %s" % (type(e).__name__, e.message)
+                result["error_short"] = repr(e)
                 self.postback(result)
 
 
@@ -543,9 +542,7 @@ class MergeThread(WorkerThread):
                           "output": info, "params": params, "chats": [] }
                 if error:
                     result["error"] = error
-                    if e:
-                        result["error_short"] = "%s: %s" % (
-                                                type(e).__name__, e.message)
+                    if e: result["error_short"] = repr(e)
                 self.postback(result)
 
 
@@ -611,9 +608,7 @@ class MergeThread(WorkerThread):
                           "params": params}
                 if error:
                     result["error"] = error
-                    if e:
-                        result["error_short"] = "%s: %s" % (
-                                                type(e).__name__, e.message)
+                    if e: result["error_short"] = repr(e)
                 self.postback(result)
 
 

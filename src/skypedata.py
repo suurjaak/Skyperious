@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.08.2014
+@modified    11.09.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1469,18 +1469,18 @@ class MessageParser(object):
     FAILURE_REASONS = {"1": "Failed", "4": "Not enough Skype Credit."}
 
 
-    def __init__(self, db, chat=None, stats=False, wrapfunc=None):
+    def __init__(self, db, chat=None, stats=False, wrapper=None):
         """
-        @param   db        SkypeDatabase instance for additional queries
-        @param   chat      chat being parsed
-        @param   stats     whether to collect message statistics
-        @param   wrapfunc  multi-line text wrap function, if any
+        @param   db       SkypeDatabase instance for additional queries
+        @param   chat     chat being parsed
+        @param   stats    whether to collect message statistics
+        @param   wrapper  multi-line text wrap function, if any
         """
         self.db = db
         self.chat = chat
         self.stats = None
         self.emoticons_unique = set()
-        self.wrapfunc = wrapfunc
+        self.wrapfunc = wrapper
         self.textwrapfunc = textwrap.TextWrapper(width=self.TEXT_MAXWIDTH,
             expand_tabs=False, replace_whitespace=False,
             break_long_words=False, break_on_hyphens=False

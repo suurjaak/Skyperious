@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    12.05.2014
+@modified    10.09.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -94,6 +94,14 @@ def format_seconds(seconds, insert=""):
                 seconds %= count
                 inter = ", "
     return formatted
+
+
+def format_exc(e):
+    """Formats an exception as Class: message, or Class: (arg1, arg2, ..)."""
+    msg = to_unicode(e.message) if e.message \
+          else u"(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
+    result = u"%s%s" % (type(e).__name__, ": " + msg if msg else "")
+    return result
 
 
 def plural(word, items=None, with_items=True):
@@ -402,13 +410,17 @@ def path_to_url(path, encoding="utf-8"):
     return url
 
 
-def to_unicode(value):
-    """Returns the value as a Unicode string."""
+def to_unicode(value, encoding=None):
+    """
+    Returns the value as a Unicode string. Tries decoding as UTF-8 if 
+    locale encoading fails.
+    """
     result = value
+    encoding = encoding or locale.getpreferredencoding()
     if not isinstance(value, unicode):
         if isinstance(value, str):
             try:
-                result = unicode(value, locale.getpreferredencoding())
+                result = unicode(value, encoding)
             except Exception:
                 result = unicode(value, "utf-8", errors="replace")
         else:
