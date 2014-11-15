@@ -66,7 +66,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses pyparsing 2.0.1,
+Skyperious uses pyparsing,
 (http://pyparsing.wikispaces.com/), released under the MIT License.
 
 Copyright (c) 2003-2013 Paul T. McGuire
@@ -122,7 +122,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses XlsxWriter 0.5.3,
+Skyperious uses XlsxWriter,
 (https://github.com/jmcnamara/XlsxWriter), released under the MIT License.
 
 Copyright (c) 2013, John McNamara <jmcnamara@cpan.org>
@@ -407,7 +407,7 @@ possibility of such damage).
 
 -------------------------------------------------------------------------------
 
-Skyperious uses Python 2.7.5 (http://www.python.org/),
+Skyperious uses Python (http://www.python.org/),
 released under the Python Software Foundation License.
 
 Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
