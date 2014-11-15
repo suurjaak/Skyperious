@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.09.2014
+@modified    14.11.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -659,32 +659,27 @@ class SkypeDatabase(object):
         if self.is_open() and "messages" in self.tables:
             and_str, and_val = "", []
             if chats and len(chats) == 1:
-                and_str = " AND convo_id in (%s)" % \
-                          ", ".join(["?"] * len(chats))
+                and_str = " AND convo_id in (%s)" % ", ".join(["?"]*len(chats))
                 and_val = [c["id"] for c in chats]
-            rows_stat = self.execute(
-                "SELECT convo_id AS id, COUNT(*) AS message_count, "
-                "MIN(timestamp) AS first_message_timestamp, "
-                "MAX(timestamp) AS last_message_timestamp, "
-                "NULL AS first_message_datetime, "
-                "NULL AS last_message_datetime "
-                "FROM messages "
-                "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
-                + and_str +
-                "GROUP BY convo_id", and_val).fetchall()
+                sql = ("SELECT convo_id AS id, COUNT(*) AS message_count, "
+                       "MIN(timestamp) AS first_message_timestamp, "
+                       "MAX(timestamp) AS last_message_timestamp, "
+                       "NULL AS first_message_datetime, "
+                       "NULL AS last_message_datetime "
+                       "FROM messages "
+                       "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
+                       + and_str + "GROUP BY convo_id")
+            rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
             chat["message_count"] = 0
-            if chat["id"] in stats:
-                stamptodate = datetime.datetime.fromtimestamp
-                data = stats[chat["id"]]
-                if data["first_message_timestamp"]:
-                    data["first_message_datetime"] = \
-                        stamptodate(data["first_message_timestamp"])
-                if data["last_message_timestamp"]:
-                    data["last_message_datetime"] = \
-                        stamptodate(data["last_message_timestamp"])
-                chat.update(data)
+            if chat["id"] not in stats: continue # for chat in chats
+            data = stats[chat["id"]]
+            stamptodate = datetime.datetime.fromtimestamp
+            for n in ["first_message", "last_message"]:
+                if data[n + "_timestamp"]: # Initialize Python datetime fields
+                    data[n + "_datetime"] = stamptodate(data[n + "_timestamp"])
+            chat.update(data)
         if log and chats:
             main.log("Statistics collected (%s).", self.filename)
 

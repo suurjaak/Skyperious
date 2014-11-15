@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    10.09.2014
+@modified    14.11.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -320,10 +320,10 @@ def pil_to_wx_image(pil_image, copy_alpha=True):
 def wx_image_to_pil(wx_image, copy_alpha=True):
     """Converts a wx.Image to PIL.Image."""
     pil_image = Image.new("RGB", wx_image.GetSize())
-    pil_image.fromstring(wx_image.Data)
+    pil_image.frombytes(wx_image.Data)
     if wx_image.HasAlpha() and copy_alpha:
         pil_image = pil_image.convert("RGBA")
-        alpha = Image.fromstring("L", wx_image.GetSize(), wx_image.AlphaData)
+        alpha = Image.frombytes("L", wx_image.GetSize(), wx_image.AlphaData)
         pil_image.putalpha(alpha)
     return pil_image
 

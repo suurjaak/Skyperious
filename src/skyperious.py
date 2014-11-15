@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.08.2014
+@modified    14.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1134,9 +1134,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     (util.plural("chat", chats), db.filename,
                     extname.upper(), export_dir))
                 wx.SafeYield() # Allow UI to refresh
-                if not db.has_consumers():
-                    db.get_conversations_stats(chats)
                 try:
+                    if not db.has_consumers():
+                        db.get_conversations_stats(chats)
                     progressfunc = lambda *args: wx.SafeYield()
                     result = export.export_chats(chats, export_dir, format, db,
                                                  progress=progressfunc)
@@ -3144,13 +3144,17 @@ class DatabasePage(wx.Panel):
                 export.export_chats([self.chat], dirname, filename, self.db,
                     messages=messages, skip=False, progress=progressfunc)
                 main.status_flash("Exported %s.", filepath)
-                util.start_file(filepath)
+                try: util.start_file(filepath)
+                except Exception:
+                    main.log("Error starting %s:\n\n%s.", filepath,
+                             traceback.format_exc())
             except Exception:
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 wx.CallAfter(support.report_error, errormsg)
+                wx.CallAfter(util.try_until, lambda: os.unlink(filepath))
             finally:
                 busy.Close()
 
@@ -4330,17 +4334,17 @@ class DatabasePage(wx.Panel):
             dates_values = [None, None] # currently filtered date range
             if chat != self.chat or (center_message_id
             and not self.stc_history.IsMessageShown(center_message_id)):
-                busy = controls.BusyPanel(self, "Loading history for %s."
-                                              % chat["title_long_lc"])
-                # Refresh last message timestamps, in case database has updated
-                self.db.get_conversations_stats([chat], log=False)
+                busy = controls.BusyPanel(self, 
+                    "Loading history for %s." % chat["title_long_lc"])
+                try:
+                    # Refresh last messages, in case database has updated
+                    self.db.get_conversations_stats([chat], log=False)
+                except Exception:
+                    main.logstatus_flash("Notice: failed to refresh %s.\n\n%s",
+                        chat["title_long_lc"], traceback.format_exc())
                 self.edit_filtertext.Value = self.chat_filter["text"] = ""
-                date_range = [
-                    chat["first_message_datetime"].date()
-                    if chat["first_message_datetime"] else None,
-                    chat["last_message_datetime"].date()
-                    if chat["last_message_datetime"] else None
-                ]
+                dts = "first_message_datetime", "last_message_datetime"
+                date_range = [chat[n].date() if chat[n] else None for n in dts]
                 self.chat_filter["daterange"] = date_range
                 self.chat_filter["startdaterange"] = date_range
                 dates_range = dates_values = date_range
@@ -4355,7 +4359,7 @@ class DatabasePage(wx.Panel):
                     self.list_participants.AssignImageList(
                         il, wx.IMAGE_LIST_SMALL)
                     index = 0
-                    # wx will open a warning dialog on image error otherwise
+                    # wx will otherwise open a warning dialog on image error
                     nolog = wx.LogNull()
                     for p in chat["participants"]:
                         b = 0
@@ -4385,9 +4389,15 @@ class DatabasePage(wx.Panel):
                     self.stc_history.FocusMessage(center_message_id)
             else:
                 self.stc_history.SetFilter(self.chat_filter)
-                self.stc_history.Populate(chat, self.db,
-                    center_message_id=center_message_id
-                )
+                try:
+                    self.stc_history.Populate(chat, self.db,
+                        center_message_id=center_message_id)
+                except Exception:
+                    errormsg = "Error loading %s:\n\n%s" % \
+                               (chat["title_long_lc"], traceback.format_exc())
+                    main.logstatus_flash(errormsg)
+                    wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+
             if self.stc_history.GetMessage(0):
                 values = [self.stc_history.GetMessage(0)["datetime"],
                     self.stc_history.GetMessage(-1)["datetime"]
@@ -4395,12 +4405,8 @@ class DatabasePage(wx.Panel):
                 dates_values = tuple(i.date() for i in values)
                 if not any(filter(None, dates_range)):
                     dates_range2 = list(dates_range)
-                    dates_range = [
-                        chat["first_message_datetime"].date()
-                        if chat["first_message_datetime"] else None,
-                        chat["last_message_datetime"].date()
-                        if chat["last_message_datetime"] else None
-                    ]
+                    dts = "first_message_datetime", "last_message_datetime"
+                    dates_range = [chat[n].date() if chat[n] else None for n in dts]
                 if not any(filter(None, dates_range)):
                     dates_range = dates_values
                 self.chat_filter["daterange"] = dates_range
