@@ -308,15 +308,6 @@ def divide_delta(td1, td2):
     return us1 / us2
 
 
-def pil_to_wx_image(pil_image, copy_alpha=True):
-    """Converts a PIL.Image to wx.Image."""
-    wx_image = wx.EmptyImage(*pil_image.size)
-    wx_image.SetData(pil_image.convert("RGB").tostring())
-    if copy_alpha and ("A" == pil_image.mode[-1]):
-        wx_image.SetAlphaData(pil_image.tostring()[3::4])
-    return wx_image
-
-
 def wx_image_to_pil(wx_image, copy_alpha=True):
     """Converts a wx.Image to PIL.Image."""
     pil_image = Image.new("RGB", wx_image.GetSize())
