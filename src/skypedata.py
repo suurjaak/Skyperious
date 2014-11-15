@@ -661,14 +661,14 @@ class SkypeDatabase(object):
             if chats and len(chats) == 1:
                 and_str = " AND convo_id in (%s)" % ", ".join(["?"]*len(chats))
                 and_val = [c["id"] for c in chats]
-                sql = ("SELECT convo_id AS id, COUNT(*) AS message_count, "
-                       "MIN(timestamp) AS first_message_timestamp, "
-                       "MAX(timestamp) AS last_message_timestamp, "
-                       "NULL AS first_message_datetime, "
-                       "NULL AS last_message_datetime "
-                       "FROM messages "
-                       "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
-                       + and_str + "GROUP BY convo_id")
+            sql = ("SELECT convo_id AS id, COUNT(*) AS message_count, "
+                   "MIN(timestamp) AS first_message_timestamp, "
+                   "MAX(timestamp) AS last_message_timestamp, "
+                   "NULL AS first_message_datetime, "
+                   "NULL AS last_message_datetime "
+                   "FROM messages "
+                   "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
+                   + and_str + "GROUP BY convo_id")
             rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:

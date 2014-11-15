@@ -130,7 +130,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.dialog_selectfolder = wx.DirDialog(
             parent=self,
-            message="Choose a directory where to search for Skype databases",
+            message="Choose a directory where to search for databases",
             defaultPath=os.getcwd(),
             style=wx.DD_DIR_MUST_EXIST | wx.RESIZE_BORDER)
         self.dialog_savefile = wx.FileDialog(
@@ -523,11 +523,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, face=self.Font.FaceName)
         BUTTONS_MAIN = [
             ("opena", "&Open a database..", images.ButtonOpenA, 
-             "Choose a Skype database from your computer to open."),
+             "Choose a database from your computer to open."),
             ("detect", "Detect databases", images.ButtonDetect,
-             "Auto-detect Skype databases from user folders."),
+             "Auto-detect databases from user folders."),
             ("folder", "&Import from folder.", images.ButtonFolder,
-             "Select a folder where to look for Skype SQLite databases "
+             "Select a folder where to look for SQLite databases "
              "(*.db files)."),
             ("missing", "Remove missing", images.ButtonRemoveMissing,
              "Remove non-existing files from the database list."),
@@ -641,7 +641,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         menu_open_database = self.menu_open_database = menu_file.Append(
             id=wx.NewId(), text="&Open database...\tCtrl-O",
-            help="Choose a Skype database file to open."
+            help="Choose a database file to open."
         )
         menu_recent = self.menu_recent = wx.Menu()
         menu_file.AppendMenu(id=wx.NewId(), text="&Recent databases",
@@ -820,12 +820,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_detect_databases(self, event):
         """
-        Handler for clicking to auto-detect Skype databases, starts the
+        Handler for clicking to auto-detect databases, starts the
         detection in a background thread.
         """
         if self.button_detect.FindFocus() == self.button_detect:
             self.list_db.SetFocus()
-        main.logstatus("Searching local computer for Skype databases..")
+        main.logstatus("Searching local computer for databases..")
         self.button_detect.Enabled = False
         self.worker_detection.work(True)
 
@@ -845,13 +845,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if "filenames" in result:
             for f in result["filenames"]:
                 if self.update_database_list(f):
-                    main.log("Detected Skype database %s.", f)
+                    main.log("Detected database %s.", f)
         if "count" in result:
-            main.logstatus_flash("Detected %d%s Skype database%s.",
-                result["count"],
-                " additional" if not (result["count"]) else "",
-                "" if result["count"] == 1 else "s"
-            )
+            name = ("" if result["count"] else "additional ") + "database"
+            main.logstatus_flash("Detected %s.", 
+                                  util.plural(name, result["count"]))
         if result.get("done", False):
             self.button_detect.Enabled = True
             wx.Bell()
@@ -1179,7 +1177,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         elif not i: # First menu item: open a file from computer
             dialog = wx.FileDialog(
                 parent=self, message="Open", defaultFile="",
-                wildcard="Skype database (*.db)|*.db|All files|*.*",
+                wildcard="SQLite database (*.db)|*.db|All files|*.*",
                 style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
             dialog.ShowModal()
             filename2 = dialog.GetPath()
@@ -1307,7 +1305,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         dialog = wx.FileDialog(
             parent=self, message="Open", defaultFile="",
-            wildcard="Skype database (*.db)|*.db|All files|*.*",
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER
         )
         if wx.ID_OK == dialog.ShowModal():
@@ -1336,20 +1334,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_add_from_folder(self, event):
         """
-        Handler for clicking to select folder where to search Skype databases,
-        adds found databases to database lists.
+        Handler for clicking to select folder where to search for databases,
+        updates database list.
         """
         if self.dialog_selectfolder.ShowModal() == wx.ID_OK:
             folder = self.dialog_selectfolder.GetPath()
-            main.logstatus("Detecting Skype databases under %s.", folder)
+            main.logstatus("Detecting databases under %s.", folder)
             count = 0
             for filename in skypedata.find_databases(folder):
                 if filename not in self.db_filenames:
-                    main.log("Detected Skype database %s.", filename)
+                    main.log("Detected database %s.", filename)
                     self.update_database_list(filename)
                     count += 1
             main.logstatus_flash("Detected %s under %s.",
-                util.plural("new Skype database", count), folder)
+                util.plural("new database", count), folder)
 
 
     def on_open_current_database(self, event):
@@ -1694,7 +1692,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if db:
                     main.log("Opened %s (%s).", db, util.format_bytes(
                              db.filesize))
-                    main.status_flash("Reading Skype database file %s.", db)
+                    main.status_flash("Reading database file %s.", db)
                     self.dbs[filename] = db
                     # Add filename to Recent Files menu and conf, if needed
                     if filename in conf.RecentFiles: # Remove earlier position
@@ -1730,7 +1728,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not db:
                 db = self.load_database(filename)
             if db:
-                main.status_flash("Opening Skype database file %s." % db)
+                main.status_flash("Opening database file %s." % db)
                 tab_title = self.get_unique_tab_title(db.filename)
                 page = DatabasePage(self.notebook, tab_title, db,
                                     self.memoryfs, self.skype_handler)
@@ -1904,7 +1902,7 @@ class DatabasePage(wx.Panel):
         self.TopLevelParent.page_db_latest = self
         self.TopLevelParent.run_console(
             "page = self.page_db_latest # Database tab")
-        self.TopLevelParent.run_console("db = page.db # Skype database")
+        self.TopLevelParent.run_console("db = page.db # SQLite database wrapper")
 
         self.Layout()
         self.toggle_filter(True)
@@ -2645,7 +2643,7 @@ class DatabasePage(wx.Panel):
                 self.dialog_savefile.Directory = directory
                 self.dialog_savefile.Filename = "%s (recovered)" % base
                 self.dialog_savefile.Message = "Save recovered data as"
-                self.dialog_savefile.Wildcard = "Skype database (*.db)|*.db"
+                self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db"
                 self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
                 if wx.ID_OK == self.dialog_savefile.ShowModal():
                     newfile = self.dialog_savefile.GetPath()
@@ -4659,7 +4657,7 @@ class MergerPage(wx.Panel):
         self.is_scanned = False # Whether global scan has been run
         self.db1 = db1
         self.db2 = db2
-        main.status("Opening Skype databases %s and %s.", self.db1, self.db2)
+        main.status("Opening databases %s and %s.", self.db1, self.db2)
         self.db1.register_consumer(self)
         self.db2.register_consumer(self)
         self.title = title
@@ -4746,7 +4744,7 @@ class MergerPage(wx.Panel):
         self.TopLevelParent.run_console(
             "page12 = self.page_merge_latest # Merger tab")
         self.TopLevelParent.run_console(
-            "db1, db2 = page12.db1, page12.db2 # Chosen Skype databases")
+            "db1, db2 = page12.db1, page12.db2 # Chosen databases")
 
         self.Layout()
         self.load_data()
@@ -5869,7 +5867,7 @@ class MergerPage(wx.Panel):
             if not self.is_scanned:
                 self.button_scan_all.Enabled = True
                 self.button_merge_all.Enabled = True
-            main.status_flash("Opened Skype databases %s and %s.",
+            main.status_flash("Opened databases %s and %s.",
                               self.db1, self.db2)
             self.page_merge_all.Layout()
             self.Refresh()
