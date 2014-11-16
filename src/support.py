@@ -474,5 +474,8 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         self.Hide()
 
 
-url_opener.addheaders = [("User-agent", "%s %s (%s)" %
-                          (conf.Title, conf.Version, get_install_type()))]
+url_opener.addheaders = [("User-agent", "%s %s (%s) (Python %s; wx %s; %s)" % (
+    conf.Title, conf.Version, get_install_type(),
+    ".".join(map(str, sys.version_info[:3])),
+    ".".join(map(str, wx.VERSION[:4])), platform.platform()
+))]
