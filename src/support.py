@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    09.09.2014
+@modified    16.11.2014
 ------------------------------------------------------------------------------
 """
 import base64
@@ -343,6 +343,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         self.cb_fullscreen = wx.CheckBox(panel, label="&Full screen")
         self.button_saveimage = wx.Button(panel, label="Save &image")
         self.button_saveimage.MinSize = (-1, 20)
+        self.button_saveimage.ToolTipString = "Save screenshot to file."
         self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
         sizer_controls.AddStretchSpacer()
         sizer_imagectrls = wx.BoxSizer(wx.VERTICAL)
@@ -435,7 +436,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         if text:
             self.Hide()
             kwargs = {"type": "feedback", "content": text}
-            if bmp: kwargs["screenshot"] = util.wx_bitmap_to_raw(bmp)
+            if bmp: kwargs["screenshot"] = util.img_wx_to_raw(bmp)
             main.status("Submitting feedback..")
             wx.CallAfter(self._SendReport, kwargs)
 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    14.11.2014
+@modified    16.11.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -24,11 +24,14 @@ import tempfile
 import time
 import urllib
 
-from PIL import Image
-try:
+try: # Most functionality works without PIL, used for image resizing
+    from PIL import Image, ImageFile
+except ImportError:
+    Image = ImageFile = None
+try: # Most functionality works without wx, used for image resizing
     import wx
 except ImportError:
-    pass # Most functionality works without wx
+    wx = None
 
 
 def m(o, name, case_insensitive=True):
@@ -308,24 +311,88 @@ def divide_delta(td1, td2):
     return us1 / us2
 
 
-def wx_image_to_pil(wx_image, copy_alpha=True):
-    """Converts a wx.Image to PIL.Image."""
-    pil_image = Image.new("RGB", wx_image.GetSize())
-    pil_image.frombytes(wx_image.Data)
-    if wx_image.HasAlpha() and copy_alpha:
-        pil_image = pil_image.convert("RGBA")
-        alpha = Image.frombytes("L", wx_image.GetSize(), wx_image.AlphaData)
-        pil_image.putalpha(alpha)
-    return pil_image
+def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
+    """Recodes and/or resizes the raw image, using wx or PIL."""
+    result = raw
+    if wx:
+        img = wx.ImageFromStream(cStringIO.StringIO(raw))
+        if size: img = img_wx_resize(img, size, aspect_ratio)
+        result = img_wx_to_raw(img, format)
+    elif ImageFile:
+        imgparser = ImageFile.Parser(); imgparser.feed(raw)
+        img = imgparser.close()
+        if size: img = img_pil_resize(img, size, aspect_ratio)
+        stream = cStringIO.StringIO()
+        img.save(stream, format)
+        result = stream.getvalue()
+    return result
 
 
-def wx_bitmap_to_raw(wx_bitmap, format="PNG"):
-    """Returns the wx.Bitmap or wx.Image as raw data of specified type."""
+def img_size(raw):
+    """Returns the size of the as (width, height), using wx or PIL."""
+    result = None
+    if wx:
+        result = tuple(wx.ImageFromStream(cStringIO.StringIO(raw)).GetSize())
+    elif ImageFile:
+        imgparser = ImageFile.Parser(); imgparser.feed(raw)
+        result = tuple(imgparser.close().size)
+    return result
+
+
+def img_wx_to_raw(img, format="PNG"):
+    """Returns the wx.Image or wx.Bitmap as raw data of specified type."""
     stream = cStringIO.StringIO()
-    img = wx_bitmap if isinstance(wx_bitmap, wx.Image) \
-          else wx_bitmap.ConvertToImage()
-    wx_image_to_pil(img).save(stream, format)
+    img = img if isinstance(img, wx.Image) else img.ConvertToImage()
+    fmttype = getattr(wx, "BITMAP_TYPE_" + format.upper(), wx.BITMAP_TYPE_PNG)
+    img.SaveStream(stream, fmttype)
     result = stream.getvalue()
+    return result
+
+
+def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
+    """
+    Returns a resized wx.Image or wx.Bitmap, centered if aspect ratio rescale
+    resulted in free space on one axis.
+    """
+    result = img if isinstance(img, wx.Image) else img.ConvertToImage()
+    if size:
+        size1, size2 = list(result.GetSize()), list(size)
+        if size2 != size1:
+            align_pos = None
+            if size1[0] < size[0] and size1[1] < size[1]:
+                size2 = tuple(size1)
+                align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+            elif aspect_ratio:
+                ratio = safedivf(*size1[:2])
+                size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
+                align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+            if size1[0] > size[0] or size1[1] > size[1]:
+                result = result.ResampleBox(*size2)
+            if align_pos:
+                result.Resize(size, align_pos, *bg)
+    return result
+
+
+def img_pil_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
+    """
+    Returns a resized PIL.Image, centered if aspect ratio rescale resulted in 
+    free space on one axis.
+    """
+    result = img
+    if size and list(size) != list(result.size):
+        size2, align_pos = list(size), None
+        if result.size[0] < size[0] and img.size[1] < size[1]:
+            size2 = result.size
+            align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+        elif aspect_ratio:
+            ratio = safedivf(*result.size[:2])
+            size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
+            align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+        if result.size[0] > size[0] or result.size[1] > size[1]:
+            result.thumbnail(tuple(map(int, size2)), Image.ANTIALIAS)
+        if align_pos:
+            result, result0 = Image.new(img.mode, size, bg), result
+            result.paste(result0, tuple(map(int, align_pos)))
     return result
 
 

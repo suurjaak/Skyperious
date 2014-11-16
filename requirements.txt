@@ -1,8 +1,8 @@
-PIL
 pyparsing
-python-dateutil
-Skype4Py
 XlsxWriter
+python-dateutil
+Pillow
+Skype4Py
 
 # wxPython is not available via pip. Can be installed in Ubuntu with:
-#   sudo apt-get install python-wxgtk2.8 python-wxtools wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev
+#   sudo apt-get install wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev python-wxgtk2.8 python-wxtools

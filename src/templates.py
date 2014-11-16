@@ -357,10 +357,10 @@ import conf, emoticons, images, skypedata, util
 <%
 p["avatar_class"] = "avatar__default"
 p["avatar_class_large"] = "avatar_large__default"
+id_csssafe = urllib.quote(p["identity"]).replace("%", "___").replace(".", "___").replace("/", "___")
 %>
 %if p["avatar_raw_large"]:
 <%
-id_csssafe = urllib.quote(p["identity"]).replace("%", "___").replace(".", "___").replace("/", "___")
 p["avatar_class_large"] = "avatar_large__" + id_csssafe
 %>
     span.{{p["avatar_class_large"]}} {
@@ -375,6 +375,9 @@ p["avatar_class"] = "avatar__" + id_csssafe
     span.{{p["avatar_class"]}} {
       background: url("data:image/png;base64,{{base64.b64encode(p["avatar_raw_small"])}}")
                   center center no-repeat;
+%if not (util.wx or util.Image): # If wx/PIL not available, images are not resized
+      background-size: contain;
+%endif
     }
 %endif
 %endfor
@@ -385,6 +388,8 @@ p["avatar_class"] = "avatar__" + id_csssafe
       background: url("data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}") center center no-repeat;
       margin: 0 10px 0 10px;
       display: block;
+%endif
+%if chat_picture_size:
       width: {{chat_picture_size[0]}}px;
       height: {{chat_picture_size[1]}}px;
 %endif
@@ -593,7 +598,7 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %endif
       </div>
 %endfor
-%elif chat_picture_size:
+%elif chat_picture_raw:
       <span id="chat_picture" title="{{chat["title"]}}"></span>
 %endif
     </td>

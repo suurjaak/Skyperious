@@ -64,7 +64,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    31.08.2014
+@modified    16.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -79,7 +79,9 @@ import wx
 import wx.html
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.gradientbutton
-import wx.lib.agw.shapedbutton
+try: # ShapedButton requires PIL, might not be installed
+    import wx.lib.agw.shapedbutton
+except Exception: pass 
 import wx.lib.embeddedimage
 import wx.lib.mixins.listctrl
 import wx.lib.newevent
@@ -2336,94 +2338,82 @@ class SearchableStyledTextCtrl(wx.PyPanel):
             wx.BORDER_STATIC, wx.BORDER_SUNKEN, wx.BORDER_THEME, wx.BORDER
         ]
         style_sub = reduce(lambda a, b: a & ~b, nobits, style | wx.BORDER_NONE)
-        self._stc = wx.stc.StyledTextCtrl(id=id, parent=self,
-            style=style_sub, name=name
-        )
+        self._stc = wx.stc.StyledTextCtrl(self, id, style=style_sub, name=name)
 
-        self._button_toggle = wx.lib.agw.shapedbutton.SBitmapButton(
-            parent=self._stc, id=wx.ID_ANY, size=(20, 20),
-            bitmap=wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(16, 16))
-        )
-        self._button_toggle.SetUseFocusIndicator(False) # Hide focus marquee
+        bmp = wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(16, 16))
+        try: # ShapedButton might be unavailable if PIL not installed
+            self._button_toggle = wx.lib.agw.shapedbutton.SBitmapButton(
+                parent=self._stc, id=wx.ID_ANY, size=(20, 20), bitmap=bmp)
+            self._button_toggle.SetUseFocusIndicator(False) # Hide focus marquee
+        except Exception:
+            self._button_toggle = wx.BitmapButton(self._stc, wx.ID_ANY, bmp,
+                (20, 20), style = wx.NO_BORDER)
+            bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+            self._button_toggle.BackgroundColour = bgcolour
         self._button_toggle.SetToolTipString("Show search bar (Ctrl-F)")
 
         panel = self._panel_bar = wx.Panel(parent=self)
         sizer_bar = panel.Sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._label_search = wx.StaticText(parent=panel,
-            label=self.SEARCH_LABEL
-        )
+        self._label_search = wx.StaticText(panel, label=self.SEARCH_LABEL)
         self._edit = wx.TextCtrl(parent=panel, style=wx.TE_PROCESS_ENTER,
-            value=self.SEARCH_DESCRIPTIVE_TEXT, size=(self.SEARCH_WIDTH, -1)
-        )
+            value=self.SEARCH_DESCRIPTIVE_TEXT, size=(self.SEARCH_WIDTH, -1))
         self._edit.SetForegroundColour(self.SEARCH_DESCRIPTIVE_COLOUR)
         self._button_next = wx.lib.agw.gradientbutton.GradientButton(
             parent=panel, label=self.BUTTON_NEXT_LABEL, size=(-1, 26),
-            bitmap=self.IMG_NEXT.GetBitmap()
-        )
+            bitmap=self.IMG_NEXT.GetBitmap())
         self._button_prev = wx.lib.agw.gradientbutton.GradientButton(
             parent=panel, label=self.BUTTON_PREV_LABEL, size=(-1, 26),
-            bitmap=self.IMG_PREV.GetBitmap()
-        )
+            bitmap=self.IMG_PREV.GetBitmap())
         for b in [self._button_next, self._button_prev]:
-            b.SetForegroundColour   (self.BUTTON_FGCOLOUR)
-            b.SetTopStartColour     (self.BUTTON_BGCOLOUR_TOP)
-            b.SetTopEndColour       (self.BUTTON_BGCOLOUR_MIDDLE)
-            b.SetBottomStartColour  (self.BUTTON_BGCOLOUR_MIDDLE)
-            b.SetBottomEndColour    (self.BUTTON_BGCOLOUR_BOTTOM)
-            b.SetPressedTopColour   (self.BUTTON_BGCOLOUR_MIDDLE)
+            b.SetBaseColours(self.BUTTON_BGCOLOUR_MIDDLE, self.BUTTON_FGCOLOUR)
+            b.SetTopStartColour(self.BUTTON_BGCOLOUR_TOP)
+            b.SetBottomEndColour(self.BUTTON_BGCOLOUR_BOTTOM)
             b.SetPressedBottomColour(self.BUTTON_BGCOLOUR_BOTTOM)
         # Linux tweak: as GradientButtons get their background from their
         # parent, and backgrounds might not propagate well through the window
         # hierarchy, set the parent background to a guaranteed proper one.
-        panel.BackgroundColour = self._label_search.BackgroundColour
+        panel.BackgroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
 
         self._cb_case = wx.CheckBox(parent=panel, label=self.CB_CASE_LABEL)
         self._cb_wholeword = wx.CheckBox(
             parent=panel, label=self.CB_WHOLEWORD_LABEL
         )
         self._cb_regex = wx.CheckBox(parent=panel, label=self.CB_REGEX_LABEL)
-        self._button_close = wx.lib.agw.shapedbutton.SBitmapButton(
-            parent=panel, id=wx.ID_ANY, size=(16, 16),
-            bitmap=self.IMG_CLOSE.GetBitmap()
-        )
-        self._button_close.SetUseFocusIndicator(False) # Hide focus marquee
+        try: # ShapedButton might be unavailable if PIL not installed
+            self._button_close = wx.lib.agw.shapedbutton.SBitmapButton(
+                parent=panel, id=wx.ID_ANY, size=(16, 16),
+                bitmap=self.IMG_CLOSE.GetBitmap())
+            self._button_close.SetUseFocusIndicator(False) # Hide focus marquee
+        except Exception:
+            self._button_close = wx.BitmapButton(panel, wx.ID_ANY,
+                self.IMG_CLOSE.GetBitmap(), (20, 20), style = wx.NO_BORDER)
         self._button_close.SetToolTipString("Hide search bar.")
         sizer_bar.Add(self._label_search, border=5,
-            flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL
-        )
+            flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         sizer_bar.Add(self._edit, border=5,
-            flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL
-        )
+            flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         sizer_bar.Add(self._button_next, border=5, flag=wx.LEFT)
         sizer_bar.Add(self._button_prev, border=5, flag=wx.LEFT)
         sizer_bar.AddStretchSpacer()
         for i in [self._cb_case, self._cb_wholeword, self._cb_regex]:
             sizer_bar.Add(i, border=5,
-                flag=wx.RIGHT | wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL
-            )
+                flag=wx.RIGHT | wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
         sizer_bar.Add(self._button_close,
-            flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL
-        )
+            flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
 
-        # AddMany tuples: (item, proportion=0, flag=0, border=0).
-        item_child = (self._stc, 1, wx.EXPAND)
-        item_bar = (panel, 0, wx.EXPAND | wx.ALL, 5)
-        items = [item_child, item_bar]
+        # AddMany item tuple structure: (item, proportion=0, flag=0, border=0).
+        items = [(self._stc, 1, wx.EXPAND), (panel, 0, wx.EXPAND | wx.ALL, 5)]
         if self._bar_pos != wx.BOTTOM:
-            item_bar = (panel, 0,
-                wx.EXPAND | wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5
-            )
-            items = [item_bar, item_chile]
+            item = (panel, 0, wx.EXPAND | wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+            items = [item, items[0]]
         self.Sizer.AddMany(items)
         self._panel_bar.Hide()
 
         self._stc.Bind(wx.EVT_KEY_UP, self.OnKeyUpCtrl)
-        self._stc.Bind(
-            wx.stc.EVT_STC_PAINTED, lambda e: self.UpdateToggleButton()
-        )
-        self._stc.Bind(
-            wx.stc.EVT_STC_UPDATEUI, lambda e: self.UpdateToggleButton()
-        )
+        self._stc.Bind(wx.stc.EVT_STC_PAINTED,
+                       lambda e: self.UpdateToggleButton())
+        self._stc.Bind(wx.stc.EVT_STC_UPDATEUI,
+                       lambda e: self.UpdateToggleButton())
         self._edit.Bind(wx.EVT_SET_FOCUS, self.OnFocusSearch)
         self._edit.Bind(wx.EVT_KILL_FOCUS, self.OnFocusSearch)
         self._edit.Bind(wx.EVT_TEXT_ENTER, lambda e: self.DoSearch())
@@ -2432,9 +2422,8 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         self._button_next.Bind(wx.EVT_BUTTON, self.OnButtonSearchNext)
         self._button_prev.Bind(wx.EVT_BUTTON, self.OnButtonSearchPrev)
         self._button_close.Bind(wx.EVT_BUTTON, self.OnButtonClose)
-        self._button_toggle.Bind(
-            wx.EVT_BUTTON, lambda e: self.ToggleSearchBar()
-        )
+        self._button_toggle.Bind(wx.EVT_BUTTON,
+                                 lambda e: self.ToggleSearchBar())
         self.Bind(wx.EVT_SIZE, self.OnSize)
         self.Layout()
 

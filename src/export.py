@@ -8,23 +8,25 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.04.2014
+@modified    16.11.2014
 ------------------------------------------------------------------------------
 """
 import collections
+import cStringIO
 import csv
 import datetime
 import os
 import re
 import traceback
 
-from PIL import ImageFile, ImageFont
+try: # ImageFont for calculating column widths in Excel export, not required.
+    from PIL import ImageFont
+except ImportError:
+    ImageFont = None
 try:
     import xlsxwriter
-    XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|"
 except ImportError:
     xlsxwriter = None
-    XLSX_WILDCARD = ""
 
 from third_party import step
 
@@ -36,13 +38,17 @@ import skypedata
 import templates
 import util
 
-try: # Used in measuring text extent for Excel column auto-width.
+try: # Used in measuring text extent for Excel column auto-width
     FONT_XLSX = ImageFont.truetype(conf.FontXlsxFile, 15)
     FONT_XLSX_BOLD = ImageFont.truetype(conf.FontXlsxBoldFile, 15)
-except IOError:
+except IOError: # Fall back to PIL default font if font files not on disk
     FONT_XLSX = FONT_XLSX_BOLD = ImageFont.load_default()
+except Exception: # Fall back to a simple mono-spaced calculation if no PIL
+    FONT_MONO = type('', (), {"getsize": lambda self, s: (8*len(s), 12)})()
+    FONT_XLSX = FONT_XLSX_BOLD = FONT_MONO
 
 """FileDialog wildcard strings, matching extensions lists and default names."""
+XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|" if xlsxwriter else ""
 CHAT_WILDCARD = ("HTML document (*.html)|*.html|Text document (*.txt)|*.txt|"
                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
 CHAT_EXTS = ["html", "txt", "xlsx", "csv"] if xlsxwriter \
@@ -190,10 +196,8 @@ def export_chat_template(chat, filename, db, messages):
                               "chat_picture_raw": None, })
             if chat["meta_picture"]:
                 raw = skypedata.fix_image_raw(chat["meta_picture"])
-                imgparser = ImageFile.Parser(); imgparser.feed(raw)
-                img = imgparser.close()
-                namespace.update(chat_picture_size=img.size,
-                                 chat_picture_raw=raw)
+                namespace["chat_picture_raw"] = raw
+                namespace["chat_picture_size"] = util.img_size(raw)
             for p in chat["participants"]:
                 contact = p["contact"].copy()
                 namespace["participants"].append(contact)
@@ -205,7 +209,7 @@ def export_chat_template(chat, filename, db, messages):
                     raw = skypedata.get_avatar_raw(contact, conf.AvatarImageSize)
                     if raw:
                         p["contact"]["avatar_raw_small"] = raw
-                raw = bmp and util.wx_bitmap_to_raw(bmp) or raw
+                raw = bmp and util.img_wx_to_raw(bmp) or raw
                 if raw:
                     if not raw_large:
                         size_large = conf.AvatarImageLargeSize

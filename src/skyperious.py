@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.11.2014
+@modified    16.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -162,7 +162,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             bmp = getattr(images, "Help" + name, None)
             if not bmp: continue # Continue for name in [..]
             bmp = bmp.Image.AdjustChannels(*tint_factor)
-            raw = util.wx_bitmap_to_raw(bmp)
+            raw = util.img_wx_to_raw(bmp)
             filename = "Help%s.png" % name
             self.memoryfs["handler"].AddFile(filename, raw, wx.BITMAP_TYPE_PNG)
             self.memoryfs["files"][filename] = 1

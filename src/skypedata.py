@@ -31,7 +31,6 @@ import traceback
 import urllib
 import xml.etree.cElementTree
 
-from PIL import Image, ImageFile
 try:
     import wx
 except ImportError:
@@ -2152,97 +2151,49 @@ def import_contacts_file(filename):
     return contacts
 
 
-def get_avatar_pil(datadict, size=None, keep_aspect_ratio=True):
-    """
-    Returns a PIL.Image for the contact/account avatar, if any.
-
-    @param   datadict           row from Contacts or Accounts
-    @param   size               (width, height) to resize image to, if any
-    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
-                                resizing, filling the outside in white
-    """
-    result = None
-    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
-    if raw:
-        try:
-            data = fix_image_raw(raw)
-            imgparser = ImageFile.Parser(); imgparser.feed(data)
-            img = imgparser.close()
-
-            if size and list(size) != list(img.size):
-                size2, align_pos = list(size), None
-                if img.size[0] < size[0] and img.size[1] < size[1]:
-                    size2 = img.size
-                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
-                elif keep_aspect_ratio:
-                    ratio = util.safedivf(img.size[0], img.size[1])
-                    size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
-                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
-                if img.size[0] > size[0] or img.size[1] > size[1]:
-                    img.thumbnail(tuple(map(int, size2)), Image.ANTIALIAS)
-                if align_pos:
-                    img, img0 = Image.new(img.mode, size, "white"), img
-                    img.paste(img0, tuple(map(int, align_pos)))
-            result = img
-        except Exception as e:
-            main.log("Error loading avatar image for %s (%s).",
-                     datadict["skypename"], e)
-    return result
-
-
-def get_avatar(datadict, size=None, keep_aspect_ratio=True):
+def get_avatar(datadict, size=None, aspect_ratio=True):
     """
     Returns a wx.Bitmap for the contact/account avatar, if any.
 
-    @param   datadict           row from Contacts or Accounts
-    @param   size               (width, height) to resize image to, if any
-    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
-                                resizing, filling the outside in white
+    @param   datadict      row from Contacts or Accounts
+    @param   size          (width, height) to resize image to, if any
+    @param   aspect_ratio  if True, keeps image aspect ratio is on resizing,
+                           filling the outside in white
     """
     result = None
-    raw = datadict.get("avatar_image") or datadict.get("profile_attachments")
+    raw = fix_image_raw(datadict.get("avatar_image") or 
+                        datadict.get("profile_attachments") or "")
     if raw:
         try:
-            data = fix_image_raw(raw)
-            img = wx.ImageFromStream(cStringIO.StringIO(data))
-
+            img = wx.ImageFromStream(cStringIO.StringIO(raw))
             if size and list(size) != list(img.GetSize()):
-                align_pos, size2 = None, list(size)
-                if keep_aspect_ratio:
-                    ratio = util.safedivf(img.Width, img.Height)
-                    size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
-                    align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
-                img = img.ResampleBox(*size2)
-                if align_pos:
-                    img.Resize(size, align_pos, 255, 255, 255)
-            result = wx.BitmapFromImage(img)
+                img = util.img_wx_resize(img, size, aspect_ratio)
+            result = img.ConvertToBitmap()
         except Exception as e:
-            main.log("Error loading avatar image for %s (%s).",
-                     datadict["skypename"], e)
+            main.log("Error loading avatar image for %s.\n\n%s",
+                     datadict["skypename"], traceback.format_exc())
     return result
 
 
-def get_avatar_raw(datadict, size=None, keep_aspect_ratio=True, format="PNG"):
+def get_avatar_raw(datadict, size=None, aspect_ratio=True, format="PNG"):
     """
     Returns the contact/account avatar image, if any, as raw encoded image.
 
-    @param   datadict           row from Contacts or Accounts
-    @param   size               (width, height) to resize larger image down to,
-                                if any
-    @param   keep_aspect_ratio  if True, keeps image aspect ratio is on
-                                resizing, filling the outside in white
-    @param   format             image format type as supported by PIL
+    @param   datadict      row from Contacts or Accounts
+    @param   size          (width, height) to resize larger image down to,
+                           if any
+    @param   aspect_ratio  if True, keeps image aspect ratio is on resizing,
+                            filling the outside in white
+    @param   format        image format type as supported by PIL or wx
     """
-    result = ""
-    try:
-        img = get_avatar_pil(datadict, size, keep_aspect_ratio)
-        if img:
-            stream = cStringIO.StringIO()
-            img.save(stream, format)
-            result = stream.getvalue()
-    except Exception as e:
-        main.log("Error creating avatar JPG for %s (%s).",
-                 datadict["skypename"], e)
+    result = fix_image_raw(datadict.get("avatar_image") or
+                           datadict.get("profile_attachments") or "")
+    if result and (size or format):
+        try:
+            result = util.img_recode(result, format, size, aspect_ratio)
+        except Exception as e:
+            main.log("Error creating avatar for %s.\n\n%s",
+                     datadict["skypename"], traceback.format_exc())
     return result
 
 
