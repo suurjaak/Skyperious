@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.10.2014
+@modified    20.10.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.2.2b"
-VersionDate = "17.10.2014"
+Version = "3.2.2c"
+VersionDate = "20.10.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -297,6 +297,24 @@ PlotFilesColour = "#33DD66"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
+"""Colour for 24h histogram plot."""
+PlotHoursColour = "#2d578b"
+
+"""Colour for date histogram plot."""
+PlotDaysColour = "#2d8b57"
+
+"""24h histogram bar rectangle full size as (width, height)."""
+PlotHoursUnitSize = (4, 30)
+
+"""Date histogram bar rectangle full size as (width, height)."""
+PlotDaysUnitSize = (13, 30)
+
+"""Chat total 24 histogram bar rectangle size as (width, height)."""
+PlotChatHoursUnitSize = (4, 50)
+
+"""Chat total date histogram bar rectangle full size as (width, height)."""
+PlotChatDaysUnitSize = (13, 50)
+
 """
 Width and height tuple of the avatar image, shown in chat data and export HTML
 statistics."""
@@ -306,7 +324,7 @@ AvatarImageSize = (32, 32)
 AvatarImageLargeSize = (96, 96)
 
 """Width of the chat statistics plots, in pixels."""
-StatisticsPlotWidth = 350
+StatisticsPlotWidth = 150
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000

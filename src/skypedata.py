@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.11.2014
+@modified    20.11.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1459,6 +1459,9 @@ class MessageParser(object):
     """Replacer callback for low bytes unusable in XML (\x00 etc)."""
     SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape")
 
+    """Number of bins in statistics days histogram."""
+    HISTOGRAM_BINS = 10
+
     """Mapping known failure reason codes to """
     FAILURE_REASONS = {"1": "Failed", "4": "Not enough Skype Credit."}
 
@@ -1485,7 +1488,11 @@ class MessageParser(object):
                           "startdate": None, "enddate": None, "wordcloud": [],
                           "cloudtext": "", "links": [], "last_message": "",
                           "chars": 0, "smschars": 0, "files": 0, "bytes": 0,
-                          "calldurations": 0, "info_items": []}
+                          "calldurations": 0, "info_items": [],
+                          "totalhist": {}, # Chat histogram {"hours": {0: 7,}, "days": {datetime.date: 4,}, "maxperday": 135, "maxperhour": 33}
+                          "hists": {}, # Author histograms {"author1": {"hours": {0:, }, "days": {datetime.date:, }} }
+                          "workhist": collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(int))),
+                          "maxmsgsauthordays": 0, "maxmsgsauthorhours": 0} # Additional data for histogram
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1916,6 +1923,9 @@ class MessageParser(object):
             MESSAGES_TYPE_FILE, MESSAGES_TYPE_MESSAGE]
         and author not in self.stats["counts"]):
             self.stats["counts"][author] = author_stats.copy()
+        hourkey, daykey = message["datetime"].hour, message["datetime"].date()
+        self.stats["workhist"]["hours"][hourkey][author] += 1
+        self.stats["workhist"]["days"][daykey][author] += 1
 
         if MESSAGES_TYPE_SMS == message["type"]:
             self.stats["smses"] += 1
@@ -2027,9 +2037,39 @@ class MessageParser(object):
 
         if delta_date is not None:
             per_day = util.safedivf(stats["messages"], delta_date.days + 1)
-            per_day = ("%d" if per_day == int(per_day) else "%.1f") % per_day
+            per_day = util.round_float(per_day)
             stats["info_items"].append(("Messages per day", per_day))
 
+
+            # Fill author and chat hourly histogram
+            histbase = {"hours": dict((x, 0) for x in range(24)), "days": {}}
+            stats["totalhist"] = histbase
+            stats["hists"] = {}
+            stats["maxmsgsauthordays"] = stats["maxmsgsauthorhours"] = 0
+            for hour, counts in stats["workhist"]["hours"].items():
+                for author, count in counts.items():
+                    if author not in stats["hists"]:
+                        stats["hists"][author] = copy.deepcopy(histbase)
+                    stats["hists"][author]["hours"][hour] += count
+                    stats["totalhist"]["hours"][hour] += count
+                    stats["maxmsgsauthorhours"] = max(count, stats["maxmsgsauthorhours"])
+            days = util.timedelta_seconds(delta_date) / 86400 / self.HISTOGRAM_BINS
+            step = datetime.timedelta(max(1, int(math.ceil(days))))
+            for x in range(self.HISTOGRAM_BINS):
+                bindate = (stats["startdate"] + step * x).date()
+                stats["totalhist"]["days"][bindate] = 0
+                for author in stats["hists"]:
+                    stats["hists"][author]["days"][bindate] = 0
+            for date, counts in sorted(stats["workhist"]["days"].items()):
+                bindate = stats["startdate"].date()
+                while bindate + step < date: bindate += step
+                for author, count in counts.items():
+                    stats["hists"][author]["days"][bindate] += count
+                    stats["totalhist"]["days"][bindate] += count
+            for a, hists in stats["hists"].items():
+                stats["maxmsgsauthordays"] = max(hists["days"].values() + [stats["maxmsgsauthordays"]])
+
+        #stats["workhist"].clear() # Drop unneeded memory @todo can't drop, called consecutively
 
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
                    "LENGTH_MIN": conf.WordCloudLengthMin,

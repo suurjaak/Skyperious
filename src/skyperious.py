@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.11.2014
+@modified    20.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4428,22 +4428,63 @@ class DatabasePage(wx.Panel):
 
     def populate_chat_statistics(self):
         """Populates html_stats with chat statistics and word cloud."""
-        stats_html = self.stc_history.GetStatisticsHtml(self.stats_sort_field)
-        if stats_html:
-            fs, fn = self.memoryfs, "avatar__default.jpg"
-            if fn not in fs["files"]:
-                bmp = images.AvatarDefault.Bitmap
-                fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
-                fs["files"][fn] = 1
+        stats, stats_html = self.stc_history.GetStatisticsData(), ""
+        if stats:
+            participants = [p["contact"] for p in self.chat["participants"]]
+            data = {"db": self.db, "participants": participants,
+                    "chat": self.chat, "sort_by": self.stats_sort_field,
+                    "stats": stats, "images": {}, "authorimages": {}}
 
+            # Fill avatar images
+            fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
+            if defaultavatar not in fs["files"]:
+                bmp = images.AvatarDefault.Bitmap
+                fs["handler"].AddFile(defaultavatar, bmp, wx.BITMAP_TYPE_BMP)
+                fs["files"][defaultavatar] = 1
             for p in self.chat["participants"]:
                 if "avatar_bitmap" in p["contact"]:
-                    vals = (self.db.filename.encode("utf-8"), p["identity"])
+                    vals = (p["identity"], self.db.filename.encode("utf-8"))
                     fn = "%s_%s.jpg" % tuple(map(urllib.quote, vals))
                     if fn not in fs["files"]:
                         bmp = p["contact"]["avatar_bitmap"]
                         fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
                         fs["files"][fn] = 1
+                    data["authorimages"][p["identity"]] = {"avatar": fn}
+                else:
+                    data["authorimages"][p["identity"]] = {"avatar": defaultavatar}
+
+            # Fill chat total histogram plot images
+            PLOTCONF = {"days": (conf.PlotChatDaysUnitSize, conf.PlotDaysColour),
+                        "hours": (conf.PlotChatHoursUnitSize, conf.PlotHoursColour)}
+            for histtype, histdata in stats["totalhist"].items():
+                vals = (self.chat["identity"], histtype,
+                        self.db.filename.encode("utf-8"))
+                fn = "%s_%s_%s.png" % tuple(map(urllib.quote, vals))
+                if fn in fs["files"]:
+                    fs["handler"].RemoveFile(fn)
+                bardata = sorted(histdata.items())
+                barsize, barcolour = PLOTCONF[histtype]
+                bmp = controls.BuildHistogram(bardata, barsize, barcolour)
+                fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                fs["files"][fn] = 1
+                data["images"][histtype] = fn
+            # Fill author histogram plot images
+            PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour, max(stats["totalhist"]["hours"].values())),
+                        "hours": (conf.PlotHoursUnitSize, conf.PlotHoursColour, max(stats["totalhist"]["days"].values()))}
+            for author, hists in stats["hists"].items():
+                for histtype, histdata in hists.items():
+                    vals = (author, histtype, self.chat["identity"],
+                            self.db.filename.encode("utf-8"))
+                    fn = "%s_%s_%s_%s.png" % tuple(map(urllib.quote, vals))
+                    if fn in fs["files"]:
+                        fs["handler"].RemoveFile(fn)
+                    bardata = sorted(histdata.items())
+                    barsize, barcolour, barmax = PLOTCONF[histtype]
+                    bmp = controls.BuildHistogram(bardata, barsize, barcolour, barmax)
+                    fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                    fs["files"][fn] = 1
+                    data["authorimages"][author][histtype] = fn
+            stats_html = step.Template(templates.STATS_HTML).expand(data)
 
         previous_anchor = self.html_stats.OpenedAnchor
         previous_scrollpos = getattr(self.html_stats, "_last_scroll_pos", None)
@@ -6555,18 +6596,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
     )
 
 
-    def GetStatisticsHtml(self, sort_field="name"):
+    def GetStatisticsData(self):
         """
-        Returns the statistics collected during last Populate as HTML, or "".
+        Returns the statistics collected during last Populate(), or {}.
         """
-        result = ""
-        stats = self._parser and self._parser.get_collected_stats()
-        if stats:
-            participants = [p["contact"] for p in self._chat["participants"]]
-            data = {"db": self._db, "participants": participants,
-                    "chat": self._chat, "sort_by": sort_field, "stats": stats }
-            result = step.Template(templates.STATS_HTML).expand(data)
-        return result
+        return self._parser.get_collected_stats() if self._parser else {}
 
 
     def ClearAll(self):

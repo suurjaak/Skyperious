@@ -58,13 +58,16 @@ Stand-alone GUI components for wx:
   on 09.02.2006 in wxPython-users thread "TextCtrlAutoComplete",
   http://wxpython-users.1045709.n5.nabble.com/TextCtrlAutoComplete-td2348906.html
 
+- def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
+  Paints and returns a wx.Bitmap with histogram plot from data.
+
 ------------------------------------------------------------------------------
 This file is part of Skyperious - a Skype database viewer and merger.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    16.11.2014
+@modified    20.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -88,6 +91,10 @@ import wx.lib.newevent
 import wx.lib.wordwrap
 import wx.stc
 
+
+# Convenience methods for getting a cached wx.Brush or wx.Pen
+BRUSH = lambda c, s=wx.SOLID: wx.TheBrushList.FindOrCreateBrush(c, s)
+PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
 
 
 class BusyPanel(wx.Window):
@@ -340,14 +347,13 @@ class NoteButton(wx.PyPanel, wx.Button):
 
     def Draw(self, dc):
         """Draws the control on the given device context."""
+        global BRUSH, PEN
         width, height = self.GetClientSize()
         if not self.Shown or not (width > 20 and height > 20):
             return
         if not self._extent_label:
             self.WrapTexts()
 
-        PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
-        BRUSH = lambda c, s=wx.SOLID: wx.TheBrushList.FindOrCreateBrush(c, s)
         x, y = 10, 10
         if (self._align & wx.ALIGN_RIGHT):
             x = width - 10 - self._bmp.Size.width
@@ -1070,6 +1076,7 @@ class RangeSlider(wx.PyPanel):
 
 
     def Draw(self, dc):
+        global BRUSH, PEN
         width, height = self.GetClientSize()
         if not width or not height:
             return
@@ -1083,8 +1090,6 @@ class RangeSlider(wx.PyPanel):
         if not any(filter(None, self._rng)):
             return
 
-        PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
-        BRUSH = lambda c, s=wx.SOLID: wx.TheBrushList.FindOrCreateBrush(c, s)
         timedelta_micros = lambda delta: delta.days * 86400 * 1000000 \
                                + delta.seconds * 1000000 + delta.microseconds
 
@@ -3335,3 +3340,35 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         self._ignore_textchange = True
         return wx.TextCtrl.SetValue(self, value)
     Value = property(GetValue, SetValue)
+
+
+
+def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
+    """Paints and returns a wx.Bitmap with histogram plot from data."""
+    global BRUSH, PEN
+    BGCOLOUR, BORDER = "white", 1
+    RECT_STEP = barsize[0] + (1 if barsize[0] < 10 else 2)
+    w, h = len(data) * RECT_STEP + BORDER + 1, barsize[1] + 2 * BORDER
+    bmp = wx.EmptyBitmap(w, h)
+    dc = wx.MemoryDC()
+    dc.SelectObject(bmp)
+    dc.Brush = BRUSH(BGCOLOUR, wx.SOLID)
+    dc.Pen = PEN(colour)
+    dc.Clear()
+    dc.DrawRectangle(0, 0, w, h)
+
+    bars = []
+    safediv = lambda a, b: a / float(b) if b else 0.0
+    maxval = maxval if maxval is not None else max(zip(*data)[1])
+    for i, (interval, val) in enumerate(data):
+        h = barsize[1] * safediv(val, maxval)
+        if 0 < h < 1.5:
+            h = 1.5 # Very low values produce no visual bar
+        x = i * RECT_STEP + BORDER + 1
+        y = bmp.Height - h
+        bars.append((x, y, barsize[0], h))
+    dc.Brush = BRUSH(colour, wx.SOLID)
+    dc.DrawRectangleList(bars)
+
+    dc.SelectObject(wx.NullBitmap)
+    return bmp

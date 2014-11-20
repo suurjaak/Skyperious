@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    15.11.2014
+@modified    20.11.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -245,7 +245,12 @@ import conf, emoticons, images, skypedata, util
       vertical-align: top;
       width: 150px;
     }
-    #stats_data > tbody > tr.stats_row > td:last-child {
+    #stats_data > tbody > tr:first-child > td:nth-child(2),
+    #stats_data > tbody > tr > td:nth-child(4),
+    #stats_data > tbody > tr > td:nth-child(5) {
+      vertical-align: top;
+    }
+    #stats_data > tbody > tr.stats_row > td:nth-child(3) {
       padding-left: 5px;
       line-height: 16px;
       white-space: nowrap;
@@ -259,6 +264,17 @@ import conf, emoticons, images, skypedata, util
     #stats_data .avatar {
       float: left;
       padding: 0 5px 5px 0;
+    }
+    #stats_data > tbody > tr > td:nth-child(4) {
+      color: {{conf.PlotHoursColour}};
+      vertical-align: bottom;
+    }
+    #stats_data > tbody > tr > td:nth-child(5) {
+      color: {{conf.PlotDaysColour}};
+      vertical-align: bottom;
+    }
+    .svg_hover_group:hover {
+      opacity: 0.6;
     }
     table.plot_table {
       white-space: nowrap;
@@ -646,11 +662,76 @@ p["avatar_class"] = "avatar__" + id_csssafe
 
   <div id="statistics">
     <table id="stats_data">
+      <tr><td>
 %for label, value in stats["info_items"]:
-      <tr><td>{{label}}:</td><td colspan="2">{{value}}</td></tr>
+      <div>{{label}}</div>
 %endfor
+      </td><td>
+%for label, value in stats["info_items"]:
+      <div>{{value}}</div>
+%endfor
+      </td><td></td><td>
+%if stats.get("totalhist", {}).get("hours"):
+<%
+RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 3, 4, 50, 1
+MAXVAL = max(stats["totalhist"]["hours"].values())
+%>
+        <svg width="{{24 * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
+          <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotHoursColour}}; fill: none;" />
+%for i, (hour, val) in enumerate(stats["totalhist"]["hours"].items()):
+<%
+height = RECTHEIGHT * util.safedivf(val, MAXVAL)
+if 0 < height < 1: height = max(0.5, height) # Very low values produce no visible bar
+title = "%02d. hour: %s" % (hour, util.plural("message", val))
+%>
+          <g class="svg_hover_group">
+            <rect width="{{RECTWIDTH}}" fill="{{conf.PlotHoursColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
+            <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
+          </g>
+%endfor
+        </svg>
+      <br />24h activity
+%endif
+      </td><td>
+%if stats.get("totalhist", {}).get("days"):
+<%
+RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 13, 15, 50, 1
+MAXVAL = max(stats["totalhist"]["days"].values())
+daydatas = sorted(stats["totalhist"]["days"].items())
+STEP = daydatas[1][0] - daydatas[0][0]
+%>
+        <svg width="{{len(daydatas) * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
+          <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotDaysColour}}; fill: none;" />
+%for i, (date, val) in enumerate(daydatas):
+<%
+height = RECTHEIGHT * util.safedivf(val, MAXVAL)
+if 0 < height < 1: height = max(0.5, height) # Very low values produce no bar
+if STEP > datetime.timedelta(1):
+  date2 = date + STEP
+  datetitle = "%s .. %s, %s days" % (date.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), STEP.days)
+else:
+  datetitle = date.strftime("%Y-%m-%d")
+title = "%s: %s" % (datetitle, util.plural("message", val))
+%>
+
+        <g class="svg_hover_group">
+          <rect width="{{RECTWIDTH}}" fill="{{conf.PlotDaysColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
+          <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
+       </g>
+%endfor
+        </svg>
+<%
+days = sorted(stats["totalhist"]["days"])
+STEP = days[1] - days[0]
+delta_date = stats["enddate"] - stats["startdate"]
+datetitle = "%s day intervals" % STEP.days
+%>
+      <br />{{datetitle}}
+%endif
+      </td></tr>
+
 %if len(stats["counts"]) > 1:
-      <tr><td></td><td><div id="sort_header"><b>Sort by:</b>
+      <tr id="stats_header"><td></td><td colspan="4"><div id="sort_header"><b>Sort by:</b>
         <a title="Sort statistics by name" href="#" onClick="return sort_stats(this, 'name');" class="selected">Name</a>
 %if stats["messages"]:
         <a title="Sort statistics by messages" href="#" onClick="return sort_stats(this, 'message');">Messages</a>
@@ -667,7 +748,8 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %if stats["transfers"]:
         <a title="Sort statistics by files sent" href="#" onClick="return sort_stats(this, 'file');">Files</a>
 %endif
-      </div></td><td></td></tr>
+      </div></td>
+      </tr>
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], participants):
       <tr class="stats_row">
@@ -717,6 +799,57 @@ else:
 %>
           <div class="{{label}}">{{text}}</div>
 %endfor
+        </td>
+        <td>
+%if stats.get("hists", {}).get(p["identity"], {}).get("hours"):
+<%
+RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 3, 4, 30, 1
+%>
+          <svg width="{{24 * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
+            <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotHoursColour}}; fill: none;" />
+%for i, (hour, val) in enumerate(stats["hists"][p["identity"]]["hours"].items()):
+<%
+height = RECTHEIGHT * util.safedivf(val, stats["maxmsgsauthorhours"])
+if 0 < height < 1: height = max(0.5, height) # Very low values produce no visible bar
+title = "%02d. hour: %s" % (hour, util.plural("message", val))
+%>
+          <g class="svg_hover_group">
+              <rect width="{{RECTWIDTH}}" fill="{{conf.PlotHoursColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
+              <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
+          </g>
+%endfor
+          </svg>
+%endif
+        </td>
+        <td>
+%if stats.get("hists", {}).get(p["identity"], {}).get("days"):
+<%
+RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 13, 15, 30, 1
+days = sorted(stats["hists"][p["identity"]]["days"].items())
+STEP = days[1][0] - days[0][0]
+%>
+          <svg width="{{len(days) * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
+            <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotDaysColour}}; fill: none;" />
+%for i, (date, val) in enumerate(days):
+<%
+height = RECTHEIGHT * util.safedivf(val, stats["maxmsgsauthordays"])
+if 0 < height < 1: height = max(0.5, height) # Very low values produce no bar
+if STEP > datetime.timedelta(1):
+  date2 = date + STEP
+  datetitle = "%s .. %s, %s days" % (date.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), STEP.days)
+else:
+  datetitle = date.strftime("%Y-%m-%d")
+if util.safedivf(val, stats["maxmsgsauthordays"]) > 1:
+    print "Trevooga!", val, stats["maxmsgsauthordays"]
+title = "%s: %s" % (datetitle, util.plural("message", val))
+%>
+            <g class="svg_hover_group">
+              <rect width="{{RECTWIDTH}}" fill="{{conf.PlotDaysColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
+              <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
+            </g>
+%endfor
+          </svg>
+%endif
         </td>
       </tr>
 %endfor
@@ -1030,7 +1163,7 @@ STATS_HTML = """<%
 import datetime, urllib
 import conf, skypedata, util
 %>
-<font color="{{conf.FgColour}}">
+<font color="{{conf.FgColour}}" face="{{conf.HistoryFontName}}" size="3">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="top"><b>Statistics for currently shown messages in {{chat["title_long_lc"]}}:</b></a></td>
 %if stats.get("wordcloud"):
@@ -1039,25 +1172,43 @@ import conf, skypedata, util
 </tr><tr><td><font size="0">&nbsp;</font></td></tr></table>
 <br />
 <table>
-%for label, value in stats["info_items"]:
-  <tr><td width="200" valign="top">{{label}}:</td><td valign="top">{{value}}</td></tr>
+%for i, (label, value) in enumerate(stats["info_items"]):
+  <tr>
+    <td width="180" valign="top">{{label}}:</td><td valign="top">{{value}}</td>
+%if not i:
+    <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="right">
+      <span align="left"><img src="memory:{{images["hours"]}}" /><br />
+        <span align="left"><font color="{{conf.PlotHoursColour}}" size="2">24h activity</font></span>
+      </span>
+    </td>
+    <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="left">
+      <img src="memory:{{images["days"]}}" /><br />
+<%
+dates = sorted(stats["totalhist"]["days"])
+interval = (dates[1] - dates[0]).days
+%>
+      <div align="left"><font color="{{conf.PlotDaysColour}}" size="2">{{interval}} day intervals</font></div>
+    </td>
+%endif
+  </tr>
 %endfor
 
 %if len(stats["counts"]) > 1:
-  <tr><td><br /><br /></td><td valign="bottom"><font size="2">
+  <tr><td><br /><br /></td><td colspan="3" valign="bottom"><font size="2">
     <table cellpadding="0" cellspacing="0"><tr>
       <td nowrap="nowrap"><b>Sort by:&nbsp;&nbsp;&nbsp;</b></td>
 %for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files")]:
 %if "name" == name or stats[name]:
 %if sort_by == name:
-      <td><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      <td nowrap="nowrap"><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</td>
 %else:
-      <td><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      <td nowrap="nowrap"><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</td>
 %endif
 %endif
 %endfor
     </tr></table>
-  </font></td></tr>
+  </font></td>
+  </tr>
 %endif
 
 <%
@@ -1068,9 +1219,6 @@ participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], 
 
 %for p in participants_sorted:
 <%
-avatar_filename = "avatar__default.jpg"
-if "avatar_bitmap" in p:
-    avatar_filename = "%s_%s.jpg" % tuple(map(urllib.quote, (db.filename.encode("utf-8"), p["identity"])))
 stat_rows = [] # [(type, label, count, total)]
 if stats["counts"][p["identity"]]["messages"]:
   stat_rows.append(("messages", "message", stats["counts"][p["identity"]]["messages"], stats["messages"]))
@@ -1089,14 +1237,14 @@ if stats["counts"][p["identity"]]["files"]:
   <tr>
     <td valign="top">
       <table cellpadding="0" cellspacing="0"><tr>
-        <td valign="top"><img src="memory:{{avatar_filename}}"/>&nbsp;&nbsp;</td>
+        <td valign="top"><img src="memory:{{authorimages[p["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
         <td valign="center">{{p["name"]}}<br /><font size="2" color="gray">{{p["identity"]}}</font></td>
       </tr></table>
     </td><td valign="top">
 %for type, label, count, total in stat_rows:
 <%
 percent = int(round(util.safedivf(count * 100, total)))
-text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 9) else ""
+text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 30) else ""
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 if "byte" == label:
   text_cell3 = util.format_bytes(count)
@@ -1112,6 +1260,8 @@ else:
       </tr></table>
 %endfor
     </td>
+    <td valign="top" align="right"><img src="memory:{{authorimages[p["identity"]]["hours"]}}"/></td>
+    <td valign="top" align="left"><img src="memory:{{authorimages[p["identity"]]["days"]}}"/></td>
   </tr>
 %endfor
   
@@ -1377,7 +1527,7 @@ ABOUT_TEXT = """<%
 import sys
 import conf
 %>
-<font size="2" face="Tahoma" color="{{conf.FgColour}}">
+<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
 <img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
 <b>{{conf.Title}} version {{conf.Version}}</b>, {{conf.VersionDate}}.<br /><br />
