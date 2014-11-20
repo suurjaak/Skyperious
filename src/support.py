@@ -16,6 +16,7 @@ import datetime
 import hashlib
 import HTMLParser
 import os
+import platform
 import re
 import sys
 import tempfile
