@@ -8,14 +8,14 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    20.11.2014
+@modified    21.11.2014
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
 #import base64, datetime, os, re, string, sys, urllib, wx
-#import conf, emoticons, images, skypedata, util
+#import conf, emoticons, images, skypedata, step, templates, util
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
@@ -26,7 +26,8 @@ SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 """HTML chat history export template."""
 CHAT_HTML = """<%
 import base64, datetime, urllib
-import conf, emoticons, images, skypedata, util
+import conf, emoticons, images, skypedata, templates, util
+from third_party import step
 %>
 <!DOCTYPE HTML><html>
 <head>
@@ -274,7 +275,7 @@ import conf, emoticons, images, skypedata, util
       vertical-align: bottom;
     }
     .svg_hover_group:hover {
-      opacity: 0.6;
+      opacity: 0.7;
     }
     table.plot_table {
       white-space: nowrap;
@@ -673,60 +674,23 @@ p["avatar_class"] = "avatar__" + id_csssafe
       </td><td></td><td>
 %if stats.get("totalhist", {}).get("hours"):
 <%
-RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 3, 4, 50, 1
-MAXVAL = max(stats["totalhist"]["hours"].values())
+svgdata = {
+    "data":     sorted(stats["totalhist"]["hours"].items()),
+    "maxval":   max(stats["totalhist"]["hours"].values()),
+    "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
-        <svg width="{{24 * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
-          <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotHoursColour}}; fill: none;" />
-%for i, (hour, val) in enumerate(stats["totalhist"]["hours"].items()):
-<%
-height = RECTHEIGHT * util.safedivf(val, MAXVAL)
-if 0 < height < 1: height = max(0.5, height) # Very low values produce no visible bar
-title = "%02d. hour: %s" % (hour, util.plural("message", val))
-%>
-          <g class="svg_hover_group">
-            <rect width="{{RECTWIDTH}}" fill="{{conf.PlotHoursColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
-            <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
-          </g>
-%endfor
-        </svg>
-      <br />24h activity
+{{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
+        <br />24h activity
 %endif
       </td><td>
 %if stats.get("totalhist", {}).get("days"):
 <%
-RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 13, 15, 50, 1
-MAXVAL = max(stats["totalhist"]["days"].values())
-daydatas = sorted(stats["totalhist"]["days"].items())
-STEP = daydatas[1][0] - daydatas[0][0]
+svgdata = {"data":     sorted(stats["totalhist"]["days"].items()),
+           "maxval":   max(stats["totalhist"]["days"].values()),
+           "colour":   conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize }
 %>
-        <svg width="{{len(daydatas) * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
-          <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotDaysColour}}; fill: none;" />
-%for i, (date, val) in enumerate(daydatas):
-<%
-height = RECTHEIGHT * util.safedivf(val, MAXVAL)
-if 0 < height < 1: height = max(0.5, height) # Very low values produce no bar
-if STEP > datetime.timedelta(1):
-  date2 = date + STEP
-  datetitle = "%s .. %s, %s days" % (date.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), STEP.days)
-else:
-  datetitle = date.strftime("%Y-%m-%d")
-title = "%s: %s" % (datetitle, util.plural("message", val))
-%>
-
-        <g class="svg_hover_group">
-          <rect width="{{RECTWIDTH}}" fill="{{conf.PlotDaysColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
-          <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
-       </g>
-%endfor
-        </svg>
-<%
-days = sorted(stats["totalhist"]["days"])
-STEP = days[1] - days[0]
-delta_date = stats["enddate"] - stats["startdate"]
-datetitle = "%s day intervals" % STEP.days
-%>
-      <br />{{datetitle}}
+{{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
+        <br />{{"%s-day intervals" % (svgdata["data"][1][0] - svgdata["data"][0][0]).days}}
 %endif
       </td></tr>
 
@@ -774,7 +738,7 @@ if stats["counts"][p["identity"]]["files"]:
 %for type, label, count, total in stat_rows:
 <%
 percent = util.safedivf(count * 100, total)
-text_cell1 = "%d%%" % round(percent) if (round(percent) > 9) else ""
+text_cell1 = "%d%%" % round(percent) if (round(percent) > 14) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
 if "byte" == label:
   text_total = util.format_bytes(total)
@@ -803,52 +767,23 @@ else:
         <td>
 %if stats.get("hists", {}).get(p["identity"], {}).get("hours"):
 <%
-RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 3, 4, 30, 1
+svgdata = {
+    "data":     sorted(stats["hists"][p["identity"]]["hours"].items()),
+    "maxval":   max(stats["totalhist"]["hours"].values()),
+    "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
-          <svg width="{{24 * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
-            <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotHoursColour}}; fill: none;" />
-%for i, (hour, val) in enumerate(stats["hists"][p["identity"]]["hours"].items()):
-<%
-height = RECTHEIGHT * util.safedivf(val, stats["maxmsgsauthorhours"])
-if 0 < height < 1: height = max(0.5, height) # Very low values produce no visible bar
-title = "%02d. hour: %s" % (hour, util.plural("message", val))
-%>
-          <g class="svg_hover_group">
-              <rect width="{{RECTWIDTH}}" fill="{{conf.PlotHoursColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
-              <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
-          </g>
-%endfor
-          </svg>
+{{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
 %endif
         </td>
         <td>
 %if stats.get("hists", {}).get(p["identity"], {}).get("days"):
 <%
-RECTWIDTH, RECTSTEP, RECTHEIGHT, BORDER = 13, 15, 30, 1
-days = sorted(stats["hists"][p["identity"]]["days"].items())
-STEP = days[1][0] - days[0][0]
+svgdata = {
+    "data":     sorted(stats["hists"][p["identity"]]["days"].items()),
+    "maxval":   max(stats["totalhist"]["days"].values()),
+    "colour":   conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize }
 %>
-          <svg width="{{len(days) * RECTSTEP + 2 * BORDER}}" height="{{RECTHEIGHT + 2 * BORDER}}">
-            <rect width="100%" height="100%" style="stroke-width: {{BORDER}}; stroke: {{conf.PlotDaysColour}}; fill: none;" />
-%for i, (date, val) in enumerate(days):
-<%
-height = RECTHEIGHT * util.safedivf(val, stats["maxmsgsauthordays"])
-if 0 < height < 1: height = max(0.5, height) # Very low values produce no bar
-if STEP > datetime.timedelta(1):
-  date2 = date + STEP
-  datetitle = "%s .. %s, %s days" % (date.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), STEP.days)
-else:
-  datetitle = date.strftime("%Y-%m-%d")
-if util.safedivf(val, stats["maxmsgsauthordays"]) > 1:
-    print "Trevooga!", val, stats["maxmsgsauthordays"]
-title = "%s: %s" % (datetitle, util.plural("message", val))
-%>
-            <g class="svg_hover_group">
-              <rect width="{{RECTWIDTH}}" fill="{{conf.PlotDaysColour}}" height="{{util.round_float(height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{util.round_float(RECTHEIGHT - height + BORDER, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
-              <rect width="{{RECTWIDTH}}" fill="white" height="{{util.round_float(RECTHEIGHT - height, 2)}}" x="{{i * RECTSTEP + BORDER + 1}}" y="{{BORDER}}" title="{{title}}"><title>{{title}}</title></rect>
-            </g>
-%endfor
-          </svg>
+{{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
 %endif
         </td>
       </tr>
@@ -1171,15 +1106,15 @@ import conf, skypedata, util
 %endif
 </tr><tr><td><font size="0">&nbsp;</font></td></tr></table>
 <br />
+<font size="2">
 <table>
 %for i, (label, value) in enumerate(stats["info_items"]):
   <tr>
     <td width="180" valign="top">{{label}}:</td><td valign="top">{{value}}</td>
 %if not i:
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="right">
-      <span align="left"><img src="memory:{{images["hours"]}}" /><br />
-        <span align="left"><font color="{{conf.PlotHoursColour}}" size="2">24h activity</font></span>
-      </span>
+      <img src="memory:{{images["hours"]}}" /><br />
+      <font color="{{conf.PlotHoursColour}}" size="2">24h activity</font>
     </td>
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="left">
       <img src="memory:{{images["days"]}}" /><br />
@@ -1187,7 +1122,7 @@ import conf, skypedata, util
 dates = sorted(stats["totalhist"]["days"])
 interval = (dates[1] - dates[0]).days
 %>
-      <div align="left"><font color="{{conf.PlotDaysColour}}" size="2">{{interval}} day intervals</font></div>
+      <font color="{{conf.PlotDaysColour}}" size="2">{{interval}}-day intervals</font>
     </td>
 %endif
   </tr>
@@ -1213,7 +1148,7 @@ interval = (dates[1] - dates[0]).days
 
 <%
 colormap = {"messages": conf.PlotMessagesColour, "smses": conf.PlotSMSesColour, "calls": conf.PlotCallsColour, "files": conf.PlotFilesColour}
-sort_key = lambda p: -stats["counts"][p["identity"]].get(sort_by, 0) if "name" != sort_by else p["name"]
+sort_key = lambda p: -stats["counts"][p["identity"]].get(sort_by, 0) if "name" != sort_by else p["name"].lower()
 participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], participants), key=sort_key)
 %>
 
@@ -1266,6 +1201,7 @@ else:
 %endfor
   
 </table>
+</font>
 
 %if stats.get("wordcloud"):
 <br /><hr />
@@ -1291,8 +1227,8 @@ f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d 
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
-    <td align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
+    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
+    <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
   </tr>
 %endfor
@@ -1940,4 +1876,42 @@ import conf
 """Message template for copying to clipboard."""
 MESSAGE_CLIPBOARD = """
 [{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{m["from_dispname"]}}: {{parser.parse(m, output={"format": "text"})}}
+"""
+
+
+
+
+
+"""Histogram SVG from [(interval, value), ] data."""
+HISTOGRAM_SVG = """<%
+#Expects parameters: data, rectsize, colour, maxval.
+import datetime
+import util
+
+border = 1
+rectstep = rectsize[0] + (1 if rectsize[0] < 10 else 2)
+step = data[1][0] - data[0][0]
+%>
+<svg width="{{len(data) * rectstep + 2 * border}}" height="{{rectsize[1] + 2 * border}}">
+  <rect width="100%" height="100%" style="stroke-width: {{border}}; stroke: {{colour}}; fill: none;" />
+%for i, (interval, val) in enumerate(data):
+<%
+height = rectsize[1] * util.safedivf(val, maxval)
+if 0 < height < 0.8: height = 0.8 # Very low values produce no or poorly visible bar
+if hasattr(interval, "strftime"):
+    if step > datetime.timedelta(1):
+        date2 = interval + step
+        datetitle = "%s .. %s, %s days" % (interval.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), step.days)
+    else:
+        datetitle = date.strftime("%Y-%m-%d")
+    title = "%s: %s" % (datetitle, util.plural("message", val))
+else:
+    title = "%02d. hour: %s" % (interval, util.plural("message", val))
+%>
+<g class="svg_hover_group">
+    <rect width="{{rectsize[0]}}" fill="{{colour}}" height="{{util.round_float(height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{util.round_float(rectsize[1] - height + border, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
+    <rect width="{{rectsize[0]}}" fill="white" height="{{util.round_float(rectsize[1] - height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{border}}" title="{{title}}"><title>{{title}}</title></rect>
+</g>
+%endfor
+</svg>
 """

@@ -1491,8 +1491,7 @@ class MessageParser(object):
                           "calldurations": 0, "info_items": [],
                           "totalhist": {}, # Chat histogram {"hours": {0: 7,}, "days": {datetime.date: 4,}, "maxperday": 135, "maxperhour": 33}
                           "hists": {}, # Author histograms {"author1": {"hours": {0:, }, "days": {datetime.date:, }} }
-                          "workhist": collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(int))),
-                          "maxmsgsauthordays": 0, "maxmsgsauthorhours": 0} # Additional data for histogram
+                          "workhist": collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(int))), }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -2043,16 +2042,14 @@ class MessageParser(object):
 
             # Fill author and chat hourly histogram
             histbase = {"hours": dict((x, 0) for x in range(24)), "days": {}}
-            stats["totalhist"] = histbase
+            stats["totalhist"] = copy.deepcopy(histbase)
             stats["hists"] = {}
-            stats["maxmsgsauthordays"] = stats["maxmsgsauthorhours"] = 0
             for hour, counts in stats["workhist"]["hours"].items():
                 for author, count in counts.items():
                     if author not in stats["hists"]:
                         stats["hists"][author] = copy.deepcopy(histbase)
                     stats["hists"][author]["hours"][hour] += count
                     stats["totalhist"]["hours"][hour] += count
-                    stats["maxmsgsauthorhours"] = max(count, stats["maxmsgsauthorhours"])
             days = util.timedelta_seconds(delta_date) / 86400 / self.HISTOGRAM_BINS
             step = datetime.timedelta(max(1, int(math.ceil(days))))
             for x in range(self.HISTOGRAM_BINS):
@@ -2066,10 +2063,6 @@ class MessageParser(object):
                 for author, count in counts.items():
                     stats["hists"][author]["days"][bindate] += count
                     stats["totalhist"]["days"][bindate] += count
-            for a, hists in stats["hists"].items():
-                stats["maxmsgsauthordays"] = max(hists["days"].values() + [stats["maxmsgsauthordays"]])
-
-        #stats["workhist"].clear() # Drop unneeded memory @todo can't drop, called consecutively
 
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
                    "LENGTH_MIN": conf.WordCloudLengthMin,

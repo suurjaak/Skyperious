@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.11.2014
+@modified    22.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4454,8 +4454,11 @@ class DatabasePage(wx.Panel):
                     data["authorimages"][p["identity"]] = {"avatar": defaultavatar}
 
             # Fill chat total histogram plot images
-            PLOTCONF = {"days": (conf.PlotChatDaysUnitSize, conf.PlotDaysColour),
-                        "hours": (conf.PlotChatHoursUnitSize, conf.PlotHoursColour)}
+            PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour,
+                                 max(stats["totalhist"]["hours"].values())),
+                        "hours": (conf.PlotHoursUnitSize, conf.PlotHoursColour,
+                                  max(stats["totalhist"]["days"].values())),
+                       } if stats["hists"] else {}
             for histtype, histdata in stats["totalhist"].items():
                 vals = (self.chat["identity"], histtype,
                         self.db.filename.encode("utf-8"))
@@ -4463,14 +4466,12 @@ class DatabasePage(wx.Panel):
                 if fn in fs["files"]:
                     fs["handler"].RemoveFile(fn)
                 bardata = sorted(histdata.items())
-                barsize, barcolour = PLOTCONF[histtype]
-                bmp = controls.BuildHistogram(bardata, barsize, barcolour)
+                barsize, colour, maxval = PLOTCONF[histtype]
+                bmp = controls.BuildHistogram(bardata, barsize, colour, maxval)
                 fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                 fs["files"][fn] = 1
                 data["images"][histtype] = fn
             # Fill author histogram plot images
-            PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour, max(stats["totalhist"]["hours"].values())),
-                        "hours": (conf.PlotHoursUnitSize, conf.PlotHoursColour, max(stats["totalhist"]["days"].values()))}
             for author, hists in stats["hists"].items():
                 for histtype, histdata in hists.items():
                     vals = (author, histtype, self.chat["identity"],
@@ -4479,8 +4480,8 @@ class DatabasePage(wx.Panel):
                     if fn in fs["files"]:
                         fs["handler"].RemoveFile(fn)
                     bardata = sorted(histdata.items())
-                    barsize, barcolour, barmax = PLOTCONF[histtype]
-                    bmp = controls.BuildHistogram(bardata, barsize, barcolour, barmax)
+                    barsize, colour, barmax = PLOTCONF[histtype]
+                    bmp = controls.BuildHistogram(bardata, barsize, colour, barmax)
                     fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn

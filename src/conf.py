@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.10.2014
+@modified    21.10.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -25,7 +25,7 @@ import util
 """Program title, version number and version date."""
 Title = "Skyperious"
 Version = "3.2.2c"
-VersionDate = "20.10.2014"
+VersionDate = "21.10.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -56,7 +56,9 @@ FileDirectiveCompatiblity = {
 OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
     "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
     "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
-    "MaxSearchTableRows", "SearchContactsChunk", "SearchResultsChunk",
+    "MaxSearchTableRows", "PlotDaysColour", "PlotDaysUnitSize",
+    "PlotHoursColour", "PlotHoursUnitSize",
+    "SearchContactsChunk", "SearchResultsChunk",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
 ]
@@ -297,23 +299,17 @@ PlotFilesColour = "#33DD66"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
-"""Colour for 24h histogram plot."""
+"""Colour for 24h histogram plot foreground, as HTML colour string."""
 PlotHoursColour = "#2d578b"
 
-"""Colour for date histogram plot."""
+"""Colour for date histogram plot foreground, as HTML colour string."""
 PlotDaysColour = "#2d8b57"
 
-"""24h histogram bar rectangle full size as (width, height)."""
+"""24h histogram bar single rectangle size as (width, height)."""
 PlotHoursUnitSize = (4, 30)
 
-"""Date histogram bar rectangle full size as (width, height)."""
+"""Date histogram bar single rectangle size as (width, height)."""
 PlotDaysUnitSize = (13, 30)
-
-"""Chat total 24 histogram bar rectangle size as (width, height)."""
-PlotChatHoursUnitSize = (4, 50)
-
-"""Chat total date histogram bar rectangle full size as (width, height)."""
-PlotChatDaysUnitSize = (13, 50)
 
 """
 Width and height tuple of the avatar image, shown in chat data and export HTML
