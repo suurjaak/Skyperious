@@ -4367,8 +4367,9 @@ class DatabasePage(wx.Panel):
                                 p["contact"]["avatar_bitmap"] = bmp
                         if "avatar_bitmap" in p["contact"]:
                             b = il.Add(p["contact"]["avatar_bitmap"])
-                        self.list_participants.InsertImageStringItem(
-                            index, p["contact"]["name"], b, it_kind=1)
+                        self.list_participants.InsertImageStringItem(index,
+                            "%s (%s)" % (p["contact"]["name"], p["identity"]),
+                            b, it_kind=1)
                         c = self.list_participants.GetItem(index)
                         c.Check(True)
                         self.list_participants.SetItem(c)
