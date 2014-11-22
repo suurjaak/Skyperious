@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    20.11.2014
+@modified    22.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -92,7 +92,7 @@ import wx.lib.wordwrap
 import wx.stc
 
 
-# Convenience methods for getting a cached wx.Brush or wx.Pen
+# Convenience methods for creating a wx.Brush and wx.Pen or returning cached.
 BRUSH = lambda c, s=wx.SOLID: wx.TheBrushList.FindOrCreateBrush(c, s)
 PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
 
@@ -2370,9 +2370,12 @@ class SearchableStyledTextCtrl(wx.PyPanel):
             parent=panel, label=self.BUTTON_PREV_LABEL, size=(-1, 26),
             bitmap=self.IMG_PREV.GetBitmap())
         for b in [self._button_next, self._button_prev]:
-            b.SetBaseColours(self.BUTTON_BGCOLOUR_MIDDLE, self.BUTTON_FGCOLOUR)
+            b.SetForegroundColour(self.BUTTON_FGCOLOUR)
             b.SetTopStartColour(self.BUTTON_BGCOLOUR_TOP)
+            b.SetTopEndColour(self.BUTTON_BGCOLOUR_MIDDLE)
+            b.SetBottomStartColour(self.BUTTON_BGCOLOUR_MIDDLE)
             b.SetBottomEndColour(self.BUTTON_BGCOLOUR_BOTTOM)
+            b.SetPressedTopColour(self.BUTTON_BGCOLOUR_MIDDLE)
             b.SetPressedBottomColour(self.BUTTON_BGCOLOUR_BOTTOM)
         # Linux tweak: as GradientButtons get their background from their
         # parent, and backgrounds might not propagate well through the window
@@ -3344,15 +3347,15 @@ class TextCtrlAutoComplete(wx.TextCtrl):
 
 
 def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
-    """Paints and returns a wx.Bitmap with histogram plot from data."""
+    """Paints and returns a wx.Bitmap with histogram bar plot from data."""
     global BRUSH, PEN
-    BGCOLOUR, BORDER = "white", 1
-    RECT_STEP = barsize[0] + (1 if barsize[0] < 10 else 2)
-    w, h = len(data) * RECT_STEP + BORDER + 1, barsize[1] + 2 * BORDER
+    bgcolour, border = "white", 1
+    rect_step = barsize[0] + (1 if barsize[0] < 10 else 2)
+    w, h = len(data) * rect_step + border + 1, barsize[1] + 2 * border
     bmp = wx.EmptyBitmap(w, h)
     dc = wx.MemoryDC()
     dc.SelectObject(bmp)
-    dc.Brush = BRUSH(BGCOLOUR, wx.SOLID)
+    dc.Brush = BRUSH(bgcolour, wx.SOLID)
     dc.Pen = PEN(colour)
     dc.Clear()
     dc.DrawRectangle(0, 0, w, h)
@@ -3364,7 +3367,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
         h = barsize[1] * safediv(val, maxval)
         if 0 < h < 1.5:
             h = 1.5 # Very low values produce no visual bar
-        x = i * RECT_STEP + BORDER + 1
+        x = i * rect_step + border + 1
         y = bmp.Height - h
         bars.append((x, y, barsize[0], h))
     dc.Brush = BRUSH(colour, wx.SOLID)

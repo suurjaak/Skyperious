@@ -268,10 +268,14 @@ from third_party import step
     }
     #stats_data > tbody > tr > td:nth-child(4) {
       color: {{conf.PlotHoursColour}};
-      vertical-align: bottom;
+      vertical-align: top;
     }
     #stats_data > tbody > tr > td:nth-child(5) {
       color: {{conf.PlotDaysColour}};
+      vertical-align: top;
+    }
+    #stats_data > tbody > tr:first-child > td:nth-child(4),
+    #stats_data > tbody > tr:first-child > td:nth-child(5) {
       vertical-align: bottom;
     }
     .svg_hover_group:hover {
@@ -680,7 +684,7 @@ svgdata = {
     "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
-        <br />24h activity
+        <br />Hours of day
 %endif
       </td><td>
 %if stats.get("totalhist", {}).get("days"):
@@ -1102,48 +1106,49 @@ import conf, skypedata, util
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="top"><b>Statistics for currently shown messages in {{chat["title_long_lc"]}}:</b></a></td>
 %if stats.get("wordcloud"):
-  <td align="right"><a href="#cloud"><font color="{{conf.LinkColour}}">Jump to word cloud</font></a></td>
+  <td align="right" valign="top" nowrap=""><a href="#cloud"><font color="{{conf.LinkColour}}">Jump to word cloud</font></a></td>
 %endif
-</tr><tr><td><font size="0">&nbsp;</font></td></tr></table>
-<br />
+</tr></table>
+<font size="0">&nbsp;</font><br />
 <font size="2">
-<table>
+<table cellpadding="2" cellspacing="2" width="100%">
 %for i, (label, value) in enumerate(stats["info_items"]):
   <tr>
-    <td width="180" valign="top">{{label}}:</td><td valign="top">{{value}}</td>
+    <td width="150" valign="top">{{label}}:</td><td valign="top">{{value}}</td>
 %if not i:
-    <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="right">
+    <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
+%if "hours" in images:
       <img src="memory:{{images["hours"]}}" /><br />
-      <font color="{{conf.PlotHoursColour}}" size="2">24h activity</font>
+      <font color="{{conf.PlotHoursColour}}">Hours of day</font>
+%endif
     </td>
-    <td rowspan="{{len(stats["info_items"])}}" valign="bottom" align="left">
+    <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
+%if "days" in images:
       <img src="memory:{{images["days"]}}" /><br />
 <%
 dates = sorted(stats["totalhist"]["days"])
 interval = (dates[1] - dates[0]).days
 %>
-      <font color="{{conf.PlotDaysColour}}" size="2">{{interval}}-day intervals</font>
+      <font color="{{conf.PlotDaysColour}}">{{interval}}-day intervals</font>
+%endif
     </td>
 %endif
   </tr>
 %endfor
 
 %if len(stats["counts"]) > 1:
-  <tr><td><br /><br /></td><td colspan="3" valign="bottom"><font size="2">
-    <table cellpadding="0" cellspacing="0"><tr>
-      <td nowrap="nowrap"><b>Sort by:&nbsp;&nbsp;&nbsp;</b></td>
+  <tr><td><br /><br /></td><td colspan="3" valign="bottom">
+    <b>Sort by:&nbsp;&nbsp;&nbsp;</b>
 %for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files")]:
 %if "name" == name or stats[name]:
 %if sort_by == name:
-      <td nowrap="nowrap"><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      <span><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</span>
 %else:
-      <td nowrap="nowrap"><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+      <span><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</span>
 %endif
 %endif
 %endfor
-    </tr></table>
-  </font></td>
-  </tr>
+  </td></tr>
 %endif
 
 <%
@@ -1178,7 +1183,8 @@ if stats["counts"][p["identity"]]["files"]:
     </td><td valign="top">
 %for type, label, count, total in stat_rows:
 <%
-percent = int(round(util.safedivf(count * 100, total)))
+ratio = util.safedivf(count, total)
+percent = int(round(100 * ratio))
 text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 30) else ""
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 if "byte" == label:
@@ -1188,15 +1194,31 @@ elif "callduration" == label:
 else:
   text_cell3 = util.plural(label, count)
 %>
-      <table cellpadding="0" width="100%" cellspacing="0"><tr>
-        <td bgcolor="{{colormap[type]}}" width="{{percent * conf.StatisticsPlotWidth / 100}}" align="center"><font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font></td>
-        <td bgcolor="{{conf.PlotBgColour}}" width="{{(100 - percent) * conf.StatisticsPlotWidth / 100}}" align="center"><font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font></td>
-        <td nowrap="nowrap">&nbsp;{{text_cell3}}</td>
+      <table cellpadding="0" cellspacing="0" width="100%"><tr>
+        <td bgcolor="{{colormap[type]}}" width="{{int(round(ratio * conf.StatisticsPlotWidth))}}" align="center">
+%if text_cell1:
+          <font color="#FFFFFF" size="2"><b>{{text_cell1}}</b></font>
+%endif
+        </td>
+        <td bgcolor="{{conf.PlotBgColour}}" width="{{int(round((1 - ratio) * conf.StatisticsPlotWidth))}}" align="center">
+%if text_cell2:
+          <font color="{{conf.PlotMessagesColour}}" size="2"><b>{{text_cell2}}</b></font>
+%endif
+        </td>
+        <td nowrap="">&nbsp;{{text_cell3}}</td>
       </tr></table>
 %endfor
     </td>
-    <td valign="top" align="right"><img src="memory:{{authorimages[p["identity"]]["hours"]}}"/></td>
-    <td valign="top" align="left"><img src="memory:{{authorimages[p["identity"]]["days"]}}"/></td>
+    <td valign="top">
+%if "hours" in authorimages.get(p["identity"] , {}):
+      <img src="memory:{{authorimages[p["identity"]]["hours"]}}"/>
+%endif
+    </td>
+    <td valign="top">
+%if "days" in authorimages.get(p["identity"] , {}):
+      <img src="memory:{{authorimages[p["identity"]]["days"]}}"/>
+%endif
+    </td>
   </tr>
 %endfor
   

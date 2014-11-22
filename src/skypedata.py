@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.11.2014
+@modified    22.11.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1470,7 +1470,7 @@ class MessageParser(object):
         """
         @param   db       SkypeDatabase instance for additional queries
         @param   chat     chat being parsed
-        @param   stats    whether to collect message statistics
+        @param   stats    whether to collect message statistics, assumes chat
         @param   wrapper  multi-line text wrap function, if any
         """
         self.db = db
@@ -1483,15 +1483,15 @@ class MessageParser(object):
             break_long_words=False, break_on_hyphens=False
         ).wrap # Text format output is wrapped with a fixed-width font
         if stats:
-            self.stats = {"smses": 0, "transfers": [], "calls": 0,
-                          "messages": 0, "counts": {}, "total": 0,
-                          "startdate": None, "enddate": None, "wordcloud": [],
-                          "cloudtext": "", "links": [], "last_message": "",
-                          "chars": 0, "smschars": 0, "files": 0, "bytes": 0,
-                          "calldurations": 0, "info_items": [],
-                          "totalhist": {}, # Chat histogram {"hours": {0: 7,}, "days": {datetime.date: 4,}, "maxperday": 135, "maxperhour": 33}
-                          "hists": {}, # Author histograms {"author1": {"hours": {0:, }, "days": {datetime.date:, }} }
-                          "workhist": collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(int))), }
+            self.stats = {
+                "smses": 0, "transfers": [], "calls": 0, "messages": 0,
+                "counts": {}, "total": 0, "startdate": None, "enddate": None,
+                "wordcloud": [], "cloudtext": "", "links": [],
+                "last_message": "", "chars": 0, "smschars": 0, "files": 0,
+                "bytes": 0, "calldurations": 0, "info_items": [],
+                "totalhist": {}, # Chat histograms {"hours": {0: 7,}, "days": {date: 4,}}
+                "hists": {}, # Author histograms {"author1": {"hours": {0: 7, }, "days": {date:  4, }} }
+                "workhist": {}, } # {"hours": {0: {author: count, }}, "days": {all days}}
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1923,6 +1923,10 @@ class MessageParser(object):
         and author not in self.stats["counts"]):
             self.stats["counts"][author] = author_stats.copy()
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
+        if not self.stats["workhist"]:
+            dd = collections.defaultdict
+            self.stats["workhist"] = {"hours": dd(lambda: dd(int)),
+                                      "days": dd(lambda: dd(int))}
         self.stats["workhist"]["hours"][hourkey][author] += 1
         self.stats["workhist"]["days"][daykey][author] += 1
 
@@ -2044,19 +2048,24 @@ class MessageParser(object):
             histbase = {"hours": dict((x, 0) for x in range(24)), "days": {}}
             stats["totalhist"] = copy.deepcopy(histbase)
             stats["hists"] = {}
+            # Fill total histogram hours and initialize author hour structures
             for hour, counts in stats["workhist"]["hours"].items():
-                for author, count in counts.items():
+                for p in self.chat["participants"]:
+                    author = p["identity"]
                     if author not in stats["hists"]:
                         stats["hists"][author] = copy.deepcopy(histbase)
-                    stats["hists"][author]["hours"][hour] += count
-                    stats["totalhist"]["hours"][hour] += count
+                    if author in counts:
+                        stats["hists"][author]["hours"][hour] += counts[author]
+                        stats["totalhist"]["hours"][hour] += counts[author]
             days = util.timedelta_seconds(delta_date) / 86400 / self.HISTOGRAM_BINS
             step = datetime.timedelta(max(1, int(math.ceil(days))))
+            # Initialize total histogram day and author day structures
             for x in range(self.HISTOGRAM_BINS):
                 bindate = (stats["startdate"] + step * x).date()
                 stats["totalhist"]["days"][bindate] = 0
                 for author in stats["hists"]:
                     stats["hists"][author]["days"][bindate] = 0
+            # Fill total histogram and author days
             for date, counts in sorted(stats["workhist"]["days"].items()):
                 bindate = stats["startdate"].date()
                 while bindate + step < date: bindate += step

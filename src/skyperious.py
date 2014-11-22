@@ -4314,7 +4314,8 @@ class DatabasePage(wx.Panel):
                         self.list_chats.SetItemFont(i, self.list_chats.Font)
                     elif self.list_chats.GetItemMappedData(i) == chat:
                         index_selected = i
-                        self.list_chats.SetItemFont(i, self.list_chats.Font.Bold())
+                        f = self.list_chats.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                        self.list_chats.SetItemFont(i, f)
                 if index_selected >= 0:
                     delta = index_selected - scrollpos
                     if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
@@ -4456,9 +4457,9 @@ class DatabasePage(wx.Panel):
 
             # Fill chat total histogram plot images
             PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour,
-                                 max(stats["totalhist"]["hours"].values())),
+                                 max(stats["totalhist"]["days"].values())),
                         "hours": (conf.PlotHoursUnitSize, conf.PlotHoursColour,
-                                  max(stats["totalhist"]["days"].values())),
+                                  max(stats["totalhist"]["hours"].values())),
                        } if stats["hists"] else {}
             for histtype, histdata in stats["totalhist"].items():
                 vals = (self.chat["identity"], histtype,
@@ -4481,8 +4482,8 @@ class DatabasePage(wx.Panel):
                     if fn in fs["files"]:
                         fs["handler"].RemoveFile(fn)
                     bardata = sorted(histdata.items())
-                    barsize, colour, barmax = PLOTCONF[histtype]
-                    bmp = controls.BuildHistogram(bardata, barsize, colour, barmax)
+                    barsize, colour, maxval = PLOTCONF[histtype]
+                    bmp = controls.BuildHistogram(bardata, barsize, colour, maxval)
                     fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn
@@ -5281,7 +5282,8 @@ class MergerPage(wx.Panel):
                     self.list_chats.SetItemFont(i, self.list_chats.Font)
                 elif self.list_chats.GetItemMappedData(i) == c:
                     index_selected = i
-                    self.list_chats.SetItemFont(i, self.list_chats.Font.Bold())
+                    f = self.list_chats.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                    self.list_chats.SetItemFont(i, f)
             if index_selected >= 0:
                 delta = index_selected - scrollpos
                 if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
