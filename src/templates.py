@@ -266,16 +266,16 @@ from third_party import step
       float: left;
       padding: 0 5px 5px 0;
     }
-    #stats_data > tbody > tr > td:nth-child(4) {
+    #stats_data > tbody > tr > td:nth-child(3) {
       color: {{conf.PlotHoursColour}};
       vertical-align: top;
     }
-    #stats_data > tbody > tr > td:nth-child(5) {
+    #stats_data > tbody > tr > td:nth-child(4) {
       color: {{conf.PlotDaysColour}};
       vertical-align: top;
     }
-    #stats_data > tbody > tr:first-child > td:nth-child(4),
-    #stats_data > tbody > tr:first-child > td:nth-child(5) {
+    #stats_data > tbody > tr:first-child > td:nth-child(3),
+    #stats_data > tbody > tr:first-child > td:nth-child(4) {
       vertical-align: bottom;
     }
     .svg_hover_group:hover {
@@ -671,11 +671,11 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %for label, value in stats["info_items"]:
       <div>{{label}}</div>
 %endfor
-      </td><td>
+      </td><td colspan="2">
 %for label, value in stats["info_items"]:
       <div>{{value}}</div>
 %endfor
-      </td><td></td><td>
+      </td><td>
 %if stats.get("totalhist", {}).get("hours"):
 <%
 svgdata = {
@@ -684,7 +684,7 @@ svgdata = {
     "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
-        <br />Hours of day
+        <br />24h activity
 %endif
       </td><td>
 %if stats.get("totalhist", {}).get("days"):
@@ -742,7 +742,7 @@ if stats["counts"][p["identity"]]["files"]:
 %for type, label, count, total in stat_rows:
 <%
 percent = util.safedivf(count * 100, total)
-text_cell1 = "%d%%" % round(percent) if (round(percent) > 14) else ""
+text_cell1 = "%d%%" % round(percent) if (round(percent) > 25) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
 if "byte" == label:
   text_total = util.format_bytes(total)
@@ -1119,7 +1119,7 @@ import conf, skypedata, util
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
 %if "hours" in images:
       <img src="memory:{{images["hours"]}}" /><br />
-      <font color="{{conf.PlotHoursColour}}">Hours of day</font>
+      <font color="{{conf.PlotHoursColour}}">24h actitity</font>
 %endif
     </td>
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
