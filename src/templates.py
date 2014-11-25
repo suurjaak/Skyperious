@@ -938,6 +938,12 @@ previous_author = None
     <td class="day t3"></td>
     <td class="day" colspan="2"><span class="weekday">{{weekday}}</span>, {{weekdate}}</td>
   </tr>
+  <tr>
+    <td class="t1"></td>
+    <td class="day t2"></td>
+    <td class="day t3" title="{{day.strftime("%Y-%m-%d")}}"></td>
+    <td class="day" colspan="2" title="{{day.strftime("%Y-%m-%d")}}"><span class="weekday">{{weekday}}</span>, {{weekdate}}</td>
+  </tr>
 %endif
 <%
 text = parser.parse(m, output={"format": "html", "export": True})
