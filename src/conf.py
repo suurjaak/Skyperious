@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.10.2014
+@modified    25.11.2014
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.2.2c"
-VersionDate = "21.10.2014"
+Version = "3.2.2d"
+VersionDate = "25.11.2014"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -61,6 +61,7 @@ OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
     "SearchContactsChunk", "SearchResultsChunk",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
+    "WordCloudWordsAuthorMax"
 ]
 OptionalFileDirectiveDefaults = {}
 
@@ -340,6 +341,9 @@ WordCloudCountMin = 2
 
 """Maximum number of words to include in word cloud."""
 WordCloudWordsMax = 100
+
+"""Maximum number of words to include in per-author word cloud."""
+WordCloudWordsAuthorMax = 50
 
 
 def load():

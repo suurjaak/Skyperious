@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.11.2014
+@modified    25.11.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1813,6 +1813,7 @@ class DatabasePage(wx.Panel):
             "participants": None    # Messages from [skype name, ]
         }
         self.stats_sort_field = "name"
+        self.stats_show_clouds = False # Show individual author word clouds
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -3421,6 +3422,9 @@ class DatabasePage(wx.Panel):
         elif href.startswith("sort://"):
             self.stats_sort_field = href[7:]
             self.populate_chat_statistics()
+        elif href.startswith("clouds://"):
+            self.stats_show_clouds = ast.literal_eval(href[9:])
+            self.populate_chat_statistics()
         else:
             self.stc_history.SearchBarVisible = True
             self.show_stats(False)
@@ -4423,6 +4427,7 @@ class DatabasePage(wx.Panel):
             if busy:
                 busy.Close()
             self.panel_chats2.Enabled = True
+            self.stats_show_clouds = False # Reset author wordclouds to collapsed
             self.populate_chat_statistics()
             if self.html_stats.Shown:
                 self.show_stats(True) # To restore scroll position
@@ -4435,8 +4440,8 @@ class DatabasePage(wx.Panel):
             participants = [p["contact"] for p in self.chat["participants"]]
             data = {"db": self.db, "participants": participants,
                     "chat": self.chat, "sort_by": self.stats_sort_field,
-                    "stats": stats, "images": {}, "authorimages": {}}
-
+                    "stats": stats, "images": {}, "authorimages": {},
+                    "show_clouds": self.stats_show_clouds}
             # Fill avatar images
             fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
             if defaultavatar not in fs["files"]:

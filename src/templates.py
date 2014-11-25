@@ -327,15 +327,40 @@ from third_party import step
       border-top: 1px solid #99BBFF;
       margin-top: 10px;
       padding-top: 5px;
-      font-family: Arial, Helvetica, sans-serif;
     }
-    #wordcloud span {
+    .wordcloud span {
       color: blue;
       padding-right: 5px;
+      font-family: Arial, Helvetica, sans-serif;
     }
-    #wordcloud span a {
+    .wordcloud span a {
       font-size: 1em;
       color: blue;
+    }
+    #wordclouds {
+      display: none;
+      padding-top: 15px;
+    }
+    #wordclouds > table {
+      border-collapse: collapse;
+    }
+    #wordclouds > table > tbody > tr > td {
+      vertical-align: top;
+      padding-top: 5px;
+      padding-bottom: 10px;
+    }
+    #wordclouds > table > tbody > tr {
+      border-top: 1px solid #99BBFF;
+    }
+    #wordclouds > table > tbody > tr > td:first-child {
+      vertical-align: top;
+      width: 150px;
+    }
+    #toggle_wordclouds {
+      font-size: 1.5em;
+      color: blue;
+      position: relative;
+      top: 2px;
     }
     #transfers {
       margin-top: 10px;
@@ -603,6 +628,13 @@ p["avatar_class"] = "avatar__" + id_csssafe
       link.className = "selected";
       return false;
     }
+
+    var toggle_wordclouds = function(link) {
+      link.innerHTML = "+-"["+" == link.innerHTML ? 1 : 0];
+      toggle_element('wordclouds');
+      return false;
+    };
+
   </script>
 </head>
 <body>
@@ -627,9 +659,10 @@ p["avatar_class"] = "avatar__" + id_csssafe
       <div id="header">{{chat["title_long"]}}.</div><br />
       Showing {{util.plural("message", message_count)}}
 %if date1 and date2:
-      from <b>{{date1}}</b> to <b>{{date2}}</b>
+      from <b>{{date1}}</b> to <b>{{date2}}</b>.<br />
+%else:
+.<br />
 %endif
-      .<br />
 %if chat["created_datetime"]:
       Chat created on <b>{{chat["created_datetime"].strftime("%d.%m.%Y")}}</b>,
 %else:
@@ -794,16 +827,56 @@ svgdata = {
 %endfor
     </table>
 
+
 %if stats["wordcloud"]:
-    <div id="wordcloud">
+    <div id="wordcloud" class="wordcloud">
 <%
 sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1.1em;", 1: "0.85em", 0: "0.8em;"}
+authorcounts = dict((w, {}) for w, c, _ in stats["wordcloud"])
+for author, cloud in stats["wordclouds"].items():
+    for word, count, size in cloud:
+        if word not in authorcounts: authorcounts[word] = {}
+        authorcounts[word][author] = count
 %>
 %for word, count, size in stats["wordcloud"]:
-      <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> ({{count}})</span> 
+<%
+if count < conf.WordCloudCountMin: continue # continue for word, count, size
+countauthors = {}
+[countauthors.setdefault(c, []).append(a) for a, c in authorcounts[word].items()]
+countstring = ";\\n".join("%s from %s" % (c, ", ".join(aa)) for c, aa in sorted(countauthors.items(), reverse=True))
+%>
+      <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{countstring}}">({{count}})</span></span> 
 %endfor
     </div>
+
+    <br /><br />
+    <b>Word cloud for each participant</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for each participant" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
+    <div id="wordclouds">
+%if stats.get("wordclouds"):
+<%
+sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1.1em;", 1: "0.85em", 0: "0.8em;"}
+globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
+%>
+      <table>
+%for p in [p for p in sorted(participants, key=lambda p: p["name"]) if stats["wordclouds"].get(p["identity"])]:
+      <tr><td>
+        <table><tr><td><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
+      </td><td>
+        <div class="wordcloud">
+%for word, count, size in stats["wordclouds"][p["identity"]][:conf.WordCloudWordsAuthorMax]:
+%if count >= conf.WordCloudCountMin:
+          <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % (100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
 %endif
+%endfor
+        </div>
+      </td></tr>
+%endfor
+      </table>
+%endif
+    </div>
+%endif
+
+
 
 %if stats["transfers"]:
     <div id="transfers">
@@ -1235,6 +1308,27 @@ else:
 %for word, count, size in stats["wordcloud"]:
 <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
+%endif
+
+<br /><br />
+<b>Word cloud for each participant</b> [<a href="clouds://{{not show_clouds}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[show_clouds]}}</font></a>]
+%if show_clouds and stats.get("wordclouds"):
+<table cellpadding="0" cellspacing="0" width="100%">
+%for p in [p for p in participants_sorted if stats["wordclouds"].get(p["identity"])]:
+  <tr><td colspan="2"><hr /></td></tr>
+  <tr><td valign="top" width="150">
+    <table cellpadding="0" cellspacing="0"><tr>
+      <td valign="top"><img src="memory:{{authorimages[p["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
+      <td valign="center">{{p["name"]}}<br /><font size="2" color="gray">{{p["identity"]}}</font></td>
+      <td width="10"></td>
+    </tr></table>
+  </td><td valign="top">
+%for word, count, size in stats["wordclouds"][p["identity"]][:conf.WordCloudWordsAuthorMax]:
+    <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
+%endfor
+  </td></tr>
+%endfor
+</table>
 %endif
 
 %if stats.get("transfers"):

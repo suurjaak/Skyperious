@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    31.08.2014
+@modified    23.11.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -33,7 +33,8 @@ FONTSIZE_MIN = 0
 """Maximum font size for words (for wx.html.HtmlWindow)."""
 FONTSIZE_MAX = 7
 
-OPTIONS = {"COUNT_MIN": COUNT_MIN, "LENGTH_MIN": LENGTH_MIN, "WORDS_MAX": WORDS_MAX}
+OPTIONS = {"COUNT_MIN": COUNT_MIN, "LENGTH_MIN": LENGTH_MIN, "WORDS_MAX": WORDS_MAX,
+           "FONTSIZE_MIN": FONTSIZE_MIN, "FONTSIZE_MAX": FONTSIZE_MAX}
 
 """A map of languages and common words."""
 COMMON_WORDS = {
@@ -160,14 +161,14 @@ def get_cloud(text, additions=None, options=None):
 
     @param   text       text to analyze
     @param   additions  a pre-parsed list of additional words to add
-    @param   options    a dict of options like {"LENGTH_MIN": 3}
+    @param   options    a dict of options like {"LENGTH_MIN": 3, "SCALE": 100}
     @return             in descending order of relevance, as
                         [('word', count, font size 0..7), ]
     """
     global OPTIONS
     result = []
-    if options: OPTIONS.update(options)
-    words = re.findall("\w{%s,}" % OPTIONS["LENGTH_MIN"], text.lower(), re.U)
+    options = dict(OPTIONS.items() + (options.items() if options else []))
+    words = re.findall("\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
     words += additions or []
     commons = find_commons(words)
     # Add and count all non-common and not wholly numeric words
@@ -175,20 +176,20 @@ def get_cloud(text, additions=None, options=None):
     for w in filter(lambda x: x not in commons and re.search("\D", x), words):
         counts[w] += 1
     # Drop rare words, limit total number
-    count_last = OPTIONS["COUNT_MIN"]
-    if len(counts) > OPTIONS["WORDS_MAX"]:
-        count_last = max(count_last, sorted(counts.values())[OPTIONS["WORDS_MAX"] - 1])
+    count_last = options["COUNT_MIN"]
+    if len(counts) > options["WORDS_MAX"]:
+        count_last = max(count_last, sorted(counts.values())[options["WORDS_MAX"] - 1])
     counts = dict((w, c) for w, c in counts.items() if c >= count_last)
     count_min = min(counts.values() or [0])
-    count_max = max(counts.values() or [0])
+    count_max = options.get("SCALE") or max(counts.values() or [0])
     for word, count in counts.items():
-        result.append((word, count, get_size(count, count_min, count_max)))
+        result.append((word, count, get_size(count, count_min, count_max, options)))
     result.sort(key=lambda x: x[1], reverse=True) # Sort by count
-    result = result[:OPTIONS["WORDS_MAX"]]
+    result = result[:options["WORDS_MAX"]]
     return result
 
 
-def get_size(count, count_min, count_max):
+def get_size(count, count_min, count_max, options):
     """
     Returns the font size for a word.
 
@@ -197,9 +198,9 @@ def get_size(count, count_min, count_max):
     @param   count_max  maximum word count in the text
     @return             FONTSIZE_MIN..FONTSIZE_MAX
     """
-    result = FONTSIZE_MAX
+    result = options["FONTSIZE_MAX"]
     if count_min != count_max:
-        lo, hi = FONTSIZE_MIN, FONTSIZE_MAX
+        lo, hi = options["FONTSIZE_MIN"], options["FONTSIZE_MAX"]
         ratio = count / float(count_max - count_min)
         result = int(lo + (hi - lo) * min(1, ratio ** 0.2))
     return result

@@ -1,6 +1,18 @@
 CHANGELOG
 =========
 
+3.3, 2014-11-xy
+---------------
+- added per-contact word clouds to chat statistics;
+- added 24h and date activity histograms to chat statistics;
+- made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
+- fixed case-sensitive name sorting in chat statistics;
+- upgraded Python from 2.7.6 to 2.7.8;
+- upgraded wxPython from 3.0.0 to 3.0.1;
+- upgraded Pillow from 2.3.0 to 2.6.1;
+- upgraded pyparsing from 2.0.1 to 2.0.3;
+- upgraded XlsxWriter from 0.5.3 to 0.6.3;
+
 3.2, 2014-05-08
 ---------------
 - added menu item to configure advanced options;
