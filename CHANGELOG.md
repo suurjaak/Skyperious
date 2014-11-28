@@ -3,6 +3,8 @@ CHANGELOG
 
 3.3, 2014-11-xy
 ---------------
+
+- changed skypename text colour in chat Excel export from transparent to gray;
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);

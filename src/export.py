@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    16.11.2014
+@modified    26.11.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -372,8 +372,8 @@ class xlsx_writer(object):
     FMT_WRAP       = dict(FMT_DEFAULT, **{"text_wrap": True})
     FMT_LOCAL      = dict(FMT_DEFAULT, **{"font_color": "#999999"})
     FMT_REMOTE     = dict(FMT_DEFAULT, **{"font_color": "#3399FF"})
-    FMT_HIDDEN     = dict(FMT_DEFAULT, **{"font_color": "white"})
-    FMT_BOLDHIDDEN = dict(FMT_DEFAULT, **{"font_color": "white", "bold": True})
+    FMT_HIDDEN     = dict(FMT_DEFAULT, **{"font_color": "#C0C0C0"})
+    FMT_BOLDHIDDEN = dict(FMT_DEFAULT, **{"font_color": "#C0C0C0", "bold": True})
     FMT_TIMESTAMP  = dict(FMT_DEFAULT, **{"font_color": "#999999",
                                           "align": "left",
                                           "num_format": "yyyy-mm-dd HH:MM", })
