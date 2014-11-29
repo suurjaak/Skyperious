@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.11.2014
+@modified    29.11.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2096,7 +2096,7 @@ class MessageParser(object):
         stats["wordcloud"] = cloud
 
         # Create author cloudtexts, scaled to max word count among all authors
-        maxcount = max(x[1] for x in cloud)
+        maxcount = max([x[1] for x in cloud] or [0])
         options = {"COUNT_MIN": 1, "LENGTH_MIN": conf.WordCloudLengthMin,
                    "FONTSIZE_MAX": wordcloud.FONTSIZE_MAX - 1,
                    "SCALE": maxcount}
