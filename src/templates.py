@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    21.11.2014
+@modified    02.12.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -849,14 +849,14 @@ countstring = ";\\n".join("%s from %s" % (c, ", ".join(aa)) for c, aa in sorted(
 %endfor
     </div>
 
-    <br /><br />
-    <b>Word cloud for each participant</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for each participant" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
-    <div id="wordclouds">
 %if stats.get("wordclouds"):
 <%
 sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1.1em;", 1: "0.85em", 0: "0.8em;"}
 globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
 %>
+    <br /><br />
+    <b>Word cloud for each participant</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for each participant" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
+    <div id="wordclouds">
       <table>
 %for p in [p for p in sorted(participants, key=lambda p: p["name"]) if stats["wordclouds"].get(p["identity"])]:
       <tr><td>
@@ -872,8 +872,8 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
       </td></tr>
 %endfor
       </table>
-%endif
     </div>
+%endif
 %endif
 
 
@@ -1316,9 +1316,10 @@ else:
 %endfor
 %endif
 
+%if stats.get("wordclouds"):
 <br /><br />
 <b>Word cloud for each participant</b> [<a href="clouds://{{not show_clouds}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[show_clouds]}}</font></a>]
-%if show_clouds and stats.get("wordclouds"):
+%if show_clouds:
 <table cellpadding="0" cellspacing="0" width="100%">
 %for p in [p for p in participants_sorted if stats["wordclouds"].get(p["identity"])]:
   <tr><td colspan="2"><hr /></td></tr>
@@ -1335,6 +1336,7 @@ else:
   </td></tr>
 %endfor
 </table>
+%endif
 %endif
 
 %if stats.get("transfers"):
@@ -2021,11 +2023,11 @@ step = data[1][0] - data[0][0]
 height = rectsize[1] * util.safedivf(val, maxval)
 if 0 < height < 0.8: height = 0.8 # Very low values produce no or poorly visible bar
 if hasattr(interval, "strftime"):
-    if step > datetime.timedelta(1):
+    if step > datetime.timedelta(days=1):
         date2 = interval + step
         datetitle = "%s .. %s, %s days" % (interval.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), step.days)
     else:
-        datetitle = date.strftime("%Y-%m-%d")
+        datetitle = interval.strftime("%Y-%m-%d")
     title = "%s: %s" % (datetitle, util.plural("message", val))
 else:
     title = "%02d. hour: %s" % (interval, util.plural("message", val))
