@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.11.2014
+@modified    02.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4628,7 +4628,7 @@ class DatabasePage(wx.Panel):
                 wx.CallAfter(support.report_error, errormsg)
         if self:
             # Refresh list from loaded data, sort by last message datetime
-            sortfunc = lambda l: l and (l.ResetColumnWidths(), l.RefreshRows(),
+            sortfunc = lambda l: l and (l.ResetColumnWidths(),
                                         l.SortListItems(4, 0))
             wx.CallLater(0, sortfunc, self.list_chats)
             wx.CallAfter(self.update_tabheader)

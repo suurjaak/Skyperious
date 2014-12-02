@@ -3,12 +3,12 @@ CHANGELOG
 
 3.3, 2014-11-xy
 ---------------
-
 - changed skypename text colour in chat Excel export from transparent to gray;
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
 - fixed case-sensitive name sorting in chat statistics;
+- number of UI tweaks and fixes;
 - upgraded Python from 2.7.6 to 2.7.8;
 - upgraded wxPython from 3.0.0 to 3.0.1;
 - upgraded Pillow from 2.3.0 to 2.6.1;
