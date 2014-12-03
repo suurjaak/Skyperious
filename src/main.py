@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.08.2014
+@modified    04.12.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -453,7 +453,7 @@ def run_gui(filenames):
     app.MainLoop()
 
 
-def run(argv):
+def run():
     """Parses command-line arguments and either runs GUI, or a CLI action."""
     global is_cli, is_gui_possible, is_verbose
 
@@ -474,6 +474,7 @@ def run(argv):
             kwargs = dict((k, arg[k]) for k in arg if k != "args")
             subparser.add_argument(*arg["args"], **kwargs)
 
+    argv = sys.argv[1:]
     if not argv or (argv[0] not in subparsers.choices 
     and argv[0].endswith(".db")):
         argv[:0] = ["gui"] # argparse hack: force default argument
@@ -666,4 +667,4 @@ class ProgressBar(threading.Thread):
 
 
 if "__main__" == __name__:
-    run(sys.argv[1:])
+    run()
