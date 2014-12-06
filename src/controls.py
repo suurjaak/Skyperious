@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.12.2014
+@modified    06.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -818,7 +818,7 @@ class ProgressWindow(wx.Dialog):
 class RangeSlider(wx.PyPanel):
     """
     A horizontal slider with two markers for selecting a value range. Supports
-    numeric and date/time values.
+    numeric and date/time values. Fires a wx.EVT_SLIDER event on value change.
     """
     BACKGROUND_COLOUR       = None
     BAR_ARROW_BG_COLOUR     = wx.Colour(212, 208, 200)
@@ -959,12 +959,11 @@ class RangeSlider(wx.PyPanel):
         """
         new_vals = [left, right]
         for i, value in enumerate(new_vals):
-            if value is not None:
+            if value is not None and value != self._vals[i]:
                 confiners = [(min, max), (max, min)][i]
                 limits = (new_vals[1 - i], self._rng[i])
                 for confine, limit in zip(confiners, limits):
                     try:    # Confine value between range edge and other marker
-                        former_value = value
                         value = confine(value, limit)
                     except: # Fails if a value of new type is being set
                         self._vals[i] = None
@@ -974,8 +973,9 @@ class RangeSlider(wx.PyPanel):
                             else self._rng[1]
             self._vals_prev[i] = self._vals[i]
             self._vals[i] = value
-        if refresh and self._vals != self._vals_prev:
-            self.Refresh()
+        if self._vals != self._vals_prev:
+            if refresh: self.Refresh()
+            wx.PostEvent(self, wx.CommandEvent(wx.EVT_SLIDER.typeId))
     Values = property(GetValues, SetValues, doc=
                       "See `GetValues` and `SetValues`.")
 
@@ -996,7 +996,7 @@ class RangeSlider(wx.PyPanel):
         will be redrawn if value has changed (and `refresh` is not False).
         """
         i = 1 if side else 0
-        if value is not None:
+        if value is not None and value != self._vals[i]:
             confiners = [(min, max), (max, min)][i]
             limits = (self._vals[1 - i], self._rng[i])
             for confine, limit in zip(confiners, limits):
@@ -1009,8 +1009,9 @@ class RangeSlider(wx.PyPanel):
                 value = self._rng[0] if value < self._rng[0] else self._rng[1]
         self._vals_prev[i] = self._vals[i]
         self._vals[i] = value
-        if refresh and self._vals[i] != self._vals_prev[i]:
-            self.Refresh()
+        if self._vals[i] != self._vals_prev[i]:
+            if refresh: self.Refresh()
+            wx.PostEvent(self, wx.CommandEvent(wx.EVT_SLIDER.typeId))
 
 
     def GetRange(self):

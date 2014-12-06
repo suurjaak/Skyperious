@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.12.2014
+@modified    06.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2044,10 +2044,18 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_TEXT_ENTER, self.on_filter_chat, edit_filter)
         edit_filter.SetToolTipString("Find messages containing the exact text")
         label_range = wx.StaticText(
-            parent=panel_stc2, label="Show messages from time period:")
+            parent=panel_stc2, label="Show messages from time perio&d:")
+        date1 = self.edit_filterdate1 = wx.TextCtrl(panel_stc2, size=(80, -1))
+        date2 = self.edit_filterdate2 = wx.TextCtrl(panel_stc2, size=(80, -1),
+                                                    style=wx.TE_RIGHT)
+        date1.SetToolTipString("Date in the form YYYY-MM-DD")
+        date2.SetToolTipString("Date in the form YYYY-MM-DD")
+        self.Bind(wx.EVT_TEXT, self.on_change_filterdate, date1)
+        self.Bind(wx.EVT_TEXT, self.on_change_filterdate, date2)
         range_date = self.range_date = \
             controls.RangeSlider(parent=panel_stc2, fmt="%Y-%m-%d")
         range_date.SetRange(None, None)
+        range_date.Bind(wx.EVT_SLIDER, self.on_change_range_date)
         label_list = \
             wx.StaticText(parent=panel_stc2, label="Sho&w messages from:")
         agw_style = (wx.LC_REPORT | wx.LC_NO_HEADER | wx.LC_SINGLE_SEL |
@@ -2065,6 +2073,7 @@ class DatabasePage(wx.Panel):
         list_participants.EnableSelectionGradient()
         if hasattr(list_participants, "SetUserLineHeight"):
             list_participants.SetUserLineHeight(conf.AvatarImageSize[1] + 2)
+        sizer_dates = wx.BoxSizer(wx.HORIZONTAL)
         sizer_filter_buttons = wx.BoxSizer(wx.HORIZONTAL)
         button_filter_apply = self.button_chat_applyfilter = \
             wx.Button(parent=panel_stc2, label="A&pply filter")
@@ -2090,10 +2099,14 @@ class DatabasePage(wx.Panel):
         sizer_filter_buttons.AddSpacer(5)
         sizer_filter_buttons.Add(button_filter_reset)
         sizer_filter_buttons.AddSpacer(5)
+        sizer_dates.Add(date1)
+        sizer_dates.AddStretchSpacer()
+        sizer_dates.Add(date2, flag=wx.ALIGN_RIGHT)
         sizer_stc2.Add(label_filter, border=5, flag=wx.LEFT)
         sizer_stc2.Add(edit_filter, border=5, flag=wx.GROW | wx.LEFT)
         sizer_stc2.AddSpacer(5)
         sizer_stc2.Add(label_range, border=5, flag=wx.LEFT)
+        sizer_stc2.Add(sizer_dates, border=5, flag=wx.GROW | wx.LEFT | wx.BOTTOM)
         sizer_stc2.Add(range_date, border=5, flag=wx.GROW | wx.LEFT)
         sizer_stc2.AddSpacer(5)
         sizer_stc2.Add(label_list, border=5, flag=wx.LEFT)
@@ -2895,13 +2908,49 @@ class DatabasePage(wx.Panel):
                 self.page_tables.Refresh()
 
 
+    def on_change_range_date(self, event):
+        """
+        Handler for value change in chat filter date range, updates date 
+        editboxes.
+        """
+        try:
+            v1, v2 = [d.strftime("%Y-%m-%d") for d in self.range_date.Values]
+        except Exception:
+            v1, v2 = "", ""
+        for e, v in [(self.edit_filterdate1, v1), (self.edit_filterdate2, v2)]:
+            if v and e.Enabled and e.Value != v:
+                sel = e.Selection
+                e.Value = v
+                e.SetSelection(*sel)
+
+
+    def on_change_filterdate(self, event):
+        """
+        Handler for changing a chat date filter editbox, updates date range
+        slider.
+        """
+        datestr = re.sub("\\D", "", event.String)[:8]
+        try:
+            assert len(datestr) == 8
+            date = datetime.datetime.strptime(datestr, "%Y%m%d").date()
+        except (AssertionError, TypeError, ValueError):
+            date = None
+        if date:
+            side = (event.EventObject == self.edit_filterdate2)
+            self.range_date.SetValue(side, date)
+            date2 = self.range_date.GetValue(side)
+            if datestr != date2.strftime("%Y%m%d"):
+                sel = event.EventObject.Selection
+                event.EventObject.Value = date2.strftime("%Y-%m-%d")
+                event.EventObject.SetSelection(*sel)
+
+
     def on_change_import_resultfilter(self, event):
         """
         Handler for changing text in contacts import result filter box,
         filters Skype userbase results list.
         """
         self.list_import_result.SetFilter(event.String.strip())
-        
 
 
     def on_change_chatfilter(self, event):
