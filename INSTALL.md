@@ -14,14 +14,10 @@ http://suurjaak.github.com/Skyperious/downloads.html.
 * install wxPython: run `brew install wxpython`
   (or use a suitable binary from http://wxpython.org/download.php)
 * run `sudo easy_install pip`
-* run `sudo pip install pyparsing`
-* run `sudo pip install XlsxWriter`
-* run `sudo pip install python-dateutil`
-* run `sudo pip install Skype4Py`
-* run `sudo pip install Pillow`
-
-Download and extract the Skyperious source, launch `skyperious.sh` or
-execute `python src\main.py`.
+* download and extract the Skyperious source
+* open a terminal in the extracted directory
+* run `sudo pip install -r requirements.txt`
+* run `skyperious.sh`, or execute `python src\main.py`
 
 
 ### Ubuntu/Debian ###
@@ -31,6 +27,5 @@ execute `python src\main.py`.
 * run `sudo apt-get install python-pip`
 * download and extract the Skyperious source
 * open a terminal in the extracted directory
-* run `sudo pip install -r requirements`
-
-Launch `skyperious.sh`, or execute `python src\main.py`.
+* run `sudo pip install -r requirements.txt`
+* run `skyperious.sh`, or execute `python src\main.py`
