@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    02.12.2014
+@modified    07.12.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -711,23 +711,27 @@ p["avatar_class"] = "avatar__" + id_csssafe
       </td><td>
 %if stats.get("totalhist", {}).get("hours"):
 <%
-svgdata = {
-    "data":     sorted(stats["totalhist"]["hours"].items()),
-    "maxval":   max(stats["totalhist"]["hours"].values()),
-    "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
+items = sorted(stats["totalhist"]["hours"].items())
+maxkey, maxval = max(items, key=lambda x: x[1])
+svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotHoursColour,
+	   "rectsize": conf.PlotHoursUnitSize}
 %>
+        peak {{util.plural("message", maxval)}}<br />
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
         <br />24h activity
 %endif
       </td><td>
 %if stats.get("totalhist", {}).get("days"):
 <%
-svgdata = {"data":     sorted(stats["totalhist"]["days"].items()),
-           "maxval":   max(stats["totalhist"]["days"].values()),
-           "colour":   conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize }
+items = sorted(stats["totalhist"]["days"].items())
+maxkey, maxval = max(items, key=lambda x: x[1])
+interval = items[1][0] - items[0][0]
+svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotDaysColour,
+	   "rectsize": conf.PlotDaysUnitSize}
 %>
+        peak {{util.plural("message", maxval)}}<br />
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
-        <br />{{"%s-day intervals" % (svgdata["data"][1][0] - svgdata["data"][0][0]).days}}
+        <br />{{interval.days}}-day intervals
 %endif
       </td></tr>
 
@@ -1197,18 +1201,27 @@ import conf, skypedata, util
 %if not i:
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
 %if "hours" in images:
+<%
+items = sorted(stats["totalhist"]["hours"].items())
+maxkey, maxval = max(items, key=lambda x: x[1])
+%>
+      <font color="{{conf.PlotHoursColour}}">
+      peak {{util.plural("message", maxval)}}<br />
       <img src="memory:{{images["hours"]}}" /><br />
-      <font color="{{conf.PlotHoursColour}}">24h actitity</font>
+      24h actitity</font>
 %endif
     </td>
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
 %if "days" in images:
-      <img src="memory:{{images["days"]}}" /><br />
 <%
-dates = sorted(stats["totalhist"]["days"])
-interval = (dates[1] - dates[0]).days
+items = sorted(stats["totalhist"]["days"].items())
+maxkey, maxval = max(items, key=lambda x: x[1])
+interval = items[1][0] - items[0][0]
 %>
-      <font color="{{conf.PlotDaysColour}}">{{interval}}-day intervals</font>
+      <font color="{{conf.PlotDaysColour}}">
+      peak {{util.plural("message", maxval)}}<br />
+      <img src="memory:{{images["days"]}}" /><br />
+      {{interval.days}}-day intervals</font>
 %endif
     </td>
 %endif
@@ -2014,23 +2027,23 @@ import util
 
 border = 1
 rectstep = rectsize[0] + (1 if rectsize[0] < 10 else 2)
-step = data[1][0] - data[0][0]
+interval = data[1][0] - data[0][0]
 %>
 <svg width="{{len(data) * rectstep + 2 * border}}" height="{{rectsize[1] + 2 * border}}">
   <rect width="100%" height="100%" style="stroke-width: {{border}}; stroke: {{colour}}; fill: none;" />
-%for i, (interval, val) in enumerate(data):
+%for i, (start, val) in enumerate(data):
 <%
 height = rectsize[1] * util.safedivf(val, maxval)
 if 0 < height < 0.8: height = 0.8 # Very low values produce no or poorly visible bar
-if hasattr(interval, "strftime"):
-    if step > datetime.timedelta(days=1):
-        date2 = interval + step
-        datetitle = "%s .. %s, %s days" % (interval.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), step.days)
+if hasattr(start, "strftime"):
+    if interval > datetime.timedelta(days=1):
+        date2 = start + interval
+        datetitle = "%s .. %s, %s days" % (start.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), interval.days)
     else:
-        datetitle = interval.strftime("%Y-%m-%d")
+        datetitle = start.strftime("%Y-%m-%d")
     title = "%s: %s" % (datetitle, util.plural("message", val))
 else:
-    title = "%02d. hour: %s" % (interval, util.plural("message", val))
+    title = "%02d. hour: %s" % (start, util.plural("message", val))
 %>
 <g class="svg_hover_group">
     <rect width="{{rectsize[0]}}" fill="{{colour}}" height="{{util.round_float(height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{util.round_float(rectsize[1] - height + border, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
