@@ -3356,7 +3356,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     safediv = lambda a, b: a / float(b) if b else 0.0
     maxval = maxval if maxval is not None else max(zip(*data)[1])
     for i, (interval, val) in enumerate(data):
-        h = barsize[1] * safediv(val, maxval)
+        h = barsize[1] * safediv(val, maxval) + 1
         if 0 < h < 1.5:
             h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
