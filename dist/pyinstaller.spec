@@ -34,7 +34,8 @@ for d in a.datas:
     if 'pyconfig' in d[0]: 
         a.datas.remove(d)
         break
-a.datas += [("res/Carlito.ttf", "res/Carlito.ttf", "DATA"),
+a.datas += [("conf.py", "src/conf.py", "DATA"), # For configuration docstrings
+            ("res/Carlito.ttf", "res/Carlito.ttf", "DATA"),
             ("res/CarlitoBold.ttf", "res/CarlitoBold.ttf", "DATA"), ]
 pyz = PYZ(a.pure)
 
