@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.2.2f, 2014-12-07
+3.2.3f, 2014-12-07
 ------------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;

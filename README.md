@@ -24,7 +24,7 @@ The graphical version includes a Python console window.
 Making a backup of the database file is recommended before making any changes.
 There is an easy "Save as" button for that on the database index page.
 
-Windows installers and more screenshots at
+Downloads, help texts, and more screenshots at
 http://suurjaak.github.com/Skyperious.
 
 [![Screenshots](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/th_collage.png)](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/collage.png)
