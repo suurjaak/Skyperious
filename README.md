@@ -71,7 +71,8 @@ Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
 form, it should run wherever Python and the required Python packages are
 installed.
 
-To run from source code: execute `skyperious.sh`, or open a terminal and run 
+If running from source code, launch `skyperious.sh` where shell scripts are 
+supported, or launch `skyperious.bat` under Windows, or open a terminal and run
 `python src/main.py` in Skyperious directory.
 
 
