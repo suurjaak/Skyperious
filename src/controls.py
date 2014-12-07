@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.12.2014
+@modified    07.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -819,6 +819,7 @@ class RangeSlider(wx.PyPanel):
     """
     A horizontal slider with two markers for selecting a value range. Supports
     numeric and date/time values. Fires a wx.EVT_SLIDER event on value change.
+    Disabling MARKER_LABEL_SHOW will skip drawing marker label area.
     """
     BACKGROUND_COLOUR       = None
     BAR_ARROW_BG_COLOUR     = wx.Colour(212, 208, 200)
@@ -848,6 +849,7 @@ class RangeSlider(wx.PyPanel):
     SCROLL_STEP             = 5  # Scroll step in pixels
     TICK_HEIGHT             = 5
     TICK_STEP               = 5  # Tick after every xth pixel
+    MARKER_LABEL_SHOW       = True # Whether to show marker labels and area
 
 
     def __init__(self, parent, id=-1, pos=wx.DefaultPosition,
@@ -1043,10 +1045,12 @@ class RangeSlider(wx.PyPanel):
         extent = self.GetFullTextExtent(self.FormatLabel(self._rng[1]))
         # 2.3 provides a bit of space between 2 labels
         best.width  = 2.3 * extent[0]
-        # 1 for upper gap, plus all set positions plus 2 * label height
-        best.height = (1 + 2 * (extent[1] + extent[2]) + self.RANGE_TOP
-                      + self.RANGE_LABEL_TOP_GAP + self.RANGE_LABEL_BOTTOM_GAP
-                      + self.TICK_HEIGHT + self.BAR_HEIGHT)
+        # +1 for upper gap plus label height plus optional marker label height,
+        # plus all set positions 
+        best.height = (1 + (1 + self.MARKER_LABEL_SHOW) * sum(extent[1:3])
+                       + self.RANGE_TOP + self.RANGE_LABEL_TOP_GAP
+                       + self.RANGE_LABEL_BOTTOM_GAP + self.TICK_HEIGHT
+                       + self.BAR_HEIGHT)
         return best
 
 
@@ -1102,13 +1106,14 @@ class RangeSlider(wx.PyPanel):
         max_extent = right_extent if (right_extent > left_extent) \
                      else left_extent
         range_delta = self._rng[1] - self._rng[0]
-        box_top = (max_extent[1] + max_extent[2]) + 2 # 1 for border, 1 for gap
+        box_top = 2 # 2 for border and gap
+        if self.MARKER_LABEL_SHOW:
+            box_top += sum(max_extent[1:3])
         selection_top = box_top + self.RANGE_TOP
         selection_height = height - selection_top - self.RANGE_BOTTOM
         self._box_area = wx.Rect(self.BAR_BUTTON_WIDTH, box_top,
-            width - 2 * self.BAR_BUTTON_WIDTH,
-            height - box_top - self.BAR_HEIGHT
-        )
+                                 width - 2 * self.BAR_BUTTON_WIDTH,
+                                 height - box_top - self.BAR_HEIGHT)
         dc.SetFont(self.GetFont())
         range_colour = self.RANGE_COLOUR if self.Enabled \
                        else self.RANGE_DISABLED_COLOUR
@@ -1232,29 +1237,22 @@ class RangeSlider(wx.PyPanel):
         dc.DrawLineList(lines)
 
         # Draw labels, determining how many labels can fit comfortably.
-        # 4/3 leaves a nice padding between.
-        label_count = int(width / (max_extent[0] * 4 / 3.0))
-        labels = [left_label]
-        label_coords = [(2, selection_top + self.RANGE_LABEL_TOP_GAP)]
+        left = (2 + self._box_area.left, selection_top + self.RANGE_LABEL_TOP_GAP)
+        labels, label_coords = [left_label], [left]
+        label_count = int(width / (max_extent[0] * 4 / 3.0)) # 4/3 is nice padding
         if isinstance(self._rng[0], (datetime.date, datetime.time)):
-            # Cannot use floats to divide timedeltas
             value_step = range_delta / (label_count or sys.maxsize)
-            # Tickid on major ja minor. Valime siin, kuhu me mida paneme.
-            # variandid: aasta-kuu, aastakuu-päev, päev-tund, tund-minut jne
         else:
-            # Should use floats for other values, to get finer precision
+            # Should use floats for all numeric values, to get finer precision
             value_step = range_delta / float(label_count)
-        # Skip first and last, as left and right are already set.
+        # Skip first and last, as left and right are already known.
         for i in range(1, label_count - 1):
             labels.append(self.FormatLabel(self._rng[0] + i * value_step))
-            label_coords.append((self._box_area.x \
-                + i * self._box_area.width / label_count,
-                selection_top + self.RANGE_LABEL_TOP_GAP
-            ))
+            label_coords += [(self._box_area.x + i * self._box_area.width 
+                / label_count, selection_top + self.RANGE_LABEL_TOP_GAP)]
         labels.append(right_label)
-        label_coords.append((self._box_area.right - right_extent[0],
-            selection_top + self.RANGE_LABEL_TOP_GAP
-        ))
+        label_coords += [(self._box_area.right - right_extent[0],
+                          selection_top + self.RANGE_LABEL_TOP_GAP)]
         dc.DrawTextList(labels, label_coords)
 
         # Draw left and right markers
@@ -1272,8 +1270,8 @@ class RangeSlider(wx.PyPanel):
                 # Cannot divide by timedeltas: convert to microseconds
                 marker_delta = timedelta_micros(marker_delta)
                 range_delta_local = timedelta_micros(range_delta) or 1
-            x = self._box_area.x \
-                + self._box_area.width * marker_delta / range_delta_local
+            x = (self._box_area.x +
+                 self._box_area.width * marker_delta / range_delta_local)
             self._marker_xs[i] = x
             label = self.FormatLabel(self._vals[i])
             # GetFullTextExtent returns (width, height, descent, leading)
@@ -1288,13 +1286,11 @@ class RangeSlider(wx.PyPanel):
                     else (width - label_area.width)
             marker_labels[i] = (label, label_area)
 
-            area = wx.Rect(
-                x - self.MARKER_WIDTH / 2, box_top,
-                self.MARKER_WIDTH, height - box_top - self.BAR_HEIGHT
-            )
+            area = wx.Rect(x - self.MARKER_WIDTH / 2, box_top,
+                self.MARKER_WIDTH, height - box_top - self.BAR_HEIGHT)
             # Create a slightly larger highlight capture area for marker
             capture_area = self._capture_areas[i] = wx.Rect(*area)
-            capture_area.x     -= self.MARKER_CAPTURE_PADX
+            capture_area.x -= self.MARKER_CAPTURE_PADX
             capture_area.width += self.MARKER_CAPTURE_PADX
 
             dc.SetPen(PEN(self.SELECTION_LINE_COLOUR))
@@ -1302,11 +1298,10 @@ class RangeSlider(wx.PyPanel):
             if self._mousepos is not None:
                 # Draw drag buttons when mouse in control
                 button_area = wx.Rect(-1, -1, self.MARKER_BUTTON_WIDTH,
-                    self.MARKER_BUTTON_HEIGHT
-                ).CenterIn(area)
+                                      self.MARKER_BUTTON_HEIGHT).CenterIn(area)
                 button_radius = 3
                 if i == self._active_marker:
-                    brush_colour = wx.WHITE#self.BAR_HL_COLOUR
+                    brush_colour = wx.WHITE # self.BAR_HL_COLOUR
                 else:
                     brush_colour = self.MARKER_BUTTON_BG_COLOUR
                 dc.SetBrush(BRUSH(brush_colour, wx.SOLID))
@@ -1323,26 +1318,23 @@ class RangeSlider(wx.PyPanel):
                 ]
                 dc.SetPen(PEN(self.SELECTION_LINE_COLOUR))
                 dc.DrawLineList(button_lines)
-        # Move marker labels apart if overlapping each other
-        if marker_labels[0][1].Intersects(marker_labels[1][1]):
-            # +1 for padding
-            overlap = wx.Rect(*marker_labels[0][1]) \
-                .Intersect(marker_labels[1][1]).width
-            delta1 = (overlap / 2) + 1
-            if (marker_labels[0][1].x - delta1 < 1):
-                # Left is going over left edge: set to 1
-                delta1 = marker_labels[0][1].x - 1
-            delta2 = overlap - delta1
-            if (marker_labels[1][1].right + delta2 > width):
-                # Right is going over right side: set to right edge
-                delta2 = width - marker_labels[1][1].right
-                delta1 = overlap - delta2
-
-            marker_labels[0][1].x -= delta1
-            marker_labels[1][1].x += delta2
-        # Draw left and right marker labels
-        for text, area in marker_labels:
-            dc.DrawText(text, area.x, 0)
+        if self.MARKER_LABEL_SHOW:
+            # Move marker labels apart if overlapping each other
+            rect1, rect2 = [x[1] for x in marker_labels]
+            if rect1.Intersects(rect2):
+                overlap = wx.Rect(*rect1).Intersect(rect2).width
+                delta1 = (overlap / 2) + 1 # +1 for padding
+                if (rect1.x - delta1 < 1):
+                    delta1 = rect1.x - 1 # Left going over left edge: set to 1
+                delta2 = overlap - delta1
+                if (rect2.right + delta2 > width):
+                    delta2 = width - rect2.right # Right going over right edge:
+                    delta1 = overlap - delta2    # set to right edge
+                rect1.x -= delta1
+                rect2.x += delta2
+            # Draw left and right marker labels
+            for text, area in marker_labels:
+                dc.DrawText(text, area.x, 0)
 
 
     def OnMouseEvent(self, event):

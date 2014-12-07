@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.12.2014
+@modified    07.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2052,6 +2052,7 @@ class DatabasePage(wx.Panel):
         date2.SetToolTipString("Date in the form YYYY-MM-DD")
         self.Bind(wx.EVT_TEXT, self.on_change_filterdate, date1)
         self.Bind(wx.EVT_TEXT, self.on_change_filterdate, date2)
+        controls.RangeSlider.MARKER_LABEL_SHOW = False
         range_date = self.range_date = \
             controls.RangeSlider(parent=panel_stc2, fmt="%Y-%m-%d")
         range_date.SetRange(None, None)
@@ -2937,12 +2938,13 @@ class DatabasePage(wx.Panel):
             date = None
         if date:
             side = (event.EventObject == self.edit_filterdate2)
-            self.range_date.SetValue(side, date)
-            date2 = self.range_date.GetValue(side)
-            if datestr != date2.strftime("%Y%m%d"):
-                sel = event.EventObject.Selection
-                event.EventObject.Value = date2.strftime("%Y-%m-%d")
-                event.EventObject.SetSelection(*sel)
+            if self.range_date.GetValue(side) != date:
+                self.range_date.SetValue(side, date)
+                date2 = self.range_date.GetValue(side)
+                if datestr != date2.strftime("%Y%m%d"):
+                    sel = event.EventObject.Selection
+                    event.EventObject.Value = date2.strftime("%Y-%m-%d")
+                    event.EventObject.SetSelection(*sel)
 
 
     def on_change_import_resultfilter(self, event):
