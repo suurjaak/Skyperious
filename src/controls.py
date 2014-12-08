@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    07.12.2014
+@modified    08.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -908,14 +908,13 @@ class RangeSlider(wx.PyPanel):
         self._grip_area = None # Current scrollbar grip area
         self._bar_arrow_areas = None # Scrollbar arrow areas
         self._box_area = None # Current range area
+        self._box_gap_areas = [] # [rect padding box_area on a side, ]
         self._bar_area = None # Scrollbar area
         self.SetInitialSize(self.GetMinSize())
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
         self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
-        self.SetToolTipString("Double-click on marker or scrollbar to "
-                              "maximize/restore values.")
 
 
     def GetLabelFormat(self):
@@ -1070,7 +1069,7 @@ class RangeSlider(wx.PyPanel):
         formatter = self._fmt or "%s"
         if callable(formatter):
             formatted = formatter(value)
-        elif isinstance(self._rng[0], (datetime.date, datetime.time)):
+        elif isinstance(value, (datetime.date, datetime.time)):
             formatted = value.strftime(formatter)
         else:
             if type(self._rng[0]) == int and type(value) == float:
@@ -1114,6 +1113,11 @@ class RangeSlider(wx.PyPanel):
         self._box_area = wx.Rect(self.BAR_BUTTON_WIDTH, box_top,
                                  width - 2 * self.BAR_BUTTON_WIDTH,
                                  height - box_top - self.BAR_HEIGHT)
+        self._box_gap_areas = [
+            wx.Rect(0, box_top, self.BAR_BUTTON_WIDTH,
+                    height - box_top - self.BAR_HEIGHT), 
+            wx.Rect(width - self.BAR_BUTTON_WIDTH, box_top,
+                    width, height - box_top - self.BAR_HEIGHT)]
         dc.SetFont(self.GetFont())
         range_colour = self.RANGE_COLOUR if self.Enabled \
                        else self.RANGE_DISABLED_COLOUR
@@ -1355,6 +1359,8 @@ class RangeSlider(wx.PyPanel):
             # Switch marker to right if two are overlapping and approaching
             # from the right.
             active_marker = active_markers[-1]
+        self.SetToolTipString("")
+
         if event.Entering():
             refresh = True
         elif event.Moving():
@@ -1381,6 +1387,12 @@ class RangeSlider(wx.PyPanel):
                     for button_area in self._bar_arrow_areas:
                         if button_area.Contains(self._mousepos):
                             refresh = True
+            if not self._mousepos_special \
+            and self._box_area and self._box_area.Contains(event.Position):
+                x_delta = abs(event.Position.x - self._box_area.x + 1)
+                range_delta = self._rng[1] - self._rng[0]
+                x_step = range_delta * x_delta / self._box_area.width
+                self.SetToolTipString(self.FormatLabel(self._rng[0] + x_step))
         elif event.LeftDClick():
             if active_marker is not None:
                 # Maximize/restore marker value on double-clicking a marker
@@ -1458,6 +1470,15 @@ class RangeSlider(wx.PyPanel):
                                 - (self._vals[i] - self._rng[i])
                 self.SetValues(*new_vals, refresh=False)
                 refresh = True
+            elif self._box_area and (self._box_area.Contains(event.Position)
+            or any(x.Contains(event.Position) for x in self._box_gap_areas)):
+                x_delta = abs(max(0, event.Position.x - self._box_area.x + 1))
+                range_delta = self._rng[1] - self._rng[0]
+                x_step = range_delta * x_delta / self._box_area.width
+                x_val = min(max(self._rng[0] + x_step, self._rng[0]), self._rng[1])
+                closest, _ = min(enumerate(abs(x - x_val) for x in self._vals),
+                                 key=lambda x: x[1])
+                self.SetValue(closest, x_val)
         elif event.LeftUp():
             if self.HasCapture():
                 self.ReleaseMouse()
@@ -1488,7 +1509,6 @@ class RangeSlider(wx.PyPanel):
                     x_delta = abs(event.Position.x - last_pos.x)
                     x_direction = 1 if (event.Position.x > last_pos.x) else -1
                     range_delta = self._rng[1] - self._rng[0]
-                    range_width = self.GetClientSize().width
                     step = range_delta * x_delta / self.GetClientSize().width
                     if isinstance(self._rng[0], datetime.date) and step.days < 1:
                         # Enforce a minimum step of 1 day for date values
