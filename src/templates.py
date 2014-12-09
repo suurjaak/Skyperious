@@ -1625,10 +1625,10 @@ under the MIT License.
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
       <li>pyparsing{{" 2.0.3" if getattr(sys, 'frozen', False) else ""}}, 
       <a href="http://pyparsing.wikispaces.com/"><font color="{{conf.LinkColour}}">pyparsing.wikispaces.com</font></a></li>
-  <li>XlsxWriter{{" 0.6.3" if getattr(sys, 'frozen', False) else ""}},
+  <li>XlsxWriter{{" 0.6.4" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://github.com/jmcnamara/XlsxWriter"><font color="{{conf.LinkColour}}">
           github.com/jmcnamara/XlsxWriter</font></a></li>
-  <li>dateutil{{" 2.2" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
+  <li>dateutil{{" 2.3" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
       <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
   <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
       <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>

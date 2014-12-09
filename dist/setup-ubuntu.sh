@@ -5,7 +5,8 @@
 # Tested on Ubuntu Precise
 #
 # To be run from the project root
-
+#
+# @author Elan Ruusamäe <https://github.com/glensc>
 
 print_err() {
   echo $@ 2>&1
@@ -30,4 +31,3 @@ PIP_BIN=$(which pip)
 [ -f requirements.txt ] && sudo $PIP_BIN install -r requirements.txt || print_err "install PIP requirements failed"
 
 exit 0
-

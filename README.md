@@ -25,7 +25,7 @@ Making a backup of the database file is recommended before making any changes.
 There is an easy "Save as" button for that on the database index page.
 
 Downloads, help texts, and more screenshots at
-http://suurjaak.github.com/Skyperious.
+http://suurjaak.github.io/Skyperious.
 
 [![Screenshots](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/th_collage.png)](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/collage.png)
 
@@ -59,7 +59,10 @@ Skyperious offers a number of options from the command line:
 ```
 
 Skyperious can be minimized to tray, clicking the tray icon opens 
-a message search popup.
+a search popup.
+
+Skyperious can usually read from the same file Skype is currently using, but
+this can cause temporary program errors. Writing to such a file is ill-advised.
 
 The program is stand-alone and does not need installation, Windows installers 
 have been provided for convenience. The installed program itself can be copied
@@ -75,12 +78,15 @@ If running from source code, launch `skyperious.sh` where shell scripts are
 supported, or launch `skyperious.bat` under Windows, or open a terminal and run
 `python src/main.py` in Skyperious directory.
 
+If you encounter a bug in the Skyperious GUI, you can send a report from menu
+Help -> Send feedback.
+
 
 Installation
 ------------
 
 Windows: download and launch the latest setup from
-http://suurjaak.github.com/Skyperious/downloads.html.
+http://suurjaak.github.io/Skyperious/downloads.html.
 
 Mac/Linux: see (INSTALL.md)[INSTALL.md].
 
@@ -95,10 +101,10 @@ If running from source code, Skyperious needs Python 2.7 or 2.6,
 and the following 3rd-party Python packages:
 * wxPython 2.9+ (http://wxpython.org/)
 * pyparsing (http://pyparsing.wikispaces.com/)
-* XlsxWriter (https://github.com/jmcnamara/XlsxWriter)
+* XlsxWriter (https://pypi.python.org/pypi/XlsxWriter)
 * Pillow (https://pypi.python.org/pypi/Pillow)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
-* Skype4Py (https://github.com/awahlig/skype4py)
+* Skype4Py (https://pypi.python.org/pypi/Skype4Py)
 
 If wxPython is not available, the command line interface will function
 regardless.

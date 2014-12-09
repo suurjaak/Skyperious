@@ -12,9 +12,10 @@ CHANGELOG
 - number of UI tweaks and fixes;
 - upgraded Python from 2.7.6 to 2.7.8;
 - upgraded wxPython from 3.0.0 to 3.0.1;
+- upgraded dateutil from 2.2 to 2.3;
 - upgraded Pillow from 2.3.0 to 2.6.1;
 - upgraded pyparsing from 2.0.1 to 2.0.3;
-- upgraded XlsxWriter from 0.5.3 to 0.6.3;
+- upgraded XlsxWriter from 0.5.3 to 0.6.4;
 
 3.2, 2014-05-08
 ---------------
