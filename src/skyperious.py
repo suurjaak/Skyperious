@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    07.12.2014
+@modified    09.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6170,7 +6170,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             if function:
                 # Calling function here immediately will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
-                wx.CallLater(50, function, *params)
+                wx.CallLater(100, function, *params)
         event.StopPropagation()
 
 
