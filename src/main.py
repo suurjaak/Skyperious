@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.12.2014
+@modified    09.12.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -104,7 +104,10 @@ ARGUMENTS = {
              {"args": ["FILE2"], "metavar": "FILE2", "nargs": "+",
               "help": "more Skype databases"},
              {"args": ["--verbose"], "action": "store_true",
-              "help": "print detailed progress messages to stderr"}, ],
+              "help": "print detailed progress messages to stderr"},
+             {"args": ["-o", "--output"], "dest": "output", "required": False,
+              "help": "Final database filename, auto-chosen by default"},
+              ]
         }, 
         {"name": "diff", "help": "compare chat history in two Skype databases",
          "description": "Compare two Skype databases for differences "
@@ -240,7 +243,7 @@ def process_deferreds():
             del deferred_status[:]
 
 
-def run_merge(filenames):
+def run_merge(filenames, output_filename=None):
     """Merges all Skype databases to a new database."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     db_base = dbs.pop()
@@ -251,10 +254,11 @@ def run_merge(filenames):
 
     name, ext = os.path.splitext(os.path.split(db_base.filename)[-1])
     now = datetime.datetime.now().strftime("%Y%m%d")
-    filename_final = util.unique_path("%s.merged.%s%s" %  (name, now, ext))
-    print("Creating %s, using %s as base." % (filename_final, db_base))
-    shutil.copyfile(db_base.filename, filename_final)
-    db2 = skypedata.SkypeDatabase(filename_final)
+    if not output_filename:
+        output_filename = util.unique_path("%s.merged.%s%s" %  (name, now, ext))
+    print("Creating %s, using %s as base." % (output_filename, db_base))
+    shutil.copyfile(db_base.filename, output_filename)
+    db2 = skypedata.SkypeDatabase(output_filename)
     chats2 = db2.get_conversations()
     db2.get_conversations_stats(chats2)
 
@@ -293,7 +297,7 @@ def run_merge(filenames):
     if not counts:
         print("Nothing new to merge.")
         db2.close()
-        os.unlink(filename_final)
+        os.unlink(output_filename)
     else:
         for db1 in dbs:
             print("Merged %s in %s from %s." %
@@ -509,7 +513,7 @@ def run():
     if "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
-        run_merge(arguments.FILE)
+        run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type)
     elif "search" == arguments.command:
