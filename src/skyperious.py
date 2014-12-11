@@ -1855,8 +1855,8 @@ class DatabasePage(wx.Panel):
         sizer.Layout() # To avoid searchbox moving around during page creation
 
         bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version.startswith("2.")
-        and sys.version[:5] < "2.7.3"):
+        if (wx.version().startswith("2.8") and sys.version_info[0:] == [2]
+        and sys.version_info < (2, 7, 3)):
             # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
             bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
@@ -4816,8 +4816,8 @@ class MergerPage(wx.Panel):
         sizer.Layout() # To avoid header moving around during page creation
 
         bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version.startswith("2.")
-        and sys.version[:5] < "2.7.3"):
+        if (wx.version().startswith("2.8") and sys.version_info[0:] == [2]
+        and sys.version_info < (2,7,3)):
             # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
             bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
