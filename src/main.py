@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.12.2014
+@modified    11.12.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -465,6 +465,10 @@ def run():
     or sys.executable.lower().endswith("pythonw.exe")):
         sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to 
         sys.stderr = ConsoleWriter(sys.stderr) # a text console
+    if "main" not in sys.modules: # E.g. setuptools install, calling main.run
+        srcdir = os.path.abspath(os.path.dirname(__file__))
+        if srcdir not in sys.path: sys.path.append(srcdir)
+        sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
     for arg in ARGUMENTS["arguments"]:
