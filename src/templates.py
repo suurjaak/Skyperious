@@ -1633,7 +1633,7 @@ under the MIT License.
   <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
       <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.8, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
+  <li>Python 2.7.9, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
   <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">
       <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
 %endif
