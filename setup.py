@@ -11,15 +11,18 @@ Released under the MIT License.
 @modified    11.12.2014
 ------------------------------------------------------------------------------
 """
-import setuptools
+import glob
 import os
 import sys
+
+import setuptools
 
 here = os.path.abspath(os.path.dirname(__file__))
 os.chdir(here)
 sys.path.append(os.path.join(here, "src"))
 
 import conf
+
 
 setuptools.setup(
     name=conf.Title,
@@ -37,10 +40,13 @@ setuptools.setup(
     entry_points={"gui_scripts": ["skyperious=src.main:run"],
                   "console_scripts": ["skyperious-cli=src.main:run"]},
 
-    packages=setuptools.find_packages(exclude=["dist", "res"]),
+    packages=setuptools.find_packages(),
     data_files=[("res", [os.path.join("res", "Carlito.ttf"), 
-                         os.path.join("res", "CarlitoBold.ttf")]), ],
-
+                         os.path.join("res", "CarlitoBold.ttf")]),
+                ("", ["CHANGELOG.md", "INSTALL.md", "LICENSE.md", "README.md",
+                 "requirements.txt", "skyperious.bat", "skyperious.sh"]),
+                ("dist", glob.glob(os.path.join("dist", "*"))),
+    ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: End Users/Desktop",
