@@ -19,7 +19,7 @@ or, to run from source code:
 ### Mac ###
 
 * install [Homebrew](http://brew.sh)
-* install Python: open a terminal and run `brew install python2`
+* install Python 2: open a terminal and run `brew install python2`
 * install wxPython: run `brew install wxpython`
   (or use a suitable binary from http://wxpython.org/download.php)
 * run `sudo easy_install pip`
