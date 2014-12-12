@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.11.2014
+@modified    12.12.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -201,7 +201,8 @@ def export_chat_template(chat, filename, db, messages):
             for p in chat["participants"]:
                 contact = p["contact"].copy()
                 namespace["participants"].append(contact)
-                contact.update(avatar_raw_small="", avatar_raw_large="")
+                contact.update(avatar_raw_small="", avatar_raw_large="",
+                               rank=p["rank"])
                 bmp = contact.get("avatar_bitmap")
                 raw = contact.get("avatar_raw_small")
                 raw_large = contact.get("avatar_raw_large")

@@ -693,7 +693,13 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
   <div id="participants">
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
-    <span><span class="avatar_large {{p["avatar_class_large"]}}" title="{{p["name"]}} ({{p["identity"]}})"></span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span>
+    <span><span class="avatar_large {{p["avatar_class_large"]}}" title="{{p["name"]}} ({{p["identity"]}})"></span>{{p["name"]}}<br />
+    <span class="identity">
+        {{p["identity"]}}
+%if 1 == p["rank"]:
+        <br /><br />chat creator
+%endif
+    </span></span>
 %endfor
   </div>
 %endif
