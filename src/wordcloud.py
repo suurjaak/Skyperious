@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    23.11.2014
+@modified    14.12.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -184,7 +184,7 @@ def get_cloud(text, additions=None, options=None):
     count_max = options.get("SCALE") or max(counts.values() or [0])
     for word, count in counts.items():
         result.append((word, count, get_size(count, count_min, count_max, options)))
-    result.sort(key=lambda x: x[1], reverse=True) # Sort by count
+    result.sort(key=lambda x: (x[1], x[0]), reverse=True) # Sort by count, name
     result = result[:options["WORDS_MAX"]]
     return result
 
