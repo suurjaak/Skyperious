@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.12.2014
+@modified    14.12.2014
 ------------------------------------------------------------------------------
 """
 import argparse
@@ -57,15 +57,20 @@ ARGUMENTS = {
         {"name": "export",
          "help": "export Skype databases as HTML, text or spreadsheet",
          "description": "Export all message history from a Skype database "
-                        "into files under a new folder, or a single Excel "
-                        "workbook with chats on separate sheets.",
+                        "into files under a new folder" + (", or a single Excel "
+                        "workbook with chats on separate sheets." 
+                        if export.xlsxwriter else ""),
          "arguments": [
              {"args": ["-t", "--type"], "dest": "type",
-              "choices": ["html", "xlsx", "csv", "txt", "xlsx_single"],
+              "choices": ["html", "xlsx", "csv", "txt", "xlsx_single"]
+                         if export.xlsxwriter else ["html", "csv", "txt"],
               "default": "html", "required": False,
               "help": "export type: HTML files (default), Excel workbooks, "
                       "CSV spreadsheets, text files, or a single Excel "
-                      "workbook with separate sheets", },
+                      "workbook with separate sheets" if export.xlsxwriter
+                      else
+                      "export type: HTML files (default), CSV spreadsheets, "
+                      "text files", },
              {"args": ["FILE"], "nargs": "+",
               "help": "one or more Skype databases to export", }, 
              {"args": ["--verbose"], "action": "store_true",
