@@ -88,7 +88,7 @@ Installation
 Windows: download and launch the latest setup from
 http://suurjaak.github.io/Skyperious/downloads.html.
 
-Mac/Linux/source: see (INSTALL.md)[INSTALL.md].
+Mac/Linux/other: see (INSTALL.md)[INSTALL.md].
 
 Skyperious has a Vagrantfile, see
 [dist/README for Vagrant.md](dist/README for Vagrant.md).
@@ -109,6 +109,8 @@ The following are also listed in `requirements.txt` for pip:
 
 If wxPython is not available, the command line interface will function
 regardless.
+if XlsxWriter, Pillow, dateutil or Skype4Py are not available, the program
+will function regardless, only with lesser service - like lacking XLSX export.
 
 Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
 Python 2.6 will need the argparse library. Python 3 is yet unsupported.
@@ -121,7 +123,7 @@ Skyperious includes step, Simple Template Engine for Python,
 (c) 2012, Daniele Mazzocchio (https://github.com/dotpy/step).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
-released under the Skype Component License 1.0.
+released under the [Skype Component License 1.0](res/emoticons/Skype Component License.txt).
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
@@ -143,6 +145,6 @@ http://nsis.sourceforge.net/
 License
 -------
 
-Copyright (C) 2011-2015 by Erki Suurjaak.
+Copyright (C) 2011-2014 by Erki Suurjaak.
 Released as free open source software under the MIT License,
 see [LICENSE.md](LICENSE.md) for full details.

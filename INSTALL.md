@@ -53,6 +53,8 @@ The graphical user interface needs wxPython, preferably version 2.9+.
 wxPython 2.8 is also supported (2.8.12+), with some layout quirks.
 
 If wxPython is not available, the command line interface will function regardless.
+if XlsxWriter, Pillow, dateutil or Skype4Py are not available, the program
+will function regardless, only with lesser service - like lacking XLSX export.
 
 To use pip to install all Python dependencies (other than wxPython), execute
 `pip install -r requirements.txt` in Skyperious directory.
