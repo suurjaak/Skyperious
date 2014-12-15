@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    14.12.2014
+@modified    15.12.2014
 ------------------------------------------------------------------------------
 """
 import collections
@@ -18,7 +18,7 @@ import re
 """Default language for common words."""
 DEFAULT_LANGUAGE = "en"
 
-"""Maximum amount of words to include."""
+"""Maximum amount of words to include, negative for unlimited."""
 WORDS_MAX = 100
 
 """Minimum count for words to be included."""
@@ -161,7 +161,7 @@ def get_cloud(text, additions=None, options=None):
 
     @param   text       text to analyze
     @param   additions  a pre-parsed list of additional words to add
-    @param   options    a dict of options like {"LENGTH_MIN": 3, "SCALE": 100}
+    @param   options    a dict of options like {"LENGTH_MIN": 3, "SCALE": 128}
     @return             in descending order of relevance, as
                         [('word', count, font size 0..7), ]
     """
@@ -177,7 +177,7 @@ def get_cloud(text, additions=None, options=None):
         counts[w] += 1
     # Drop rare words, limit total number
     count_last = options["COUNT_MIN"]
-    if len(counts) > options["WORDS_MAX"]:
+    if options["WORDS_MAX"] > 0 and len(counts) > options["WORDS_MAX"]:
         count_last = max(count_last, sorted(counts.values())[options["WORDS_MAX"] - 1])
     counts = dict((w, c) for w, c in counts.items() if c >= count_last)
     count_min = min(counts.values() or [0])
@@ -185,7 +185,8 @@ def get_cloud(text, additions=None, options=None):
     for word, count in counts.items():
         result.append((word, count, get_size(count, count_min, count_max, options)))
     result.sort(key=lambda x: (x[1], x[0]), reverse=True) # Sort by count, name
-    result = result[:options["WORDS_MAX"]]
+    if options["WORDS_MAX"] > 0:
+        result = result[:options["WORDS_MAX"]]
     return result
 
 
@@ -200,8 +201,8 @@ def get_size(count, count_min, count_max, options):
     """
     result = options["FONTSIZE_MAX"]
     if count_min != count_max:
-        lo, hi = options["FONTSIZE_MIN"], options["FONTSIZE_MAX"]
         ratio = count / float(count_max - count_min)
+        lo, hi = options["FONTSIZE_MIN"], options["FONTSIZE_MAX"]
         result = int(lo + (hi - lo) * min(1, ratio ** 0.2))
     return result
 
