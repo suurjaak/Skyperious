@@ -61,13 +61,14 @@ Skyperious offers a number of options from the command line:
 Skyperious can be minimized to tray, clicking the tray icon opens 
 a search popup.
 
-Skyperious can usually read from the same file Skype is currently using, but
+Skyperious can usually read from the same file Skype is currently using, although
 this can cause temporary program errors. Writing to such a file is ill-advised.
 
-The program is stand-alone and does not need installation, Windows installers 
-have been provided for convenience. The installed program itself can be copied
-to a USB stick and used elsewhere, same goes for the source code. The command
-line interface only needs Python and pyparsing to run.
+The program itself is stand-alone, can work from any directory, and does not 
+need additional installation, Windows installers have been provided for 
+convenience. The installed program can be copied to a USB stick and used
+elsewhere, same goes for the source code. The command line interface only needs
+Python and pyparsing to run.
 
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
 Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
