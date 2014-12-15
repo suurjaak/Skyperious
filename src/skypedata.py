@@ -1104,6 +1104,8 @@ class SkypeDatabase(object):
                     chatrows_present[m["chatname"]] = 1
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
+                if m["author"] == source_db.id:  # Ensure correct author
+                    m_filled["author"] = self.id # if merge from other account
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
@@ -1122,6 +1124,8 @@ class SkypeDatabase(object):
                             # something go out of sync if their values differ?
                             row = [t.get(col, "") if col != "convo_id" else chat["id"]
                                    for col in transfer_fields]
+                            if row["partner_handle"] == source_db.id:
+                                row["partner_handle"] = self.id
                             row = self.blobs_to_binary(row, transfer_fields,
                                                        transfer_col_data)
                             self.execute(sql, row)
