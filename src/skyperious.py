@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.12.2014
+@modified    15.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1462,7 +1462,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         unsaved_pages = {} # {DatabasePage: filename, }
         merging_pages = [] # [MergerPage title, ]
         for page, db in self.db_pages.items():
-            if page.get_unsaved_grids():
+            if page and page.get_unsaved_grids():
                 unsaved_pages[page] = db.filename
         if unsaved_pages:
             response = wx.MessageBox(
@@ -1475,8 +1475,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if wx.YES == response:
                 do_exit = all(p.save_unsaved_grids() for p in unsaved_pages)
         if do_exit:
-            merging_pages = filter(lambda x: x.is_merging, self.merger_pages)
-            merging_pages = [p.title for p in merging_pages]
+            merging_pages = filter(lambda x: x and x.is_merging, self.merger_pages)
+            merging_pages = [p and p.title for p in merging_pages]
         if merging_pages:
             response = wx.MessageBox(
                 "Merging is currently in progress in %s.\nExit anyway? "
@@ -1486,6 +1486,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             do_exit = (wx.CANCEL != response)
         if do_exit:
             for page in self.db_pages:
+                if not page: continue # continue for page, if dead object
                 active_idx = page.notebook.Selection
                 if active_idx:
                     conf.LastActivePage[page.db.filename] = active_idx
