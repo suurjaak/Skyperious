@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    08.12.2014
+@modified    15.12.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -802,13 +802,13 @@ else:
 %for type, label, count, total in stat_rows:
 <%
 if "byte" == label:
-  text = util.format_bytes(count)
+  text, title = util.format_bytes(count), util.plural(label, count)
 elif "callduration" == label:
-  text = util.format_seconds(count, "call")
+  text, title = util.format_seconds(count, "call"), util.plural("second", count)
 else:
-  text = util.plural(label, count)
+  text = title = util.plural(label, count)
 %>
-          <div class="{{label}}">{{text}}</div>
+          <div class="{{label}}" title="{{count}}">{{text}}</div>
 %endfor
         </td>
         <td>
@@ -842,18 +842,10 @@ svgdata = {
     <div id="wordcloud" class="wordcloud">
 <%
 sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1.1em;", 1: "0.85em", 0: "0.8em;"}
-authorcounts = dict((w, {}) for w, c, _ in stats["wordcloud"])
-for author, cloud in stats["wordclouds"].items():
-    for word, count, size in cloud:
-        if word not in authorcounts: authorcounts[word] = {}
-        authorcounts[word][author] = count
 %>
 %for word, count, size in stats["wordcloud"]:
 <%
-if count < conf.WordCloudCountMin: continue # continue for word, count, size
-countauthors = {}
-[countauthors.setdefault(c, []).append(a) for a, c in authorcounts[word].items()]
-countstring = ";\\n".join("%s from %s" % (c, ", ".join(aa)) for c, aa in sorted(countauthors.items(), reverse=True))
+countstring = ";\\n".join("%s from %s" % (c, a) for a, c in sorted(stats["wordcounts"][word].items(), key=lambda x: -x[1]))
 %>
       <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{countstring}}">({{count}})</span></span> 
 %endfor
@@ -873,10 +865,8 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
         <table><tr><td><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
-%for word, count, size in stats["wordclouds"][p["identity"]][:conf.WordCloudWordsAuthorMax]:
-%if count >= conf.WordCloudCountMin:
+%for word, count, size in stats["wordclouds"][p["identity"]]:
           <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % (100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
-%endif
 %endfor
         </div>
       </td></tr>
@@ -897,13 +887,15 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
 partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
-f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
+dt = datetime.datetime.fromtimestamp(f["starttime"]) if f.get("starttime") else None
+f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
+f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td{{" class='remote'" if from_remote else ""}}>{{partner if from_remote else db.account["name"]}}</td><td>
+        <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}">{{partner if from_remote else db.account["name"]}}</td><td>
           <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
-        </td><td>
+        </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
-        </td><td>
+        </td><td title="{{f_datetime_title}}">
           {{f_datetime}}
         </td></tr>
 %endfor
@@ -942,12 +934,6 @@ day = m["datetime"].date()
 weekday, weekdate = util.get_locale_day_date(day)
 previous_author = None
 %>
-  <tr>
-    <td class="t1"></td>
-    <td class="day t2"></td>
-    <td class="day t3"></td>
-    <td class="day" colspan="2"><span class="weekday">{{weekday}}</span>, {{weekdate}}</td>
-  </tr>
   <tr>
     <td class="t1"></td>
     <td class="day t2"></td>
@@ -1349,7 +1335,7 @@ else:
       <td width="10"></td>
     </tr></table>
   </td><td valign="top">
-%for word, count, size in stats["wordclouds"][p["identity"]][:conf.WordCloudWordsAuthorMax]:
+%for word, count, size in stats["wordclouds"][p["identity"]]:
     <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
   </td></tr>

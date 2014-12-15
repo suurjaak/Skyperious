@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.12.2014
+@modified    15.12.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -19,7 +19,6 @@ import csv
 import datetime
 import math
 import os
-import Queue
 import re
 import sqlite3
 import shutil
@@ -1488,6 +1487,7 @@ class MessageParser(object):
                 "counts": {}, "total": 0, "startdate": None, "enddate": None,
                 "wordclouds": {}, "cloudtexts": {}, # Per-author
                 "wordcloud": [], "links": [], # Wordcloud and encountered links
+                "wordcounts": {}, # {word: {author: count, }, }
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
@@ -2010,8 +2010,8 @@ class MessageParser(object):
 
         @return  dict with statistics entries, or empty dict if not collecting
         """
-        if not self.stats:
-            return {}
+        if not self.stats or self.stats["wordclouds"]:
+            return self.stats
         stats = self.stats
         for k in ["chars", "smschars", "files", "bytes", "calls"]:
             stats[k] = sum(i[k] for i in stats["counts"].values())
@@ -2050,7 +2050,6 @@ class MessageParser(object):
             per_day = util.round_float(per_day)
             stats["info_items"].append(("Messages per day", per_day))
 
-
             # Fill author and chat hourly histogram
             histbase = {"hours": dict((x, 0) for x in range(24)), "days": {}}
             stats["totalhist"] = copy.deepcopy(histbase)
@@ -2080,13 +2079,15 @@ class MessageParser(object):
                     stats["hists"][author]["days"][bindate] += count
                     stats["totalhist"]["days"][bindate] += count
 
-        maincloud, maxcount = "", 0
-        # First author cloudtext analysis pass to accumulate statistics
-        options = {"COUNT_MIN": 1, "LENGTH_MIN": conf.WordCloudLengthMin}
+        # Author cloudtext analysis to accumulate word counts and main cloud
+        maincloud = ""; stats["wordcounts"].clear()
+        options = {"COUNT_MIN": 1, "LENGTH_MIN": conf.WordCloudLengthMin,
+                   "WORDS_MAX": -1}
         for author, cloudtext in stats["cloudtexts"].items():
             maincloud += cloudtext
             cloud = wordcloud.get_cloud(cloudtext, options=options)
-            maxcount = max(maxcount, max(x[1] for x in (cloud or [(0,0,0)])))
+            for word, count, size in cloud:
+                stats["wordcounts"].setdefault(word, {})[author] = count
 
         # Create main cloudtext
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
@@ -2095,13 +2096,16 @@ class MessageParser(object):
         cloud = wordcloud.get_cloud(maincloud, stats["links"], options)
         stats["wordcloud"] = cloud
 
-        # Create author cloudtexts, scaled to max word count among all authors
-        maxcount = max([x[1] for x in cloud] or [0])
-        options = {"COUNT_MIN": 1, "LENGTH_MIN": 1, "SCALE": maxcount,
-                   "FONTSIZE_MAX": wordcloud.FONTSIZE_MAX - 1}
+        # Create author cloudtexts, scaled to max word count in main cloud
+        maxcount = max(x[1] for x in cloud or [0])
+        options = {"COUNT_MIN": conf.WordCloudCountMin, "SCALE": maxcount,
+                   "LENGTH_MIN": conf.WordCloudLengthMin,
+                   "WORDS_MAX": conf.WordCloudWordsAuthorMax,
+                   "FONTSIZE_MAX": wordcloud.FONTSIZE_MAX - 1} # 1 step smaller
         for author, cloudtext in stats["cloudtexts"].items():
             cloud = wordcloud.get_cloud(cloudtext, options=options)
             stats["wordclouds"][author] = cloud
+
         return stats
 
 
