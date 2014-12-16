@@ -2334,12 +2334,19 @@ class DatabasePage(wx.Panel):
         panel2 = self.panel_sql2 = wx.Panel(parent=splitter)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         label_help = wx.StaticText(panel2, label=
-            "Ctrl-Space shows autocompletion list. Alt-Enter runs the query "
-            "contained in currently selected text or on the current line.")
+            "Alt-Enter runs the query contained in currently selected text or "
+            "on the current line. Ctrl-Space shows autocompletion list.")
         label_help.ForegroundColour = "grey"
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         button_sql = self.button_sql = wx.Button(panel2, label="Execute S&QL")
+        button_script = self.button_script = wx.Button(panel2, 
+                                                       label="Execute scrip&t")
+        button_sql.SetToolTipString("Execute a single statement "
+                                    "from the SQL window")
+        button_script.SetToolTipString("Execute multiple SQL statements, "
+                                       "separated by semicolons")
         self.Bind(wx.EVT_BUTTON, self.on_button_sql, button_sql)
+        self.Bind(wx.EVT_BUTTON, self.on_button_script, button_script)
         button_reset = self.button_reset_grid_sql = \
             wx.Button(parent=panel2, label="&Reset filter/sort")
         button_reset.SetToolTipString("Resets all applied sorting "
@@ -2352,6 +2359,7 @@ class DatabasePage(wx.Panel):
         button_export.Bind(wx.EVT_BUTTON, self.on_button_export_grid)
         button_export.Enabled = False
         sizer_buttons.Add(button_sql, flag=wx.ALIGN_LEFT)
+        sizer_buttons.Add(button_script, border=5, flag=wx.LEFT | wx.ALIGN_LEFT)
         sizer_buttons.AddStretchSpacer()
         sizer_buttons.Add(button_reset, border=5,
                           flag=wx.ALIGN_RIGHT | wx.RIGHT)
@@ -4172,6 +4180,33 @@ class DatabasePage(wx.Panel):
             self.execute_sql(sql)
 
 
+    def on_button_script(self, event):
+        """
+        Handler for clicking to run multiple SQL statements, runs the selected
+        text or whole contents as an SQL script.
+        """
+        sql = self.stc_sql.SelectedText.strip() or self.stc_sql.Text.strip()
+        try:
+            if sql:
+                main.log("Executing SQL script \"%s\".", sql)
+                self.db.connection.executescript(sql)
+                self.grid_sql.SetTable(None)
+                self.grid_sql.CreateGrid(1, 1)
+                self.grid_sql.SetColLabelValue(0, "Affected rows")
+                self.grid_sql.SetCellValue(0, 0, "-1")
+                self.button_reset_grid_sql.Enabled = False
+                self.button_export_sql.Enabled = False
+                size = self.grid_sql.Size
+                self.grid_sql.Fit()
+                # Jiggle size by 1 pixel to refresh scrollbars
+                self.grid_sql.Size = size[0], size[1]-1
+                self.grid_sql.Size = size[0], size[1]
+        except Exception as e:
+            msg = util.format_exc(e)
+            main.logstatus_flash(msg)
+            wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+
+
     def execute_sql(self, sql):
         """Executes the SQL query and populates the SQL grid with results."""
         try:
@@ -4203,8 +4238,9 @@ class DatabasePage(wx.Panel):
                 col_range = range(grid_data.GetNumberCols())
                 [self.grid_sql.AutoSizeColLabelSize(x) for x in col_range]
         except Exception as e:
-            wx.MessageBox(util.format_exc(e), conf.Title,
-                          wx.OK | wx.ICON_WARNING)
+            msg = util.format_exc(e)
+            main.logstatus_flash(msg)
+            wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
     def get_unsaved_grids(self):
