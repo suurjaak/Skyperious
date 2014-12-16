@@ -2189,15 +2189,21 @@ def import_contacts_file(filename):
     lines_raw = [line.replace('\x00', '') for line in open(filename, "rb")]
     lines = list(csv.reader(lines_raw))
     header, items = lines[0], lines[1:]
-    titlemap = dict((title, i) for i, title in enumerate(header))
+    titlemap = dict((title.lower(), i) for i, title in enumerate(header))
 
     # By default, assume MSN/Outlook type of values
-    FIRST, MIDDLE, LAST = "First Name", "Middle Name", "Last Name"
-    PHONE_FIELDS, EMAIL_FIELDS = ["Mobile Phone"], ["E-mail Address"]
-    if "Given Name" in titlemap: # Looks like GMail type of values
-        FIRST, MIDDLE, LAST = "Given Name", "Additional Name", "Family Name"
-        PHONE_FIELDS = [("Phone %s - Value" % i) for i in range(1, 5)]
-        EMAIL_FIELDS = [("E-mail %s - Value" % i) for i in range(1, 3)]
+    FIRST, MIDDLE, LAST = "first name", "middle name", "last name"
+    PHONE_FIELDS, EMAIL_FIELDS = ["mobile phone"], ["e-mail address"]
+    if "given name" in titlemap: # Looks like GMail type of values
+        FIRST, MIDDLE, LAST = "given name", "additional name", "family name"
+        PHONE_FIELDS = [("phone %s - value" % i) for i in range(1, 5)]
+        EMAIL_FIELDS = [("e-mail %s - value" % i) for i in range(1, 3)]
+    if not any(x in titlemap for x in [FIRST, MIDDLE, LAST]):
+        FIRST = "name" if "name" in titlemap else "skypename"
+    if not any(x in titlemap for x in PHONE_FIELDS):
+        PHONE_FIELDS = ["phone"] if "phone" in titlemap else ["mobile"]
+    if not any(x in titlemap for x in EMAIL_FIELDS):
+        EMAIL_FIELDS = ["e-mail"] if "e-mail" in titlemap else ["email"]
 
     for row in filter(None, items):
         row = [i.strip().decode("latin1") for i in row]
