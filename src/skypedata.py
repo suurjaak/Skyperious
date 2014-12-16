@@ -2188,6 +2188,12 @@ def import_contacts_file(filename):
     # GMail CSVs can contain mysterious NULL bytes
     lines_raw = [line.replace('\x00', '') for line in open(filename, "rb")]
     lines = list(csv.reader(lines_raw))
+    if lines and len(lines[0]) == 1 and ";" in lines[0][0]:
+        # Just one field with semicolons: CSV parsing probably failed.
+        # csv.excel.delimiter default "," is not actually used by Excel.
+        dialect, dialect.delimiter = csv.excel, ";"
+        lines = list(csv.reader(lines_raw, dialect))
+        
     header, items = lines[0], lines[1:]
     titlemap = dict((title.lower(), i) for i, title in enumerate(header))
 
@@ -2198,15 +2204,28 @@ def import_contacts_file(filename):
         FIRST, MIDDLE, LAST = "given name", "additional name", "family name"
         PHONE_FIELDS = [("phone %s - value" % i) for i in range(1, 5)]
         EMAIL_FIELDS = [("e-mail %s - value" % i) for i in range(1, 3)]
+    # Try other possible headers if not MSN/GMail export
     if not any(x in titlemap for x in [FIRST, MIDDLE, LAST]):
         FIRST = "name" if "name" in titlemap else "skypename"
     if not any(x in titlemap for x in PHONE_FIELDS):
         PHONE_FIELDS = ["phone"] if "phone" in titlemap else ["mobile"]
     if not any(x in titlemap for x in EMAIL_FIELDS):
         EMAIL_FIELDS = ["e-mail"] if "e-mail" in titlemap else ["email"]
+    # Looks like no header: try to auto-detect
+    ALL_FIELDS = [FIRST, MIDDLE, LAST] + PHONE_FIELDS + EMAIL_FIELDS
+    if not any(x in titlemap for x in ALL_FIELDS):
+        titlemap.clear()
+        for i, title in filter(lambda x: x[1], enumerate(header)):
+            if "@" in title:
+                titlemap[EMAIL_FIELDS[0]] = i
+            elif re.search("\d{3,}", title):
+                titlemap[PHONE_FIELDS[0]] = i
+            else:
+                titlemap[FIRST] = i
+        items = [header] + items
 
     for row in filter(None, items):
-        row = [i.strip().decode("latin1") for i in row]
+        row = [x.strip().decode("latin1") for x in row]
         values = dict((t, row[i]) for t, i in titlemap.items())
 
         # Assemble full name from partial fields

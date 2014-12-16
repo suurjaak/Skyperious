@@ -262,7 +262,7 @@ def export_chat_csv(chat, filename, db, messages):
     """
     parser = skypedata.MessageParser(db, chat=chat, stats=False)
     dialect = csv.excel
-    # Delimiter for Excel dialect "," is actually not used by Excel.
+    # csv.excel.delimiter default "," is not actually used by Excel.
     # Default linefeed "\r\n" would cause another "\r" to be written.
     dialect.delimiter, dialect.lineterminator = ";", "\r"
     with open(filename, "wb") as f:
