@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.12.2014
+@modified    16.12.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2184,7 +2184,7 @@ def import_contacts_file(filename):
     """
     Returns contacts found in the CSV file, as [{"name", "e-mail", "phone"}].
     """
-    contacts = []
+    contacts, uniques = [], {}
     # GMail CSVs can contain mysterious NULL bytes
     lines_raw = [line.replace('\x00', '') for line in open(filename, "rb")]
     lines = list(csv.reader(lines_raw))
@@ -2221,7 +2221,10 @@ def import_contacts_file(filename):
                 contact[t] = values[title]
 
         if any(contact.values()):
-            contacts.append(contact)
+            key = tuple(contact.items())
+            if key not in uniques: contacts.append(contact)
+            uniques[key] = contact
+
     return contacts
 
 
