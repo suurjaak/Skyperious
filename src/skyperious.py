@@ -2395,6 +2395,7 @@ class DatabasePage(wx.Panel):
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_header = wx.BoxSizer(wx.HORIZONTAL)
         sizer_top1 = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_selectbuttons = wx.BoxSizer(wx.VERTICAL)
 
         label_header = wx.StaticText(parent=panel1, 
             label="Import people to your Skype contacts from a CSV file, "
@@ -2408,9 +2409,14 @@ class DatabasePage(wx.Panel):
         label_header.ForegroundColour = "grey"
         button_import = self.button_import_file = \
             wx.Button(panel1, label="Se&lect contacts file")
+        button_import_db = self.button_import_db = \
+            wx.Button(panel1, label="Use &database contacts")
         button_import.Bind(wx.EVT_BUTTON, self.on_choose_import_file)
-        sizer_header.Add(button_import, border=10,
-                         flag=wx.RIGHT | wx.ALIGN_CENTER_VERTICAL)
+        button_import_db.Bind(wx.EVT_BUTTON, self.on_choose_import_db)
+        sizer_selectbuttons.Add(button_import, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.GROW)
+        sizer_selectbuttons.AddStretchSpacer()
+        sizer_selectbuttons.Add(button_import_db, flag=wx.ALIGN_CENTER_HORIZONTAL)
+        sizer_header.Add(sizer_selectbuttons, border=10, flag=wx.RIGHT | wx.GROW)
         sizer_header.Add(label_header, border=60, flag=wx.LEFT)
 
         label_source = self.label_import_source = \
@@ -2990,6 +2996,8 @@ class DatabasePage(wx.Panel):
                 wx.CallAfter(support.report_error, errormsg)
         if contacts is not None:
             self.list_import_result.DeleteAllItems()
+            cols = [("name", "Name"), ("e-mail", "E-mail"), ("phone", "Phone")]
+            self.list_import_source.SetColumns(cols)
             self.list_import_source.Populate(contacts)
             self.button_import_add.Enabled = False
             self.button_import_clear.Enabled = False
@@ -3000,6 +3008,27 @@ class DatabasePage(wx.Panel):
             self.button_import_select_all.Enabled = len(contacts)
             main.logstatus_flash("Found %s in file %s.",
                                  util.plural("contact", contacts), filename)
+
+
+    def on_choose_import_db(self, event):
+        """Handler for clicking to choose to import contacts from current DB."""
+        contacts = [{"e-mail": x["emails"] if "@" in (x["emails"] or "") else "", 
+                     "name": x["name"], "skypename": x["skypename"], 
+                     "phone": x["phone_mobile_normalized"]}
+                    for x in self.db.get_contacts()]
+        contacts = filter(lambda x: any(x.values()), contacts)
+        self.list_import_result.DeleteAllItems()
+        cols = [("skypename", "Skypename"), ("name", "Name"), 
+                ("e-mail", "E-mail"), ("phone", "Phone")]
+        self.list_import_source.SetColumns(cols)
+        self.list_import_source.Populate(contacts)
+        self.button_import_add.Enabled = False
+        self.button_import_clear.Enabled = False
+        self.button_import_search_selected.Enabled = False
+        self.label_import_source.Label = \
+            "C&ontacts in database %s [%s]:" % (self.db, len(contacts))
+        self.label_import_result.Label = "Contacts found in Sk&ype:"
+        self.button_import_select_all.Enabled = len(contacts)
 
 
     def on_select_import_sourcelist(self, event):
@@ -3049,8 +3078,8 @@ class DatabasePage(wx.Panel):
             selected = lst.GetFirstSelected()
             while selected >= 0:
                 contact = lst.GetItemMappedData(selected)
-                for key in ["name", "phone", "e-mail"]:
-                    if contact[key] and contact[key] not in values_unique:
+                for key in ["skypename", "name", "phone", "e-mail"]:
+                    if contact.get(key) and contact[key] not in values_unique:
                         search_values.append(contact[key])
                         values_unique.add(contact[key])
                         contacts_unique.add(id(contact))
