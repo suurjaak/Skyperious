@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.12.2014
+@modified    16.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2401,11 +2401,14 @@ class DatabasePage(wx.Panel):
             label="Import people to your Skype contacts from a CSV file, "
                   "like ones exported from MSN or GMail.\n"
                   "Skype needs to be running and logged in.\n\n"
-                  "For exporting your MSN contacts, log in to hotmail.com "
+                  "For exporting your MSN contacts, log in to live.com "
                   "with your MSN account and find \"Export contacts\" under "
-                  "Options.\n"
+                  "People.\n"
                   "For exporting your GMail contacts, log in to gmail.com and "
-                  "find \"Export...\" under \"Contacts\" -> \"More\".")
+                  "find \"Download data\" under \"Account\".\n"
+                  "For other CSV sources: header row should have fields "
+                  "\"Name\", \"Phone\", \"E-mail\", or \"Skypename\"."
+                  )
         label_header.ForegroundColour = "grey"
         button_import = self.button_import_file = \
             wx.Button(panel1, label="Se&lect contacts file")
@@ -2992,6 +2995,7 @@ class DatabasePage(wx.Panel):
                 contacts = skypedata.import_contacts_file(filename)
             except Exception as e:
                 errormsg = "Error reading \"%s\".\n\n%s" % (filename, util.format_exc(e))
+                main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 wx.CallAfter(support.report_error, errormsg)
         if contacts is not None:
