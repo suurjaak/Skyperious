@@ -68,7 +68,7 @@ The program itself is stand-alone, can work from any directory, and does not
 need additional installation, Windows installers have been provided for 
 convenience. The installed program can be copied to a USB stick and used
 elsewhere, same goes for the source code. The command line interface only needs
-Python and pyparsing to run.
+Python to run.
 
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
 Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
@@ -110,8 +110,9 @@ The following are also listed in `requirements.txt` for pip:
 
 If wxPython is not available, the command line interface will function
 regardless.
-if XlsxWriter, Pillow, dateutil or Skype4Py are not available, the program
-will function regardless, only with lesser service - like lacking XLSX export.
+If other Python libraries are not available, the program will function 
+regardless, only with lesser service - like lacking XLSX export or full 
+search syntax.
 
 Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
 Python 2.6 will need the argparse library. Python 3 is yet unsupported.

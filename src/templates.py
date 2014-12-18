@@ -14,7 +14,7 @@ Released under the MIT License.
 import re
 
 # Modules imported inside templates:
-#import base64, datetime, os, re, string, sys, urllib, wx
+#import base64, datetime, os, pyparsing, re, string, sys, urllib, wx
 #import conf, emoticons, images, skypedata, step, templates, util
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
@@ -1747,9 +1747,15 @@ import conf
 """Long help text shown in a separate tab on search page."""
 SEARCH_HELP_LONG = """<%
 import conf
+try:
+    import pyparsing
+except ImportError:
+    pyparsing = None
 %>
 <font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
-
+%if not pyparsing:
+<b><font color="red">Search syntax currently limited:</font></b>&nbsp;&nbsp;pyparsing not installed.<br /><br /><br />
+%endif
 {{conf.Title}} supports a Google-like syntax for searching messages:<br /><br />
 <table><tr><td width="500">
   <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{conf.HelpBorderColour}}"

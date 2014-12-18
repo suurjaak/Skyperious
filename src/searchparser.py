@@ -15,13 +15,15 @@ Parses a Google-like search grammar into SQL for querying a Skype database.
 - "-" immediately before: exclude words, phrases, grouped words and keywords
 - can also provide queries to search all fields in any table
 
+If pyparsing is unavailable, falls back to naive split into words and keywords.
+
 ------------------------------------------------------------------------------
 This file is part of Skyperious - a Skype database viewer and merger.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    11.04.2014
+@modified    18.12.2014
 """
 import calendar
 import collections
@@ -31,7 +33,11 @@ import string
 import traceback
 import warnings
 
-from pyparsing import *
+try:
+    from pyparsing import CaselessLiteral, Combine, FollowedBy, Forward, Group, Literal, NotAny, OneOrMore, Optional, ParseResults, ParserElement, Suppress, Word, ZeroOrMore
+    ParserElement.enablePackrat() # Speeds up recursive grammar significantly
+except ImportError:
+    ParserElement = None
 
 import util
 
@@ -43,16 +49,16 @@ ALLWORDCHARS = u"".join(set(unichr(c) for c in range(65536)
 ALLCHARS = ALLWORDCHARS + string.whitespace
 WORDCHARS = ALLWORDCHARS.replace("(", "").replace(")", "").replace("\"", "")
 ESCAPE_CHAR = "\\" # Character used to escape SQLite special characters like _%
-ParserElement.enablePackrat() # Speeds up recursive grammar significantly
 
 
 class SearchQueryParser(object):
 
-    # For naive identification of "chat:xyz" and "from:xyz" keywords
-    PATTERN_KEYWORD = re.compile("^(-?)(chat|from)\:([^\s]+)$", re.I)
+    # For naive identification of "chat:xyz", "from:xyz" etc keywords
+    PATTERN_KEYWORD = re.compile("^(-?)(chat|from|date|table)\:([^\s]+)$", re.I)
 
 
     def __init__(self):
+        if not ParserElement: return
         with warnings.catch_warnings():
             # In Python 2.6, pyparsing throws warnings on its own code.
             warnings.simplefilter("ignore")
@@ -116,7 +122,7 @@ class SearchQueryParser(object):
             parse_results = self._grammar.parseString(query, parseAll=True)
         except Exception:
             # Grammar parsing failed: do a naive parsing into keywords and words
-            split_words = query.lower().split()
+            split_words = query.lower().split() # @todo vt kas saaks lowerist lahti?
 
             for word in split_words[:]:
                 if self.PATTERN_KEYWORD.match(word):
@@ -124,7 +130,10 @@ class SearchQueryParser(object):
                     key = negation + key
                     keywords[key.lower()].append(value)
                     split_words.remove(word)
-            parse_results = ParseResults(split_words)
+            try:                
+                parse_results = ParseResults(split_words)
+            except NameError: # pyparsing.ParseResults not available
+                parse_results = split_words
 
         result = self._makeSQL(parse_results, words, keywords, sql_params,
                               table=table)
@@ -161,10 +170,24 @@ class SearchQueryParser(object):
         to argument dictionaries.
         """
         result = ""
-        if isinstance(item, ParseResults):
+        if isinstance(item, basestring):
+            words.append(item)
+            safe = self._escape(item, ("*" if "QUOTES" != parent_name else ""))
+            if not table:
+                table = {"name": "m", "columns": [{"name": "body_xml"}]}
+            i = len(sql_params)
+            for col in table["columns"]:
+                result_col = "%s.%s LIKE :body_like%s" % \
+                             (table["name"], col["name"], i)
+                if len(safe) > len(item):
+                    result_col += " ESCAPE '%s'" % ESCAPE_CHAR
+                result += (" OR " if result else "") + result_col
+            if len(table["columns"]) > 1: result = "(%s)" % result
+            sql_params["body_like%s" % i] = "%" + safe + "%"
+        else:
             elements = item
             parsed_elements = []
-            name = item.getName()
+            name = hasattr(item, "getName") and item.getName()
             do_recurse = True
             negation = ("NOT" == name)
             if "KEYWORD" == name:
@@ -191,20 +214,6 @@ class SearchQueryParser(object):
                 result, count = self._join_strings(parsed_elements, glue)
                 result = "(%s)"   % result if count > 1 else result
                 result = "NOT %s" % result if negation else result
-        else:
-            words.append(item)
-            safe = self._escape(item, ("*" if "QUOTES" != parent_name else ""))
-            if not table:
-                table = {"name": "m", "columns": [{"name": "body_xml"}]}
-            i = len(sql_params)
-            for col in table["columns"]:
-                result_col = "%s.%s LIKE :body_like%s" % \
-                             (table["name"], col["name"], i)
-                if len(safe) > len(item):
-                    result_col += " ESCAPE '%s'" % ESCAPE_CHAR
-                result += (" OR " if result else "") + result_col
-            if len(table["columns"]) > 1: result = "(%s)" % result
-            sql_params["body_like%s" % i] = "%" + safe + "%"
         return result
 
 
@@ -306,7 +315,7 @@ class SearchQueryParser(object):
 
         @param   wildcards  characters to replace with SQL wildcard %
         """
-        result =   item.replace("%", ESCAPE_CHAR + "%")
+        result   = item.replace("%", ESCAPE_CHAR + "%")
         result = result.replace("_", ESCAPE_CHAR + "_")
         if wildcards:
             result = "".join(result.replace(c, "%") for c in wildcards)

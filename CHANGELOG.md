@@ -10,6 +10,7 @@ CHANGELOG
 - fixed case-sensitive name sorting in chat statistics;
 - changed skypename text colour in chat Excel export from transparent to gray;
 - number of UI tweaks and fixes;
+- made pyparsing optional;
 - upgraded Python from 2.7.6 to 2.7.9;
 - upgraded wxPython from 3.0.0 to 3.0.1;
 - upgraded dateutil from 2.2 to 2.3;
