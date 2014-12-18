@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.12.2014
+@modified    18.12.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2184,20 +2184,25 @@ def import_contacts_file(filename):
     """
     Returns contacts found in the CSV file, as [{"name", "e-mail", "phone"}].
     """
-    contacts, uniques = [], {}
-    # GMail CSVs can contain mysterious NULL bytes
-    lines_raw = [line.replace('\x00', '') for line in open(filename, "rb")]
-    lines = list(csv.reader(lines_raw))
-    if lines and len(lines[0]) == 1 and ";" in lines[0][0]:
-        # Just one field with semicolons: CSV parsing probably failed.
-        # csv.excel.delimiter default "," is not actually used by Excel.
-        dialect, dialect.delimiter = csv.excel, ";"
-        lines = list(csv.reader(lines_raw, dialect))
-        
-    header, items = lines[0], lines[1:]
+    result, uniques = [], {}
+    contents = open(filename, "rb").read()
+    if not contents: return result
+
+    if contents.startswith("\xFF\xFE"): # Unicode little endian header
+        try:
+            contents = contents.decode("utf-16") # GMail CSVs can be in UTF-16
+        except UnicodeDecodeError:
+            contents = contents[2:].replace("\x00", "")
+        else: # CSV has trouble with Unicode: turn back to string
+            contents = contents.encode("latin1", errors="xmlcharrefreplace")
+    lines = contents.splitlines()
+    csvfile = csv.reader(lines, csv.Sniffer().sniff(lines[0], ",;\t"))
+    rows = filter(None, csvfile)
+    header, items = rows[0] if rows else [], rows[1:]
     titlemap = dict((title.lower(), i) for i, title in enumerate(header))
 
-    # By default, assume MSN/Outlook type of values
+    # Look through header row and see what fields we recognize.
+    # By default, assume MSN/Outlook type of values.
     FIRST, MIDDLE, LAST = "first name", "middle name", "last name"
     PHONE_FIELDS, EMAIL_FIELDS = ["mobile phone"], ["e-mail address"]
     if "given name" in titlemap: # Looks like GMail type of values
@@ -2211,7 +2216,7 @@ def import_contacts_file(filename):
         PHONE_FIELDS = ["phone"] if "phone" in titlemap else ["mobile"]
     if not any(x in titlemap for x in EMAIL_FIELDS):
         EMAIL_FIELDS = ["e-mail"] if "e-mail" in titlemap else ["email"]
-    # Looks like no header: try to auto-detect
+    # Looks like no header: try to auto-detect fields from first values
     ALL_FIELDS = [FIRST, MIDDLE, LAST] + PHONE_FIELDS + EMAIL_FIELDS
     if not any(x in titlemap for x in ALL_FIELDS):
         titlemap.clear()
@@ -2220,18 +2225,18 @@ def import_contacts_file(filename):
                 titlemap[EMAIL_FIELDS[0]] = i
             elif re.search("\d{3,}", title):
                 titlemap[PHONE_FIELDS[0]] = i
-            else:
+            elif FIRST not in titlemap:
                 titlemap[FIRST] = i
         items = [header] + items
 
-    for row in filter(None, items):
+    for row in items:
         row = [x.strip().decode("latin1") for x in row]
-        values = dict((t, row[i]) for t, i in titlemap.items())
+        values = dict((t, row[i]) for t, i in titlemap.items() if i < len(row))
 
         # Assemble full name from partial fields
         contact = {"name": values.get(FIRST, ""), "phone": "", "e-mail": ""}
         for title in filter(lambda x: values.get(x, ""), [MIDDLE, LAST]):
-            contact["name"] += " " + values[title]
+            contact["name"] += (" " if contact["name"] else "") + values[title]
 
         # Phone data can contain arbitrary whitespace: remove it
         for title in filter(lambda x: values.get(x, ""), PHONE_FIELDS):
@@ -2241,16 +2246,16 @@ def import_contacts_file(filename):
         for t, fields in [("phone", PHONE_FIELDS), ("e-mail", EMAIL_FIELDS)]:
             for title in filter(lambda x: values.get(x, ""), fields):
                 if contact[t]: # Value already filled: make new record
-                    contacts.append(contact)
+                    result.append(contact)
                     contact = contact.copy()
                 contact[t] = values[title]
 
         if any(contact.values()):
             key = tuple(contact.items())
-            if key not in uniques: contacts.append(contact)
+            if key not in uniques: result.append(contact)
             uniques[key] = contact
 
-    return contacts
+    return result
 
 
 def get_avatar(datadict, size=None, aspect_ratio=True):
