@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.12.2014
+@modified    21.12.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1490,8 +1490,9 @@ class MessageParser(object):
                 "smses": 0, "transfers": [], "calls": 0, "messages": 0,
                 "counts": {}, "total": 0, "startdate": None, "enddate": None,
                 "wordclouds": {}, "cloudtexts": {}, # Per-author
-                "wordcloud": [], "links": [], # Wordcloud and encountered links
+                "wordcloud": [], # [(word, count, size), ]
                 "wordcounts": {}, # {word: {author: count, }, }
+                "links": {}, # {author: [link, ], }
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
@@ -1930,7 +1931,7 @@ class MessageParser(object):
         self.stats["last_message"] = ""
         author = message["author"]
         if message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
-            self.collect_dom_stats(message["dom"])
+            self.collect_dom_stats(message["dom"], message)
             if not self.stats["cloudtexts"]:
                 self.stats["cloudtexts"] = collections.defaultdict(str)
             self.stats["cloudtexts"][author] += self.stats["last_cloudtext"]
@@ -1981,7 +1982,7 @@ class MessageParser(object):
             self.stats["counts"][author]["chars"] += len_msg
 
 
-    def collect_dom_stats(self, dom, tails_new=None):
+    def collect_dom_stats(self, dom, message, tails_new=None):
         """Updates current statistics with data from the message DOM."""
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
@@ -2000,7 +2001,7 @@ class MessageParser(object):
                 self.add_dict_text(self.stats, "last_message", text)
                 subitems = elem.getchildren()
             elif "a" == elem.tag:
-                self.stats["links"].append(text)
+                self.stats["links"].setdefault(message["author"], []).append(text)
                 self.add_dict_text(self.stats, "last_message", text)
             elif "ss" == elem.tag:
                 self.emoticons_unique.add(elem.get("type"))
@@ -2010,7 +2011,7 @@ class MessageParser(object):
                 self.add_dict_text(self.stats, "last_cloudtext", text)
                 self.add_dict_text(self.stats, "last_message", text)
             for i in subitems:
-                self.collect_dom_stats(i, tails_new)
+                self.collect_dom_stats(i, message, tails_new)
                 to_skip[i] = True
             if tail:
                 self.add_dict_text(self.stats, "last_cloudtext", tail)
@@ -2098,7 +2099,8 @@ class MessageParser(object):
                    "WORDS_MAX": -1}
         for author, cloudtext in stats["cloudtexts"].items():
             maincloud += cloudtext
-            cloud = wordcloud.get_cloud(cloudtext, options=options)
+            additions = stats["links"].get(author)
+            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
             for word, count, size in cloud:
                 stats["wordcounts"].setdefault(word, {})[author] = count
 
@@ -2106,7 +2108,8 @@ class MessageParser(object):
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
                    "LENGTH_MIN": conf.WordCloudLengthMin,
                    "WORDS_MAX": conf.WordCloudWordsMax}
-        cloud = wordcloud.get_cloud(maincloud, stats["links"], options)
+        additions = sum(stats["links"].values(), [])
+        cloud = wordcloud.get_cloud(maincloud, additions, options)
         stats["wordcloud"] = cloud
 
         # Create author cloudtexts, scaled to max word count in main cloud
@@ -2116,7 +2119,8 @@ class MessageParser(object):
                    "WORDS_MAX": conf.WordCloudWordsAuthorMax,
                    "FONTSIZE_MAX": wordcloud.FONTSIZE_MAX - 1} # 1 step smaller
         for author, cloudtext in stats["cloudtexts"].items():
-            cloud = wordcloud.get_cloud(cloudtext, options=options)
+            additions = stats["links"].get(author)
+            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
             stats["wordclouds"][author] = cloud
 
         return stats
