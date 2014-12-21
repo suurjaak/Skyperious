@@ -5,6 +5,7 @@ CHANGELOG
 ------------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
+- added support for bold, italic and strike-through formatting in Skype 7 (issue #31);
 - added start-end editboxes for chat date filter;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
 - fixed case-sensitive name sorting in chat statistics;

@@ -1832,6 +1832,8 @@ class MessageParser(object):
                     subelem.set(greyattr, greyval)
                     # Add whitespace before next content
                     subelem.tail = " " + (subelem.tail or "")
+                elif subelem.tag in ["b", "i", "s"]:
+                    subelem.attrib.clear() # Clear raw_pre and raw_post
                 elif "a" == subelem.tag:
                     subelem.set("target", "_blank")
                     if output.get("export"):
@@ -1898,6 +1900,12 @@ class MessageParser(object):
                 text = "[%s]\r\n" % text.strip()
             elif "ss" == elem.tag:
                 text = elem.text
+            elif elem.tag in ["i", "b", "s"]: # italic bold strikethrough
+                pre = tail = dict(zip("ibs", "_*~"))[elem.tag]
+                if elem.get("raw_pre"): pre = elem.get("raw_pre")
+                if elem.get("raw_post"): tail = elem.get("raw_post")
+                text = pre + text
+                subitems = elem.getchildren()
             if text:
                 fulltext += text
             for i in subitems:
@@ -1953,7 +1961,8 @@ class MessageParser(object):
                 if identity not in self.stats["counts"]:
                     self.stats["counts"][identity] = author_stats.copy()
                 self.stats["counts"][identity]["calldurations"] += duration
-            self.stats["calldurations"] += max(calldurations.values() or [0])
+            if calldurations:
+                self.stats["calldurations"] += max(calldurations.values())
         elif MESSAGES_TYPE_FILE == message["type"]:
             files = message.get("__files")
             if files is None:
@@ -1997,7 +2006,7 @@ class MessageParser(object):
                 self.emoticons_unique.add(elem.get("type"))
             elif "quotefrom" == elem.tag:
                 self.add_dict_text(self.stats, "last_message", text)
-            elif elem.tag in ["xml", "b"]:
+            elif elem.tag in ["xml", "i", "b", "s"]:
                 self.add_dict_text(self.stats, "last_cloudtext", text)
                 self.add_dict_text(self.stats, "last_message", text)
             for i in subitems:
@@ -2101,7 +2110,7 @@ class MessageParser(object):
         stats["wordcloud"] = cloud
 
         # Create author cloudtexts, scaled to max word count in main cloud
-        maxcount = max(x[1] for x in cloud or [0])
+        maxcount = max([x[1] for x in cloud] or [0])
         options = {"COUNT_MIN": conf.WordCloudCountMin, "SCALE": maxcount,
                    "LENGTH_MIN": conf.WordCloudLengthMin,
                    "WORDS_MAX": conf.WordCloudWordsAuthorMax,

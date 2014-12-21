@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.12.2014
+@modified    21.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6083,6 +6083,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             "remote": 13, "local": 14, "link": 15, "tiny": 16,
             "special": 17, "bolddefault": 18, "boldlink": 19,
             "boldspecial": 20, "remoteweak": 21, "localweak": 22,
+            "italic": 23, "strike": 24
         }
         stylespecs = {
             "default":      "face:%s,size:%d,fore:%s,back:%s" %
@@ -6100,6 +6101,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             "tiny":        "size:1",
             "special":     "fore:%s" % conf.HistoryGreyColour,
             "boldspecial": "fore:%s,bold" % conf.HistoryGreyColour,
+            "italic":      "italic",
+            "strike":      "underline",
         }
         self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, stylespecs["default"])
         self.StyleClearAll() # Apply the new default style to all styles
@@ -6469,8 +6472,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                                 in highlighted style
         @param   tails_new      internal use, {element: modified tail str}
         """
-        tagstyle_map = {"a": "link", "b": "bold", "quotefrom": "special",
-                        "bodystatus": "special", "ss": "default", }
+        tagstyle_map = {"b": "bold", "i": "italic", "s": "strike",
+                        "bodystatus": "special",  "quotefrom": "special",
+                        "a": "link", "ss": "default" }
         to_skip = {} # {element to skip: True, }
         parent_map = dict((c, p) for p in dom.getiterator() for c in p)
         tails_new = {} if tails_new is None else tails_new
@@ -6512,7 +6516,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 text = "\n%s\n" % text
             elif e.tag in ["xml", "b"]:
                 linefeed_final = "\n\n"
-            elif e.tag not in ["blink", "font", "bodystatus"]:
+            elif "s" == e.tag:
+                text = "~%s~" % text # STC does not support strikethrough style
+            elif e.tag not in ["blink", "font", "bodystatus", "i", "s"]:
                 text = ""
             if text:
                 self._append_text(text, style, rgx_highlight)
