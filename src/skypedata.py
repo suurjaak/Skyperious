@@ -2399,7 +2399,7 @@ Conversations:
   meta_topic      topic set to the conversation
 
 Messages:
-  chatmsg_type    NULL: (type 4, 30, 39, 50, 53, 68, 110)
+  chatmsg_type    NULL: any type also can be NULL (NB!),
                   1:    add participant (type 10),
                         identities has space-separated list)
                   2:    type 10: add participant (identities has
@@ -2409,22 +2409,27 @@ Messages:
                   4:    "%name has left" (type 13)
                   5:    set conversation topic (type 2)
                   6:    file accepting (type 100)
-                  7:    file transfer, SMS, or "/me laughs" (type 60, 64, 68)
+                  7:    file transfer, SMS, or "/me laughs", or others
+                        (type 60, 64, 68, 201)
                         if transfer, Messages.guid == Transfers.chatmsg_guid
                   8:    sent contacts (body_xml has contacts XML) (type 63)
                   11:   "%name removed %name from this conversation." (type 12)
                   15:   "%name% has changed the conversation picture" (type 2)
-                  18:   different call/contact things (type 30, 39, 51)
+                  18:   different call/contact things (type 30, 39, 51, 68)
 
   type            2:    set topic or picture (chatmsg_type 5, 15)
                   4:    "#author created a group conversation with #identities.
                         Show group conversation" (chatmsg_type NULL)
+                  8:    "%name can now participate in this chat."
+                        (chatmsg_type NULL)
+                  9:    "%name needs to update Skype to participate in this chat."
+                        (chatmsg_type NULL)
                   10:   added participant (chatmsg_type 1, 2)
                   12:   sent contacts (chatmsg_type 11)
                   13:   "%name has left" (chatmsg_type 4)
-                  30:   call (chatmsg_type 18, NULL). body_xml can have
+                  30:   call (chatmsg_type 18). body_xml can have
                         participants XML.
-                  39:   call ended (chatmsg_type 18, NULL)
+                  39:   call ended (chatmsg_type 18)
                   50:   intro message, "wish to add you to my contacts"
                         (chatmsg_type NULL). body_xml can have display message.
                         Seems received when one or other adds on request?
@@ -2437,8 +2442,10 @@ Messages:
                   63:   sent contacts (chatmsg_type 8)
                   64:   SMS (chatmsg_type 7)
                   68:   file transfer (chatmsg_type 7)
+                  70:   video sharing (chatmsg_type NULL)
                   100:  file sending and accepting (chatmsg_type 2, 6)
                   110:  birthday alert (chatmsg_type NULL)
+                  201:  photo sharing (chatmsg_type 7)
   edited_timestamp      if set, message has been edited; if body_xml is empty,
                         message has been deleted
 
