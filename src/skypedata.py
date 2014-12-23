@@ -104,6 +104,7 @@ ACCOUNT_FIELD_TITLES = {
     "about"              : "About me",
     "skypeout_balance"   : "SkypeOut balance",
 }
+AUTHORS_SPECIAL = ["sys"] # Used by Skype for system messages
 
 
 class SkypeDatabase(object):
@@ -1110,7 +1111,7 @@ class SkypeDatabase(object):
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
                 m_id = cursor.lastrowid
-                if (m["chatmsg_type"] == 7 and m["type"] == 68
+                if (MESSAGES_TYPE_FILE == m["type"]
                 and "transfers" in source_db.tables):
                     transfers = [t for t in source_db.get_transfers()
                                  if t.get("chatmsg_guid") == m["guid"]]
@@ -1118,18 +1119,18 @@ class SkypeDatabase(object):
                         sql = "INSERT INTO transfers (%s) VALUES (%s)" % \
                               (transfer_cols, transfer_vals)
                         transfers.sort(key=lambda x: x.get("chatmsg_index"))
-                        for t in transfers:
+                        for t in map(dict.copy, transfers):
                             # pk_id and nodeid are troublesome, ditto in SMSes,
                             # because their meaning is unknown - will
                             # something go out of sync if their values differ?
+                            if t["partner_handle"] == source_db.id:
+                                t["partner_handle"] = self.id
                             row = [t.get(col, "") if col != "convo_id" else chat["id"]
                                    for col in transfer_fields]
-                            if row["partner_handle"] == source_db.id:
-                                row["partner_handle"] = self.id
                             row = self.blobs_to_binary(row, transfer_fields,
                                                        transfer_col_data)
                             self.execute(sql, row)
-                if (m["chatmsg_type"] == 7 and m["type"] == 64
+                if (MESSAGES_TYPE_SMS == m["type"]
                 and "smses" in source_db.tables):
                     smses = [s for s in source_db.get_smses()
                              if s.get("chatmsg_id") == m["id"]]
@@ -1927,9 +1928,11 @@ class MessageParser(object):
         author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
         self.stats["enddate"] = message["datetime"]
+        author = message["author"]
+        if author in AUTHORS_SPECIAL:
+            return
         self.stats["total"] += 1
         self.stats["last_message"] = ""
-        author = message["author"]
         if message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
             self.collect_dom_stats(message["dom"], message)
             if not self.stats["cloudtexts"]:
@@ -2394,7 +2397,6 @@ Conversations:
   displayname     name of other correspondent for single chats, and
                   given/assigned name for multichats
   meta_topic      topic set to the conversation
-
 
 Messages:
   chatmsg_type    NULL: (type 4, 30, 39, 50, 53, 68, 110)
