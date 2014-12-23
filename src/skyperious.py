@@ -7342,8 +7342,8 @@ class SkypeHandler(Skype4Py.Skype if Skype4Py else object):
     def __init__(self):
         if Skype4Py:
             # Hack Skype4Py to avoid uncatchable error on refusing Skype access.
-            # The original attach_override raises an exception on refusal, and
-            # as it rises in a callback thread, it cannot be caught otherwise.
+            # The original attachment_changed raises an exception on refusal,
+            # and it cannot be caught as it rises in a callback thread.
             def attach_override(self, status):
                 try:
                     self.skype._CallEventHandler("AttachmentStatus", status)
