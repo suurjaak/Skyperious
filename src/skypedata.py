@@ -54,26 +54,26 @@ CHATS_TYPENAMES = {
     CHATS_TYPE_CONFERENCE: "Conference"
 }
 MESSAGE_REMOVED_TEXT = "This message has been removed."
-MESSAGES_TYPE_TOPIC        =   2 # Changed chat topic or picture
-MESSAGES_TYPE_GROUP        =   4 # Created group conversation
-MESSAGES_TYPE_UPDATE_DONE  =   8 # Updated, can now participate in this chat
-MESSAGES_TYPE_UPDATE_NEED  =   9 # Needs update to participate in this chat
-MESSAGES_TYPE_PARTICIPANTS =  10 # Added participants to chat
-MESSAGES_TYPE_REMOVE       =  12 # Removed participants from chat
-MESSAGES_TYPE_LEAVE        =  13 # Contact left the chat
-MESSAGES_TYPE_CALL         =  30 # Started Skype call
-MESSAGES_TYPE_CALL_END     =  39 # Skype call ended
-MESSAGES_TYPE_INTRO        =  50 # Intro message, "wish to add to my contacts"
-MESSAGES_TYPE_SHARE_DETAIL =  51 # Sharing contact details
-MESSAGES_TYPE_BLOCK        =  53 # Blocking contacts
-MESSAGES_TYPE_INFO         =  60 # Info message like "/me is planting corn"
-MESSAGES_TYPE_MESSAGE      =  61 # Ordinary message
-MESSAGES_TYPE_CONTACTS     =  63 # Sent contacts
-MESSAGES_TYPE_SMS          =  64 # SMS message
-MESSAGES_TYPE_FILE         =  68 # File transfer
-MESSAGES_TYPE_SHARE_VIDEO  =  70 # Video sharing
-MESSAGES_TYPE_BIRTHDAY     = 110 # Birthday notification
-MESSAGES_TYPE_SHARE_PHOTO  = 201 # Photo sharing
+MESSAGE_TYPE_TOPIC        =   2 # Changed chat topic or picture
+MESSAGE_TYPE_GROUP        =   4 # Created group conversation
+MESSAGE_TYPE_UPDATE_DONE  =   8 # Updated, can now participate in this chat
+MESSAGE_TYPE_UPDATE_NEED  =   9 # Needs update to participate in this chat
+MESSAGE_TYPE_PARTICIPANTS =  10 # Added participants to chat
+MESSAGE_TYPE_REMOVE       =  12 # Removed participants from chat
+MESSAGE_TYPE_LEAVE        =  13 # Contact left the chat
+MESSAGE_TYPE_CALL         =  30 # Started Skype call
+MESSAGE_TYPE_CALL_END     =  39 # Skype call ended
+MESSAGE_TYPE_INTRO        =  50 # Intro message, "wish to add to my contacts"
+MESSAGE_TYPE_SHARE_DETAIL =  51 # Sharing contact details
+MESSAGE_TYPE_BLOCK        =  53 # Blocking contacts
+MESSAGE_TYPE_INFO         =  60 # Info message like "/me is planting corn"
+MESSAGE_TYPE_MESSAGE      =  61 # Ordinary message
+MESSAGE_TYPE_CONTACTS     =  63 # Sent contacts
+MESSAGE_TYPE_SMS          =  64 # SMS message
+MESSAGE_TYPE_FILE         =  68 # File transfer
+MESSAGE_TYPE_SHARE_VIDEO  =  70 # Video sharing
+MESSAGE_TYPE_BIRTHDAY     = 110 # Birthday notification
+MESSAGE_TYPE_SHARE_PHOTO  = 201 # Photo sharing
 MESSAGE_TYPES_BASE = (2, 4, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_STATS = (2, 4, 10, 12, 13, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
@@ -437,7 +437,7 @@ class SkypeDatabase(object):
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             result[k] = next(res, {}).get("count")
 
-        typestr = ", ".join(MESSAGE_TYPES_BASE)
+        typestr = ", ".join(map(str, MESSAGE_TYPES_BASE))
         res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
             "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
@@ -511,7 +511,8 @@ class SkypeDatabase(object):
                 if additional_sql and " c." in additional_sql:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
                 # Take only known and supported types of messages.
-                sql += "WHERE m.type IN (%s)" % ", ".join(MESSAGE_TYPES_MESSAGE)
+                sql += "WHERE m.type IN (%s)" % ", ".join(
+                       map(str, MESSAGE_TYPES_MESSAGE))
                 if chat:
                     sql += " AND m.convo_id = :convo_id"
                     params["convo_id"] = chat["id"]
@@ -673,7 +674,7 @@ class SkypeDatabase(object):
                    "NULL AS first_message_datetime, "
                    "NULL AS last_message_datetime "
                    "FROM messages WHERE type IN (%s)%s GROUP BY convo_id" 
-                   % (", ".join(MESSAGE_TYPES_STATS), and_str))
+                   % (", ".join(map(str, MESSAGE_TYPES_STATS)), and_str))
             rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
@@ -1117,7 +1118,7 @@ class SkypeDatabase(object):
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
                 m_id = cursor.lastrowid
-                if (MESSAGES_TYPE_FILE == m["type"]
+                if (MESSAGE_TYPE_FILE == m["type"]
                 and "transfers" in source_db.tables):
                     transfers = [t for t in source_db.get_transfers()
                                  if t.get("chatmsg_guid") == m["guid"]]
@@ -1136,7 +1137,7 @@ class SkypeDatabase(object):
                             row = self.blobs_to_binary(row, transfer_fields,
                                                        transfer_col_data)
                             self.execute(sql, row)
-                if (MESSAGES_TYPE_SMS == m["type"]
+                if (MESSAGE_TYPE_SMS == m["type"]
                 and "smses" in source_db.tables):
                     smses = [s for s in source_db.get_smses()
                              if s.get("chatmsg_id") == m["id"]]
@@ -1571,14 +1572,14 @@ class MessageParser(object):
         for entity, value in self.REPLACE_ENTITIES.items():
             body = body.replace(entity, value)
         body = body.encode("utf-8")
-        if (message["type"] == MESSAGES_TYPE_MESSAGE and "<" not in body
+        if (message["type"] == MESSAGE_TYPE_MESSAGE and "<" not in body
         and self.EMOTICON_CHARS_RGX.search(body)):
             # Replace emoticons with <ss> tags if message appears to
             # have no XML (probably in older format).
             body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
         dom = self.make_xml(body, message)
 
-        if MESSAGES_TYPE_SMS == message["type"]:
+        if MESSAGE_TYPE_SMS == message["type"]:
             # SMS body can be plaintext, or can be XML. Relevant tags:
             # <sms alt="It's hammer time."><status>6</status>
             # <failurereason>0</failurereason><targets>
@@ -1610,8 +1611,8 @@ class MessageParser(object):
                 status_text += ": %s" % self.FAILURE_REASONS[status.text]
             dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
                                 (status_text, body), message)
-        elif MESSAGES_TYPE_FILE == message["type"] \
-        or (MESSAGES_TYPE_INFO == message["type"]
+        elif MESSAGE_TYPE_FILE == message["type"] \
+        or (MESSAGE_TYPE_INFO == message["type"]
         and "<files" in message["body_xml"]):
             transfers = self.db.get_transfers()
             files = dict((f["chatmsg_index"], f) for f in transfers
@@ -1631,7 +1632,7 @@ class MessageParser(object):
                                  else TRANSFER_TYPE_INBOUND)}
             message["__files"] = [f for i, f in sorted(files.items())]
             dom.clear()
-            dom.text = "sent " if MESSAGES_TYPE_INFO == message["type"] \
+            dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
                        else "Sent "
             dom.text += ("files " if len(files) > 1 else "file ")
             a = None
@@ -1644,7 +1645,7 @@ class MessageParser(object):
                 a.text = f["filename"]
             if a is not None:
                 a.tail = "."
-        elif MESSAGES_TYPE_CONTACTS == message["type"]:
+        elif MESSAGE_TYPE_CONTACTS == message["type"]:
             self.db.get_contacts()
             get_name = self.db.get_contact_name
             contacts = sorted([get_name(i.get("f") or i.get("s"))
@@ -1657,7 +1658,7 @@ class MessageParser(object):
                 b = xml.etree.cElementTree.SubElement(dom, "b")
                 b.text = i["name"] if type(i) is dict else i
             b.tail = "."
-        elif MESSAGES_TYPE_TOPIC == message["type"]:
+        elif MESSAGE_TYPE_TOPIC == message["type"]:
             if dom.text:
                 dom.text = "Changed the conversation topic to \"%s\"." \
                            % dom.text
@@ -1665,7 +1666,7 @@ class MessageParser(object):
                     dom.text += "."
             else:
                 dom.text = "Changed the conversation picture."
-        elif MESSAGES_TYPE_CALL == message["type"]:
+        elif MESSAGE_TYPE_CALL == message["type"]:
             for elem in dom.getiterator("part"):
                 identity = elem.get("identity")
                 duration = elem.findtext("duration")
@@ -1679,33 +1680,33 @@ class MessageParser(object):
             dom.clear()
             elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
             elm_stat.text = " Call"
-        elif MESSAGES_TYPE_CALL_END == message["type"]:
+        elif MESSAGE_TYPE_CALL_END == message["type"]:
             dom.clear()
             elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
             elm_stat.text = " Call ended"
-        elif MESSAGES_TYPE_LEAVE == message["type"]:
+        elif MESSAGE_TYPE_LEAVE == message["type"]:
             dom.clear()
             b = xml.etree.cElementTree.SubElement(dom, "b")
             b.text = message["from_dispname"]
             b.tail = " has left the conversation."
-        elif MESSAGES_TYPE_INTRO == message["type"]:
+        elif MESSAGE_TYPE_INTRO == message["type"]:
             orig = "\n\n" + dom.text if dom.text else ""
             dom.clear()
             b = xml.etree.cElementTree.SubElement(dom, "b")
             b.text = message["from_dispname"]
             b.tail = " would like to add you on Skype%s" % orig
-        elif message["type"] in [MESSAGES_TYPE_PARTICIPANTS,
-        MESSAGES_TYPE_GROUP, MESSAGES_TYPE_BLOCK, MESSAGES_TYPE_REMOVE,
-        MESSAGES_TYPE_SHARE_DETAIL]:
+        elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
+        MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
+        MESSAGE_TYPE_SHARE_DETAIL]:
             names = sorted([self.db.get_contact_name(i)
                             for i in message["identities"].split(" ")])
             dom.clear()
             dom.text = "Added "
-            if MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
+            if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
                 dom.text = "Has shared contact details with "
-            elif MESSAGES_TYPE_BLOCK == message["type"]:
+            elif MESSAGE_TYPE_BLOCK == message["type"]:
                 dom.text = "Blocked "
-            elif MESSAGES_TYPE_GROUP == message["type"]:
+            elif MESSAGE_TYPE_GROUP == message["type"]:
                 dom.text = "Created a group conversation with "
             for i in names:
                 if len(dom) > 0:
@@ -1713,14 +1714,14 @@ class MessageParser(object):
                 b = xml.etree.cElementTree.SubElement(dom, "b")
                 b.text = i["name"] if type(i) is dict else i
             b.tail = "."
-            if MESSAGES_TYPE_REMOVE == message["type"]:
+            if MESSAGE_TYPE_REMOVE == message["type"]:
                 dom.text = "Removed "
                 b.tail = " from this conversation."
-        elif message["type"] in [MESSAGES_TYPE_INFO, MESSAGES_TYPE_MESSAGE]:
+        elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE]:
             if message["edited_timestamp"] and not message["body_xml"]:
                 elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
                 elm_sub.text = MESSAGE_REMOVED_TEXT
-        elif MESSAGES_TYPE_SHARE_VIDEO == message["type"]:
+        elif MESSAGE_TYPE_SHARE_VIDEO == message["type"]:
             for elm in dom.findall("videomessage"):
                 elm.tag = "span"
                 sid, link = elm.get("sid"), elm.get("publiclink")
@@ -1731,8 +1732,8 @@ class MessageParser(object):
                     a.text = link
                 elif sid:
                     elm.text += " - code %s" % sid
-        elif message["type"] in [MESSAGES_TYPE_UPDATE_NEED,
-        MESSAGES_TYPE_UPDATE_DONE]:
+        elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
+        MESSAGE_TYPE_UPDATE_DONE]:
             names = sorted([self.db.get_contact_name(i)
                             for i in message["identities"].split(" ")])
             dom.clear()
@@ -1742,7 +1743,7 @@ class MessageParser(object):
                 b = xml.etree.cElementTree.SubElement(dom, "b")
                 b.text = i["name"] if type(i) is dict else i
             b.tail = " needs to update Skype to participate in this chat."
-            if MESSAGES_TYPE_UPDATE_DONE == message["type"]:
+            if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                 b.tail = " can now participate in this chat."
 
         for x in dom.findall("*/Text"): x.tag = "span" # photo/video sharing
@@ -1978,7 +1979,7 @@ class MessageParser(object):
             return
         self.stats["total"] += 1
         self.stats["last_message"] = ""
-        if message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_MESSAGE]:
+        if message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_MESSAGE]:
             self.collect_dom_stats(message["dom"], message)
             if not self.stats["cloudtexts"]:
                 self.stats["cloudtexts"] = collections.defaultdict(str)
@@ -1986,8 +1987,8 @@ class MessageParser(object):
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
         len_msg = len(self.stats["last_message"])
-        if (message["type"] in [MESSAGES_TYPE_SMS, MESSAGES_TYPE_CALL,
-            MESSAGES_TYPE_FILE, MESSAGES_TYPE_MESSAGE]
+        if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
+            MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
         and author not in self.stats["counts"]):
             self.stats["counts"][author] = author_stats.copy()
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
@@ -1998,11 +1999,11 @@ class MessageParser(object):
         self.stats["workhist"]["hours"][hourkey][author] += 1
         self.stats["workhist"]["days"][daykey][author] += 1
 
-        if MESSAGES_TYPE_SMS == message["type"]:
+        if MESSAGE_TYPE_SMS == message["type"]:
             self.stats["smses"] += 1
             self.stats["counts"][author]["smses"] += 1
             self.stats["counts"][author]["smschars"] += len_msg
-        elif MESSAGES_TYPE_CALL == message["type"]:
+        elif MESSAGE_TYPE_CALL == message["type"]:
             self.stats["calls"] += 1
             self.stats["counts"][author]["calls"] += 1
             calldurations = message.get("__calldurations", {})
@@ -2012,7 +2013,7 @@ class MessageParser(object):
                 self.stats["counts"][identity]["calldurations"] += duration
             if calldurations:
                 self.stats["calldurations"] += max(calldurations.values())
-        elif MESSAGES_TYPE_FILE == message["type"]:
+        elif MESSAGE_TYPE_FILE == message["type"]:
             files = message.get("__files")
             if files is None:
                 transfers = self.db.get_transfers()
@@ -2024,7 +2025,7 @@ class MessageParser(object):
             self.stats["counts"][author]["files"] += len(files)
             size_files = sum([int(i["filesize"]) for i in files])
             self.stats["counts"][author]["bytes"] += size_files
-        elif MESSAGES_TYPE_MESSAGE == message["type"]:
+        elif MESSAGE_TYPE_MESSAGE == message["type"]:
             self.stats["messages"] += 1
             self.stats["counts"][author]["messages"] += 1
             self.stats["counts"][author]["chars"] += len_msg

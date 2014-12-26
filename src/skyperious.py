@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.12.2014
+@modified    26.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6423,7 +6423,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 body = m["body_xml"] or ""
                 special_tag = dom.find("msgstatus")
                 # Info messages like "/me is thirsty" -> author on same line.
-                is_info = (skypedata.MESSAGES_TYPE_INFO == m["type"])
+                is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 
                 if is_info:
                     stylebase = colourmap[m["author"]]

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    11.09.2014
+@modified    26.12.2014
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -371,9 +371,9 @@ class MergeThread(WorkerThread):
 
     # Difftext to compare will be assembled from other fields for these types.
     MESSAGE_TYPES_IGNORE_BODY = [
-        skypedata.MESSAGES_TYPE_GROUP, skypedata.MESSAGES_TYPE_PARTICIPANTS,
-        skypedata.MESSAGES_TYPE_REMOVE, skypedata.MESSAGES_TYPE_LEAVE,
-        skypedata.MESSAGES_TYPE_SHARE_DETAIL
+        skypedata.MESSAGE_TYPE_GROUP, skypedata.MESSAGE_TYPE_PARTICIPANTS,
+        skypedata.MESSAGE_TYPE_REMOVE, skypedata.MESSAGE_TYPE_LEAVE,
+        skypedata.MESSAGE_TYPE_SHARE_DETAIL
     ]
     # Number of iterations between allowing a UI refresh
     REFRESH_COUNT = 20000
@@ -671,7 +671,7 @@ class MergeThread(WorkerThread):
                 # database values. Using raw values instead.
                 if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
                     t = m["identities"]
-                    if skypedata.MESSAGES_TYPE_LEAVE == m["type"]:
+                    if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
                         t = m["author"]
                 else:
                     t = parser.parse(m, output={"format": "text"})
@@ -781,7 +781,7 @@ class MergeThread(WorkerThread):
                     # database values. Using raw values instead.
                     if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
                         t = m["identities"]
-                        if skypedata.MESSAGES_TYPE_LEAVE == m["type"]:
+                        if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
                             t = m["author"]
                     else:
                         t = parser.parse(m, output={"format": "text"})

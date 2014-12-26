@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    15.12.2014
+@modified    26.12.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -945,7 +945,7 @@ previous_author = None
 text = parser.parse(m, output={"format": "html", "export": True})
 from_name = m["from_dispname"] if previous_author != m["author"] else ""
 # Info messages like "/me is thirsty" -> author on same line.
-is_info = (skypedata.MESSAGES_TYPE_INFO == m["type"])
+is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
 # with the author, as emoticons have an upper margin pushing the row higher
 text_plain = m.get("body_txt", text)
@@ -1017,7 +1017,7 @@ previous_day = m["datetime"].date()
 ----------------------------------------
 
 %endif
-%if skypedata.MESSAGES_TYPE_INFO == m["type"]:
+%if skypedata.MESSAGE_TYPE_INFO == m["type"]:
 {{m["datetime"].strftime("%H:%M")}}
 {{m["from_dispname"]}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %else:
@@ -1492,7 +1492,7 @@ elif m["author"] == search["db"].id:
 </tr>
 <tr><td></td>
   <td width="100%" valign="top" colspan="2">
-%if skypedata.MESSAGES_TYPE_INFO == m["type"]:
+%if skypedata.MESSAGE_TYPE_INFO == m["type"]:
     <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{m["from_dispname"]}}</font>
 %endif
   {{body}}<br /></td>
