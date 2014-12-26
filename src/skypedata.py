@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.12.2014
+@modified    26.12.2014
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -56,18 +56,27 @@ CHATS_TYPENAMES = {
 MESSAGE_REMOVED_TEXT = "This message has been removed."
 MESSAGES_TYPE_TOPIC        =   2 # Changed chat topic or picture
 MESSAGES_TYPE_GROUP        =   4 # Created group conversation
+MESSAGES_TYPE_UPDATE_DONE  =   8 # Updated, can now participate in this chat
+MESSAGES_TYPE_UPDATE_NEED  =   9 # Needs update to participate in this chat
 MESSAGES_TYPE_PARTICIPANTS =  10 # Added participants to chat
 MESSAGES_TYPE_REMOVE       =  12 # Removed participants from chat
 MESSAGES_TYPE_LEAVE        =  13 # Contact left the chat
 MESSAGES_TYPE_CALL         =  30 # Started Skype call
 MESSAGES_TYPE_CALL_END     =  39 # Skype call ended
+MESSAGES_TYPE_INTRO        =  50 # Intro message, "wish to add to my contacts"
 MESSAGES_TYPE_SHARE_DETAIL =  51 # Sharing contact details
+MESSAGES_TYPE_BLOCK        =  53 # Blocking contacts
 MESSAGES_TYPE_INFO         =  60 # Info message like "/me is planting corn"
 MESSAGES_TYPE_MESSAGE      =  61 # Ordinary message
 MESSAGES_TYPE_CONTACTS     =  63 # Sent contacts
 MESSAGES_TYPE_SMS          =  64 # SMS message
 MESSAGES_TYPE_FILE         =  68 # File transfer
+MESSAGES_TYPE_SHARE_VIDEO  =  70 # Video sharing
 MESSAGES_TYPE_BIRTHDAY     = 110 # Birthday notification
+MESSAGES_TYPE_SHARE_PHOTO  = 201 # Photo sharing
+MESSAGE_TYPES_BASE = (2, 4, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
+MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
+MESSAGE_TYPES_STATS = (2, 4, 10, 12, 13, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 TRANSFER_TYPE_OUTBOUND     =   1 # Transfer sent by partner_handle
 TRANSFER_TYPE_INBOUND      =   2 # Transfer sent to partner_handle
 CONTACT_FIELD_TITLES = {
@@ -428,11 +437,11 @@ class SkypeDatabase(object):
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             result[k] = next(res, {}).get("count")
 
+        typestr = ", ".join(MESSAGE_TYPES_BASE)
         res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
             "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68) "
-            "ORDER BY m.timestamp DESC LIMIT 1")
+            "WHERE m.type IN (%s) ORDER BY m.timestamp DESC LIMIT 1" % typestr)
         msg_last = next(res, None)
         if msg_last:
             if msg_last.get("timestamp"):
@@ -450,8 +459,8 @@ class SkypeDatabase(object):
         res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
             "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68) "
-            "ORDER BY m.timestamp ASC LIMIT 1")
+            "WHERE m.type IN (typestr) ORDER BY m.timestamp ASC LIMIT 1"
+            % typestr)
         msg_first = next(res, None)
         if msg_first:
             if msg_first.get("timestamp"):
@@ -466,9 +475,8 @@ class SkypeDatabase(object):
 
         for i in range(2):
             row = self.execute("SELECT COUNT(*) AS count FROM Messages "
-                "WHERE author %s= :skypename AND "
-                "type IN (2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68)"
-                % "!="[i], result).fetchone()
+                "WHERE author %s= :skypename AND type IN (%s)"
+                % ("!="[i], typestr), result).fetchone()
             result["messages_" + ("to", "from")[i]] = row["count"]
 
         return result
@@ -503,8 +511,7 @@ class SkypeDatabase(object):
                 if additional_sql and " c." in additional_sql:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
                 # Take only known and supported types of messages.
-                sql += "WHERE m.type IN " \
-                       "(2, 10, 12, 13, 30, 39, 51, 60, 61, 63, 64, 68)"
+                sql += "WHERE m.type IN (%s)" % ", ".join(MESSAGE_TYPES_MESSAGE)
                 if chat:
                     sql += " AND m.convo_id = :convo_id"
                     params["convo_id"] = chat["id"]
@@ -665,9 +672,8 @@ class SkypeDatabase(object):
                    "MAX(timestamp) AS last_message_timestamp, "
                    "NULL AS first_message_datetime, "
                    "NULL AS last_message_datetime "
-                   "FROM messages "
-                   "WHERE type IN (2, 10, 13, 51, 60, 61, 63, 64, 68) "
-                   + and_str + "GROUP BY convo_id")
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id" 
+                   % (", ".join(MESSAGE_TYPES_STATS), and_str))
             rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
@@ -1678,16 +1684,29 @@ class MessageParser(object):
             elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
             elm_stat.text = " Call ended"
         elif MESSAGES_TYPE_LEAVE == message["type"]:
-            dom.text = "%s has left the conversation." \
-                        % message["from_dispname"]
+            dom.clear()
+            b = xml.etree.cElementTree.SubElement(dom, "b")
+            b.text = message["from_dispname"]
+            b.tail = " has left the conversation."
+        elif MESSAGES_TYPE_INTRO == message["type"]:
+            orig = "\n\n" + dom.text if dom.text else ""
+            dom.clear()
+            b = xml.etree.cElementTree.SubElement(dom, "b")
+            b.text = message["from_dispname"]
+            b.tail = " would like to add you on Skype%s" % orig
         elif message["type"] in [MESSAGES_TYPE_PARTICIPANTS,
-        MESSAGES_TYPE_REMOVE, MESSAGES_TYPE_SHARE_DETAIL]:
+        MESSAGES_TYPE_GROUP, MESSAGES_TYPE_BLOCK, MESSAGES_TYPE_REMOVE,
+        MESSAGES_TYPE_SHARE_DETAIL]:
             names = sorted([self.db.get_contact_name(i)
                             for i in message["identities"].split(" ")])
             dom.clear()
             dom.text = "Added "
             if MESSAGES_TYPE_SHARE_DETAIL == message["type"]:
                 dom.text = "Has shared contact details with "
+            elif MESSAGES_TYPE_BLOCK == message["type"]:
+                dom.text = "Blocked "
+            elif MESSAGES_TYPE_GROUP == message["type"]:
+                dom.text = "Created a group conversation with "
             for i in names:
                 if len(dom) > 0:
                     b.tail = ", "
@@ -1701,6 +1720,32 @@ class MessageParser(object):
             if message["edited_timestamp"] and not message["body_xml"]:
                 elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
                 elm_sub.text = MESSAGE_REMOVED_TEXT
+        elif MESSAGES_TYPE_SHARE_VIDEO == message["type"]:
+            for elm in dom.findall("videomessage"):
+                elm.tag = "span"
+                sid, link = elm.get("sid"), elm.get("publiclink")
+                elm.text = "%s has shared a video with you" % message["from_dispname"]
+                if link:
+                    elm.text += " - "
+                    a = xml.etree.cElementTree.SubElement(elm, "a", href=link)
+                    a.text = link
+                elif sid:
+                    elm.text += " - code %s" % sid
+        elif message["type"] in [MESSAGES_TYPE_UPDATE_NEED,
+        MESSAGES_TYPE_UPDATE_DONE]:
+            names = sorted([self.db.get_contact_name(i)
+                            for i in message["identities"].split(" ")])
+            dom.clear()
+            for i in names:
+                if len(dom) > 0:
+                    b.tail = ", "
+                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b.text = i["name"] if type(i) is dict else i
+            b.tail = " needs to update Skype to participate in this chat."
+            if MESSAGES_TYPE_UPDATE_DONE == message["type"]:
+                b.tail = " can now participate in this chat."
+
+        for x in dom.findall("*/Text"): x.tag = "span" # photo/video sharing
 
         # Process Skype message quotation tags, assembling a simple
         # <quote>text<special>footer</special></quote> element.

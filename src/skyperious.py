@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.12.2014
+@modified    25.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6518,7 +6518,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 linefeed_final = "\n\n"
             elif "s" == e.tag:
                 text = "~%s~" % text # STC does not support strikethrough style
-            elif e.tag not in ["blink", "font", "bodystatus", "i", "s"]:
+            elif e.tag not in ["blink", "font", "bodystatus", "i", "s", "span"]:
                 text = ""
             if text:
                 self._append_text(text, style, rgx_highlight)
