@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    18.12.2014
+@modified    26.12.2014
 """
 import calendar
 import collections
@@ -122,7 +122,7 @@ class SearchQueryParser(object):
             parse_results = self._grammar.parseString(query, parseAll=True)
         except Exception:
             # Grammar parsing failed: do a naive parsing into keywords and words
-            split_words = query.lower().split() # @todo vt kas saaks lowerist lahti?
+            split_words = query.split()
 
             for word in split_words[:]:
                 if self.PATTERN_KEYWORD.match(word):
