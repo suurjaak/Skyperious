@@ -670,7 +670,7 @@ class MergeThread(WorkerThread):
                 # message is the same: contact names are taken from current
                 # database values. Using raw values instead.
                 if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
-                    t = m["identities"]
+                    t = m["identities"] or ""
                     if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
                         t = m["author"]
                 else:
@@ -780,7 +780,7 @@ class MergeThread(WorkerThread):
                     # message is the same: contact names are taken from current
                     # database values. Using raw values instead.
                     if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
-                        t = m["identities"]
+                        t = m["identities"] or ""
                         if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
                             t = m["author"]
                     else:

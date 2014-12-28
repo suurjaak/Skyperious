@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    26.12.2014
+@modified    27.12.2014
 ------------------------------------------------------------------------------
 """
 import re
@@ -857,7 +857,7 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
 %>
     <br /><br />
-    <b>Word cloud for each participant</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for each participant" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
+    <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
     <div id="wordclouds">
       <table>
 %for p in [p for p in sorted(participants, key=lambda p: p["name"]) if stats["wordclouds"].get(p["identity"])]:
@@ -1323,8 +1323,8 @@ else:
 
 %if stats.get("wordclouds"):
 <br /><br />
-<b>Word cloud for each participant</b> [<a href="clouds://{{not show_clouds}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[show_clouds]}}</font></a>]
-%if show_clouds:
+<b>Word cloud for individuals</b> [<a href="clouds://{{not expand_clouds}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[expand_clouds]}}</font></a>]
+%if expand_clouds:
 <table cellpadding="0" cellspacing="0" width="100%">
 %for p in [p for p in participants_sorted if stats["wordclouds"].get(p["identity"])]:
   <tr><td colspan="2"><hr /></td></tr>

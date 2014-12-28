@@ -1505,6 +1505,7 @@ class MessageParser(object):
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
+                "authors": set(), # Authors encountered in parsed messages
                 "totalhist": {}, # Chat histograms {"hours": {0: 7,}, "days": {date: 4,}}
                 "hists": {}, # Author histograms {"author1": {"hours": {0: 7, }, "days": {date:  4, }} }
                 "workhist": {}, } # {"hours": {0: {author: count, }}, "days": {all days}}
@@ -1700,7 +1701,7 @@ class MessageParser(object):
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
             names = sorted([self.db.get_contact_name(i)
-                            for i in message["identities"].split(" ")])
+                            for i in (message["identities"] or "").split(" ")])
             dom.clear()
             dom.text = "Added "
             if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
@@ -1714,10 +1715,16 @@ class MessageParser(object):
                     b.tail = ", "
                 b = xml.etree.cElementTree.SubElement(dom, "b")
                 b.text = i["name"] if type(i) is dict else i
-            b.tail = "."
+            if names:
+                b.tail = "."
+            else:
+                dom.text += "."
             if MESSAGE_TYPE_REMOVE == message["type"]:
-                dom.text = "Removed "
-                b.tail = " from this conversation."
+                if names:
+                    dom.text = "Removed "
+                    b.tail = " from this conversation."
+                else:
+                    dom.text = "Removed  from this conversation."
         elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE]:
             if message["edited_timestamp"] and not message["body_xml"]:
                 elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
@@ -1736,7 +1743,7 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
         MESSAGE_TYPE_UPDATE_DONE]:
             names = sorted([self.db.get_contact_name(i)
-                            for i in message["identities"].split(" ")])
+                            for i in (message["identities"] or "").split(" ")])
             dom.clear()
             for i in names:
                 if len(dom) > 0:
@@ -1987,19 +1994,19 @@ class MessageParser(object):
             self.stats["cloudtexts"][author] += self.stats["last_cloudtext"]
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
-        len_msg = len(self.stats["last_message"])
         if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
-            MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
+        MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
         and author not in self.stats["counts"]):
             self.stats["counts"][author] = author_stats.copy()
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
         if not self.stats["workhist"]:
-            dd = collections.defaultdict
-            self.stats["workhist"] = {"hours": dd(lambda: dd(int)),
-                                      "days": dd(lambda: dd(int))}
+            factory = lambda: collections.defaultdict(int)
+            self.stats["workhist"] = {"hours": collections.defaultdict(factory),
+                                      "days": collections.defaultdict(factory)}
         self.stats["workhist"]["hours"][hourkey][author] += 1
         self.stats["workhist"]["days"][daykey][author] += 1
 
+        len_msg = len(self.stats["last_message"])
         if MESSAGE_TYPE_SMS == message["type"]:
             self.stats["smses"] += 1
             self.stats["counts"][author]["smses"] += 1
@@ -2140,6 +2147,10 @@ class MessageParser(object):
                 bindate = stats["startdate"].date()
                 while bindate + step < date: bindate += step
                 for author, count in counts.items():
+                    if author not in stats["hists"]:
+                        stats["hists"][author] = copy.deepcopy(histbase)
+                    if bindate not in stats["hists"][author]["days"]:
+                        stats["hists"][author]["days"][bindate] = 0
                     stats["hists"][author]["days"][bindate] += count
                     stats["totalhist"]["days"][bindate] += count
 
@@ -2172,6 +2183,7 @@ class MessageParser(object):
             additions = stats["links"].get(author)
             cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
             stats["wordclouds"][author] = cloud
+        stats["authors"].update(stats["hists"])
 
         return stats
 

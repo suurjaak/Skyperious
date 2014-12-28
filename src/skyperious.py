@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.12.2014
+@modified    28.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1814,7 +1814,7 @@ class DatabasePage(wx.Panel):
             "participants": None    # Messages from [skype name, ]
         }
         self.stats_sort_field = "name"
-        self.stats_show_clouds = False # Show individual author word clouds
+        self.stats_expand_clouds = False # Expand individual author word clouds
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -3516,7 +3516,7 @@ class DatabasePage(wx.Panel):
             self.stats_sort_field = href[7:]
             self.populate_chat_statistics()
         elif href.startswith("clouds://"):
-            self.stats_show_clouds = ast.literal_eval(href[9:])
+            self.stats_expand_clouds = ast.literal_eval(href[9:])
             self.populate_chat_statistics()
         else:
             self.stc_history.SearchBarVisible = True
@@ -4325,14 +4325,17 @@ class DatabasePage(wx.Panel):
                         self.tree_tables.SetItemBold(item,
                         self.grid_table.Table.IsChanged())
                 item = self.tree_tables.GetNextSibling(item)
+            # Refresh cell colours; without CallAfter wx 2.8 can crash
+            wx.CallLater(0, self.grid_table.ForceRefresh)
 
 
     def on_rollback_table(self, event):
         """Handler for clicking to rollback the changed database table."""
         self.grid_table.Table.UndoChanges()
         self.on_change_table(None)
-        # Refresh scrollbars; without CallAfter wx 2.8 can crash
-        wx.CallAfter(self.grid_table.ContainingSizer.Layout)
+        # Refresh scrollbars and colours; without CallAfter wx 2.8 can crash
+        wx.CallLater(0, lambda: (self.grid_table.ContainingSizer.Layout(),
+                                 self.grid_table.ForceRefresh()))
 
 
     def on_insert_row(self, event):
@@ -4548,7 +4551,6 @@ class DatabasePage(wx.Panel):
             if busy:
                 busy.Close()
             self.panel_chats2.Enabled = True
-            self.stats_show_clouds = False # Reset author wordclouds to collapsed
             self.populate_chat_statistics()
             if self.html_stats.Shown:
                 self.show_stats(True) # To restore scroll position
@@ -4562,24 +4564,29 @@ class DatabasePage(wx.Panel):
             data = {"db": self.db, "participants": participants,
                     "chat": self.chat, "sort_by": self.stats_sort_field,
                     "stats": stats, "images": {}, "authorimages": {},
-                    "show_clouds": self.stats_show_clouds}
+                    "expand_clouds": self.stats_expand_clouds}
             # Fill avatar images
             fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
             if defaultavatar not in fs["files"]:
                 bmp = images.AvatarDefault.Bitmap
                 fs["handler"].AddFile(defaultavatar, bmp, wx.BITMAP_TYPE_BMP)
                 fs["files"][defaultavatar] = 1
-            for p in self.chat["participants"]:
-                if "avatar_bitmap" in p["contact"]:
-                    vals = (p["identity"], self.db.filename.encode("utf-8"))
+            #for p in self.chat["participants"]: @todo remove
+            contacts = dict((c["skypename"], c) for c in self.db.get_contacts())
+            partics = [p["identity"] for p in self.chat["participants"]]
+            for author in stats["authors"].union(partics):
+                # There can be authors not among participants, and vice versa
+                contact = contacts.get(author, {})
+                if "avatar_bitmap" in contact:
+                    vals = (author, self.db.filename.encode("utf-8"))
                     fn = "%s_%s.jpg" % tuple(map(urllib.quote, vals))
                     if fn not in fs["files"]:
-                        bmp = p["contact"]["avatar_bitmap"]
+                        bmp = contact["avatar_bitmap"]
                         fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
                         fs["files"][fn] = 1
-                    data["authorimages"][p["identity"]] = {"avatar": fn}
+                    data["authorimages"][author] = {"avatar": fn}
                 else:
-                    data["authorimages"][p["identity"]] = {"avatar": defaultavatar}
+                    data["authorimages"][author] = {"avatar": defaultavatar}
 
             # Fill chat total histogram plot images
             PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour,
@@ -4613,6 +4620,7 @@ class DatabasePage(wx.Panel):
                     fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn
+
             stats_html = step.Template(templates.STATS_HTML).expand(data)
 
         previous_anchor = self.html_stats.OpenedAnchor
