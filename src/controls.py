@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    08.12.2014
+@modified    26.12.2014
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3377,7 +3377,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     maxval = maxval if maxval is not None else max(zip(*data)[1])
     for i, (interval, val) in enumerate(data):
         h = barsize[1] * safediv(val, maxval) + 1
-        if 0 < h < 1.5:
+        if val and h < 1.5:
             h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
         y = bmp.Height - h
