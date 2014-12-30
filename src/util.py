@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    16.11.2014
+@modified    30.12.2014
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -69,8 +69,7 @@ def format_bytes(size, precision=2, max_units=True):
             UNITS = [byteunit, "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
             log = min(len(UNITS) - 1, math.floor(math.log(size, 1024)))
             formatted = "%.*f" % (precision, size / math.pow(1024, log))
-            while formatted.endswith("0"): formatted = formatted[:-1]
-            if formatted.endswith("."): formatted = formatted[:-1]
+            formatted = formatted.rstrip("0").rstrip(".")
             formatted += " " + UNITS[int(log)]
         else:
             formatted = "".join([x + ("," if i and not i % 3 else "")
@@ -139,30 +138,6 @@ def cmp_dicts(dict1, dict2):
     return result
 
 
-def cmp_dictlists(list1, list2):
-    """Returns the two dictionary lists with matching dictionaries removed."""
-
-    # Items different in list1, items different in list2
-    result = ([], [])
-    for d1 in list1:
-        match = False
-        for d2 in list2:
-            if cmp_dicts(d1, d2):
-                match = True
-                break # break for d2 in list2
-        if not match:
-            result[0].append(d1)
-    for d2 in list2:
-        match = False
-        for d1 in list1:
-            if cmp_dicts(d2, d1):
-                match = True
-                break # break for d1 in list1
-        if not match:
-            result[1].append(d2)
-    return result
-
-
 def try_until(func, count=1, sleep=0.5):
     """
     Tries to execute the specified function a number of times.
@@ -224,7 +199,7 @@ def unique_path(pathname):
 
 def start_file(filepath):
     """
-    Tries to open the specified file.
+    Tries to open the specified file in the operating system.
 
     @return  (success, error message)
     """
@@ -253,45 +228,6 @@ def is_os_64bit():
     if 'PROCESSOR_ARCHITEW6432' in os.environ:
         return True
     return os.environ['PROCESSOR_ARCHITECTURE'].endswith('64')
-
-
-def htmltag(name, attrs=None, content=None, utf=True):
-    """
-    Returns an HTML tag string for the specified name, attributes and content.
-
-    @param   name     HTML tag name, like 'a'
-    @param   attrs    tag attributes dict
-    @param   content  tag content string
-    @param   utf      whether to convert all values to UTF-8
-    """
-    SELF_CLOSING_TAGS = ["img", "br", "meta", "hr", "base", "basefont",
-                         "input", "area", "link"]
-    tag = "<%s" % name
-    if attrs:
-        tag += " " + " ".join(["%s='%s'" % (k, escape_html(v, utf=utf))
-                               for k, v in attrs.items()])
-    if name not in SELF_CLOSING_TAGS:
-    #or (content is not None and str(content)):
-        tag += ">%s</%s>" % (escape_html(content, utf=utf), name)
-    else:
-        tag += " />"
-    return tag
-
-
-def escape_html(value, utf=True):
-    """
-    Escapes the value for HTML content (converts "'< to &quot;&#39;&lt;).
-
-    @param   value  string or unicode value
-    @param   utf    whether to encode result into UTF-8 (True by default)
-    """
-    strval = value if isinstance(value, basestring) \
-             else (str(value) if value is not None else "")
-    result = strval.replace("<",    "&lt;").replace(">", "&gt;") \
-                   .replace("\"", "&quot;").replace("'", "&#39;")
-    if utf:
-        result = result.encode("utf-8")
-    return result
 
 
 def round_float(value, precision=1):
