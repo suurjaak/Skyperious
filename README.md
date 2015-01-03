@@ -147,6 +147,6 @@ http://nsis.sourceforge.net/
 License
 -------
 
-Copyright (C) 2011-2014 by Erki Suurjaak.
+Copyright (C) 2011 by Erki Suurjaak.
 Released as free open source software under the MIT License,
 see [LICENSE.md](LICENSE.md) for full details.
