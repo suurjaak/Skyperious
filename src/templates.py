@@ -671,7 +671,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
   <div id="participants">
-%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
+%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
@@ -744,7 +744,7 @@ svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotDaysColour,
       </div></td>
       </tr>
 %endif
-%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
+%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
         <td><table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
         <td><table class="plot_table">
@@ -842,7 +842,7 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
     <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
     <div id="wordclouds">
       <table>
-%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
+%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr><td>
         <table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
       </td><td>
