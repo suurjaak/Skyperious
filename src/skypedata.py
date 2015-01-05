@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.12.2014
+@modified    04.01.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2351,7 +2351,7 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
             if size and list(size) != list(img.GetSize()):
                 img = util.img_wx_resize(img, size, aspect_ratio)
             result = img.ConvertToBitmap()
-        except Exception as e:
+        except Exception:
             main.log("Error loading avatar image for %s.\n\n%s",
                      datadict["skypename"], traceback.format_exc())
     return result
@@ -2373,7 +2373,7 @@ def get_avatar_raw(datadict, size=None, aspect_ratio=True, format="PNG"):
     if result and (size or format):
         try:
             result = util.img_recode(result, format, size, aspect_ratio)
-        except Exception as e:
+        except Exception:
             main.log("Error creating avatar for %s.\n\n%s",
                      datadict["skypename"], traceback.format_exc())
     return result
