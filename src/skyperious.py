@@ -6664,10 +6664,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         result = False
         if (self._filter.get("participants")
         and message["author"] not in self._filter["participants"]
-        and message["author"]
-        in [p["identity"] for p in self._chat["participants"]]):
-            # Last check among chat participants is for cases where contact is
-            # not listed among chat participants at all (e.g. left at once)
+        and set(self._filter["participants"]) != 
+        set([p["identity"] for p in self._chat["participants"]])):
+            # Last condition is to check if participants filter is applied.
             result = True
         elif ("daterange" in self._filter
         and not (self._filter["daterange"][0] <= message["datetime"].date()
