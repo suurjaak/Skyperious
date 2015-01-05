@@ -67,12 +67,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.12.2014
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
 import ast
 import collections
 import datetime
+import functools
 import locale
 import operator
 import os
@@ -2354,7 +2355,8 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         nobits = [wx.BORDER_DOUBLE, wx.BORDER_RAISED, wx.BORDER_SIMPLE,
             wx.BORDER_STATIC, wx.BORDER_SUNKEN, wx.BORDER_THEME, wx.BORDER
         ]
-        style_sub = reduce(lambda a, b: a & ~b, nobits, style | wx.BORDER_NONE)
+        style_sub = functools.reduce(lambda a, b: a & ~b, nobits,
+                                     style | wx.BORDER_NONE)
         self._stc = wx.stc.StyledTextCtrl(self, id, style=style_sub, name=name)
 
         bmp = wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(16, 16))

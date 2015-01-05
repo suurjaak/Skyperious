@@ -3029,7 +3029,7 @@ class DatabasePage(wx.Panel):
                      "name": x["name"], "skypename": x["skypename"], 
                      "phone": x["phone_mobile_normalized"]}
                     for x in self.db.get_contacts()]
-        contacts = filter(lambda x: any(x.values()), contacts)
+        contacts = list(filter(lambda x: any(x.values()), contacts))
         self.list_import_result.DeleteAllItems()
         cols = [("skypename", "Skypename"), ("name", "Name"), 
                 ("e-mail", "E-mail"), ("phone", "Phone")]

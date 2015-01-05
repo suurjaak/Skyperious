@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    21.12.2014
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -180,8 +180,8 @@ def get_cloud(text, additions=None, options=None):
     if options["WORDS_MAX"] > 0 and len(counts) > options["WORDS_MAX"]:
         count_last = max(count_last, sorted(counts.values())[options["WORDS_MAX"] - 1])
     counts = dict((w, c) for w, c in counts.items() if c >= count_last)
-    count_min = min(counts.values() or [0])
-    count_max = options.get("SCALE") or max(counts.values() or [0])
+    count_min = min(list(counts.values()) or [0])
+    count_max = options.get("SCALE") or max(list(counts.values()) or [0])
     for word, count in counts.items():
         result.append((word, count, get_size(count, count_min, count_max, options)))
     result.sort(key=lambda x: (-x[1], x[0])) # Sort by count, name

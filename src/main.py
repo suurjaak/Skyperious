@@ -9,9 +9,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.12.2014
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
+from __future__ import print_function
 import argparse
 import atexit
 import codecs
@@ -297,7 +298,7 @@ def run_merge(filenames, output_filename=None):
         bar.stop()
         bar.afterword = " Processed %s." % db1
         bar.update(bar_total)
-        print
+        print()
 
     if not counts:
         print("Nothing new to merge.")
@@ -334,7 +335,7 @@ def run_search(filenames, query):
                 break # break while True
             if result.get("count", 0) or is_verbose:
                 if len(dbs) > 1:
-                    print "%s:" % db,
+                    print("%s:" % db, end=" ")
                 print(result["output"])
 
 
@@ -373,7 +374,7 @@ def run_export(filenames, format):
             if count:
                 bar.afterword = " Exported %s to %s. " % (db, target)
                 bar.update(bar_total)
-                print
+                print()
                 log("Exported %s %sto %s as %s.", util.plural("chat", count),
                      dbstr, target, format)
             else:
@@ -428,7 +429,7 @@ def run_diff(filename1, filename2):
     bar.stop()
     bar.afterword = " Scanned %s and %s." % (db1, db2)
     bar.update(bar_total)
-    print
+    print()
 
 
 def run_gui(filenames):
@@ -666,7 +667,7 @@ class ProgressBar(threading.Thread):
 
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
-        print "\r" + self.bar,
+        print("\r" + self.bar, end=" ")
 
 
     def run(self):

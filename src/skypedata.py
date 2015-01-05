@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.01.2015
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2272,7 +2272,7 @@ def import_contacts_file(filename):
             contents = contents.encode("latin1", errors="xmlcharrefreplace")
     lines = contents.splitlines()
     csvfile = csv.reader(lines, csv.Sniffer().sniff(lines[0], ",;\t"))
-    rows = filter(None, csvfile)
+    rows = list(filter(None, csvfile))
     header, items = rows[0] if rows else [], rows[1:]
     titlemap = dict((title.lower(), i) for i, title in enumerate(header))
 
