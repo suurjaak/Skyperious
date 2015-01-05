@@ -225,6 +225,7 @@ def export_chat_template(chat, filename, db, messages):
             for author in stats["authors"].union(partics):
                 contact = partics.get(author, {}).get("contact")
                 contact = contact or contacts.get(author, {})
+                contact = contact or {"identity": author, "name": author}
                 bmp = contact.get("avatar_bitmap")
                 raw = contact.get("avatar_raw_small") or ""
                 raw_large = contact.get("avatar_raw_large") or ""

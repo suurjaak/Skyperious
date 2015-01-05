@@ -1985,6 +1985,7 @@ class MessageParser(object):
         author = message["author"]
         if author in AUTHORS_SPECIAL:
             return
+        self.stats["authors"].add(author)
         self.stats["total"] += 1
         self.stats["last_message"] = ""
         if message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_MESSAGE]:
@@ -2127,8 +2128,7 @@ class MessageParser(object):
             stats["hists"] = {}
             # Fill total histogram hours and initialize author hour structures
             for hour, counts in stats["workhist"]["hours"].items():
-                for p in self.chat["participants"]:
-                    author = p["identity"]
+                for author in stats["authors"]:
                     if author not in stats["hists"]:
                         stats["hists"][author] = copy.deepcopy(histbase)
                     if author in counts:
@@ -2183,7 +2183,6 @@ class MessageParser(object):
             additions = stats["links"].get(author)
             cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
             stats["wordclouds"][author] = cloud
-        stats["authors"].update(stats["hists"])
 
         return stats
 

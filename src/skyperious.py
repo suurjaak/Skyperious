@@ -4561,8 +4561,7 @@ class DatabasePage(wx.Panel):
         """Populates html_stats with chat statistics and word cloud."""
         stats, stats_html = self.stc_history.GetStatisticsData(), ""
         if stats:
-            participants = [p["contact"] for p in self.chat["participants"]]
-            data = {"db": self.db, "participants": participants,
+            data = {"db": self.db, "participants": [],
                     "chat": self.chat, "sort_by": self.stats_sort_field,
                     "stats": stats, "images": {}, "authorimages": {},
                     "expand_clouds": self.stats_expand_clouds}
@@ -4578,6 +4577,7 @@ class DatabasePage(wx.Panel):
             for author in stats["authors"].union(partics):
                 contact = partics.get(author, {}).get("contact")
                 contact = contact or contacts.get(author, {})
+                contact = contact or {"identity": author, "name": author}
                 if "avatar_bitmap" in contact:
                     vals = (author, self.db.filename.encode("utf-8"))
                     fn = "%s_%s.jpg" % tuple(map(urllib.quote, vals))
@@ -4588,6 +4588,7 @@ class DatabasePage(wx.Panel):
                     data["authorimages"][author] = {"avatar": fn}
                 else:
                     data["authorimages"][author] = {"avatar": defaultavatar}
+                data["participants"].append(contact)
 
             # Fill chat total histogram plot images
             PLOTCONF = {"days": (conf.PlotDaysUnitSize, conf.PlotDaysColour,
