@@ -8,6 +8,7 @@ CHANGELOG
 - added support for bold, italic and strike-through formatting in Skype 7 (issue #31);
 - fixed duplicate transfer rows in consecutive merges;
 - added start-end editboxes for chat date filter;
+- made contact avatar images in HTML export easily saveable;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
 - fixed case-sensitive name sorting in chat statistics;
 - changed skypename text colour in chat Excel export from transparent to gray;

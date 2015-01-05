@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.01.2015
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4572,12 +4572,12 @@ class DatabasePage(wx.Panel):
                 bmp = images.AvatarDefault.Bitmap
                 fs["handler"].AddFile(defaultavatar, bmp, wx.BITMAP_TYPE_BMP)
                 fs["files"][defaultavatar] = 1
-            #for p in self.chat["participants"]: @todo remove
             contacts = dict((c["skypename"], c) for c in self.db.get_contacts())
-            partics = [p["identity"] for p in self.chat["participants"]]
+            partics = dict((p["identity"], p) for p in self.chat["participants"])
+            # There can be authors not among participants, and vice versa
             for author in stats["authors"].union(partics):
-                # There can be authors not among participants, and vice versa
-                contact = contacts.get(author, {})
+                contact = partics.get(author, {}).get("contact")
+                contact = contact or contacts.get(author, {})
                 if "avatar_bitmap" in contact:
                     vals = (author, self.db.filename.encode("utf-8"))
                     fn = "%s_%s.jpg" % tuple(map(urllib.quote, vals))

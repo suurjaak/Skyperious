@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    03.01.2015
+@modified    05.01.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -99,9 +99,6 @@ from third_party import step
     table.quote td:last-child {
       padding: 0 0 0 5px;
     }
-    span.grey {
-      color: #999;
-    }
     a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; cursor: pointer; }
     a:hover, a.visited:hover { text-decoration: underline; }
     #footer {
@@ -151,7 +148,7 @@ from third_party import step
       border-radius: 5px;
       padding: 5px;
     }
-    #participants span.avatar_large {
+    #participants img.avatar_large {
       margin-right: 5px;
     }
     #statistics {
@@ -174,22 +171,19 @@ from third_party import step
       color: gray;
       cursor: default;
     }
-    span.avatar_large {
+    img.avatar_large {
       height: 96px;
       width: 96px;
-      display: block;
       float: left;
       border: 1px solid lightgray;
     }
-    span.avatar {
+    img.avatar {
       height: 32px;
       width: 32px;
-      display: block;
       margin-right: 10px;
     }
-    .participants span.avatar_large {
+    .participants img.avatar_large {
       margin-right: 4px;
-      display: inline;
     }
     #content_table td.day {
       border-top: 1px solid {{conf.HistoryLineColour}};
@@ -391,54 +385,19 @@ from third_party import step
       display: block;
       font-size: 1.1em;
     }
-    span.avatar_large__default {
-      background: url("data:image/png;base64,{{images.AvatarDefaultLarge.data}}")
-                  center center no-repeat;
-    }
-    span.avatar__default {
-      background: url("data:image/png;base64,{{images.AvatarDefault.data}}")
-                  center center no-repeat;
-    }
-%for p in participants:
-<%
-p["avatar_class"] = "avatar__default"
-p["avatar_class_large"] = "avatar_large__default"
-id_csssafe = urllib.quote(p["identity"]).replace("%", "___").replace(".", "___").replace("/", "___")
-%>
-%if p["avatar_raw_large"]:
-<%
-p["avatar_class_large"] = "avatar_large__" + id_csssafe
-%>
-    span.{{p["avatar_class_large"]}} {
-      background: url("data:image/png;base64,{{base64.b64encode(p["avatar_raw_large"])}}")
-                  center center no-repeat;
-    }
-%endif
-%if p["avatar_raw_small"]:
-<%
-p["avatar_class"] = "avatar__" + id_csssafe
-%>
-    span.{{p["avatar_class"]}} {
-      background: url("data:image/png;base64,{{base64.b64encode(p["avatar_raw_small"])}}")
-                  center center no-repeat;
-%if not (util.wx or util.Image): # If wx/PIL not available, images are not resized
-      background-size: contain;
-%endif
-    }
-%endif
-%endfor
     #chat_picture {
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
       display: none;
 %elif chat_picture_raw:
-      background: url("data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}") center center no-repeat;
       margin: 0 10px 0 10px;
-      display: block;
 %endif
 %if chat_picture_size:
       width: {{chat_picture_size[0]}}px;
       height: {{chat_picture_size[1]}}px;
 %endif
+    }
+    span.gray {
+      color: #999;
     }
 %if emoticons_used:
     span.emoticon {
@@ -645,14 +604,17 @@ p["avatar_class"] = "avatar__" + id_csssafe
     <td id="header_left">
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
 %for p in filter(lambda p: p["identity"] != db.id, participants):
-      <div><span class="avatar_large header {{p["avatar_class_large"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
+<%
+alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
+%>
+      <div><img class="avatar_large header" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
       </div>
 %endfor
 %elif chat_picture_raw:
-      <span id="chat_picture" title="{{chat["title"]}}"></span>
+      <img id="chat_picture" title="{{chat["title"]}}" alt="{{chat["title"]}}" src="data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}" />
 %endif
     </td>
     <td id="header_center">
@@ -680,7 +642,10 @@ p["avatar_class"] = "avatar__" + id_csssafe
     <td id="header_right">
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
 %for p in filter(lambda p: p["identity"] == db.id, participants):
-      <div><span class="avatar_large header {{p["avatar_class_large"]}}" title="{{p["name"]}}{{(" (%s)" % p["identity"]) if p["name"] != p["identity"] else ""}}"></span><br />{{p["name"]}}
+<%
+alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
+%>
+      <div><img class="avatar_large header" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -693,10 +658,13 @@ p["avatar_class"] = "avatar__" + id_csssafe
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
   <div id="participants">
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
-    <span><span class="avatar_large {{p["avatar_class_large"]}}" title="{{p["name"]}} ({{p["identity"]}})"></span>{{p["name"]}}<br />
+<%
+alt = "%s (%s)" % (p["name"], p["identity"])
+%>
+    <span><img class="avatar_large" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" />{{p["name"]}}<br />
     <span class="identity">
         {{p["identity"]}}
-%if 1 == p["rank"]:
+%if 1 == p.get("rank"):
         <br /><br />chat creator
 %endif
     </span></span>
@@ -762,9 +730,9 @@ svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotDaysColour,
       </div></td>
       </tr>
 %endif
-%for p in filter(lambda p: p["identity"] in stats["counts"], participants):
+%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
       <tr class="stats_row">
-        <td><table><tr><td><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
+        <td><table><tr><td><img class="avatar header" title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -860,14 +828,18 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
     <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
     <div id="wordclouds">
       <table>
-%for p in [p for p in sorted(participants, key=lambda p: p["name"]) if stats["wordclouds"].get(p["identity"])]:
+%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
       <tr><td>
-        <table><tr><td><span class="avatar header {{p["avatar_class"]}}" title="{{p["name"]}}"></span></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
+        <table><tr><td><img class="avatar header" title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
+%if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
           <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % (100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
 %endfor
+%else:
+          <span class="gray">Not enough words.</span>
+%endif
         </div>
       </td></tr>
 %endfor
@@ -1326,18 +1298,22 @@ else:
 <b>Word cloud for individuals</b> [<a href="clouds://{{not expand_clouds}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[expand_clouds]}}</font></a>]
 %if expand_clouds:
 <table cellpadding="0" cellspacing="0" width="100%">
-%for p in [p for p in participants_sorted if stats["wordclouds"].get(p["identity"])]:
+%for p in participants_sorted:
   <tr><td colspan="2"><hr /></td></tr>
   <tr><td valign="top" width="150">
     <table cellpadding="0" cellspacing="0"><tr>
       <td valign="top"><img src="memory:{{authorimages[p["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
-      <td valign="center">{{p["name"]}}<br /><font size="2" color="gray">{{p["identity"]}}</font></td>
+      <td valign="center"><font size="2">{{p["name"]}}<br /><font color="gray">{{p["identity"]}}</font></font></td>
       <td width="10"></td>
     </tr></table>
   </td><td valign="top">
+%if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
     <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
+%else:
+    <font color="gray" size="2">Not enough words.</font>
+%endif
   </td></tr>
 %endfor
 </table>
@@ -1987,7 +1963,7 @@ MESSAGE_QUOTE = """
 %if export:
 <table class="quote"><tr>
     <td><span>&#8223;</span></td>
-    <td><br /><span class="grey">{EMDASH} </span></td>
+    <td><br /><span class="gray">{EMDASH} </span></td>
 </tr></table>
 %else:
 <%

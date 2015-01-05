@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    17.12.2014
+@modified    04.01.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -32,7 +32,6 @@ from third_party import step
 
 import conf
 import emoticons
-import images
 import main
 import skypedata
 import templates
@@ -189,36 +188,6 @@ def export_chat_template(chat, filename, db, messages):
         parser = skypedata.MessageParser(db, chat=chat, stats=is_html)
         namespace = {"db": db, "chat": chat, "messages": messages,
                      "parser": parser}
-
-        if is_html:
-            # Collect chat and participant images.
-            namespace.update({"participants": [], "chat_picture_size": None,
-                              "chat_picture_raw": None, })
-            if chat["meta_picture"]:
-                raw = skypedata.fix_image_raw(chat["meta_picture"])
-                namespace["chat_picture_raw"] = raw
-                namespace["chat_picture_size"] = util.img_size(raw)
-            for p in chat["participants"]:
-                contact = p["contact"].copy()
-                namespace["participants"].append(contact)
-                contact.update(avatar_raw_small="", avatar_raw_large="",
-                               rank=p["rank"])
-                bmp = contact.get("avatar_bitmap")
-                raw = contact.get("avatar_raw_small")
-                raw_large = contact.get("avatar_raw_large")
-                if not raw and not bmp:
-                    raw = skypedata.get_avatar_raw(contact, conf.AvatarImageSize)
-                    if raw:
-                        p["contact"]["avatar_raw_small"] = raw
-                raw = bmp and util.img_wx_to_raw(bmp) or raw
-                if raw:
-                    if not raw_large:
-                        size_large = conf.AvatarImageLargeSize
-                        raw_large = skypedata.get_avatar_raw(contact, size_large)
-                        p["contact"]["avatar_raw_large"] = raw_large
-                    contact["avatar_raw_small"] = raw
-                    contact["avatar_raw_large"] = raw_large
-
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
         # statistics will be available for the main file after parsing.
@@ -240,6 +209,35 @@ def export_chat_template(chat, filename, db, messages):
                                      parser.emoticons_unique)),
             "message_count":  stats.get("messages", 0),
         })
+
+        if is_html:
+            # Collect chat and participant images.
+            namespace.update({"participants": [], "chat_picture_size": None,
+                              "chat_picture_raw": None, })
+            if chat["meta_picture"]:
+                raw = skypedata.fix_image_raw(chat["meta_picture"])
+                namespace["chat_picture_raw"] = raw
+                namespace["chat_picture_size"] = util.img_size(raw)
+
+            contacts = dict((c["skypename"], c) for c in db.get_contacts())
+            partics = dict((p["identity"], p) for p in chat["participants"])
+            # There can be authors not among participants, and vice versa
+            for author in stats["authors"].union(partics):
+                contact = partics.get(author, {}).get("contact")
+                contact = contact or contacts.get(author, {})
+                bmp = contact.get("avatar_bitmap")
+                raw = contact.get("avatar_raw_small") or ""
+                raw_large = contact.get("avatar_raw_large") or ""
+                if not raw and not bmp:
+                    raw = skypedata.get_avatar_raw(contact, conf.AvatarImageSize)
+                raw = bmp and util.img_wx_to_raw(bmp) or raw
+                if raw:
+                    raw_large = raw_large or skypedata.get_avatar_raw(
+                                    contact, conf.AvatarImageLargeSize)
+                    contact["avatar_raw_small"] = raw
+                    contact["avatar_raw_large"] = raw_large
+                contact["rank"] = partics.get(author, {}).get("rank")
+                namespace["participants"].append(contact)
 
         tmpfile.flush(), tmpfile.seek(0)
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), "")
