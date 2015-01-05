@@ -148,9 +148,6 @@ from third_party import step
       border-radius: 5px;
       padding: 5px;
     }
-    #participants img.avatar_large {
-      margin-right: 5px;
-    }
     #statistics {
       padding: 5px;
       margin: 7px;
@@ -171,19 +168,39 @@ from third_party import step
       color: gray;
       cursor: default;
     }
-    img.avatar_large {
-      height: 96px;
-      width: 96px;
+    .avatar_large {
       float: left;
+      position: relative;
+      width: 96px;
+      height: 96px;
       border: 1px solid lightgray;
     }
-    img.avatar {
-      height: 32px;
+    .avatar {
       width: 32px;
-      margin-right: 10px;
+      height: 32px;
+      text-align: center;
+      vertical-align: middle;
+      padding: 0 5px 5px 0;
     }
-    .participants img.avatar_large {
-      margin-right: 4px;
+    .avatar_large > img {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      margin: auto;
+      max-height: 96px;
+      max-width: 96px;
+    }
+    .avatar > img {
+      max-height: 32px;
+      max-width: 32px;
+%if not (util.wx or util.Image):
+      object-fit: scale-down;
+%endif
+    }
+    #participants .avatar_large {
+      margin-right: 5px;
     }
     #content_table td.day {
       border-top: 1px solid {{conf.HistoryLineColour}};
@@ -255,10 +272,6 @@ from third_party import step
     }
     #stats_data .name {
       vertical-align: middle;
-    }
-    #stats_data .avatar {
-      float: left;
-      padding: 0 5px 5px 0;
     }
     #stats_data > tbody > tr > td:nth-child(3) {
       color: {{conf.PlotHoursColour}};
@@ -337,6 +350,7 @@ from third_party import step
     }
     #wordclouds > table {
       border-collapse: collapse;
+      width: 100%;
     }
     #wordclouds > table > tbody > tr > td {
       vertical-align: top;
@@ -607,7 +621,7 @@ from third_party import step
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><img class="avatar_large header" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -645,7 +659,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><img class="avatar_large header" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -661,7 +675,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span><img class="avatar_large" title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" />{{p["name"]}}<br />
+    <span><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span>{{p["name"]}}<br />
     <span class="identity">
         {{p["identity"]}}
 %if 1 == p.get("rank"):
@@ -732,7 +746,7 @@ svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotDaysColour,
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
       <tr class="stats_row">
-        <td><table><tr><td><img class="avatar header" title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -830,7 +844,7 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"])):
       <tr><td>
-        <table><tr><td><img class="avatar header" title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
+        <table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
