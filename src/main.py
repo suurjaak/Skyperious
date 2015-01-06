@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.01.2015
+@modified    06.01.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -255,8 +255,7 @@ def run_merge(filenames, output_filename=None):
     db_base = dbs.pop()
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
-    postfunc = lambda r: postbacks.put(r)
-    worker = workers.MergeThread(postfunc)
+    worker = workers.MergeThread(postbacks.put)
 
     name, ext = os.path.splitext(os.path.split(db_base.filename)[-1])
     now = datetime.datetime.now().strftime("%Y%m%d")
@@ -317,8 +316,7 @@ def run_search(filenames, query):
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
 
     postbacks = Queue.Queue()
-    postfunc = lambda r: postbacks.put(r)
-    worker = workers.SearchThread(postfunc)
+    worker = workers.SearchThread(postbacks.put)
 
     for db in dbs:
         log("Searching \"%s\" in %s." % (query, db))
@@ -368,7 +366,7 @@ def run_export(filenames, format):
             bar = ProgressBar(max=bar_total, afterword=bartext)
             bar.start()
             result = export.export_chats(chats, export_dir, filename, db,
-                                         progress=lambda x: bar.update(x))
+                                         progress=bar.update)
             files, count = result
             bar.stop()
             if count:
@@ -394,8 +392,7 @@ def run_diff(filename1, filename2):
     db1, db2 = map(skypedata.SkypeDatabase, [filename1, filename2])
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
-    postfunc = lambda r: postbacks.put(r)
-    worker = workers.MergeThread(postfunc)
+    worker = workers.MergeThread(postbacks.put)
 
     chats1, chats2 = db1.get_conversations(), db2.get_conversations()
     db1.get_conversations_stats(chats1), db2.get_conversations_stats(chats2)
@@ -446,7 +443,7 @@ def run_gui(filenames):
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
     # Decorate write to catch printed errors
     try: sys.stdout.write = support.reporting_write(sys.stdout.write)
-    except: pass
+    except Exception: pass
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
@@ -489,7 +486,7 @@ def run():
             subparser.add_argument(*arg["args"], **kwargs)
 
     argv = sys.argv[1:]
-    if not argv or (argv[0] not in subparsers.choices 
+    if not argv or (argv[0] not in subparsers.choices
     and argv[0].endswith(".db")):
         argv[:0] = ["gui"] # argparse hack: force default argument
     if argv[0] in ("-h", "--help") and len(argv) > 1:
