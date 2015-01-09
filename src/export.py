@@ -8,16 +8,14 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    04.01.2015
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import collections
-import cStringIO
 import csv
 import datetime
 import os
 import re
-import traceback
 
 try: # ImageFont for calculating column widths in Excel export, not required.
     from PIL import ImageFont
@@ -158,7 +156,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True, progress=No
                         {3: "boldhidden"})
         writer.set_header(False)
         msgs = messages or db.get_messages(chat)
-        for i, m in enumerate(msgs):
+        for m in msgs:
             text = parser.parse(m, output={"format": "text"})
             try:
                 text = text.decode("utf-8")
@@ -205,8 +203,8 @@ def export_chat_template(chat, filename, db, messages):
                      if stats.get("startdate") else "",
             "date2": stats["enddate"].strftime("%d.%m.%Y")
                      if stats.get("enddate") else "",
-            "emoticons_used": list(filter(lambda e: hasattr(emoticons, e),
-                                     parser.emoticons_unique)),
+            "emoticons_used": [x for x in parser.emoticons_unique
+                               if hasattr(emoticons, x)],
             "message_count":  stats.get("messages", 0),
         })
 
@@ -267,7 +265,7 @@ def export_chat_csv(chat, filename, db, messages):
     with open(filename, "wb") as f:
         writer = csv.writer(f, dialect, extrasaction="ignore")
         writer.writerow(["Time", "Author", "Message"])
-        for i, m in enumerate(messages):
+        for m in messages:
             text = parser.parse(m, output={"format": "text"})
             try:
                 text = text.decode("utf-8")
@@ -349,7 +347,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                 if is_sql and table:
                     # Add CREATE TABLE statement.
                     create_sql = db.tables[table.lower()]["sql"] + ";"
-                    re_sql = re.compile("^(CREATE\s+TABLE\s+)", re.IGNORECASE)
+                    re_sql = re.compile("^(CREATE\\s+TABLE\\s+)", re.IGNORECASE)
                     replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
                     namespace["create_sql"] = re_sql.sub(replacer, create_sql)
 

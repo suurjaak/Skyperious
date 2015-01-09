@@ -9,14 +9,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    26.12.2014
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import datetime
 import Queue
 import re
 import threading
-import time
 import traceback
 
 try:
@@ -286,8 +285,8 @@ class SearchThread(WorkerThread):
                     for table in search["db"].get_tables():
                         table["columns"] = search["db"].get_table_columns(
                             table["name"])
-                        sql, params, words = \
-                            query_parser.Parse(search["text"], table)
+                        sql, params, words = query_parser.Parse(search["text"],
+                                                                table)
                         if not sql:
                             continue # continue for table in search["db"]..
                         infotext += (", " if infotext else "") + table["name"]
@@ -406,7 +405,6 @@ class MergeThread(WorkerThread):
         db1, db2 = params["db1"], params["db2"]
         chats1 = params.get("chats") or db1.get_conversations()
         chats2 = db2.get_conversations()
-        c1map = dict((c["identity"], c) for c in chats1)
         c2map = dict((c["identity"], c) for c in chats2)
         compared = []
         for c1 in chats1:
@@ -431,14 +429,13 @@ class MergeThread(WorkerThread):
                 if new_chat:
                     info += " - new chat"
                 if diff["messages"]:
-                   info += ", %s" % util.plural("%smessage" % newstr,
-                                                diff["messages"])
+                    info += ", %s" % util.plural("%smessage" % newstr,
+                                                 diff["messages"])
                 else:
                     info += ", no messages"
                 if diff["participants"] and not new_chat:
-                        info += ", %s" % (
-                            util.plural("%sparticipant" % newstr,
-                                        diff["participants"]))
+                    info += ", %s" % (util.plural("%sparticipant" % newstr,
+                                                  diff["participants"]))
                 info += ".<br />"
                 result["output"] += info
                 result["chats"].append({"chat": chat, "diff": diff})
@@ -469,7 +466,6 @@ class MergeThread(WorkerThread):
         try:
             chats1 = params.get("chats") or db1.get_conversations()
             chats2 = db2.get_conversations()
-            c1map = dict((c["identity"], c) for c in chats1)
             c2map = dict((c["identity"], c) for c in chats2)
             for c1 in chats1:
                 c2 = c2map.get(c1["identity"])
@@ -854,7 +850,7 @@ class ContactSearchThread(WorkerThread):
             found = {} # { Skype handle: 1, }
             result = {"search": search, "results": []}
             if search and search["handler"]:
-                for i, value in enumerate(search["values"]):
+                for value in search["values"]:
                     main.log("Searching Skype contact directory for '%s'.",
                              value)
 
@@ -871,7 +867,7 @@ class ContactSearchThread(WorkerThread):
 
                             if self._stop_work:
                                 break # break for user in search["handler"].searc..
-                    except Exception as e:
+                    except Exception:
                         main.log("Error searching Skype contacts:\n\n%s",
                                  traceback.format_exc())
 
@@ -880,7 +876,7 @@ class ContactSearchThread(WorkerThread):
                         result = {"search": search, "results": []}
 
                     if self._stop_work:
-                        break # break for i, value in enumerate(search_values)
+                        break # break for value in search["values"]
 
                 if not self._drop_results:
                     result["done"] = True

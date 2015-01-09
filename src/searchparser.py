@@ -23,14 +23,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    26.12.2014
+@modified    08.01.2015
 """
 import calendar
 import collections
 import datetime
 import re
 import string
-import traceback
 import warnings
 
 try:
@@ -54,7 +53,7 @@ ESCAPE_CHAR = "\\" # Character used to escape SQLite special characters like _%
 class SearchQueryParser(object):
 
     # For naive identification of "chat:xyz", "from:xyz" etc keywords
-    PATTERN_KEYWORD = re.compile("^(-?)(chat|from|date|table)\:([^\s]+)$", re.I)
+    PATTERN_KEYWORD = re.compile("^(-?)(chat|from|date|table)\\:([^\\s]+)$", re.I)
 
 
     def __init__(self):
@@ -82,7 +81,6 @@ class SearchQueryParser(object):
                            ).setResultsName("NOT")
             word = Group(keyWord | notExpr | quotedWord | plainWord
                         ).setResultsName("WORD")
-            words = Group(OneOrMore(word)).setResultsName("WORDS")
 
             grammar = Forward()
             parens = Forward()
@@ -225,7 +223,7 @@ class SearchQueryParser(object):
         result = ""
         for keyword, words in keywords.items():
             kw_sql = ""
-            for i, word in enumerate(words):
+            for word in words:
                 param = add_escape = ""
                 escaped = self._escape(word)
                 if len(escaped) > len(word):
@@ -250,7 +248,7 @@ class SearchQueryParser(object):
                         ymd = list(map(util.to_int, word.split("-")[:3]))
                         while len(ymd) < 3: ymd.append(None) # Ensure 3 values
                         if not any(ymd): # No valid values given: skip
-                            continue # continue for i, word in enumerate(words)
+                            continue # continue for word in words
                         format, value = "", ""
                         for j, (frm, val) in enumerate(zip("Ymd", ymd)):
                             if val is None: continue # continue for j, (forma..
@@ -264,30 +262,30 @@ class SearchQueryParser(object):
                     else:
                         # Date range given: use timestamp matching
                         date_words = word.split("..", 1)
-                    for j, d in filter(lambda x: x[1], enumerate(date_words)):
+                    for i, d in ((i, d) for i, d in enumerate(date_words) if d):
                         parts = filter(None, d.split("-")[:3])
                         ymd = list(map(util.to_int, parts))
                         if not ymd or ymd[0] is None:
-                            continue # continue for j, d in filter(..
+                            continue # continue for i, d in filter(..
                         while len(ymd) < 3: ymd.append(None) # Ensure 3 values
                         ymd[0] = max(min(ymd[0], 9999), 1) # Year in 1..9999
                         # Force month into legal range
                         if ymd[1] is None:
-                            ymd[1] = [1, 12][j]
+                            ymd[1] = [1, 12][i]
                         else:
                             ymd[1] = max(min(ymd[1], 12), 1) # Month in 1..12
                         # Force day into legal range
                         day_max = calendar.monthrange(*ymd[:2])[1]
                         if ymd[2] is None:
-                            ymd[2] = day_max if j else 1
+                            ymd[2] = day_max if i else 1
                         else:
                             ymd[2] = max(min(ymd[2], day_max), 1)
-                        dates[j] = datetime.date(*ymd)
-                    for j, d in filter(lambda x: x[1], enumerate(dates)):
+                        dates[i] = datetime.date(*ymd)
+                    for i, d in ((i, d) for i, d in enumerate(dates) if d):
                         timestamp = int(util.timedelta_seconds(d - UNIX_EPOCH))
                         param = "timestamp_%s" % len(sql_params)
                         sql += (" AND " if sql else "")
-                        sql += "m.timestamp %s :%s" % ([">=", "<="][j], param)
+                        sql += "m.timestamp %s :%s" % ([">=", "<="][i], param)
                         sql_params[param] = timestamp
                 kw_sql += (" OR " if kw_sql else "") + sql
             if kw_sql:
@@ -386,10 +384,10 @@ if "__main__" == __name__:
         print("\n".join(loglines))
         print("PARSE DURATION: %s" % (d2 - d1))
         try:
-            parsetree = parser._grammar.parseString(query, parseAll=True)
+            parsetree = parser._grammar.parseString(item, parseAll=True)
             print("PARSE TREE: %s" % parsetree)
-        except:
-            pass
+        except Exception as e:
+            print("PARSE TREE: FAILED: %s" % e)
         sql, params, words = r
         for name, value in params.items():
             sql = sql.replace(":%s " % name, '"%s" ' % value)

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.01.2015
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -214,12 +214,12 @@ class SkypeDatabase(object):
         with open(filename, "w") as _: pass # Truncate file
         self.execute("ATTACH DATABASE ? AS new", (filename, ))
         # Create structure for all tables
-        for t in filter(lambda x: x.get("sql"), self.tables_list or []):
+        for t in (x for x in self.tables_list or [] if x.get("sql")):
             if t["name"].lower().startswith("sqlite_"): continue # Internal use
             sql  = t["sql"].replace("CREATE TABLE ", "CREATE TABLE new.")
             self.execute(sql)
         # Copy data from all tables
-        for t in filter(lambda x: x.get("sql"), self.tables_list or []):
+        for t in (x for x in self.tables_list or [] if x.get("sql")):
             if t["name"].lower().startswith("sqlite_"): continue # Internal use
             sql = "INSERT INTO new.%(name)s SELECT * FROM main.%(name)s" % t
             try:
@@ -238,7 +238,7 @@ class SkypeDatabase(object):
             result.append(repr(e))
             main.log("Error getting indexes from %s.\n\n%s",
                      self.filename, traceback.format_exc())
-        for i in filter(lambda x: x.get("sql"), indexes):
+        for i in (x for x in indexes if x.get("sql")):
             sql  = i["sql"].replace("CREATE INDEX ", "CREATE INDEX new.")
             try:
                 self.execute(sql)
@@ -264,7 +264,7 @@ class SkypeDatabase(object):
                 "COALESCE(fullname, displayname, skypename, '') AS name, "
                 "skypename AS identity FROM accounts LIMIT 1").fetchone()
             self.id = self.account["skypename"]
-        except Exception as e:
+        except Exception:
             main.log("Error getting account information from %s.\n\n%s",
                      self, traceback.format_exc())
 
@@ -547,11 +547,9 @@ class SkypeDatabase(object):
                     key=lambda m: m["timestamp"], reverse=not ascending
                 )
                 if timestamp_from:
-                    messages_sorted = filter(
-                        lambda x: (x["timestamp"] > timestamp_from)
-                        if ascending else
-                        (x["timestamp"] < timestamp_from), messages_sorted
-                    )
+                    messages_sorted = (x for x in messages_sorted
+                        if (x["timestamp"] > timestamp_from if ascending 
+                            else x["timestamp"] < timestamp_from))
                 for message in messages_sorted:
                     yield message
 
@@ -785,7 +783,6 @@ class SkypeDatabase(object):
         Returns all the SMSes in the database.
         Uses already retrieved cached values if possible.
         """
-        transfers = []
         if self.is_open() and "smses" in self.tables:
             if "smses" not in self.table_rows:
                 rows = self.execute(
@@ -916,11 +913,10 @@ class SkypeDatabase(object):
     def get_contact(self, identity):
         """
         Returns the contact specified by the identity
-        (skypename or pstnnumber).
+        (skypename or pstnnumber), using cache if possible.
         """
         contact = None
         if self.is_open() and "contacts" in self.tables:
-            """Returns the specified contact row, using cache if possible."""
             if "contacts" not in self.table_objects:
                 self.table_objects["contacts"] = {}
             contact = self.table_objects["contacts"].get(identity)
@@ -1278,21 +1274,19 @@ class SkypeDatabase(object):
             fields = [col["name"] for col in col_data if not col["pk"]]
             str_fields = ", ".join(["%s = :%s" % (col, col) for col in fields])
             existing = dict([(c["name"], c) for c in self.get_contactgroups()])
-            for c in filter(lambda x: x["name"] in existing, groups):
+            for c in (x for x in groups if x["name"] in existing):
                 c_filled = self.fill_missing_fields(c, fields)
                 c_filled[pk_key] = existing[c["name"]][pk]
-                self.execute("UPDATE contactgroups SET %s WHERE %s = :%s" % (
-                    str_fields, pk, pk_key
-                ), c_filled)
+                self.execute("UPDATE contactgroups SET %s WHERE %s = :%s" %
+                             (str_fields, pk, pk_key ), c_filled)
 
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
-            for c in filter(lambda x: x["name"] not in existing, groups):
+            for c in (x for x in groups if x["name"] not in existing):
                 c_filled = self.fill_missing_fields(c, fields)
                 c_filled = self.blobs_to_binary(c_filled, fields, col_data)
-                self.execute("INSERT INTO contactgroups (%s) VALUES (%s)" % (
-                    str_cols, str_vals
-                ), c_filled)
+                self.execute("INSERT INTO contactgroups (%s) VALUES (%s)" %
+                             (str_cols, str_vals), c_filled)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
 
@@ -1937,7 +1931,7 @@ class MessageParser(object):
         return result
 
 
-    def dom_to_text(self, dom, tails_new=None):
+    def dom_to_text(self, dom):
         """Returns a plaintext representation of the message DOM."""
         fulltext = ""
         to_skip = {} # {element to skip: True, }
@@ -2230,7 +2224,7 @@ def detect_databases():
         for root, dirs, files in os.walk(search_path):
             if os.path.basename(root).lower() in WINDOWS_APPDIRS:
                 # Skip all else under "Application Data" or "AppData\Roaming".
-                dirs[:] = filter(lambda x: "skype" == x.lower(), dirs)
+                dirs[:] = [x for x in dirs if "skype" == x.lower()]
             results = []
             for f in files:
                 if "main.db" == f.lower() and is_sqlite_file(f, root):
@@ -2242,7 +2236,7 @@ def detect_databases():
     main.log("Looking for Skype databases under %s.", search_path)
     for root, dirs, files in os.walk(search_path):
         results = []
-        for f in filter(lambda f: is_sqlite_file(f, root), files):
+        for f in (x for x in files if is_sqlite_file(f, root)):
             results.append(os.path.realpath(os.path.join(root, f)))
         if results: yield results
 
@@ -2250,7 +2244,7 @@ def detect_databases():
 def find_databases(folder):
     """Yields a list of all Skype databases under the specified folder."""
     for root, dirs, files in os.walk(folder):
-        for f in filter(lambda f: is_sqlite_file(f, root), files):
+        for f in (x for x in files if is_sqlite_file(f, root)):
             yield os.path.join(root, f)
 
 
@@ -2271,7 +2265,7 @@ def import_contacts_file(filename):
             contents = contents.encode("latin1", errors="xmlcharrefreplace")
     lines = contents.splitlines()
     csvfile = csv.reader(lines, csv.Sniffer().sniff(lines[0], ",;\t"))
-    rows = list(filter(None, csvfile))
+    rows = [x for x in csvfile if x]
     header, items = rows[0] if rows else [], rows[1:]
     titlemap = dict((title.lower(), i) for i, title in enumerate(header))
 
@@ -2294,10 +2288,10 @@ def import_contacts_file(filename):
     ALL_FIELDS = [FIRST, MIDDLE, LAST] + PHONE_FIELDS + EMAIL_FIELDS
     if not any(x in titlemap for x in ALL_FIELDS):
         titlemap.clear()
-        for i, title in filter(lambda x: x[1], enumerate(header)):
+        for i, title in ((i, t) for i, t in enumerate(header) if t):
             if "@" in title:
                 titlemap[EMAIL_FIELDS[0]] = i
-            elif re.search("\d{3,}", title):
+            elif re.search("\\d{3,}", title):
                 titlemap[PHONE_FIELDS[0]] = i
             elif FIRST not in titlemap:
                 titlemap[FIRST] = i
@@ -2309,16 +2303,16 @@ def import_contacts_file(filename):
 
         # Assemble full name from partial fields
         contact = {"name": values.get(FIRST, ""), "phone": "", "e-mail": ""}
-        for title in filter(lambda x: values.get(x, ""), [MIDDLE, LAST]):
+        for title in (x for x in [MIDDLE, LAST] if values.get(x, "")):
             contact["name"] += (" " if contact["name"] else "") + values[title]
 
         # Phone data can contain arbitrary whitespace: remove it
-        for title in filter(lambda x: values.get(x, ""), PHONE_FIELDS):
+        for title in (x for x in PHONE_FIELDS if values.get(x, "")):
             values[title] = re.sub(r"\s+", "", values[title])
 
         # Gather phone and e-mail information
         for t, fields in [("phone", PHONE_FIELDS), ("e-mail", EMAIL_FIELDS)]:
-            for title in filter(lambda x: values.get(x, ""), fields):
+            for title in (x for x in fields if values.get(x, "")):
                 if contact[t]: # Value already filled: make new record
                     result.append(contact)
                     contact = contact.copy()

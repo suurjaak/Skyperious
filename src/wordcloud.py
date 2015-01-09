@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    05.01.2015
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -168,12 +168,12 @@ def get_cloud(text, additions=None, options=None):
     global OPTIONS
     result = []
     options = dict(OPTIONS.items() + (options.items() if options else []))
-    words = re.findall("\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
+    words = re.findall("\\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
     words += additions or []
     commons = find_commons(words)
     # Add and count all non-common and not wholly numeric words
     counts = collections.defaultdict(lambda: 0)
-    for w in filter(lambda x: x not in commons and re.search("\D", x), words):
+    for w in (x for x in words if x not in commons and re.search("\\D", x)):
         counts[w] += 1
     # Drop rare words, limit total number
     count_last = options["COUNT_MIN"]
@@ -218,7 +218,7 @@ def find_commons(words):
     result = []
     words = set(words)
     for commontext in COMMON_WORDS.values():
-        allcommons = set(re.findall("\w+", commontext, re.UNICODE))
+        allcommons = set(re.findall("\\w+", commontext, re.UNICODE))
         matches = allcommons & words
         if len(matches) > len(result):
             result = matches

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    30.12.2014
+@modified    06.01.2015
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -17,10 +17,8 @@ import locale
 import math
 import os
 import re
-import string
 import subprocess
 import sys
-import tempfile
 import time
 import urllib
 
@@ -127,7 +125,6 @@ def plural(word, items=None, with_items=True):
 def cmp_dicts(dict1, dict2):
     """Returns True if dict2 has all the keys and matching values as dict1."""
     result = True
-    index = 0
     for key, val in dict1.items():
         if key not in dict2:
             result = False
@@ -156,7 +153,7 @@ def try_until(func, count=1, sleep=0.5):
         try:
             func_result = func()
             result = True
-        except Exception as e:
+        except Exception:
             if tries < count and sleep:
                 time.sleep(sleep)
     return result, func_result
@@ -166,7 +163,7 @@ def to_int(value):
     """Returns the value as integer, or None if not integer."""
     try:
         result = int(value)
-    except ValueError as e:
+    except ValueError:
         result = None
     return result
 

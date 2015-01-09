@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    16.11.2014
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -20,7 +20,6 @@ import platform
 import re
 import sys
 import tempfile
-import time
 import traceback
 import urllib
 import urllib2
@@ -56,7 +55,7 @@ def check_newest_version(callback=None):
     try:
         main.log("Checking for new version at %s.", conf.DownloadURL)
         html = url_opener.open(conf.DownloadURL).read()
-        links = re.findall("<a[^>]*\shref=['\"](.+)['\"][^>]*>", html, re.I)
+        links = re.findall("<a[^>]*\\shref=['\"](.+)['\"][^>]*>", html, re.I)
         links = [urllib.basejoin(conf.DownloadURL, x) for x in links[:3]]
         if links:
             # Determine release types
@@ -73,7 +72,7 @@ def check_newest_version(callback=None):
             install_type = get_install_type()
             link = linkmap[install_type]
             # Extract version number like 1.3.2a from skyperious_1.3.2a_x64.exe
-            version = (re.findall("(\d[\da-z.]+)", link) + [None])[0]
+            version = (re.findall("(\\d[\\da-z.]+)", link) + [None])[0]
             main.log("Newest %s version is %s.", install_type, version)
             try:
                 if (version != conf.Version
@@ -85,11 +84,11 @@ def check_newest_version(callback=None):
                 try:
                     main.log("Reading changelog from %s.", conf.ChangelogURL)
                     html = url_opener.open(conf.ChangelogURL).read()
-                    match = re.search("<h4[^>]*>(v%s,.*)</h4\s*>" % version,
+                    match = re.search("<h4[^>]*>(v%s,.*)</h4\\s*>" % version,
                                       html, re.I)
                     if match:
                         ul = html[match.end(0):html.find("</ul", match.end(0))]
-                        lis = re.findall("(<li[^>]*>(.+)</li\s*>)+", ul, re.I)
+                        lis = re.findall("(<li[^>]*>(.+)</li\\s*>)+", ul, re.I)
                         items = [re.sub("<[^>]+>", "", x[1]) for x in lis]
                         items = map(HTMLParser.HTMLParser().unescape, items)
                         changes = "\n".join("- " + i.strip() for i in items)
@@ -238,7 +237,7 @@ def report_error(text):
             # Keep configuration in reasonable size
             if len(conf.ErrorReportHashes) > conf.ErrorsStoredMax:
                 conf.ErrorReportHashes = \
-                    conf.ErrorReportHashes[-conf.ErrorHashesMax:]
+                    conf.ErrorReportHashes[-conf.ErrorsStoredMax:]
             if len(conf.ErrorsReportedOnDay) > conf.ErrorsStoredMax:
                 days = sorted(conf.ErrorsReportedOnDay.keys())
                 # Prune older days from dictionary
@@ -286,11 +285,11 @@ def get_install_type():
 
 def canonic_version(v):
     """Returns a numeric version representation: "1.3.2a" to 10301,99885."""
-    nums = [int(re.sub("[^\d]", "", x)) for x in v.split(".")][::-1]
+    nums = [int(re.sub("[^\\d]", "", x)) for x in v.split(".")][::-1]
     nums[0:0] = [0] * (3 - len(nums)) # Zero-pad if version like 1.4 or just 2
     # Like 1.4a: subtract 1 and add fractions to last number to make < 1.4
-    if re.findall("\d+([\D]+)$", v):
-        ords = map(ord, re.findall("\d+([\D]+)$", v)[0])
+    if re.findall("\\d+([\\D]+)$", v):
+        ords = map(ord, re.findall("\\d+([\\D]+)$", v)[0])
         nums[0] += sum(x / (65536. ** (i + 1)) for i, x in enumerate(ords)) - 1
     return sum((x * 100 ** i) for i, x in enumerate(nums))
 

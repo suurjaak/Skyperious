@@ -8,14 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.01.2015
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import ast
 import base64
 import collections
 import copy
-import cStringIO
 import datetime
 import hashlib
 import inspect
@@ -580,9 +579,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             setattr(self, "button_" + name, button)
             exec("button_%s = self.button_%s" % (name, name)) # Hack local name
 
-        for c in list(panel_main.Children) + list(panel_detail.Children) + \
-        [panel_main, panel_detail]:
-           c.BackgroundColour = page.BackgroundColour 
+        children = list(panel_main.Children) + list(panel_detail.Children)
+        for c in [panel_main, panel_detail] + children:
+            c.BackgroundColour = page.BackgroundColour 
         panel_right.SetupScrolling(scroll_x=False)
         panel_detail.Hide()
 
@@ -863,7 +862,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         @param   filename  possibly new filename, if any
         @return            True if was file was new or changed, False otherwise
         """
-        result, count_initial = False, self.list_db.GetItemCount() - 1
+        result = False
         # Insert into database lists, if not already there
         if filename:
             filename = util.to_unicode(filename)
@@ -1197,11 +1196,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             db2 = self.load_database(filename2)
         if db1 and db2:
             dbset = set((db1, db2))
-            pp = list(filter(lambda i: i and set([i.db1, i.db2]) == dbset,
-                             self.merger_pages))
-            page = pp[0] if pp else None
+            page = next((x for x in self.merger_pages
+                         if x and set([x.db1, x.db2]) == dbset), None)
             if not page:
-                f1, f2 = filename1, filename2
                 main.log("Merge page for %s and %s.", db1, db2)
                 page = MergerPage(self.notebook, db1, db2,
                        self.get_unique_tab_title("Database comparison"))
@@ -1367,7 +1364,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         db = None
         try:
             db = self.dbs.get(filename) or skypedata.SkypeDatabase(filename)
-        except Exception:
+        except Exception as e:
             self.label_account.Value = "(database not readable)"
             self.label_messages.Value = "Error text: %s" % util.format_exc(e)
             self.label_account.ForegroundColour = conf.LabelErrorColour 
@@ -1475,8 +1472,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if wx.YES == response:
                 do_exit = all(p.save_unsaved_grids() for p in unsaved_pages)
         if do_exit:
-            merging_pages = filter(lambda x: x and x.is_merging, self.merger_pages)
-            merging_pages = [p and p.title for p in merging_pages]
+            merging_pages = [x.title for x in self.merger_pages 
+                             if x.is_merging and x.title]
         if merging_pages:
             response = wx.MessageBox(
                 "Merging is currently in progress in %s.\nExit anyway? "
@@ -1508,7 +1505,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.WindowSize = [-1, -1] if self.IsMaximized() else self.Size[:]
             conf.save()
             self.trayicon.Destroy()
-            self.Destroy()
+            sys.exit()
 
 
     def on_close_page(self, event):
@@ -1525,8 +1522,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not self.page_log.is_hidden:
                 event.Veto() # Veto delete event
                 self.on_showhide_log(None) # Fire remove event
-            pages2 = list(filter(lambda x: x != page, self.pages_visited))
-            self.pages_visited = pages2
+            self.pages_visited = [x for x in self.pages_visited if x != page]
             self.page_log.Show(False)
             return
         elif (not isinstance(page, (DatabasePage, MergerPage))
@@ -1600,8 +1596,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.UpdateAccelerators() # Remove page accelerators
 
         # Remove page from visited pages order
-        self.pages_visited = list(filter(lambda x: x != page,
-                                         self.pages_visited))
+        self.pages_visited = [x for x in self.pages_visited if x != page]
         index_new = 0
         if self.pages_visited:
             for i in range(self.notebook.GetPageCount()):
@@ -1660,7 +1655,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 except Exception:
                     is_accessible = False
                     try:
-                        with open(filename, "rb") as f:
+                        with open(filename, "rb"):
                             is_accessible = True
                     except Exception:
                         pass
@@ -1723,8 +1718,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if filename in self.dbs:
             db = self.dbs[filename]
         if db and db in self.db_pages.values():
-            pp = list(filter(lambda i: i and (i.db == db), self.db_pages))
-            page = pp[0] if pp else None
+            page = next((x for x in self.db_pages if x and x.db == db), None)
         if not page:
             if not db:
                 db = self.load_database(filename)
@@ -1741,7 +1735,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if page:
             for i in range(1, self.list_db.GetItemCount()):
                 if self.list_db.GetItemText(i) == filename:
-                    self.list_db.Select(i);
+                    self.list_db.Select(i)
                     break # break for i
             for i in range(self.notebook.GetPageCount()):
                 if self.notebook.GetPage(i) == page:
@@ -2573,7 +2567,6 @@ class DatabasePage(wx.Panel):
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, face=self.Font.FaceName)
         sizer1.Add(label_account, border=5, flag=wx.ALL)
 
-        account = self.db.account or {}
         bmp_panel = wx.Panel(parent=panel1)
         bmp_panel.Sizer = wx.BoxSizer(wx.VERTICAL)
         bmp = images.AvatarDefaultLarge.Bitmap
@@ -2987,14 +2980,6 @@ class DatabasePage(wx.Panel):
         self.list_import_source.SetFilter(event.String.strip())
 
 
-    def on_change_import_resultfilter(self, event):
-        """
-        Handler for changing text in contacts import result filter box,
-        filters contacts found in Skype.
-        """
-        self.list_import_result.SetFilter(event.String.strip())
-
-
     def on_choose_import_file(self, event):
         """Handler for clicking to choose a CSV file for contact import."""
         contacts = None
@@ -3029,7 +3014,7 @@ class DatabasePage(wx.Panel):
                      "name": x["name"], "skypename": x["skypename"], 
                      "phone": x["phone_mobile_normalized"]}
                     for x in self.db.get_contacts()]
-        contacts = list(filter(lambda x: any(x.values()), contacts))
+        contacts = [x for x in contacts if any(x.values())]
         self.list_import_result.DeleteAllItems()
         cols = [("skypename", "Skypename"), ("name", "Name"), 
                 ("e-mail", "E-mail"), ("phone", "Phone")]
@@ -3108,7 +3093,6 @@ class DatabasePage(wx.Panel):
             self.button_import_add.Enabled = False
             self.button_import_clear.Enabled = False
 
-            found = {} # { Skype handle: user data, }
             data = {"id": wx.NewId(), "handler": self.skype_handler,
                     "values": search_values}
             self.search_data_contact.update(data)
@@ -4255,7 +4239,7 @@ class DatabasePage(wx.Panel):
     def save_unsaved_grids(self):
         """Saves all data in unsaved table grids, returns success/failure."""
         result = True
-        for grid in filter(lambda x: x.IsChanged(), self.db_grids.values()):
+        for grid in (x for x in self.db_grids.values() if x.IsChanged()):
             try:
                 grid.SaveChanges()
             except Exception as e:
@@ -4533,7 +4517,6 @@ class DatabasePage(wx.Panel):
                 ]
                 dates_values = tuple(i.date() for i in values)
                 if not any(filter(None, dates_range)):
-                    dates_range2 = list(dates_range)
                     dts = "first_message_datetime", "last_message_datetime"
                     dates_range = [chat[n].date() if chat[n] else None for n in dts]
                 if not any(filter(None, dates_range)):
@@ -4662,8 +4645,6 @@ class DatabasePage(wx.Panel):
         if grid.Table and isinstance(grid.Table, SqliteGridBase):
             row, col = event.GetRow(), event.GetCol()
             # Remember scroll positions, as grid update loses them
-            scroll_hor = grid.GetScrollPos(wx.HORIZONTAL)
-            scroll_ver = grid.GetScrollPos(wx.VERTICAL)
             if row < 0: # Only react to clicks in the header
                 grid_data = grid.Table
                 current_filter = unicode(grid_data.filters[col]) \
@@ -4676,9 +4657,8 @@ class DatabasePage(wx.Panel):
                     new_filter = dialog.GetValue()
                     if len(new_filter):
                         busy = controls.BusyPanel(self.page_tables,
-                            "Filtering column \"%s\" by \"%s\"." % (
-                                grid_data.columns[col]["name"], new_filter
-                        ))
+                            "Filtering column \"%s\" by \"%s\"." %
+                            (grid_data.columns[col]["name"], new_filter))
                         grid_data.AddFilter(col, new_filter)
                         busy.Close()
                     else:
@@ -5589,7 +5569,6 @@ class MergerPage(wx.Panel):
             main.logstatus_flash("Found %s in %s.", s1, self.db1)
             self.button_swap.Enabled = True
             self.button_merge_chats.Enabled = True
-            fields = ["chat", "message"]
             if self.chats_diffdata:
                 count_msgs = util.plural(
                     "message", sum(len(d["diff"]["messages"])
@@ -6000,7 +5979,6 @@ class MergerPage(wx.Panel):
                               db.last_modified.strftime("%Y-%m-%d %H:%M:%S"))
             for i in range(2):
                 db = self.db2 if i else self.db1
-                tables = db.get_tables()
                 condiff = self.con2diff if i else self.con1diff
                 contacts = contacts2 if i else contacts1
                 db.update_fileinfo()
@@ -6486,7 +6464,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         "bodystatus": "special",  "quotefrom": "special",
                         "a": "link", "ss": "default" }
         to_skip = {} # {element to skip: True, }
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
         tails_new = {} if tails_new is None else tails_new
         linefeed_final = "\n\n" # Decreased if quotefrom is last
 
@@ -6781,7 +6758,7 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
         self.row_iterator = self.db.execute(sql)
         # Fill column information
         self.columns = []
-        for idx, col in enumerate(self.row_iterator.description or []):
+        for col in self.row_iterator.description or []:
             coldata = {"name": col[0], "type": "TEXT"}
             self.columns.append(coldata)
 
@@ -6896,7 +6873,6 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
     def SeekToRow(self, row):
         """Seeks ahead on the row iterator to the specified row."""
         rows_before = len(self.rows_all)
-        row_initial = row
         while self.row_iterator and (self.iterator_index < row):
             rowdata = None
             try:

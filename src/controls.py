@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.01.2015
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -741,7 +741,7 @@ class PropertyDialog(wx.Dialog):
                      else tuple(typeclass(*ast.literal_eval(value)))
             isinstance(result, basestring) and result.strip()[0] # Reject empty
             return result 
-        except Exception as e:
+        except Exception:
             return None
 
 
@@ -933,14 +933,14 @@ class RangeSlider(wx.PyPanel):
 
 
     def GetLeftValue(self):
-        return self._vals(0)
+        return self._vals[0]
     def SetLeftValue(self, value):
         return self.SetValue(wx.LEFT, value)
     LeftValue = property(GetLeftValue, SetLeftValue, doc=
         "The left position value. Cannot get greater than the right value."
     )
     def GetRightValue(self):
-        return self._vals(1)
+        return self._vals[1]
     def SetRightValue(self, value, refresh=True):
         return self.SetValue(wx.RIGHT, value, refresh)
     RightValue = property(GetRightValue, SetRightValue, doc=
@@ -967,7 +967,7 @@ class RangeSlider(wx.PyPanel):
                 for confine, limit in zip(confiners, limits):
                     try:    # Confine value between range edge and other marker
                         value = confine(value, limit)
-                    except: # Fails if a value of new type is being set
+                    except Exception: # Fails if value of new type is being set
                         self._vals[i] = None
                 if self._rng[0] is not None \
                 and not (self._rng[0] <= value <= self._rng[1]):
@@ -1004,7 +1004,7 @@ class RangeSlider(wx.PyPanel):
             for confine, limit in zip(confiners, limits):
                 try:    # Confine value between range edge and other marker
                     value = confine(value, limit)
-                except: # Comparison fails if a value of new type is being set
+                except Exception: # Fails if value of new type is being set
                     self._vals[i] = None
             if self._rng[0] is not None \
             and not (self._rng[0] <= value <= self._rng[1]):
@@ -1490,7 +1490,7 @@ class RangeSlider(wx.PyPanel):
                 if not self.ClientRect.Contains(event.Position):
                     # Mouse was down inside self, dragged out and released
                     self._mousepos = None
-            self._dragging_markers[i] = False
+            self._dragging_markers[:] = [False] * 2
             self._dragging_scrollbar = False
             refresh = True
         elif event.Dragging():
@@ -1535,9 +1535,6 @@ class RangeSlider(wx.PyPanel):
                 if self._grip_area.x <= self._box_area.x \
                 or self._grip_area.right >= self._box_area.right:
                     going_right = (event.Position.x > last_pos.x)
-                    edge_x = self._box_area.x \
-                             if self._grip_area.x <= self._box_area.x \
-                             else self._box_area.right + 1
                     do_step = going_right \
                         and (self._grip_area.right < self._box_area.right) \
                         or not going_right \
@@ -1668,9 +1665,8 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
             # Execute scroll later as something resets it after this handler
             try:
                 wx.CallLater(50, lambda:
-                    self.Scroll(*self._last_scroll_pos) if self else None
-                )
-            except:
+                    self.Scroll(*self._last_scroll_pos) if self else None)
+            except Exception:
                 pass # CallLater fails if not called from the main thread
         event.Skip() # Allow event to propagate wx handler
 
@@ -1972,7 +1968,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
                 new_item.Text = u"%s%s" % (t, ARROWS[ascending])
                 self.SetColumn(i, new_item)
-            elif any(filter(lambda i: i in col_item.Text, ARROWS.values())):
+            elif any(i for i in ARROWS.values() if i in col_item.Text):
                 # Remove the previous sort arrow, if any
                 new_item = wx.ListItem()
                 t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
@@ -2174,7 +2170,6 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
             do_autocomp = False
             words = self.autocomps_total
             autocomp_len = 0
-            key_code = event.UnicodeKey
             if wx.WXK_SPACE == event.UnicodeKey and event.CmdDown():
                 # Start autocomp when user presses Ctrl+Space
                 do_autocomp = True
@@ -2183,7 +2178,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                 char = None
                 try: # Not all keycodes can be chars
                     char = chr(event.UnicodeKey).decode("latin1")
-                except:
+                except Exception:
                     pass
                 if char not in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, 10, 13] \
                 and char is not None:
@@ -2193,7 +2188,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                         self.GetCurrentPos()
                     )
                     text = u""
-                    for last_word in re.findall("(\w+)$", line_text):
+                    for last_word in re.findall("(\\w+)$", line_text):
                         text += last_word
                     text = text.upper()
                     if "." == char:
@@ -2208,10 +2203,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                             self.AddText(char)
                     else:
                         text += char
-                        if (len(text) >= self.AUTOCOMP_LEN) and any(filter(
-                            lambda x: x.upper().startswith(text),
-                            self.autocomps_total
-                        )):
+                        if len(text) >= self.AUTOCOMP_LEN and any(x for x in
+                        self.autocomps_total if x.upper().startswith(text)):
                             do_autocomp = True
                             current_pos = self.GetCurrentPos() - 1
                             while chr(self.GetCharAt(current_pos)).isalnum():
@@ -2789,7 +2782,7 @@ class TabbedHtmlWindow(wx.PyPanel):
         notebook.SetActiveTabColour(bgcolour)
         notebook.SetTabAreaColour(tabcolour)
         try: notebook._pages.GetSingleLineBorderColour = notebook.GetActiveTabColour
-        except: pass # Hack to get uniform background colour
+        except Exception: pass # Hack to get uniform background colour
 
         # Monkey-patch object with HtmlWindow and FlatNotebook attributes
         for name in ["Scroll", "GetScrollRange", "GetScrollPos",
@@ -2829,7 +2822,7 @@ class TabbedHtmlWindow(wx.PyPanel):
             try:
                 wx.CallLater(50, lambda:
                              self.Scroll(*tab["scrollpos"]) if self else None)
-            except:
+            except Exception:
                 pass # CallLater fails if not called from the main thread
         event.Skip() # Allow event to propagate to wx handler
 

@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    09.08.2014
+@modified    08.01.2015
 ------------------------------------------------------------------------------
 """
 import functools
@@ -123,7 +123,7 @@ def collect_shortcuts(control, use_heuristics=True):
                 except Exception: pass # FindTool not implemented in GTK
             for tool in filter(None, toolsmap.values()):
                 text = ctrl.GetToolShortHelp(tool.GetId())
-                parts = re.split("\(Alt-(.)\)", text, maxsplit=1)
+                parts = re.split("\\(Alt-(.)\\)", text, maxsplit=1)
                 if len(parts) > 1:
                     result.append(parts[1].lower())
         elif hasattr(ctrl, "Label") and not isinstance(ctrl, wx.TextCtrl):
@@ -207,7 +207,7 @@ def collect_shortcuts(control, use_heuristics=True):
                     try:
                         item = ctrl.ContainingSizer.GetItem(len(sizer_items))
                         sizer_items.append(item.Window)
-                    except:
+                    except Exception:
                         break # Reached item limit
                 index = sizer_items.index(ctrl)
                 if index < len(sizer_items) - 1:
@@ -231,7 +231,7 @@ def collect_shortcuts(control, use_heuristics=True):
             # name, but "label" appended or prepended.
             if (DEBUG): print("Going through named %s '%s'." % (ctrl, name))
             match_found = False
-            label_regex = re.compile("(^label[_ \.]*%s$)|(^%s[_ \.]*label$)"
+            label_regex = re.compile("(^label[_ \\.]*%s$)|(^%s[_ \\.]*label$)"
                                      % tuple([name] * 2), re.IGNORECASE)
             for potential_name, potential in nameds.items():
                 if label_regex.match(potential_name):
@@ -321,7 +321,7 @@ def accelerate(window, use_heuristics=True):
                     for tool in filter(None, toolsmap.values()):
                         id = tool.GetId()
                         text = tb.GetToolShortHelp(id)
-                        parts = re.split("\(Alt-(%s)\)" % key, text,
+                        parts = re.split("\\(Alt-(%s)\\)" % key, text,
                                          maxsplit=1, flags=re.IGNORECASE)
                         if len(parts) > 1:
                             event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
