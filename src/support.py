@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    08.01.2015
+@modified    09.01.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -219,32 +219,41 @@ def take_screenshot(fullscreen=True):
 
 
 def report_error(text):
-    """Reports the error, if error reporting is enabled and below limit."""
-    if conf.ErrorReportsAutomatic:
-        # Set severe constraints on error sending to avoid creating
-        # a busy idiot.
-        today = datetime.date.today().strftime("%Y%m%d")
-        conf.ErrorsReportedOnDay = conf.ErrorsReportedOnDay or {}
-        reports_today = conf.ErrorsReportedOnDay.get(today, 0)
-        text_hashed = "%s\n\n%s" % (conf.Version, text)
-        sha1 = hashlib.sha1(text_hashed.encode("latin1", errors="ignore"))
-        hash = sha1.hexdigest()
-        if hash not in conf.ErrorReportHashes \
-        and reports_today < conf.ErrorReportsPerDay:
-            reports_today += 1
-            conf.ErrorReportHashes.append(hash)
-            conf.ErrorsReportedOnDay[today] = reports_today
-            # Keep configuration in reasonable size
-            if len(conf.ErrorReportHashes) > conf.ErrorsStoredMax:
-                conf.ErrorReportHashes = \
-                    conf.ErrorReportHashes[-conf.ErrorsStoredMax:]
-            if len(conf.ErrorsReportedOnDay) > conf.ErrorsStoredMax:
-                days = sorted(conf.ErrorsReportedOnDay.keys())
-                # Prune older days from dictionary
-                for day in days[:len(days) - conf.ErrorsStoredMax]:
-                    del conf.ErrorsReportedOnDay[day]
-            conf.save()
-            send_report(text, "error")
+    """Reports the error if unknown, reporting enabled and below daily limit."""
+    if not conf.ErrorReportsAutomatic:
+        return
+
+    # Avoid reporting externally caused errors.
+    SKIP_ERRORS = ["DatabaseError: database disk image is malformed",
+                   "OperationalError: attempt to write a readonly database",
+                   "OperationalError: database is locked",
+                   "OperationalError: disk I/O error",
+                   "OperationalError: unable to open database file",
+                   "SkypeAPIError: Skype attach timeout"]
+    if any(x for x in SKIP_ERRORS if x in text):
+        return
+
+    # Set severe constraints on error sending to avoid creating a busy idiot.
+    today = datetime.date.today().strftime("%Y%m%d")
+    conf.ErrorsReportedOnDay = conf.ErrorsReportedOnDay or {}
+    sent_today = conf.ErrorsReportedOnDay.get(today, 0)
+    text_hashed = "%s\n\n%s" % (conf.Version, text)
+    sha1 = hashlib.sha1(text_hashed.encode("latin1", errors="ignore"))
+    hash = sha1.hexdigest()
+    if hash in conf.ErrorReportHashes or sent_today >= conf.ErrorReportsPerDay:
+        return
+
+    conf.ErrorReportHashes.append(hash)
+    conf.ErrorsReportedOnDay[today] = sent_today + 1
+    # Keep configuration in reasonable size
+    if len(conf.ErrorReportHashes) > conf.ErrorsStoredMax:
+        conf.ErrorReportHashes = conf.ErrorReportHashes[-conf.ErrorsStoredMax:]
+    if len(conf.ErrorsReportedOnDay) > conf.ErrorsStoredMax:
+        days = sorted(conf.ErrorsReportedOnDay.keys())
+        for day in days[:len(days) - conf.ErrorsStoredMax]:
+            del conf.ErrorsReportedOnDay[day] # Prune older days from log
+    conf.save()
+    send_report(text, "error")
 
 
 def send_report(content, type, screenshot=""):
@@ -254,6 +263,7 @@ def send_report(content, type, screenshot=""):
     @return    True on success, False on failure
     """
     global url_opener
+    result = False
     try:
         data = {"content": content.encode("utf-8"), "type": type,
                 "screenshot": base64.b64encode(screenshot),
@@ -267,7 +277,6 @@ def send_report(content, type, screenshot=""):
     except Exception:
         main.log("Failed to send %s to %s.\n\n%s", type, conf.ReportURL,
                  traceback.format_exc())
-        result = False
     return result
 
 
