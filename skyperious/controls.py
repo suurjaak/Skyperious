@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-
 Stand-alone GUI components for wx:
 
 - BusyPanel(wx.Window):
@@ -68,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    21.12.2015
+@modified    28.06.2016
 ------------------------------------------------------------------------------
 """
 import ast
@@ -363,7 +362,7 @@ class NoteButton(wx.PyPanel, wx.Button):
             x = 10 + (width - self.DoGetBestSize().width) / 2
 
         dc.Font = self.Font
-        dc.Brush = BRUSH(self.BackgroundColour, wx.SOLID)
+        dc.Brush = BRUSH(self.BackgroundColour)
         if self.IsThisEnabled():
             dc.TextForeground = self.ForegroundColour
         else:
@@ -438,7 +437,7 @@ class NoteButton(wx.PyPanel, wx.Button):
                           wx.FONTWEIGHT_BOLD, face=dc.Font.FaceName)
         text_label = self._text_label
         if "&" in self._label:
-            text_label, h, lines = "", y - 1, []
+            text_label, h = "", y - 1
             for line in self._text_label.split("\n"):
                 i, chars = 0, ""
                 while i < len(line):
@@ -1140,7 +1139,7 @@ class RangeSlider(wx.PyPanel):
                        else self.RANGE_DISABLED_COLOUR
 
         # Fill background
-        dc.SetBrush(BRUSH(self.BACKGROUND_COLOUR, wx.SOLID))
+        dc.SetBrush(BRUSH(self.BACKGROUND_COLOUR))
         dc.SetPen(PEN(self.BACKGROUND_COLOUR))
         dc.DrawRectangle(0, 0, width, height)
         dc.SetPen(PEN(self.BOX_COLOUR))
@@ -1165,7 +1164,7 @@ class RangeSlider(wx.PyPanel):
                 x = self._box_area.x \
                     + self._box_area.width * marker_delta / range_delta_local
                 value_rect[2 if i else 0] = (x - value_rect[0]) if i else x
-            dc.SetBrush(BRUSH(range_colour, wx.SOLID))
+            dc.SetBrush(BRUSH(range_colour))
             dc.SetPen(PEN(range_colour))
             dc.DrawRectangle(*value_rect)
             # Draw scrollbar arrow buttons
@@ -1185,9 +1184,9 @@ class RangeSlider(wx.PyPanel):
                 button_colour = self.BAR_ARROW_BG_COLOUR
                 if self._bar_arrow_areas[i].Contains(self._mousepos):
                     button_colour = self.BAR_HL_COLOUR
-                dc.SetBrush(BRUSH(button_colour, wx.SOLID))
+                dc.SetBrush(BRUSH(button_colour))
                 dc.DrawRectangle(*self._bar_arrow_areas[i])
-            dc.SetBrush(BRUSH(self.BAR_ARROW_FG_COLOUR, wx.SOLID))
+            dc.SetBrush(BRUSH(self.BAR_ARROW_FG_COLOUR))
             dc.SetPen(PEN(self.BAR_ARROW_FG_COLOUR))
             dc.DrawPolygon(((self.BAR_BUTTON_WIDTH / 2 + 1,
                 height - self.BAR_HEIGHT / 2 - 3), (
@@ -1325,7 +1324,7 @@ class RangeSlider(wx.PyPanel):
                     brush_colour = wx.WHITE # self.BAR_HL_COLOUR
                 else:
                     brush_colour = self.MARKER_BUTTON_BG_COLOUR
-                dc.SetBrush(BRUSH(brush_colour, wx.SOLID))
+                dc.SetBrush(BRUSH(brush_colour))
                 dc.SetPen(PEN(self.MARKER_BUTTON_COLOUR))
                 dc.DrawRoundedRectangle(*button_area, radius=button_radius)
                 button_lines = [
@@ -3462,7 +3461,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     bmp = wx.EmptyBitmap(w, h)
     dc = wx.MemoryDC()
     dc.SelectObject(bmp)
-    dc.Brush = BRUSH(bgcolour, wx.SOLID)
+    dc.Brush = BRUSH(bgcolour)
     dc.Pen = PEN(colour)
     dc.Clear()
     dc.DrawRectangle(0, 0, w, h)
@@ -3472,12 +3471,11 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     maxval = maxval if maxval is not None else max(zip(*data)[1])
     for i, (interval, val) in enumerate(data):
         h = barsize[1] * safediv(val, maxval) + 1
-        if val and h < 1.5:
-            h = 1.5 # Very low values produce no visual bar
+        if val and h < 1.5: h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
         y = bmp.Height - h
         bars.append((x, y, barsize[0], h))
-    dc.Brush = BRUSH(colour, wx.SOLID)
+    dc.Brush = BRUSH(colour)
     dc.DrawRectangleList(bars)
 
     dc.SelectObject(wx.NullBitmap)
