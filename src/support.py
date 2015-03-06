@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    09.01.2015
+@modified    03.03.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -23,6 +23,7 @@ import tempfile
 import traceback
 import urllib
 import urllib2
+import urlparse
 import wx
 
 import conf
@@ -56,11 +57,10 @@ def check_newest_version(callback=None):
         main.log("Checking for new version at %s.", conf.DownloadURL)
         html = url_opener.open(conf.DownloadURL).read()
         links = re.findall("<a[^>]*\\shref=['\"](.+)['\"][^>]*>", html, re.I)
-        links = [urllib.basejoin(conf.DownloadURL, x) for x in links[:3]]
         if links:
             # Determine release types
             linkmap = {} # {"src": link, "x86": link, "x64": link}
-            for link in links:
+            for link in links[:3]:
                 link_text = link.lower()
                 if link_text.endswith(".zip"):
                     linkmap["src"] = link
@@ -98,7 +98,7 @@ def check_newest_version(callback=None):
                 except Exception:
                     main.log("Failed to read changelog.\n\n%s.",
                              traceback.format_exc())
-                url = urllib.basejoin(conf.DownloadURL, link)
+                url = urlparse.urljoin(conf.DownloadURL, link)
                 result = (version, url, changes)
     except Exception:
         main.log("Failed to retrieve new version from %s.\n\n%s",
@@ -267,10 +267,7 @@ def send_report(content, type, screenshot=""):
     try:
         data = {"content": content.encode("utf-8"), "type": type,
                 "screenshot": base64.b64encode(screenshot),
-                "version": "%s-%s" % (conf.Version, get_install_type()),
-                "info": "Python " + ".".join(map(str, sys.version_info[:3])) +
-                        "; wx " + ".".join(map(str, wx.VERSION[:4])) +
-                        "; platform " + platform.platform()}
+                "version": "%s-%s" % (conf.Version, get_install_type())}
         url_opener.open(conf.ReportURL, urllib.urlencode(data))
         main.log("Sent %s report to %s (%s).", type, conf.ReportURL, content)
         result = True
@@ -486,5 +483,6 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
 url_opener.addheaders = [("User-agent", "%s %s (%s) (Python %s; wx %s; %s)" % (
     conf.Title, conf.Version, get_install_type(),
     ".".join(map(str, sys.version_info[:3])),
-    ".".join(map(str, wx.VERSION[:4])), platform.platform()
+    ".".join(map(str, wx.VERSION[:4])),
+    platform.platform() + ("-x64" if platform.machine().endswith("64") else "")
 ))]
