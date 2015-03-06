@@ -59,12 +59,12 @@ Attribution
 -----------
 
 Skyperious has been built using the following open-source software:
-- Python 2.7.8 (http://www.python.org)
-- wxPython 3.0.1 (http://www.wxpython.org)
+- Python 2.7.9 (http://www.python.org)
+- wxPython 3.0.2 (http://www.wxpython.org)
 - Pillow 2.6.1 (https://pypi.python.org/pypi/Pillow)
 - pyparsing 2.0.3 (http://pyparsing.wikispaces.com/)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 0.6.4 (https://github.com/jmcnamara/XlsxWriter)
+- XlsxWriter 0.6.7 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.3, (http://pypi.python.org/pypi/python-dateutil)
 - Skype4Py 1.0.35, (https://github.com/awahlig/skype4py)
 - pyinstaller 2.1 (http://www.pyinstaller.org/)

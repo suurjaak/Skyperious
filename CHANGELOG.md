@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.2.3i, 2014-12-11
+3.2.3l, 2015-03-03
 ------------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
@@ -15,11 +15,11 @@ CHANGELOG
 - number of UI tweaks and fixes;
 - made pyparsing optional;
 - upgraded Python from 2.7.6 to 2.7.9;
-- upgraded wxPython from 3.0.0 to 3.0.1;
+- upgraded wxPython from 3.0.0 to 3.0.2;
 - upgraded dateutil from 2.2 to 2.3;
 - upgraded Pillow from 2.3.0 to 2.6.1;
 - upgraded pyparsing from 2.0.1 to 2.0.3;
-- upgraded XlsxWriter from 0.5.3 to 0.6.4;
+- upgraded XlsxWriter from 0.5.3 to 0.6.7;
 
 3.2, 2014-05-08
 ---------------

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    05.01.2015
+@modified    03.03.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -1599,7 +1599,7 @@ under the MIT License.
 
 {{conf.Title}} has been built using the following open source software:
 <ul>
-  <li>wxPython{{" 3.0.1" if getattr(sys, 'frozen', False) else ""}},
+  <li>wxPython{{" 3.0.2.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
   <li>Pillow{{" 2.6.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
@@ -1607,7 +1607,7 @@ under the MIT License.
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
       <li>pyparsing{{" 2.0.3" if getattr(sys, 'frozen', False) else ""}}, 
       <a href="http://pyparsing.wikispaces.com/"><font color="{{conf.LinkColour}}">pyparsing.wikispaces.com</font></a></li>
-  <li>XlsxWriter{{" 0.6.4" if getattr(sys, 'frozen', False) else ""}},
+  <li>XlsxWriter{{" 0.6.7" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://github.com/jmcnamara/XlsxWriter"><font color="{{conf.LinkColour}}">
           github.com/jmcnamara/XlsxWriter</font></a></li>
   <li>dateutil{{" 2.3" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
