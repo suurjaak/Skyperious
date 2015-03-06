@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    06.01.2015
+@modified    06.03.2015
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -145,17 +145,12 @@ def try_until(func, count=1, sleep=0.5):
                      (default 0.5)
     @return          (True, func_result) if success else (False, None)
     """
-    tries = 0
-    result = False
-    func_result = None
+    result, func_result, tries = False, None, 0
     while tries < count:
         tries += 1
-        try:
-            func_result = func()
-            result = True
+        try: result, func_result = True, func()
         except Exception:
-            if tries < count and sleep:
-                time.sleep(sleep)
+            time.sleep(sleep) if tries < count and sleep else None
     return result, func_result
 
 
