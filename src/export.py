@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    08.01.2015
+@modified    06.03.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -263,7 +263,7 @@ def export_chat_csv(chat, filename, db, messages):
     # Default linefeed "\r\n" would cause another "\r" to be written.
     dialect.delimiter, dialect.lineterminator = ";", "\r"
     with open(filename, "wb") as f:
-        writer = csv.writer(f, dialect, extrasaction="ignore")
+        writer = csv.writer(f, dialect)
         writer.writerow(["Time", "Author", "Message"])
         for m in messages:
             text = parser.parse(m, output={"format": "text"})
@@ -309,7 +309,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                 if is_csv:
                     dialect = csv.excel
                     dialect.delimiter, dialect.lineterminator = ";", "\r"
-                    writer = csv.writer(f, dialect, extrasaction="ignore")
+                    writer = csv.writer(f, dialect)
                     if sql_query:
                         flat = sql_query.replace("\r", " ").replace("\n", " ")
                         sql_query = flat.encode("latin1", "replace")
