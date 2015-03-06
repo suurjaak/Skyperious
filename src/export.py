@@ -183,7 +183,7 @@ def export_chat_template(chat, filename, db, messages):
     tmpfile, tmpname = None, None # Temporary file for exported messages
     try:
         is_html = filename.lower().endswith(".html")
-        parser = skypedata.MessageParser(db, chat=chat, stats=is_html)
+        parser = skypedata.MessageParser(db, chat=chat, stats=True)
         namespace = {"db": db, "chat": chat, "messages": messages,
                      "parser": parser}
         # As HTML and TXT contain statistics in their headers before
