@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.01.2015
+@modified    17.01.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -485,6 +485,8 @@ def run():
             kwargs = dict((k, arg[k]) for k in arg if k != "args")
             subparser.add_argument(*arg["args"], **kwargs)
 
+    if "nt" == os.name: # Fix Unicode arguments, otherwise converted to ?
+        sys.argv[:] = win32_unicode_argv()
     argv = sys.argv[1:]
     if not argv or (argv[0] not in subparsers.choices
     and argv[0].endswith(".db")):
@@ -675,6 +677,29 @@ class ProgressBar(threading.Thread):
 
     def stop(self):
         self.is_running = False
+
+
+def win32_unicode_argv():
+    # @from http://stackoverflow.com/a/846931/145400
+    result = sys.argv
+    from ctypes import POINTER, byref, cdll, c_int, windll
+    from ctypes.wintypes import LPCWSTR, LPWSTR
+ 
+    GetCommandLineW = cdll.kernel32.GetCommandLineW
+    GetCommandLineW.argtypes = []
+    GetCommandLineW.restype = LPCWSTR
+ 
+    CommandLineToArgvW = windll.shell32.CommandLineToArgvW
+    CommandLineToArgvW.argtypes = [LPCWSTR, POINTER(c_int)]
+    CommandLineToArgvW.restype = POINTER(LPWSTR)
+ 
+    argc = c_int(0)
+    argv = CommandLineToArgvW(GetCommandLineW(), byref(argc))
+    if argc.value:
+        # Remove Python executable and commands if present
+        start = argc.value - len(sys.argv)
+        result = [argv[i].encode("utf-8") for i in range(start, argc.value)]
+    return result
 
 
 if "__main__" == __name__:

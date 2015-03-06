@@ -11,6 +11,7 @@ CHANGELOG
 - made contact avatar images in HTML export easily saveable;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
 - fixed case-sensitive name sorting in chat statistics;
+- fixed using Unicode command-line arguments;
 - changed skypename text colour in chat Excel export from transparent to gray;
 - number of UI tweaks and fixes;
 - made pyparsing optional;
