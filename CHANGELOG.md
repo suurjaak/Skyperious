@@ -10,6 +10,7 @@ CHANGELOG
 - added start-end editboxes for chat date filter;
 - made contact avatar images in HTML export easily saveable;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
+- fixed parsing errors for certain Skype messages;
 - fixed case-sensitive name sorting in chat statistics;
 - fixed using Unicode command-line arguments;
 - changed skypename text colour in chat Excel export from transparent to gray;
@@ -20,7 +21,7 @@ CHANGELOG
 - upgraded dateutil from 2.2 to 2.3;
 - upgraded Pillow from 2.3.0 to 2.6.1;
 - upgraded pyparsing from 2.0.1 to 2.0.3;
-- upgraded XlsxWriter from 0.5.3 to 0.6.7;
+- upgraded XlsxWriter from 0.5.3 to 0.6.7.
 
 3.2, 2014-05-08
 ---------------

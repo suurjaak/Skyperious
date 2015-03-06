@@ -1630,30 +1630,27 @@ class MessageParser(object):
             dom.clear()
             dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
                        else "Sent "
-            dom.text += ("files " if len(files) > 1 else "file ")
-            a = None
-            for i in sorted(files.keys()):
+            dom.text += util.plural("file", files, False) + " "
+            for i, f in enumerate(files[i] for i in sorted(files)):
                 if len(dom) > 0:
                     a.tail = ", "
-                f = files[i]
                 h = util.path_to_url(f["filepath"] or f["filename"])
                 a = xml.etree.cElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
-            if a is not None:
-                a.tail = "."
+                a.tail = "" if i < len(files) - 1 else "."
         elif MESSAGE_TYPE_CONTACTS == message["type"]:
             self.db.get_contacts()
             get_name = self.db.get_contact_name
-            contacts = sorted([get_name(i.get("f") or i.get("s"))
-                               for i in dom.findall("*/c")])
+            contacts = sorted(get_name(i.get("f") or i.get("s"))
+                              for i in dom.findall("*/c"))
             dom.clear()
-            dom.text = "Sent contact" + (len(contacts) > 1 and "s " or " ")
-            for i in contacts:
+            dom.text = "Sent %s " % util.plural("contact", contacts, False)
+            for i, c in enumerate(contacts):
                 if len(dom) > 0:
                     b.tail = ", "
                 b = xml.etree.cElementTree.SubElement(dom, "b")
-                b.text = i["name"] if type(i) is dict else i
-            b.tail = "."
+                b.text = c["name"] if isinstance(c, dict) else c
+                b.tail = "" if i < len(contacts) - 1 else "."
         elif MESSAGE_TYPE_TOPIC == message["type"]:
             if dom.text:
                 dom.text = "Changed the conversation topic to \"%s\"." \
@@ -1694,8 +1691,8 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
-            names = sorted([self.db.get_contact_name(i)
-                            for i in (message["identities"] or "").split(" ")])
+            names = sorted(self.db.get_contact_name(i)
+                           for i in (message["identities"] or "").split(" "))
             dom.clear()
             dom.text = "Added "
             if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
@@ -1736,17 +1733,19 @@ class MessageParser(object):
                     elm.text += " - code %s" % sid
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
         MESSAGE_TYPE_UPDATE_DONE]:
-            names = sorted([self.db.get_contact_name(i)
-                            for i in (message["identities"] or "").split(" ")])
+            names = sorted(self.db.get_contact_name(x)
+                           for x in (message["identities"] or "").split(" "))
             dom.clear()
-            for i in names:
+            b = None
+            for n in names:
                 if len(dom) > 0:
                     b.tail = ", "
                 b = xml.etree.cElementTree.SubElement(dom, "b")
-                b.text = i["name"] if type(i) is dict else i
-            b.tail = " needs to update Skype to participate in this chat."
-            if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
-                b.tail = " can now participate in this chat."
+                b.text = n["name"] if type(n) is dict else n
+            if b is not None:
+                b.tail = " needs to update Skype to participate in this chat."
+                if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
+                    b.tail = " can now participate in this chat."
 
         for x in dom.findall("*/Text"): x.tag = "span" # photo/video sharing
 
