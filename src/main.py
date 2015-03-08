@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.01.2015
+@modified    08.03.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -627,15 +627,8 @@ class ProgressBar(threading.Thread):
         @param   interval   ticker thread interval, in seconds
         """
         threading.Thread.__init__(self)
+        for k, v in locals().items(): setattr(self, k, v) if "self" != k else 0
         self.daemon = True # Daemon threads do not keep application running
-        self.max = max
-        self.min = min
-        self.width = width
-        self.forechar = forechar
-        self.backchar = backchar
-        self.foreword = foreword
-        self.afterword = afterword
-        self.interval = interval
         self.percent = None        # Current progress ratio in per cent
         self.value = None          # Current progress bar value
         self.bar = "%s[-%s]%s" % (foreword, " " * (self.width - 3), afterword)
@@ -648,14 +641,14 @@ class ProgressBar(threading.Thread):
         """Updates the progress bar value, and refreshes by default."""
         self.value = min(self.max, max(self.min, value))
         new_percent = int(round(100.0 * self.value / (self.max or 1)))
-        full_w = self.width - 2
-        done_w = max(1, int(round((new_percent / 100.0) * full_w)))
+        w_full = self.width - 2
+        w_done = max(1, int(round((new_percent / 100.0) * w_full)))
         # Build bar outline, animate by cycling last char from progress chars
         char_last = self.forechar
-        if draw and done_w < full_w: char_last = next(self.progresschar)
+        if draw and w_done < w_full: char_last = next(self.progresschar)
         self.bar = "%s[%s%s%s]%s" % (
-                   self.foreword, self.forechar * (done_w - 1), char_last,
-                   self.backchar * (full_w - done_w), self.afterword)
+                   self.foreword, self.forechar * (w_done - 1), char_last,
+                   self.backchar * (w_full - w_done), self.afterword)
         # Write percentage into the middle of the bar
         centertxt = " %2d%% " % new_percent
         pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
