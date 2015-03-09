@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    08.01.2015
+@modified    09.03.2015
 ------------------------------------------------------------------------------
 """
 import functools
@@ -351,14 +351,13 @@ def accelerate(window, use_heuristics=True):
         accelerators = []
         dummy_menu = wx.Menu()
         for key, targets in shortcuts.items():
-            event_id = wx.NewId()
             if (DEBUG): print("Binding %s to targets %s." %
                               (key, [type(t) for t in targets]))
-            menu_item = dummy_menu.Append(id=event_id, text="&%s" % key)
+            menu_item = dummy_menu.Append(wx.ID_ANY, text="&%s" % key)
             window.Bind(wx.EVT_MENU,
                         functools.partial(shortcut_handler, targets, key),
                         menu_item)
-            accelerators.append((wx.ACCEL_ALT, ord(key), event_id))
+            accelerators.append((wx.ACCEL_ALT, ord(key), menu_item.Id))
         window.SetAcceleratorTable(wx.AcceleratorTable(accelerators))
         window.__ampersand_shortcut_menu = dummy_menu
     return shortcuts

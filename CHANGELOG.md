@@ -14,6 +14,7 @@ CHANGELOG
 - fixed parsing errors for certain Skype messages;
 - fixed case-sensitive name sorting in chat statistics;
 - fixed using Unicode command-line arguments;
+- fixed possible wx error for shortcut keys when lots of windows open;
 - changed skypename text colour in chat Excel export from transparent to gray;
 - number of UI tweaks and fixes;
 - made pyparsing optional;
