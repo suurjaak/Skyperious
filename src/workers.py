@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    08.01.2015
+@modified    09.03.2015
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -592,6 +592,7 @@ class MergeThread(WorkerThread):
         except Exception as e:
             error = traceback.format_exc()
         finally:
+            html = "Nothing to merge."
             if chats:
                 html = "Merged %s" % util.plural("new message",
                                                  count_messages)
