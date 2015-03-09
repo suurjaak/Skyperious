@@ -376,6 +376,8 @@ class MergeThread(WorkerThread):
     ]
     # Number of iterations between allowing a UI refresh
     REFRESH_COUNT = 20000
+    # Number of iterations between performing an intermediary postback
+    POSTBACK_COUNT = 5000
 
 
     def run(self):
@@ -400,7 +402,8 @@ class MergeThread(WorkerThread):
         # {"output": "html result for db1, db2",
         #  "index": currently processed chat index,
         #  "chats": [differing chats in db1]}
-        result = {"output": "", "chats": [],
+        result = {"output": "", "chats": [], "count": 0,
+                  "chatindex": 0, "chatcount": 0,
                   "params": params, "index": 0, "type": "diff_left"}
         db1, db2 = params["db1"], params["db2"]
         chats1 = params.get("chats") or db1.get_conversations()
@@ -414,11 +417,16 @@ class MergeThread(WorkerThread):
             c["messages2"] = c2["message_count"] or 0 if c2 else 0
             c["c1"], c["c2"] = c1, c2
             compared.append(c)
+            result["count"] += c["messages1"] + c["messages2"]
+        result["chatcount"] = len(chats1)
         compared.sort(key=lambda x: x["title"].lower())
         info_template = step.Template(templates.DIFF_RESULT_ITEM)
 
         for index, chat in enumerate(compared):
-            diff = self.get_chat_diff_left(chat, db1, db2)
+            result["chatindex"] = index
+            postback = dict((k, v) for k, v in result.items()
+                            if k not in ["output", "chats", "params"])
+            diff = self.get_chat_diff_left(chat, db1, db2, postback)
             if self._stop_work:
                 break # break for index, chat in enumerate(compared)
             if diff["messages"] \
@@ -439,14 +447,13 @@ class MergeThread(WorkerThread):
                 info += ".<br />"
                 result["output"] += info
                 result["chats"].append({"chat": chat, "diff": diff})
-            result["index"] = index
+            result["index"] = postback["index"]
             if not self._drop_results:
                 if index < len(compared) - 1:
                     result["status"] = ("Scanning %s." % 
                                         compared[index + 1]["title_long_lc"])
                 self.postback(result)
-                result = {"output": "", "chats": [], "index": index,
-                          "params": params, "type": "diff_left"}
+                result = dict(result, output="", chats=[])
         if not self._drop_results:
             result["done"] = True
             self.postback(result)
@@ -458,8 +465,9 @@ class MergeThread(WorkerThread):
         Worker branch that compares all chats on the left side for differences,
         copies them over to the right, posting progress back to application.
         """
-        result = {"output": "", "index": 0, "params": params, "chats": [],
-                  "count": 0, "type": "diff_merge_left", }
+        result = {"output": "", "index": 0, "count": 0, "chatindex": 0,
+                  "chatcount": 0, "params": params, "chats": [],
+                  "type": "diff_merge_left"}
         error, e = None, None
         compared = []
         db1, db2 = params["db1"], params["db2"]
@@ -474,12 +482,17 @@ class MergeThread(WorkerThread):
                 c["messages2"] = c2["message_count"] or 0 if c2 else 0
                 c["c1"], c["c2"] = c1, c2
                 compared.append(c)
+                result["count"] += c["messages1"] + c["messages2"]
+            result["chatcount"] = len(chats1)
             compared.sort(key=lambda x: x["title"].lower())
-            result["count"] = len(compared)
             count_messages = 0
             count_participants = 0
+
             for index, chat in enumerate(compared):
-                diff = self.get_chat_diff_left(chat, db1, db2)
+                result["chatindex"] = index
+                postback = dict((k, v) for k, v in result.items()
+                                if k not in ["output", "chats", "params"])
+                diff = self.get_chat_diff_left(chat, db1, db2, postback)
                 if self._stop_work:
                     break # break for index, chat in enumerate(compared)
                 if diff["messages"] \
@@ -511,16 +524,14 @@ class MergeThread(WorkerThread):
                         info += ", no messages"
                     result["output"] = info + "."
                     result["diff"] = diff
-                result["index"] = index
+                result["index"] = postback["index"]
                 result["chats"].append(chat)
                 if not self._drop_results:
                     if index < len(compared) - 1:
                         result["status"] = ("Scanning %s." % 
                                             compared[index+1]["title_long_lc"])
                     self.postback(result)
-                    result = {"output": "", "index": index, "params": params,
-                              "count": len(compared), "type": "diff_merge_left",
-                              "chats": [], }
+                    result = dict(result, output="", chats=[])
         except Exception as e:
             error = traceback.format_exc()
         finally:
@@ -553,6 +564,10 @@ class MergeThread(WorkerThread):
         chats1_count = len(db1.get_conversations())
         count_messages = 0
         count_participants = 0
+        result = {"count": sum(len(x["diff"]["messages"]) for x in chats),
+                  "index": 0, "chatindex": 0, "chatcount": len(chats),
+                  "type": "merge_left", "output": "", "chats": [],
+                  "params": params}
         try:
             for index, chat_data in enumerate(chats):
                 if self._stop_work:
@@ -582,13 +597,14 @@ class MergeThread(WorkerThread):
                                         self.yield_ui, self.REFRESH_COUNT)
                     count_messages += len(messages)
                 if not self._drop_results:
-                    result = {"type": "merge_left", "index": index,
-                              "output": html, "count": chats1_count,
-                              "params": params, "chats": [chat_data["chat"]] }
+                    result.update(output=html, chatindex=index,
+                                  chats=[chat_data["chat"]])
+                    result["index"] += len(messages)
                     if index < len(chats) - 1:
                         result["status"] = ("Merging %s."
                             % chats[index + 1]["chat"]["title_long_lc"])
                     self.postback(result)
+                    result = dict(result, output="", chats=[])
         except Exception as e:
             error = traceback.format_exc()
         finally:
@@ -726,11 +742,14 @@ class MergeThread(WorkerThread):
         return result
 
 
-    def get_chat_diff_left(self, chat, db1, db2):
+    def get_chat_diff_left(self, chat, db1, db2, postback=None):
         """
         Compares the chat in the two databases and returns the differences from
         the left as {"messages": [message IDs different in db1],
                      "participants": [participants different in db1] }.
+
+        @param   postback  if {"count": .., "index": ..}, updates index
+                           and posts the result at POSTBACK_COUNT intervals
         """
         c = chat
         participants1 = c["c1"]["participants"] if c["c1"] else []
@@ -791,6 +810,9 @@ class MergeThread(WorkerThread):
                     bodymap[difftext].append(m_cache)
                     if i and not i % self.REFRESH_COUNT:
                         self.yield_ui()
+                    if postback: postback["index"] += 1
+                    if postback and i and not i % self.POSTBACK_COUNT:
+                        self.postback(postback)
 
             # Compare assembled remote_id maps between databases and see if
             # there are no messages with matching body in the other database.

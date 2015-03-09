@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.01.2015
+@modified    09.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5547,7 +5547,7 @@ class MergerPage(wx.Panel):
         to the diff windows.
         """
         result = event.result
-        for d in result["chats"]:
+        for d in result.get("chats", []):
             self.chats_diffdata[d["chat"]["identity"]] = d
         if result.get("output") and "done" not in result:
             self.html_report.Freeze()
@@ -5557,11 +5557,13 @@ class MergerPage(wx.Panel):
             self.html_report.Thaw()
         if "status" in result:
             main.status_flash(result["status"])
-        i, count = result["index"] + 1, len(self.chats1)
-        percent = math.ceil(100 * util.safedivf(i, count))
-        msg = "Scan %d%% complete (%s of %s)." % \
-              (percent, i + 1, util.plural("conversation", count))
-        self.update_gauge(self.gauge_progress, percent, msg)
+        if "index" in result:
+            mindex, mcount = result["index"], result["count"]
+            cindex, ccount = result["chatindex"], result["chatcount"]
+            percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            msg = "Scan %d%% complete (%s of %s)." % \
+                  (percent, cindex + 1, util.plural("conversation", ccount))
+            self.update_gauge(self.gauge_progress, percent, msg)
         if "done" in result:
             self.is_scanning = False
             self.is_scanned = True
@@ -5639,10 +5641,11 @@ class MergerPage(wx.Panel):
         action = ("Merge" if "merge_left" == result["type"]
                   else "Scan and merge")
         if "index" in result:
-            i, count = result["index"] + 1, result["count"]
-            percent = math.ceil(100 * util.safedivf(i, count))
-            msg = "%s %d%% complete (%s of %s)." % \
-                  (action, percent, i, util.plural("conversation", count))
+            mindex, mcount = result["index"], result["count"]
+            cindex, ccount = result["chatindex"], result["chatcount"]
+            percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            msg = "%s %d%% complete (%s of %s)." % (action, percent,
+                  cindex+1, util.plural("conversation", ccount))
             self.update_gauge(self.gauge_progress, percent, msg)
             for chat in result.get("chats", []):
                 if chat["identity"] in self.chats_diffdata:
