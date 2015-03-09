@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.2.3l, 2015-03-03
+3.2.3m, 2015-03-09
 ------------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
@@ -10,6 +10,7 @@ CHANGELOG
 - added start-end editboxes for chat date filter;
 - made contact avatar images in HTML export easily saveable;
 - made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
+- fixed creating duplicates in merge where contact names differ in databases;
 - fixed parsing errors for certain Skype messages;
 - fixed case-sensitive name sorting in chat statistics;
 - fixed using Unicode command-line arguments;

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.01.2015
+@modified    09.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1515,25 +1515,28 @@ class MessageParser(object):
         @param   output         dict with output options:
                                 "format": "html" returns an HTML string 
                                                  including author and timestamp
-                                "format": "text" returns message body plaintext
+                                          "text" returns message body plaintext
                                 "wrap": False    whether to wrap long lines
                                 "export": False  whether output is for export,
                                                  using another content template
+                                "merge": False   for merge comparison, inserts
+                                                 skypename instead of fullname
         @return                 a string if html or text specified, 
                                 or xml.etree.cElementTree.Element containing
                                 message body, with "xml" as the root tag and
                                 any number of subtags:
                                 (a|b|quote|quotefrom|msgstatus|bodystatus),
         """
-        result = None
-        dom = None
-        is_html = output and "html" == output.get("format")
+        result = dom = None
+        output = output or {}
+        is_html = "html" == output.get("format")
 
         if "dom" in message:
             dom = message["dom"] # Cached DOM already exists
         if dom is None:
-            dom = self.parse_message_dom(message)
-            message["dom"] = dom # Cache DOM
+            dom = self.parse_message_dom(message, output)
+            if not output.get("merge"): # Cache DOM, only not for merge as that
+                message["dom"] = dom    # produces a DOM with different content
 
         if dom is not None and is_html: # Create a copy, HTML will mutate dom
             dom = copy.deepcopy(dom)
@@ -1542,7 +1545,7 @@ class MessageParser(object):
 
         if dom is not None and is_html:
             result = self.dom_to_html(dom, output, message)
-        elif dom is not None and output and "text" == output.get("format"):
+        elif dom is not None and "text" == output.get("format"):
             result = self.dom_to_text(dom)
             if output.get("wrap"):
                 linelists = map(self.textwrapfunc, result.split("\n"))
@@ -1556,14 +1559,21 @@ class MessageParser(object):
         return result
 
 
-    def parse_message_dom(self, message):
+    def parse_message_dom(self, message, options):
         """
         Parses the body of the Skype message according to message type.
 
         @param   message  message data dict
+        @param   output   output options, {merge: True} has different content
         @return           ElementTree instance
         """
         body = message["body_xml"] or ""
+        get_contact_name = self.db.get_contact_name
+        get_author_name = lambda m: m.get("from_dispname")
+        get_quote_name = lambda x: x.get("authorname") or ""
+        if options.get("merge"):           # Use skypename in merge: full name
+            get_contact_name = lambda x: x # can be different across databases
+            get_author_name = get_quote_name = lambda m: m.get("author") or ""
 
         for entity, value in self.REPLACE_ENTITIES.items():
             body = body.replace(entity, value)
@@ -1621,7 +1631,7 @@ class MessageParser(object):
                         "filename": f.text, "filepath": "",
                         "filesize": f.get("size"),
                         "partner_handle": message["author"],
-                        "partner_dispname": message["from_dispname"],
+                        "partner_dispname": get_author_name(message),
                         "starttime": message["timestamp"],
                         "type": (TRANSFER_TYPE_OUTBOUND 
                                  if message["author"] == self.db.id
@@ -1640,8 +1650,7 @@ class MessageParser(object):
                 a.tail = "" if i < len(files) - 1 else "."
         elif MESSAGE_TYPE_CONTACTS == message["type"]:
             self.db.get_contacts()
-            get_name = self.db.get_contact_name
-            contacts = sorted(get_name(i.get("f") or i.get("s"))
+            contacts = sorted(get_contact_name(i.get("f") or i.get("s"))
                               for i in dom.findall("*/c"))
             dom.clear()
             dom.text = "Sent %s " % util.plural("contact", contacts, False)
@@ -1680,18 +1689,18 @@ class MessageParser(object):
         elif MESSAGE_TYPE_LEAVE == message["type"]:
             dom.clear()
             b = xml.etree.cElementTree.SubElement(dom, "b")
-            b.text = message["from_dispname"]
+            b.text = get_author_name(message)
             b.tail = " has left the conversation."
         elif MESSAGE_TYPE_INTRO == message["type"]:
             orig = "\n\n" + dom.text if dom.text else ""
             dom.clear()
             b = xml.etree.cElementTree.SubElement(dom, "b")
-            b.text = message["from_dispname"]
+            b.text = get_author_name(message)
             b.tail = " would like to add you on Skype%s" % orig
         elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
-            names = sorted(self.db.get_contact_name(i)
+            names = sorted(get_contact_name(i)
                            for i in (message["identities"] or "").split(" "))
             dom.clear()
             dom.text = "Added "
@@ -1724,7 +1733,8 @@ class MessageParser(object):
             for elm in dom.findall("videomessage"):
                 elm.tag = "span"
                 sid, link = elm.get("sid"), elm.get("publiclink")
-                elm.text = "%s has shared a video with you" % message["from_dispname"]
+                elm.text = ("%s has shared a video with you" %
+                            get_author_name(message))
                 if link:
                     elm.text += " - "
                     a = xml.etree.cElementTree.SubElement(elm, "a", href=link)
@@ -1733,7 +1743,7 @@ class MessageParser(object):
                     elm.text += " - code %s" % sid
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
         MESSAGE_TYPE_UPDATE_DONE]:
-            names = sorted(self.db.get_contact_name(x)
+            names = sorted(get_contact_name(x)
                            for x in (message["identities"] or "").split(" "))
             dom.clear()
             b = None
@@ -1759,7 +1769,7 @@ class MessageParser(object):
                 if i.tail:
                     quote.text += i.tail
                 quote.remove(i)
-            footer = quote.get("authorname") or ""
+            footer = get_quote_name(quote)
             if quote.get("timestamp"):
                 footer += (", %s" if footer else "%s") % \
                     datetime.datetime.fromtimestamp(
@@ -2182,7 +2192,7 @@ class MessageParser(object):
 
 def is_sqlite_file(filename, path=None):
     """Returns whether the file looks to be an SQLite database file."""
-    result = filename.lower().endswith(".db")
+    result = ".db" == filename[-3:].lower()
     if result:
         try:
             fullpath = os.path.join(path, filename) if path else filename
@@ -2192,8 +2202,7 @@ def is_sqlite_file(filename, path=None):
                 SQLITE_HEADER = "SQLite format 3\00"
                 with open(fullpath, "rb") as f:
                     result = (f.read(len(SQLITE_HEADER)) == SQLITE_HEADER)
-        except Exception:
-            pass
+        except Exception: pass
     return result
 
 

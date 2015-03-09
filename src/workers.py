@@ -750,6 +750,7 @@ class MergeThread(WorkerThread):
             messages2 = db2.get_messages(c["c2"], use_cache=False)
             parser1 = skypedata.MessageParser(db1)
             parser2 = skypedata.MessageParser(db2)
+            parse_options = {"format": "text", "merge": True}
 
             m1map = {} # {remote_id: [(id, datetime), ], }
             m2map = {} # {remote_id: [(id, datetime), ], }
@@ -781,7 +782,7 @@ class MergeThread(WorkerThread):
                         if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
                             t = m["author"]
                     else:
-                        t = parser.parse(m, output={"format": "text"})
+                        t = parser.parse(m, output=parse_options)
                     t = t if isinstance(t, str) else t.encode("utf-8")
                     author = (m["author"] or "").encode("utf-8")
                     difftext = "%s-%s-%s" % (author, m["type"], t)
