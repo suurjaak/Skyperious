@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2015
+@modified    10.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5241,7 +5241,7 @@ class MergerPage(wx.Panel):
         namespace = {"db1": self.db1, "db2": self.db2}
         label_title = step.Template(templates.MERGE_DB_LINKS).expand(namespace)
         self.html_dblabel.SetPage(label_title)
-        self.html_dblabel.BackgroundColour = conf.WidgetColour
+        self.html_dblabel.BackgroundColour = wx.NullColour
         self.con1diff, self.con2diff = self.con2diff, self.con1diff
         self.con1difflist, self.con2difflist = \
             self.con2difflist, self.con1difflist
@@ -5829,7 +5829,7 @@ class MergerPage(wx.Panel):
         namespace = {"db1": self.db1, "db2": self.db2}
         label_title = step.Template(templates.MERGE_DB_LINKS).expand(namespace)
         self.html_dblabel.SetPage(label_title)
-        self.html_dblabel.BackgroundColour = conf.WidgetColour
+        self.html_dblabel.BackgroundColour = wx.NullColour
 
         try:
             # Populate the chat comparison list
