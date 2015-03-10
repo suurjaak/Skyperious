@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2015
+@modified    10.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2244,7 +2244,7 @@ def detect_databases():
     main.log("Looking for Skype databases under %s.", search_path)
     for root, dirs, files in os.walk(search_path):
         results = []
-        for f in (x for x in files if is_sqlite_file(f, root)):
+        for f in (x for x in files if is_sqlite_file(x, root)):
             results.append(os.path.realpath(os.path.join(root, f)))
         if results: yield results
 
@@ -2252,7 +2252,7 @@ def detect_databases():
 def find_databases(folder):
     """Yields a list of all Skype databases under the specified folder."""
     for root, dirs, files in os.walk(folder):
-        for f in (x for x in files if is_sqlite_file(f, root)):
+        for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)
 
 
