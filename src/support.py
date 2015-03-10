@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    03.03.2015
+@modified    09.03.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -348,12 +348,12 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_controls.Add(sizer_buttons)
         self.cb_fullscreen = wx.CheckBox(panel, label="&Full screen")
         self.button_saveimage = wx.Button(panel, label="Save &image")
-        self.button_saveimage.MinSize = (-1, 20)
         self.button_saveimage.ToolTipString = "Save screenshot to file."
         self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
         sizer_controls.AddStretchSpacer()
         sizer_imagectrls = wx.BoxSizer(wx.VERTICAL)
-        sizer_imagectrls.Add(self.button_saveimage, border=8, flag=wx.BOTTOM)
+        sizer_imagectrls.Add(self.button_saveimage, border=8,
+                             flag=wx.BOTTOM | wx.ALIGN_RIGHT)
         sizer_imagectrls.Add(self.cb_fullscreen, border=20, flag=wx.BOTTOM)
         sizer_controls.Add(sizer_imagectrls, flag=wx.ALIGN_RIGHT)
         sizer_controls.Add(self.cb_bmp, border=5, flag=wx.TOP)
@@ -371,9 +371,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         self.Bind(wx.EVT_CLOSE, self.OnCancel)
 
         self.SetScreenshot(None)
-        self.Layout()
-        self.Refresh()
-        self.Size = self.Size # Touch to force correct size
+        self.Fit()
         self.Show()
 
 
