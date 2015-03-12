@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.03.2015
+@modified    12.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1995,7 +1995,7 @@ class MessageParser(object):
             self.collect_dom_stats(message["dom"], message)
             if not self.stats["cloudtexts"]:
                 self.stats["cloudtexts"] = collections.defaultdict(str)
-            self.stats["cloudtexts"][author] += self.stats["last_cloudtext"]
+            self.stats["cloudtexts"][author] += self.stats["last_cloudtext"] + " "
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
         if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
