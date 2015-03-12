@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    08.01.2015
+@modified    12.03.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -178,7 +178,8 @@ def get_cloud(text, additions=None, options=None):
     # Drop rare words, limit total number
     count_last = options["COUNT_MIN"]
     if options["WORDS_MAX"] > 0 and len(counts) > options["WORDS_MAX"]:
-        count_last = max(count_last, sorted(counts.values())[options["WORDS_MAX"] - 1])
+        counts_sorted = sorted(counts.values(), reverse=True)
+        count_last = max(count_last, counts_sorted[options["WORDS_MAX"] - 1])
     counts = dict((w, c) for w, c in counts.items() if c >= count_last)
     count_min = min(list(counts.values()) or [0])
     count_max = options.get("SCALE") or max(list(counts.values()) or [0])
