@@ -155,22 +155,23 @@ COMMON_WORDS = {
 
 def get_cloud(text, additions=None, options=None):
     """
-    Returns the word cloud for the specified text. Language of the text is
-    autodetected from among English (default), Estonian and Russian, and
-    pre-defined common words (like 'at') are removed.
+    Returns the word cloud for the specified text. If options["COMMONS"] is not
+    given, language of the text is autodetected from among English (default),
+    Estonian and Russian, and pre-defined common words (like 'at') are removed.
 
     @param   text       text to analyze, will be split on word boundaries
     @param   additions  a pre-parsed list of additional words to include
-    @param   options    a dict of options like {"LENGTH_MIN": 3, "SCALE": 128}
+    @param   options    a dict of options like {"SCALE": 128, "COMMONS": [..]}
     @return             in descending order of relevance, as
                         [('word', count, font size 0..7), ]
     """
     global OPTIONS
     result = []
     options = dict(OPTIONS.items() + (options.items() if options else []))
+    commons = options["COMMONS"] if "COMMONS" in options \
+              else find_commons(text, options)
     words = re.findall("\\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
     words += additions or []
-    commons = find_commons(words)
     # Add and count all non-common and not wholly numeric words
     counts = collections.defaultdict(lambda: 0)
     for w in (x for x in words if x not in commons and re.search("\\D", x)):
@@ -208,15 +209,18 @@ def get_size(count, count_min, count_max, options):
     return result
 
 
-def find_commons(words):
+def find_commons(text, options=None):
     """
     Returns the common words found from the specified words, in the language
     that matches best the given words.
 
-    @param   words  a list of words
-    @return         a set of common words of a language found from the words
+    @param   words    text to analyze
+    @param   options  a dict of options like {"LENGTH_MIN": 2}
+    @return           a set of common words of a language found from the words
     """
     result = []
+    options = dict(OPTIONS.items() + (options.items() if options else []))
+    words = re.findall("\\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
     words = set(words)
     for commontext in COMMON_WORDS.values():
         allcommons = set(re.findall("\\w+", commontext, re.UNICODE))

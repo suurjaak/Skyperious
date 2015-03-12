@@ -2157,31 +2157,29 @@ class MessageParser(object):
                     stats["hists"][author]["days"][bindate] += count
                     stats["totalhist"]["days"][bindate] += count
 
-        # Author cloudtext analysis to accumulate word counts and main cloud
-        maincloud = ""; stats["wordcounts"].clear()
-        options = {"COUNT_MIN": 1, "LENGTH_MIN": conf.WordCloudLengthMin,
-                   "WORDS_MAX": -1}
-        for author, cloudtext in stats["cloudtexts"].items():
-            maincloud += cloudtext
-            additions = stats["links"].get(author)
-            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
-            for word, count, size in cloud:
-                stats["wordcounts"].setdefault(word, {})[author] = count
-
         # Create main cloudtext
+        maincloud = " ".join(stats["cloudtexts"].values())
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
                    "LENGTH_MIN": conf.WordCloudLengthMin,
                    "WORDS_MAX": conf.WordCloudWordsMax}
+        options["COMMONS"] = wordcloud.find_commons(maincloud, options)
         additions = sum(stats["links"].values(), [])
-        cloud = wordcloud.get_cloud(maincloud, additions, options)
-        stats["wordcloud"] = cloud
+        stats["wordcloud"] = wordcloud.get_cloud(maincloud, additions, options)
+
+        # Author cloudtext analysis to accumulate total word counts
+        options.update(COUNT_MIN=1, WORDS_MAX=-1)
+        stats["wordcounts"] = collections.defaultdict(dict)
+        for author, cloudtext in stats["cloudtexts"].items():
+            additions = stats["links"].get(author)
+            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
+            for word, count, size in cloud:
+                stats["wordcounts"][word][author] = count
 
         # Create author cloudtexts, scaled to max word count in main cloud
-        maxcount = max([x[1] for x in cloud] or [0])
-        options = {"COUNT_MIN": conf.WordCloudCountMin, "SCALE": maxcount,
-                   "LENGTH_MIN": conf.WordCloudLengthMin,
-                   "WORDS_MAX": conf.WordCloudWordsAuthorMax,
-                   "FONTSIZE_MAX": wordcloud.FONTSIZE_MAX - 1} # 1 step smaller
+        maxcount = max([x[1] for x in stats["wordcloud"]] or [0])
+        options.update(COUNT_MIN=conf.WordCloudCountMin, SCALE=maxcount,
+                   WORDS_MAX=conf.WordCloudWordsAuthorMax,
+                   FONTSIZE_MAX=wordcloud.FONTSIZE_MAX - 1) # 1 step smaller
         for author, cloudtext in stats["cloudtexts"].items():
             additions = stats["links"].get(author)
             cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
