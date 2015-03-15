@@ -62,5 +62,8 @@ setuptools.setup(
 and
 - synchronize messages in two Skype databases: keep chat history up-to-date on
   different computers, or restore missing messages from older files into the
-  current one""",
+  current one
+
+Note that wxPython for the graphical interface needs to be installed separately.
+""",
 )
