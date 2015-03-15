@@ -21,8 +21,8 @@ CHANGELOG
 - made pyparsing optional;
 - upgraded Python from 2.7.6 to 2.7.9;
 - upgraded wxPython from 3.0.0 to 3.0.2;
-- upgraded dateutil from 2.2 to 2.3;
-- upgraded Pillow from 2.3.0 to 2.6.1;
+- upgraded dateutil from 2.2 to 2.4.1;
+- upgraded Pillow from 2.3.0 to 2.7.0;
 - upgraded pyparsing from 2.0.1 to 2.0.3;
 - upgraded XlsxWriter from 0.5.3 to 0.6.7.
 

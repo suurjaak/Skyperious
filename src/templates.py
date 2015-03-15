@@ -1601,7 +1601,7 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 3.0.2.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
-  <li>Pillow{{" 2.6.1" if getattr(sys, 'frozen', False) else ""}},
+  <li>Pillow{{" 2.7.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
@@ -1610,7 +1610,7 @@ under the MIT License.
   <li>XlsxWriter{{" 0.6.7" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://github.com/jmcnamara/XlsxWriter"><font color="{{conf.LinkColour}}">
           github.com/jmcnamara/XlsxWriter</font></a></li>
-  <li>dateutil{{" 2.3" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
+  <li>dateutil{{" 2.4.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
       <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
   <li>Skype4Py, <a href="https://github.com/awahlig/skype4py">
       <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>
