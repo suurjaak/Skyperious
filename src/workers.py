@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    09.03.2015
+@modified    15.03.2015
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -623,123 +623,6 @@ class MergeThread(WorkerThread):
                     result["error"] = error
                     if e: result["error_short"] = repr(e)
                 self.postback(result)
-
-
-    def get_chat_diff(self, chat, db1, db2):
-        """
-        Compares the chat in the two databases and returns the differences as
-          {"messages": [[IDs of messages different in db1], [..db2]],
-           "participants": [[participants different in db1], [..db2]]}.
-        """
-        c = chat
-        messages1 = db1.get_messages(c["c1"], use_cache=False) \
-                    if c["c1"] else []
-        messages2 = db2.get_messages(c["c2"], use_cache=False) \
-                    if c["c2"] else []
-        c1m_diff = [] # Messages different in chat 1
-        c2m_diff = [] # Messages different in chat 2
-        participants1 = c["c1"]["participants"] if c["c1"] else []
-        participants2 = c["c2"]["participants"] if c["c2"] else []
-        c1p_diff = [] # Participants different in chat 1
-        c2p_diff = [] # Participants different in chat 2
-        c1p_map = dict((p["identity"], p) for p in participants1)
-        c2p_map = dict((p["identity"], p) for p in participants2)
-
-        m1map = {} # {remote_id: [(id, datetime), ], }
-        m2map = {} # {remote_id: [(id, datetime), ], }
-        m1_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
-        m2_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
-        m1bodymap = {} # {author+type+body: [(id, datetime), ], }
-        m2bodymap = {} # {author+type+body: [(id, datetime), ], }
-        difftexts = {} # {(id, datetime): text, }
-
-        # Skip comparing messages if one side is completely empty
-        parser1, parser2 = None, None
-        if not messages1:
-            c2m_diff = [(m["id"], m.get("datetime")) for m in messages2]
-            messages1, messages2 = [], []
-        elif not messages2:
-            c1m_diff = [(m["id"], m.get("datetime")) for m in messages1]
-            messages1, messages2 = [], []
-        else:
-            parser1 = skypedata.MessageParser(db1)
-            parser2 = skypedata.MessageParser(db2)
-
-        # Assemble maps by remote_id and create diff texts. remote_id is
-        # not unique and can easily have duplicates.
-        things = [(messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
-                  (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]
-        for messages, idmap, noidmap, bodymap, parser in things:
-            for i, m in enumerate(messages):
-                # Avoid keeping whole messages in memory, can easily run out.
-                m_cache = (m["id"], m.get("datetime"))
-                if m["remote_id"]:
-                    if m["remote_id"] not in idmap:
-                        idmap[m["remote_id"]] = []
-                    idmap[m["remote_id"]].append(m_cache)
-                else:
-                    noidmap.append(m_cache)
-                # In these messages, parsed body can differ even though
-                # message is the same: contact names are taken from current
-                # database values. Using raw values instead.
-                if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
-                    t = m["identities"] or ""
-                    if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
-                        t = m["author"]
-                else:
-                    t = parser.parse(m, output={"format": "text"})
-                t = t if isinstance(t, str) else t.encode("utf-8")
-                author = (m["author"] or "").encode("utf-8")
-                difftext = "%s-%s-%s" % (author, m["type"], t)
-                difftexts[m_cache]  = difftext
-                if difftext not in bodymap: bodymap[difftext] = []
-                bodymap[difftext].append(m_cache)
-                if i and not i % self.REFRESH_COUNT:
-                    self.yield_ui()
-
-        # Compare assembled remote_id maps between databases and see if there
-        # are no messages with matching body in the other database.
-        remote_id_maps = [(m1map, m2map, c1m_diff), (m2map, m1map, c2m_diff)]
-        for map1, map2, output in remote_id_maps:
-            remote_id_messages = [(r, j) for r, i in map1.items() for j in i]
-            for i, (remote_id, m) in enumerate(remote_id_messages):
-                if remote_id in map2:
-                    is_match = lambda x: difftexts[m] == difftexts[x]
-                    if not any(filter(is_match, map2[remote_id])):
-                        output.append(m) # Nothing with same remote_id and body
-                else:
-                    output.append(m)
-                if i and not i % self.REFRESH_COUNT:
-                    self.yield_ui()
-            
-
-        # For messages with no remote_id-s, compare by author-type-body key
-        # and see if there are no matching messages sufficiently close in time.
-        no_remote_ids =  [(m1_no_remote_ids, c1m_diff, m2bodymap),
-                          (m2_no_remote_ids, c2m_diff, m1bodymap)]
-        for m_no_remote_ids, output, mbodymap in no_remote_ids:
-            for i, m in enumerate(m_no_remote_ids):
-                potential_matches = mbodymap.get(difftexts[m], [])
-                if not [m2 for m2 in potential_matches
-                        if self.match_time(m[1], m2[1], 180)]:
-                    output.append(m)
-                if i and not i % self.REFRESH_COUNT:
-                    self.yield_ui()
-        for p in participants1:
-            if p["identity"] not in c2p_map:
-                c1p_diff.append(p)
-        for p in participants2:
-            if p["identity"] not in c1p_map:
-                c2p_diff.append(p)
-
-        c1m_diff.sort(lambda a, b: cmp(a[1], b[1]))
-        c2m_diff.sort(lambda a, b: cmp(a[1], b[1]))
-        message_ids1 = [m[0] for m in c1m_diff]
-        message_ids2 = [m[0] for m in c2m_diff]
-
-        result = { "messages": [message_ids1, message_ids2],
-                   "participants": [c1p_diff, c2p_diff] }
-        return result
 
 
     def get_chat_diff_left(self, chat, db1, db2, postback=None):
