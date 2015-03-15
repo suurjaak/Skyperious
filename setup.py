@@ -8,21 +8,14 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    11.12.2014
+@modified    10.03.2015
 ------------------------------------------------------------------------------
 """
 import glob
 import os
-import sys
-
 import setuptools
 
-here = os.path.abspath(os.path.dirname(__file__))
-os.chdir(here)
-sys.path.append(os.path.join(here, "src"))
-
-import conf
-
+from skyperious import conf
 
 setuptools.setup(
     name=conf.Title,
@@ -37,16 +30,11 @@ setuptools.setup(
     keywords="skype sqlite merge export",
 
     install_requires=["pyparsing", "XlsxWriter", "Pillow", "python-dateutil", "Skype4Py"],
-    entry_points={"gui_scripts": ["skyperious=src.main:run"],
-                  "console_scripts": ["skyperious-cli=src.main:run"]},
+    entry_points={"gui_scripts": ["skyperious=skyperious.main:run"],
+                  "console_scripts": ["skyperious-cli=skyperious.main:run_cli"]},
 
     packages=setuptools.find_packages(),
-    data_files=[("res", [os.path.join("res", "Carlito.ttf"), 
-                         os.path.join("res", "CarlitoBold.ttf")]),
-                ("", ["CHANGELOG.md", "INSTALL.md", "LICENSE.md", "README.md",
-                 "requirements.txt", "skyperious.bat", "skyperious.sh"]),
-                ("dist", glob.glob(os.path.join("dist", "*"))),
-    ],
+    include_package_data=True, # Use MANIFEST.in for data files
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: End Users/Desktop",

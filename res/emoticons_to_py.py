@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   26.01.2014
-@modified  31.01.2014
+@modified  10.03.2015
 """
 import base64
 import datetime
@@ -19,7 +19,7 @@ import sys
 import wx.tools.img2py
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "src", "emoticons.py")
+TARGET = os.path.join("..", "skyperious", "emoticons.py")
 
 Q3 = '"""'
 

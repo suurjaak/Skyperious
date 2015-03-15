@@ -11,7 +11,7 @@ set INITIAL_DIR=%CD%
 cd %0\..
 set SETUPDIR=%CD%
 
-cd ../src
+cd ../skyperious
 if defined PROGRAMW6432 set SUFFIX64=_x64
 if [%1] == [] (
     for /f %%I in ('python -c "import conf; print conf.Version"') do set VERSION=%%I

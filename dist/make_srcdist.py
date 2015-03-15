@@ -1,10 +1,10 @@
 """
-Creates Skyperious source distribution archive from current version in src\.
-Sets execute flag permission on .sh files.
+Creates Skyperious source distribution archive from current version in
+skyperious\. Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  15.11.2014
+@modified  14.03.2015
 """
 import glob
 import os
@@ -18,7 +18,7 @@ if "__main__" == __name__:
     INITIAL_DIR = os.getcwd()
     PACKAGING_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__)))
     os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-    sys.path.append("src")
+    sys.path.append("skyperious")
     import conf
 
     BASE_DIR = ""
@@ -52,8 +52,9 @@ if "__main__" == __name__:
     with zipfile.ZipFile(os.path.join(INITIAL_DIR, DEST_FILE), mode="w") as zf:
         size = 0
         for subdir, wildcard in [("res", "*"),
-        (pathjoin("res", "emoticons"), "*"), ("src", "*.py"),
-        ("dist", "*"), (pathjoin("src", "third_party"), "*.py")]:
+        (pathjoin("res", "emoticons"), "*"), ("skyperious", "*.py"),
+        ("dist", "*"), (pathjoin("skyperious", "third_party"), "*.py"),
+        (pathjoin("skyperious", "res"), "*.ttf")]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)

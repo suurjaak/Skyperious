@@ -4,13 +4,13 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  10.02.2014
+@modified  14.03.2015
 """
 import os
 import sys
 
 os.chdir("..")
-APPPATH = os.path.join(os.getcwd(), "src")
+APPPATH = os.path.join(os.getcwd(), "skyperious")
 sys.path.append(APPPATH)
 
 import conf
@@ -34,9 +34,9 @@ for d in a.datas:
     if 'pyconfig' in d[0]: 
         a.datas.remove(d)
         break
-a.datas += [("conf.py", "src/conf.py", "DATA"), # For configuration docstrings
-            ("res/Carlito.ttf", "res/Carlito.ttf", "DATA"),
-            ("res/CarlitoBold.ttf", "res/CarlitoBold.ttf", "DATA"), ]
+a.datas += [("conf.py", "skyperious/conf.py", "DATA"), # For configuration docstrings
+            ("res/Carlito.ttf", "skyperious/res/Carlito.ttf", "DATA"),
+            ("res/CarlitoBold.ttf", "skyperious/res/CarlitoBold.ttf", "DATA"), ]
 pyz = PYZ(a.pure)
 
 exe = EXE(

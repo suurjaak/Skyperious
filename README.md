@@ -77,7 +77,7 @@ installed.
 
 If running from source code, launch `skyperious.sh` where shell scripts are 
 supported, or launch `skyperious.bat` under Windows, or open a terminal and run
-`python src/main.py` in Skyperious directory.
+`python skyperious/main.py` in Skyperious directory.
 
 If you encounter a bug in the Skyperious GUI, you can send a report from menu
 Help -> Send feedback.

@@ -22,8 +22,8 @@ the software.
 
 -------------------------------------------------------------------------------
 
-Skyperious includes step in src/third_party/step.py - Simple Template Engine
-for Python (https://github.com/dotpy/step), released under the BSD License.
+Skyperious includes step in skyperious/third_party/step.py - Simple Template 
+Engine for Python (https://github.com/dotpy/step), released under the BSD License.
 
 Copyright (c) 2012 Daniele Mazzocchio (danix@kernel-panic.it)
 All rights reserved.

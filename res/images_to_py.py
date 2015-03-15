@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  26.07.2014
+@modified  10.03.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -18,7 +18,7 @@ import shutil
 import wx.tools.img2py
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "src", "images.py")
+TARGET = os.path.join("..", "skyperious", "images.py")
 
 Q3 = '"""'
 

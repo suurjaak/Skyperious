@@ -13,7 +13,7 @@ or, to run from source code:
 * Download [Skyperious source](http://suurjaak.github.io/Skyperious/downloads.html)
 * extract archive and open a command prompt in the extracted directory
 * run `pip install -r requirements.txt`
-* run `skyperious.bat`, or execute `python src\main.py`
+* run `skyperious.bat`, or execute `python skyperious\main.py`
 
 
 ### Mac ###
@@ -26,7 +26,7 @@ or, to run from source code:
 * download [Skyperious source](http://suurjaak.github.io/Skyperious/downloads.html)
 * extract archive and open a terminal in the extracted directory
 * run `sudo pip install -r requirements.txt`
-* run `skyperious.sh`, or execute `python src\main.py`
+* run `skyperious.sh`, or execute `python skyperious\main.py`
 
 
 ### Ubuntu/Debian ###
@@ -35,7 +35,7 @@ or, to run from source code:
 * download [Skyperious source](http://suurjaak.github.io/Skyperious/downloads.html)
 * extract archive and open a terminal in the extracted directory
 * run `sudo pip install -r requirements.txt`
-* run `skyperious.sh`, or execute `python src\main.py`
+* run `skyperious.sh`, or execute `python skyperious\main.py`
 
 
 ### Vagrant ###

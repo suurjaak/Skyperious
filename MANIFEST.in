@@ -1,0 +1,2 @@
+recursive-include skyperious *.py *.ttf *.ini
+include CHANGELOG.md INSTALL.md LICENSE.md README.md requirements.txt

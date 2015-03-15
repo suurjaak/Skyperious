@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2015
+@modified    15.03.2015
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,15 +23,15 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.2.3m"
-VersionDate = "09.03.2015"
+Version = "3.2.3n"
+VersionDate = "15.03.2015"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
     ApplicationDirectory = os.path.dirname(sys.executable)
     ResourceDirectory = os.path.join(getattr(sys, "_MEIPASS", ""), "res")
 else:
-    ApplicationDirectory = os.path.dirname(os.path.dirname(__file__))
+    ApplicationDirectory = os.path.dirname(__file__)
     ResourceDirectory = os.path.join(ApplicationDirectory, "res")
 
 """Name of file where FileDirectives are kept."""
