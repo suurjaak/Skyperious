@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Skyperious</title>
+    
+    <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-30919338-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Skyperious</h1>
+        <p>Skype SQLite database viewer and merger</p>
+        <p class="view">
+          <a href="index.html">Index</a><br />
+          <a href="downloads.html">Downloads</a><br />
+          <a href="install.html">Installation</a><br />
+          <span class="subview">
+            <a href="#windows">Windows</a><br />
+            <a href="#mac">Mac</a><br />
+            <a href="#ubuntu">Ubuntu/Debian</a><br />
+            <a href="#general">General remarks</a><br />
+            <a href="#vagrant">Vagrant</a><br />
+          </span>
+          <a href="screens.html">Screenshots</a><br />
+          <a href="faq.html">FAQ</a><br />
+          <a href="help.html">Help Texts</a><br />
+          <a href="changelog.html">Changelog</a><br />
+          <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
+        </p>
+        <ul>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.2-src.zip">Download <strong>Source</strong></a></li>
+        </ul>
+      </header>
+      <section>
+
+        <h2>Installation</h2>
+
+        <a name="windows"><h3>Windows</h3></a>
+
+        <p>Download and launch the latest setup.</p>
+
+        or, to run from source code:
+        <ul>
+        <li>install <a href="https://www.python.org/downloads/">Python 2</a></li>
+        <li>install <a href="http://wxpython.org/download.php">wxPython</a></li>
+        <li>open a command prompt in Skyperious directory</li>
+        <li>run <code>pip install -r requirements.txt</code></li>
+        <li>run <code>skyperious.bat</code>, or execute <code>python skyperious\main.py</code></li>
+        </ul>
+
+        <a name="mac"><h3>Mac</h3></a>
+
+        Users have reported problems getting wxPython to run on Mac OS X,
+        but you can try the following:
+        <ul>
+        <li>install <a href="http://brew.sh">Homebrew</a></li>
+        <li>install Python: open a terminal and run <code>brew install python2</code></li>
+        <li>install wxPython: run <code>brew install wxpython</code><br />
+        (or use a suitable binary from <a href="http://wxpython.org/download.php">wxpython.org/download.php</a>)</li>
+        <li>run <code>sudo easy_install pip</code></li>
+        <li>download <a href="http://suurjaak.github.io/Skyperious/downloads.html">Skyperious source</a></li>
+        <li>extract archive and open a terminal in the extracted directory</li>
+        <li>run <code>sudo pip install -r requirements.txt</code></li>
+        <li>run <code>skyperious.sh</code>, or execute <code>python skyperious\main.py</code></li>
+        </ul>
+
+        <a name="ubuntu"><h3>Ubuntu/Debian</h3></a>
+
+        <ul>
+        <li>run <code>sudo aptitude install wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev
+        python-wxgtk2.8 python-wxtools python-pip</code></li>
+        <li>download <a href="http://suurjaak.github.io/Skyperious/downloads.html">Skyperious source</a></li>
+        <li>extract archive and open a terminal in the extracted directory</li>
+        <li>run <code>sudo pip install -r requirements.txt</code></li>
+        <li>run <code>skyperious.sh</code>, or execute <code>python skyperious\main\main.py</code></li>
+        </ul>
+
+
+        <a name="general"><h3>General remarks</h3></a>
+        <p>
+        The program itself is stand-alone, can work from any directory, and does not 
+        need additional installation, Windows installers have been provided for 
+        convenience. The installed program can be copied to a USB stick and used
+        elsewhere, same goes for the source code. The command line interface only needs
+        Python to run.
+        </p>
+
+        <p>
+        If running from source code, Skyperious needs Python 2.7 or 2.6.
+        Python 2.6 will need the argparse library. Python 3 is yet unsupported.
+        </p>
+
+        <p>
+        The graphical user interface needs wxPython, preferably version 2.9+. 
+        wxPython 2.8 is also supported (2.8.12+), with some layout quirks.
+        </p>
+
+        <p>
+        If wxPython is not available, the command line interface will function regardless.
+        <br />
+        If other Python libraries are not available, the program will function 
+        regardless, only with lesser service - like lacking XLSX export or full 
+        search syntax.
+        </p>
+
+
+        <a name="vagrant"><h3>Vagrant</h3></a>
+        If you have problems using above methods, you can try using Vagrant.
+        <p>Pre-requisites:</p>
+
+        <ul>
+        <li>
+        <a href="https://www.virtualbox.org/">Virtualbox</a> 4.0 or greater.</li>
+        <li>
+        <a href="http://www.vagrantup.com/">Vagrant</a> 1.5 or greater.</li>
+        </ul><p>Clone this project and get it running:</p>
+
+        <pre>
+<code>git clone https://github.com/suurjaak/Skyperious
+cd Skyperious/dist
+vagrant up</code>
+        </pre>
+
+        <p>A <code>vagrant up</code> will do the following:</p>
+
+        <ul>
+        <li>download a default vagrant box with Ubuntu precise32 (no GUI)</li>
+        <li>install Skyperious dependencies</li>
+        <li>install Ubuntu desktop environment</li>
+        </ul><h4>
+        <a name="user-content-steps-for-using-the-vagrantfile" class="anchor" href="#steps-for-using-the-vagrantfile"><span class="octicon octicon-link"></span></a>Steps for using the Vagrantfile:</h4>
+
+        <ol>
+        <li><code>vagrant up</code></li>
+        <li>A VirtualBox window will appear</li>
+        <li>Wait until <code>vagrant up</code> finishes setting up the VM</li>
+        <li>Log into the console as the user <code>vagrant</code>, password <code>vagrant</code>
+        </li>
+        <li>Run <code>startx -- :1</code>
+        </li>
+        <li>Now you are in ubuntu desktop env</li>
+        <li>Open a terminal</li>
+        <li><code>cd /vagrant</code></li>
+        <li><code>./skyperious.sh &amp;</code></li>
+        </ol>
+        <p>To have your Skype database files accessible within the virtual machine, place them in Skyperious/dist directory.</p>
+
+        <p>Vagrant support provided by <a href="https://github.com/alb-i986">Alberto Scotto</a> 
+        and <a href="https://github.com/glensc">Elan Ruusam&auml;e</a>.</p>
+
+
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/suurjaak">Erki Suurjaak</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="js/scale.fix.js"></script>
+    
+  </body>
+</html>

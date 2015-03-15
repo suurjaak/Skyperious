@@ -6,6 +6,9 @@
     <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/pygment_trac.css">
+<style>
+
+</style>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <link rel="stylesheet" type="text/css" href="css/shadowbox.css" />
     <script src="js/shadowbox.js"></script>
@@ -22,10 +25,16 @@
         <p class="view">
           <a href="index.html">Index</a><br />
           <a href="downloads.html">Downloads</a><br />
+          <a href="install.html">Installation</a><br />
           <a href="screens.html">Screenshots</a><br />
+          <span class="subview">
+            <a href="#single">Skype database</a><br />
+            <a href="#merging">Merging</a><br />
+            <a href="#start">Start page</a><br />
+          </span>
           <a href="faq.html">FAQ</a><br />
-          <a href="changelog.html">Changelog</a><br />
           <a href="help.html">Help Texts</a><br />
+          <a href="changelog.html">Changelog</a><br />
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
@@ -37,22 +46,34 @@
       <section>
         <h2>Screenshots</h2>
 
-        <h3>Start page</h3>
+        <a name="single"><h3>Working with a single database</h3></a>
         <p>
-        Initial screen:<br />
-        <a href="img/screen_main.png" rel="lightbox[Screenshots]" title="Initial screen"><img src="img/th_screen_main.png" width="500" alt="Initial screen" /></a>
+        Statistics and wordcloud for currently shown messages, maximized:<br />
+        <a href="img/screen_browse_stats.png" rel="lightbox[Screenshots]" title="Statistics and wordcloud for currently shown messages, maximized"><img src="img/th_screen_browse_stats.png" width="500" alt="Statistics and wordcloud for currently shown messages, maximized" /></a>
         </p>
 
         <p>
-        Database details:<br />
-        <a href="img/screen_main_detail.png" rel="lightbox[Screenshots]" title="Database details"><img src="img/th_screen_main_detail.png" width="500" alt="Database info" /></a>
+        HTML export: chat history<br />
+        <a href="img/screen_export_html.png" rel="lightbox[Screenshots]" title="HTML export: chat history"><img src="img/th_screen_export_html.png" width="500" alt="HTML export: chat history" /></a>
         </p>
 
+        <p>
+        Excel export: chat history<br />
+        <a href="img/screen_export_xlsx.png" rel="lightbox[Screenshots]" title="Excel export"><img src="img/th_screen_export_xlsx.png" width="500" alt="Excel export" /></a>
+        </p>
 
-        <h3>Browsing a Skype SQLite database</h3>
+        Filtering chat messages:<br />
+        <a href="img/screen_browse_filter.png" rel="lightbox[Screenshots]" title="Filtering chat messages"><img src="img/th_screen_browse_filter.png" width="500" alt="Filtering chat messages" /></a>
+        </p>
+
         <p>
         Database welcome page:<br />
         <a href="img/screen_browse_welcome.png" rel="lightbox[Screenshots]" title="Database welcome page"><img src="img/th_screen_browse_welcome.png" width="500" alt="Database welcome page" /></a>
+        </p>
+
+        <p>
+        Search syntax:<br />
+        <a href="img/screen_browse_search_syntax.png" rel="lightbox[Screenshots]" title="Search syntax"><img src="img/th_screen_browse_search_syntax.png" width="500" alt="Search syntax" /></a>
         </p>
 
         <p>
@@ -66,20 +87,6 @@
         </p>
 
         <p>
-        Filtering chat messages:<br />
-        <a href="img/screen_browse_filter.png" rel="lightbox[Screenshots]" title="Filtering chat messages"><img src="img/th_screen_browse_filter.png" width="500" alt="Filtering chat messages" /></a>
-        </p>
-
-        <p>
-        Statistics and wordcloud for currently shown messages, maximized:<br />
-        <a href="img/screen_browse_stats.png" rel="lightbox[Screenshots]" title="Statistics and wordcloud for currently shown messages, maximized"><img src="img/th_screen_browse_stats.png" width="500" alt="Statistics and wordcloud for currently shown messages, maximized" /></a>
-        </p>
-
-        <p>
-        HTML export: chat history<br />
-        <a href="img/screen_export_html.png" rel="lightbox[Screenshots]" title="HTML export: chat history"><img src="img/th_screen_export_html.png" width="500" alt="HTML export: chat history" /></a>
-        </p>
-
         <p>
         Database information:<br />
         <a href="img/screen_file_info.png" rel="lightbox[Screenshots]" title="Database information"><img src="img/th_screen_file_info.png" width="500" alt="atabase information" /></a>
@@ -101,16 +108,12 @@
         </p>
 
         <p>
-        Search syntax:<br />
-        <a href="img/screen_browse_search_syntax.png" rel="lightbox[Screenshots]" title="Search syntax"><img src="img/th_screen_browse_search_syntax.png" width="500" alt="Search syntax" /></a>
-        </p>
-
-        <p>
         Searching over all database tables:<br />
         <a href="img/screen_browse_search_tables.png" rel="lightbox[Screenshots]" title="Searching over all database tables"><img src="img/th_screen_browse_search_tables.png" width="500" alt="Searching over all database tables" /></a>
         </p>
 
-        <h3>Merging two Skype SQLite databases</h3>
+        
+        <a name="merging"><h3>Merging two Skype databases</h3></a>
         <p>
         Global merge:<br />
         <a href="img/screen_merge_all.png" rel="lightbox[Screenshots]" title="Global merge"><img src="img/th_screen_merge_all.png" width="500" alt="Global merge" /></a>
@@ -126,7 +129,18 @@
         <a href="img/screen_merge_contacts.png" rel="lightbox[Screenshots]" title="Merging individual contacts"><img src="img/th_screen_merge_contacts.png" width="500" alt="Merging individual contacts" /></a>
         </p>
 
-</div></div></div></div>
+
+        <a name="start"><h3>Start page</h3></a>
+        <p>
+        Initial screen:<br />
+        <a href="img/screen_main.png" rel="lightbox[Screenshots]" title="Initial screen"><img src="img/th_screen_main.png" width="500" alt="Initial screen" /></a>
+        </p>
+
+        <p>
+        Database details:<br />
+        <a href="img/screen_main_detail.png" rel="lightbox[Screenshots]" title="Database details"><img src="img/th_screen_main_detail.png" width="500" alt="Database info" /></a>
+        </p>
+
 
       </section>
       <footer>

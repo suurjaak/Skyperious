@@ -33,10 +33,11 @@
         <p class="view">
           <a href="index.html">Index</a><br />
           <a href="downloads.html">Downloads</a><br />
+          <a href="install.html">Installation</a><br />
           <a href="screens.html">Screenshots</a><br />
           <a href="faq.html">FAQ</a><br />
-          <a href="changelog.html">Changelog</a><br />
           <a href="help.html">Help Texts</a><br />
+          <a href="changelog.html">Changelog</a><br />
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
@@ -76,12 +77,12 @@
           You will need to get their Skype files onto one computer, merge them
           there, and copy the resulting file back.<br />
           Select one database on Skyperious main screen, click "Compare and merge" and
-          choose the second database. In the comparison tab, click "Scan differences
-          between left and right". Scanning will take some time, as it has to go
-          through every chat in either database and compare all messages. Once ready,
-          you can see an overview of the differences in chats and contacts, and
-          choose to merge them into either database.<br />
+          choose the second database. In the comparison tab, you can click "Scan and report"
+          to scan for new messages in the first database and overview changes before merging,
+          or you can click "Merge to the right" to scan and merge immediately. Either process
+          will take some time, as every message in the first database has to be processed.<br />
           Afterwards, copy the updated file back to its Skype folder.<br />
+          This can be automated with the <a href="help.html#commandline">command line interface</a>.<br />
           <br />
           <b>!</b> The databases should belong to the same Skype account.<br />
           <br />
@@ -93,28 +94,7 @@
 
         <h3><a name="osx"></a>Can I use Skyperious on OS X?</h3>
         <p>
-          Yes, in source code form. You will need to install a number of required packages.
-          Here is an example of doing this with <a href="http://brew.sh/">Homebrew</a>:
-
-          <ul>
-          <li>install Homebrew</li>
-          <li>install Python: open a terminal and run &nbsp;<code>brew install python</code></li>
-          <li>run &nbsp;<code>brew install Pillow</code></li>
-          <li>run &nbsp;<code>brew install pyparsing</code></li>
-          <li>install wxPython 2.9 (or 2.8), with a suitable binary from <a href="http://wxpython.org/download.php">wxpython.org/download.php</a></li>
-          </ul>
-
-          The following packages are not strictly required,
-          but provide additional functionality like Excel export or contact import:
-          <ul>
-          <li><code>brew install XlsxWriter</code></li>
-          <li><code>brew install Skype4Py</code></li>
-          <li><code>brew install python-dateutil</code></li>
-          </ul>
-
-          Download and extract the Skyperious source, and launch &nbsp;<code>skyperious.sh</code>.
-          Or open a terminal in the extracted source directory and run
-          &nbsp;<code>python src\main.py</code>.
+          Yes, in source code form. See the <a href="install.html#mac">installation guide</a>.
         </p>
         <br />
 
@@ -133,7 +113,7 @@
         <h3><a name="dbb"></a>Can I restore messages from *.dbb files that I have from an older computer?</h3>
         <p>
           Not directly, Skyperious does not work with *.dbb files. It is an old proprietary format
-          that was in use prior to Skype version 4. However, Skype can automatically convert them 
+          that was in use prior to 2008. However, Skype can automatically convert them 
           to the current format. Try the following:<br />
           <ul>
           <li>shut down Skype</li>

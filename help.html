@@ -34,10 +34,15 @@
         <p class="view">
           <a href="index.html">Index</a><br />
           <a href="downloads.html">Downloads</a><br />
+          <a href="install.html">Installation</a><br />
           <a href="screens.html">Screenshots</a><br />
           <a href="faq.html">FAQ</a><br />
-          <a href="changelog.html">Changelog</a><br />
           <a href="help.html">Help Texts</a><br />
+          <span class="subview">
+            <a href="#search">Search syntax</a><br />
+            <a href="#commandline">Command-line help</a><br />
+          </span>
+          <a href="changelog.html">Changelog</a><br />
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
@@ -230,7 +235,7 @@
         finds quoted messages, and <code>&lt;ss</code> finds messages with emoticons.
       </section>
       <section>
-        <a name="commandline"><h3>Command Line Help</h3></a>
+        <a name="commandline"><h3>Command-Line Help</h3></a>
 
         Command-line interface does not require having wx installed,
         if running from source code.<br />
@@ -238,9 +243,9 @@
         <br /><br />
 
 <pre>
-<code>$ python main.py -h</code>
+<code>$ skyperious -h</code>
 
-usage: main.py [-h] [--verbose] {export,search,merge,diff,gui} ...
+usage: skyperious [-h] [--verbose] {export,search,merge,diff,gui} ...
 
 Skyperious - Skype SQLite database viewer and merger.
 
@@ -259,9 +264,9 @@ optional arguments:
 
 
 <pre>
-<code>$ python main.py -h export</code>
+<code>$ skyperious -h export</code>
 
-usage: main.py export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [--verbose]
+usage: skyperious export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [--verbose]
                       FILE [FILE ...]
 
 Export all message history from a Skype database into files under a new
@@ -281,9 +286,9 @@ optional arguments:
 
 
 <pre>
-<code>$ python main.py -h search</code>
+<code>$ skyperious -h search</code>
 
-usage: main.py search [-h] [-t {message,contact,chat,table}] [--verbose]
+usage: skyperious search [-h] [-t {message,contact,chat,table}] [--verbose]
                       QUERY FILE [FILE ...]
 
 Search Skype databases for messages, chat or contact information, or table
@@ -306,9 +311,9 @@ optional arguments:
 
 
 <pre>
-<code>$ python main.py -h merge</code>
+<code>$ skyperious -h merge</code>
 
-usage: main.py merge [-h] [--verbose] FILE1 FILE2 [FILE2 ...]
+usage: skyperious merge [-h] [--verbose] [-o OUTPUT] FILE1 FILE2 [FILE2 ...]
 
 Merge two or more Skype database files into a new database in current
 directory, with a full combined message history. New filename will be chosen
@@ -316,18 +321,20 @@ automatically. Last database in the list will be used as base for comparison.
 
 positional arguments:
   FILE1       first Skype database
-  FILE2       more Skype databases
+  FILE2       second Skype database, or more
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --verbose   print detailed progress messages to stderr
+  -h, --help            show this help message and exit
+  --verbose             print detailed progress messages to stderr
+  -o OUTPUT, --output OUTPUT
+                        Final database filename, auto-chosen by default
 </pre>
 
 
 <pre>
-<code>$ python main.py -h diff</code>
+<code>$ skyperious -h diff</code>
 
-usage: main.py diff [-h] [--verbose] FILE1 FILE2
+usage: skyperious diff [-h] [--verbose] FILE1 FILE2
 
 Compare two Skype databases for differences in chat history.
 
@@ -341,9 +348,11 @@ optional arguments:
 </pre>
 
 <pre>
-<code>$ python main.py -h gui</code>
+<code>$ skyperious -h gui</code>
 
-usage: main.py gui [-h] [FILE [FILE ...]]
+usage: skyperious gui [-h] [FILE [FILE ...]]
+
+Launch Skyperious graphical program (default option).
 
 positional arguments:
   FILE        Skype database to open on startup, if any
