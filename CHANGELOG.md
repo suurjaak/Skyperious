@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.2.3m, 2015-03-09
+3.3, 2015-03-15
 ------------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
@@ -9,15 +9,15 @@ CHANGELOG
 - fixed duplicate transfer rows in consecutive merges;
 - added start-end editboxes for chat date filter;
 - made contact avatar images in HTML export easily saveable;
-- made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
+- made database comparison progress-bar advance by message count instead of chat count;
 - fixed creating duplicates in merge where contact names differ in databases;
 - fixed parsing errors for certain Skype messages;
 - fixed case-sensitive name sorting in chat statistics;
 - fixed using Unicode command-line arguments;
 - fixed possible wx error for shortcut keys when lots of windows open;
-- made database comparison progress-bar advance by message count instead of chat count;
 - changed skypename text colour in chat Excel export from transparent to gray;
 - number of UI tweaks and fixes;
+- made Pillow/PIL an optional requirement for both GUI and command-line (issue #28);
 - made pyparsing optional;
 - added setup.py script;
 - upgraded Python from 2.7.6 to 2.7.9;
