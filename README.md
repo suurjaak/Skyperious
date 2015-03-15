@@ -89,7 +89,7 @@ Installation
 Windows: download and launch the latest setup from
 http://suurjaak.github.io/Skyperious/downloads.html.
 
-Mac/Linux/other: see (INSTALL.md)[INSTALL.md].
+Mac/Linux/other: see [INSTALL.md](INSTALL.md).
 
 Skyperious has a Vagrantfile, see
 [dist/README for Vagrant.md](dist/README for Vagrant.md).
