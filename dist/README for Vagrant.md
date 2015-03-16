@@ -23,7 +23,7 @@ A `vagrant up` will do the following:
 #### Steps for using the Vagrantfile:
 
 1. `vagrant up`
-2. A VirtuaBox window will appear
+2. A VirtualBox window will appear
 3. Wait until `vagrant up` finishes setting up the VM
 4. Log into the console as the user `vagrant`, password `vagrant`
 5. Run `startx -- :1`
