@@ -30,8 +30,7 @@ setuptools.setup(
     keywords="skype sqlite merge export",
 
     install_requires=["pyparsing", "XlsxWriter", "Pillow", "python-dateutil", "Skype4Py"],
-    entry_points={"gui_scripts": ["skyperious=skyperious.main:run"],
-                  "console_scripts": ["skyperious-cli=skyperious.main:run_cli"]},
+    entry_points={"gui_scripts": ["skyperious=skyperious.main:run"]},
 
     packages=setuptools.find_packages(),
     include_package_data=True, # Use MANIFEST.in for data files
@@ -62,5 +61,8 @@ setuptools.setup(
 and
 - synchronize messages in two Skype databases: keep chat history up-to-date on
   different computers, or restore missing messages from older files into the
-  current one""",
+  current one
+
+Note that wxPython for the graphical interface needs to be installed separately.
+""",
 )

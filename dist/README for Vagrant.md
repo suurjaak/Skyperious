@@ -17,13 +17,13 @@ Clone this project and get it running:
 A `vagrant up` will do the following:
 
 - download a default vagrant box with Ubuntu precise32 (no GUI)
-- install Skyperious dependencies
 - install Ubuntu desktop environment
+- install Skyperious and its dependencies
 
 #### Steps for using the Vagrantfile:
 
 1. `vagrant up`
-2. A VirtuaBox window will appear
+2. A VirtualBox window will appear
 3. Wait until `vagrant up` finishes setting up the VM
 4. Log into the console as the user `vagrant`, password `vagrant`
 5. Run `startx -- :1`
