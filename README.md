@@ -75,9 +75,10 @@ Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
 form, it should run wherever Python and the required Python packages are
 installed.
 
-If running from source code, launch `skyperious.sh` where shell scripts are 
-supported, or launch `skyperious.bat` under Windows, or open a terminal and run
-`python skyperious/main.py` in Skyperious directory.
+If running from pip installation, run `skyperious` from the command-line. 
+If running from straight source code, launch `skyperious.sh` where shell 
+scripts are supported, or launch `skyperious.bat` under Windows, or open 
+a terminal and run `python skyperious/main.py` in Skyperious directory.
 
 If you encounter a bug in the Skyperious GUI, you can send a report from menu
 Help -> Send feedback.
@@ -89,7 +90,11 @@ Installation
 Windows: download and launch the latest setup from
 http://suurjaak.github.io/Skyperious/downloads.html.
 
-Mac/Linux/other: see [INSTALL.md](INSTALL.md).
+Mac/Linux/other:
+`pip install skyperious`
+
+The pip installation will add the `skyperious` command to path.
+For more thorough instructions, see [INSTALL.md](INSTALL.md).
 
 Skyperious has a Vagrantfile, see
 [dist/README for Vagrant.md](dist/README for Vagrant.md).
@@ -111,7 +116,7 @@ The following are also listed in `requirements.txt` for pip:
 If wxPython is not available, the command line interface will function
 regardless.
 If other Python libraries are not available, the program will function 
-regardless, only with lesser service - like lacking XLSX export or full 
+regardless, only with lesser service - like lacking Excel export or full 
 search syntax.
 
 Skyperious can also run under wxPython 2.8.12+, with some layout quirks.

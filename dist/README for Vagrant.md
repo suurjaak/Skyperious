@@ -17,8 +17,8 @@ Clone this project and get it running:
 A `vagrant up` will do the following:
 
 - download a default vagrant box with Ubuntu precise32 (no GUI)
-- install Skyperious dependencies
 - install Ubuntu desktop environment
+- install Skyperious and its dependencies
 
 #### Steps for using the Vagrantfile:
 
