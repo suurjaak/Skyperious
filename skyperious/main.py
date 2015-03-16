@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2015
+@modified    16.03.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -502,9 +502,9 @@ def run(nogui=False):
         arguments.FILE2 = [util.to_unicode(f) for f in arguments.FILE2]
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
-        arguments.FILE = sum([(sorted(glob.glob(f)) if "*" in f else [f])
-                             for f in arguments.FILE], [])
-        arguments.FILE = [util.to_unicode(f) for f in arguments.FILE]
+        arguments.FILE = sum([glob.glob(f) if "*" in f else [f]
+                              for f in arguments.FILE], [])
+        arguments.FILE = sorted(set(util.to_unicode(f) for f in arguments.FILE))
 
     if "gui" == arguments.command and (nogui or not is_gui_possible):
         argparser.print_help()
