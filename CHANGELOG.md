@@ -4,6 +4,7 @@ CHANGELOG
 3.3.1a, 2015-03-17
 ------------------
 - fixed a parsing issue with certain Skype messages;
+- added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
 
 3.3, 2015-03-15
 ------------------
