@@ -30,7 +30,7 @@ setuptools.setup(
     keywords="skype sqlite merge export",
 
     install_requires=["pyparsing", "XlsxWriter", "Pillow", "python-dateutil", "Skype4Py"],
-    entry_points={"gui_scripts": ["skyperious=skyperious.main:run"]},
+    entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
     packages=setuptools.find_packages(),
     include_package_data=True, # Use MANIFEST.in for data files
