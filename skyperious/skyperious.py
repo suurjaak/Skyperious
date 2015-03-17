@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.03.2015
+@modified    17.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -398,6 +398,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not self.pages_visited or self.pages_visited[-1] != p:
             self.pages_visited.append(p)
         self.update_notebook_header()
+        self.Title = conf.Title
+        if hasattr(p, "title"): self.Title += " - %s" % p.title
         if event: event.Skip() # Pass event along to next handler
 
 

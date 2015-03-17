@@ -1,9 +1,10 @@
 CHANGELOG
 =========
 
-3.3.1a, 2015-03-17
+3.3.1a, 2015-03-18
 ------------------
 - fixed a parsing issue with certain Skype messages;
+- started adding opened file name to application title;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
 
 3.3, 2015-03-15
