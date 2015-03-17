@@ -1,3 +1,4 @@
+argparse
 Pillow
 pyparsing
 python-dateutil
