@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+3.3.1a, 2015-03-17
+------------------
+- fixed a parsing issue with certain Skype messages;
+
 3.3, 2015-03-15
 ------------------
 - added per-contact word clouds to chat statistics;

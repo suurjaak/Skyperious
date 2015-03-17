@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.03.2015
+@modified    17.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1854,7 +1854,6 @@ class MessageParser(object):
             index = 0
             for subelem in elem:
                 if "quote" == subelem.tag:
-                    elem_quotefrom = subelem.find("quotefrom")
                     # Replace quote tags with a formatted subtable
                     templ = step.Template(templates.MESSAGE_QUOTE)
                     template = templ.expand(export=output.get("export"))
@@ -1862,8 +1861,10 @@ class MessageParser(object):
                     table = xml.etree.cElementTree.fromstring(template)
                     # Select last, content cell
                     cell = table.findall("*/td")[-1]
-                    cell.find(greytag).text += elem_quotefrom.text
-                    subelem.remove(elem_quotefrom)
+                    elem_quotefrom = subelem.find("quotefrom")
+                    if elem_quotefrom is not None:
+                        cell.find(greytag).text += elem_quotefrom.text
+                        subelem.remove(elem_quotefrom)
                     cell.text = subelem.text
                     # Insert all children before the last font element
                     len_orig = len(cell)
