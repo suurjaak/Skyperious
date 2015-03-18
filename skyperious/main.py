@@ -256,49 +256,51 @@ def run_merge(filenames, output_filename=None):
     db_base = dbs.pop()
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
-    worker = workers.MergeThread(postbacks.put)
 
     name, ext = os.path.splitext(os.path.split(db_base.filename)[-1])
     now = datetime.datetime.now().strftime("%Y%m%d")
     if not output_filename:
         output_filename = util.unique_path("%s.merged.%s%s" %  (name, now, ext))
     output("Creating %s, using %s as base." % (output_filename, db_base))
+    bar = ProgressBar()
+    bar.start()
     shutil.copyfile(db_base.filename, output_filename)
     db2 = skypedata.SkypeDatabase(output_filename)
     chats2 = db2.get_conversations()
     db2.get_conversations_stats(chats2)
 
-    for db1 in dbs:
-        chats = db1.get_conversations()
-        db1.get_conversations_stats(chats)
-        bar_text = " Processing %.*s.." % (30, db1)
-        bar = ProgressBar(afterword=bar_text)
-        bar.start()
-        args = {"db1": db1, "db2": db2, "chats": chats,
-                "type": "diff_merge_left"}
-        worker.work(args)
-        while True:
-            result = postbacks.get()
-            if "error" in result:
-                output("Error merging %s:\n\n%s" % (db1, result["error"]))
-                worker = None # Signal for global break
-                break # break while True
-            if "done" in result:
-                break # break while True
-            if "diff" in result:
-                counts[db1]["chats"] += 1
-                counts[db1]["msgs"] += len(result["diff"]["messages"])
-            if "index" in result:
-                bar.max = result["count"]
-                bar.update(result["index"])
-            if result.get("output"):
-                log(result["output"])
-        if not worker:
-            break # break for db1 in dbs
-        bar.stop()
-        bar.afterword = " Processed %s." % db1
-        bar.update(bar.max)
-        output()
+    args = {"db2": db2, "type": "diff_merge_left"}
+    worker = workers.MergeThread(postbacks.put)
+    try:
+        for db1 in dbs:
+            chats = db1.get_conversations()
+            db1.get_conversations_stats(chats)
+            bar.afterword = " Processing %.*s.." % (30, db1)
+            worker.work(dict(args, db1=db1, chats=chats))
+            while True:
+                result = postbacks.get()
+                if "error" in result:
+                    output("Error merging %s:\n\n%s" % (db1, result["error"]))
+                    db1 = None # Signal for global break
+                    break # break while True
+                if "done" in result:
+                    break # break while True
+                if "diff" in result:
+                    counts[db1]["chats"] += 1
+                    counts[db1]["msgs"] += len(result["diff"]["messages"])
+                if "index" in result:
+                    bar.max = result["count"]
+                    bar.update(result["index"])
+                if result.get("output"):
+                    log(result["output"])
+            if not db1:
+                break # break for db1 in dbs
+            bar.stop()
+            bar.afterword = " Processed %s." % db1
+            bar.update(bar.max)
+            output()
+    finally:
+        worker and (worker.stop(), worker.join())
 
     if not counts:
         output("Nothing new to merge.")
@@ -315,27 +317,28 @@ def run_merge(filenames, output_filename=None):
 def run_search(filenames, query):
     """Searches the specified databases for specified query."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
-
     postbacks = Queue.Queue()
+    args = {"text": query, "table": "messages", "output": "text"}
     worker = workers.SearchThread(postbacks.put)
-
-    for db in dbs:
-        log("Searching \"%s\" in %s." % (query, db))
-        args = {"db": db, "text": query, "table": "messages", "output": "text"}
-        worker.work(args)
-        while True:
-            result = postbacks.get()
-            if "error" in result:
-                output("Error searching %s:\n\n%s" %
-                      (db, result.get("error_short", result["error"])))
-                break # break while True
-            if "done" in result:
-                log("Finished searching for \"%s\" in %s.", query, db)
-                break # break while True
-            if result.get("count", 0) or is_verbose:
-                if len(dbs) > 1:
-                    output("%s:" % db, end=" ")
-                output(result["output"])
+    try:
+        for db in dbs:
+            log("Searching \"%s\" in %s." % (query, db))
+            worker.work(dict(args, db=db))
+            while True:
+                result = postbacks.get()
+                if "error" in result:
+                    output("Error searching %s:\n\n%s" %
+                          (db, result.get("error_short", result["error"])))
+                    break # break while True
+                if "done" in result:
+                    log("Finished searching for \"%s\" in %s.", query, db)
+                    break # break while True
+                if result.get("count", 0) or is_verbose:
+                    if len(dbs) > 1:
+                        output("%s:" % db, end=" ")
+                    output(result["output"])
+    finally:
+        worker and (worker.stop(), worker.join())
 
 
 def run_export(filenames, format):
@@ -393,38 +396,43 @@ def run_diff(filename1, filename2):
     db1, db2 = map(skypedata.SkypeDatabase, [filename1, filename2])
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
-    worker = workers.MergeThread(postbacks.put)
 
-    chats1, chats2 = db1.get_conversations(), db2.get_conversations()
-    db1.get_conversations_stats(chats1), db2.get_conversations_stats(chats2)
     bar_text = "%.*s.." % (50, " Scanning %s vs %s" % (db1, db2))
     bar = ProgressBar(afterword=bar_text)
     bar.start()
+    chats1, chats2 = db1.get_conversations(), db2.get_conversations()
+    db1.get_conversations_stats(chats1), db2.get_conversations_stats(chats2)
+
     args = {"db1": db1, "db2": db2, "chats": chats1, "type": "diff_left"}
-    worker.work(args)
-    while True:
-        result = postbacks.get()
-        if "error" in result:
-            output("Error scanning %s and %s:\n\n%s" %
-                  (db1, db2, result["error"]))
-            worker = None # Signal for global break
-            break # break while True
-        if "done" in result:
-            break # break while True
-        if "chats" in result and result["chats"]:
-            counts[db1]["chats"] += 1
-            msgs = len(result["chats"][0]["diff"]["messages"])
-            msgs_text = util.plural("new message", msgs)
-            contacts_text = util.plural("new participant", 
-                            result["chats"][0]["diff"]["participants"])
-            text = ", ".join(filter(None, [msgs_text, contacts_text]))
-            output("%s, %s." % (result["chats"][0]["chat"]["title_long"], text))
-            counts[db1]["msgs"] += msgs
-        if "index" in result:
-            bar.max = result["count"]
-            bar.update(result["index"])
-        if result["output"]:
-            log(result["output"])
+    worker = workers.MergeThread(postbacks.put)
+    try:
+        worker.work(args)
+        while True:
+            result = postbacks.get()
+            if "error" in result:
+                output("Error scanning %s and %s:\n\n%s" %
+                      (db1, db2, result["error"]))
+                break # break while True
+            if "done" in result:
+                break # break while True
+            if "chats" in result and result["chats"]:
+                counts[db1]["chats"] += 1
+                msgs = len(result["chats"][0]["diff"]["messages"])
+                msgs_text = util.plural("new message", msgs)
+                contacts_text = util.plural("new participant", 
+                                result["chats"][0]["diff"]["participants"])
+                text = ", ".join(filter(None, [msgs_text, contacts_text]))
+                bar.afterword = (" %s, %s." % (result["chats"][0]["chat"]["title"],
+                                    text))
+                counts[db1]["msgs"] += msgs
+            if "index" in result:
+                bar.max = result["count"]
+                bar.update(result["index"])
+            if result.get("output"):
+                log(result["output"])
+    finally:
+        worker and (worker.stop(), worker.join())
+
     bar.stop()
     bar.afterword = " Scanned %s and %s." % (db1, db2)
     bar.update(bar.max)

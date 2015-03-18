@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.03.2015
+@modified    18.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1492,6 +1492,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 elif page.db.filename in conf.LastActivePage:
                     del conf.LastActivePage[page.db.filename]
                 page.save_page_conf()
+                for worker in page.workers_search.values(): worker.stop()
+                page.worker_search_contacts.stop()
+            for page in self.merger_pages: page.worker_merge.stop()
+            self.worker_detection.stop()
 
             # Save last selected files in db lists, to reselect them on rerun
             conf.DBFiles = [self.list_db.GetItemText(i)
@@ -1555,7 +1559,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             elif page.db.filename in conf.LastActivePage:
                 del conf.LastActivePage[page.db.filename]
 
-            [i.stop() for i in page.workers_search.values()]
+            for worker in page.workers_search.values(): worker.stop()
+            page.worker_search_contacts.stop()
             page.save_page_conf()
 
             if page in self.db_pages:
@@ -1576,7 +1581,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
             page.worker_merge.stop()
-            page.worker_merge.join()
             main.log("Closed comparison tab for %s and %s.",
                      page.db1, page.db2)
 
@@ -3757,7 +3761,6 @@ class DatabasePage(wx.Panel):
         if tab_data and tab_data["id"] in self.workers_search:
             self.tb_search_settings.SetToolNormalBitmap(
                 wx.ID_STOP, images.ToolbarStopped.Bitmap)
-            self.workers_search[tab_data["id"]].stop_work(drop_results=True)
             self.workers_search[tab_data["id"]].stop()
             del self.workers_search[tab_data["id"]]
 

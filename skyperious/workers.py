@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    15.03.2015
+@modified    18.03.2015
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -41,23 +41,23 @@ class WorkerThread(threading.Thread):
         @param   callback  function to call with result chunks
         """
         threading.Thread.__init__(self)
-        self.daemon = True # Daemon threads do not keep application running
         self._callback = callback
         self._is_running = False
         self._stop_work = False   # Flag to stop the current work
         self._drop_results = False # Flag to not post back obtained results
         self._queue = Queue.Queue()
-        self.start()
 
 
     def work(self, data):
         """
-        Registers new work to process. Stops current work, if any.
+        Registers new work to process. Stops current work, if any. Starts 
+        thread if not running.
 
         @param   data  a dict with work data
         """
         self._stop_work = True
         self._queue.put(data)
+        if not self._is_running: self.start()
 
 
     def stop(self):
