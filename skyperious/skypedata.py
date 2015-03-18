@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.03.2015
+@modified    18.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1633,9 +1633,7 @@ class MessageParser(object):
                         "partner_handle": message["author"],
                         "partner_dispname": get_author_name(message),
                         "starttime": message["timestamp"],
-                        "type": (TRANSFER_TYPE_OUTBOUND 
-                                 if message["author"] == self.db.id
-                                 else TRANSFER_TYPE_INBOUND)}
+                        "type": TRANSFER_TYPE_OUTBOUND}
             message["__files"] = [f for i, f in sorted(files.items())]
             dom.clear()
             dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
