@@ -517,10 +517,10 @@ def run(nogui=False):
         conf.load()
         is_cli = sys.modules["main"].is_cli = True
         is_verbose = sys.modules["main"].is_verbose = arguments.verbose
+        # Avoid Unicode errors when printing to console.
         enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
-        if "nt" == os.name: # Avoid print encoding errors under windows
-            sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
-            sys.stderr = codecs.getwriter(enc)(sys.stderr, "xmlcharrefreplace")
+        sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
+        sys.stderr = codecs.getwriter(enc)(sys.stderr, "xmlcharrefreplace")
 
     if "diff" == arguments.command:
         run_diff(*arguments.FILE)
