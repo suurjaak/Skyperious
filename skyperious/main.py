@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.03.2015
+@modified    18.03.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -18,6 +18,7 @@ import atexit
 import codecs
 import collections
 import datetime
+import errno
 import glob
 import locale
 import itertools
@@ -261,7 +262,7 @@ def run_merge(filenames, output_filename=None):
     now = datetime.datetime.now().strftime("%Y%m%d")
     if not output_filename:
         output_filename = util.unique_path("%s.merged.%s%s" %  (name, now, ext))
-    print("Creating %s, using %s as base." % (output_filename, db_base))
+    output("Creating %s, using %s as base." % (output_filename, db_base))
     shutil.copyfile(db_base.filename, output_filename)
     db2 = skypedata.SkypeDatabase(output_filename)
     chats2 = db2.get_conversations()
@@ -279,7 +280,7 @@ def run_merge(filenames, output_filename=None):
         while True:
             result = postbacks.get()
             if "error" in result:
-                print("Error merging %s:\n\n%s" % (db1, result["error"]))
+                output("Error merging %s:\n\n%s" % (db1, result["error"]))
                 worker = None # Signal for global break
                 break # break while True
             if "done" in result:
@@ -297,18 +298,18 @@ def run_merge(filenames, output_filename=None):
         bar.stop()
         bar.afterword = " Processed %s." % db1
         bar.update(bar.max)
-        print()
+        output()
 
     if not counts:
-        print("Nothing new to merge.")
+        output("Nothing new to merge.")
         db2.close()
         os.unlink(output_filename)
     else:
         for db1 in dbs:
-            print("Merged %s in %s from %s." %
+            output("Merged %s in %s from %s." %
                   (util.plural("message", counts[db1]["msgs"]),
                    util.plural("chat", counts[db1]["chats"]), db1))
-        print("Merge into %s complete." % db2)
+        output("Merge into %s complete." % db2)
 
 
 def run_search(filenames, query):
@@ -325,7 +326,7 @@ def run_search(filenames, query):
         while True:
             result = postbacks.get()
             if "error" in result:
-                print("Error searching %s:\n\n%s" %
+                output("Error searching %s:\n\n%s" %
                       (db, result.get("error_short", result["error"])))
                 break # break while True
             if "done" in result:
@@ -333,8 +334,8 @@ def run_search(filenames, query):
                 break # break while True
             if result.get("count", 0) or is_verbose:
                 if len(dbs) > 1:
-                    print("%s:" % db, end=" ")
-                print(result["output"])
+                    output("%s:" % db, end=" ")
+                output(result["output"])
 
 
 def run_export(filenames, format):
@@ -356,7 +357,7 @@ def run_export(filenames, format):
             filename = format
         target = filename if is_xlsx_single else export_dir
         try:
-            print("Exporting as %s %sto %s." % 
+            output("Exporting as %s %sto %s." % 
                   (format[:4].upper(), dbstr, target))
             chats = sorted(db.get_conversations(),
                            key=lambda x: x["title"].lower())
@@ -372,22 +373,22 @@ def run_export(filenames, format):
             if count:
                 bar.afterword = " Exported %s to %s. " % (db, target)
                 bar.update(bar_total)
-                print()
+                output()
                 log("Exported %s %sto %s as %s.", util.plural("chat", count),
                      dbstr, target, format)
             else:
-                print("\nNo messages to export%s." %
+                output("\nNo messages to export%s." %
                       ("" if len(dbs) == 1 else " from %s" % db))
                 os.unlink(filename) if is_xlsx_single else os.rmdir(export_dir)
         except Exception as e:
-            print("Error exporting chats: %s\n\n%s" % 
+            output("Error exporting chats: %s\n\n%s" % 
                   (e, traceback.format_exc()))
 
 
 def run_diff(filename1, filename2):
     """Compares the first database for changes with the second."""
     if os.path.realpath(filename1) == os.path.realpath(filename2):
-        print("Error: cannot compare %s with itself." % filename1)
+        output("Error: cannot compare %s with itself." % filename1)
         return
     db1, db2 = map(skypedata.SkypeDatabase, [filename1, filename2])
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
@@ -404,7 +405,7 @@ def run_diff(filename1, filename2):
     while True:
         result = postbacks.get()
         if "error" in result:
-            print("Error scanning %s and %s:\n\n%s" %
+            output("Error scanning %s and %s:\n\n%s" %
                   (db1, db2, result["error"]))
             worker = None # Signal for global break
             break # break while True
@@ -417,7 +418,7 @@ def run_diff(filename1, filename2):
             contacts_text = util.plural("new participant", 
                             result["chats"][0]["diff"]["participants"])
             text = ", ".join(filter(None, [msgs_text, contacts_text]))
-            print("%s, %s." % (result["chats"][0]["chat"]["title_long"], text))
+            output("%s, %s." % (result["chats"][0]["chat"]["title_long"], text))
             counts[db1]["msgs"] += msgs
         if "index" in result:
             bar.max = result["count"]
@@ -427,7 +428,7 @@ def run_diff(filename1, filename2):
     bar.stop()
     bar.afterword = " Scanned %s and %s." % (db1, db2)
     bar.update(bar.max)
-    print()
+    output()
 
 
 def run_gui(filenames):
@@ -666,7 +667,7 @@ class ProgressBar(threading.Thread):
 
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
-        print("\r" + self.bar, end=" ")
+        output("\r" + self.bar, end=" ")
 
 
     def run(self):
@@ -700,6 +701,17 @@ def win32_unicode_argv():
         start = argc.value - len(sys.argv)
         result = [argv[i].encode("utf-8") for i in range(start, argc.value)]
     return result
+
+
+def output(*args, **kwargs):
+    """Print wrapper, avoids "Broken pipe" errors if piping is interrupted."""
+    print(*args, **kwargs)
+    try:
+        sys.stdout.flush() # Uncatchable error otherwise if interrupted
+    except IOError as e:
+        if e.errno in (errno.EINVAL, errno.EPIPE):
+            sys.exit() # Stop work in progress if sys.stdout or pipe closed
+        raise # Propagate any other errors
 
 
 if "__main__" == __name__:

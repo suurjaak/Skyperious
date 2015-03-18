@@ -5,6 +5,7 @@ CHANGELOG
 ------------------
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
+- avoid "Broken pipe" errors if command-line output is piped and interrupted;
 - started adding opened file name to application title;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
 
