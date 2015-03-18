@@ -648,6 +648,7 @@ class ProgressBar(threading.Thread):
         self.percent = None        # Current progress ratio in per cent
         self.value = None          # Current progress bar value
         self.bar = "%s[-%s]%s" % (foreword, " " * (self.width - 3), afterword)
+        self.printbar = self.bar   # Printable text, includes padding to clear
         self.progresschar = itertools.cycle("-\\|/")
         self.is_running = False
         self.update(value, draw=False)
@@ -662,25 +663,27 @@ class ProgressBar(threading.Thread):
         # Build bar outline, animate by cycling last char from progress chars
         char_last = self.forechar
         if draw and w_done < w_full: char_last = next(self.progresschar)
-        self.bar = "%s[%s%s%s]%s" % (
+        bartext = "%s[%s%s%s]%s" % (
                    self.foreword, self.forechar * (w_done - 1), char_last,
                    self.backchar * (w_full - w_done), self.afterword)
         # Write percentage into the middle of the bar
         centertxt = " %2d%% " % new_percent
         pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
-        self.bar = self.bar[:pos] + centertxt + self.bar[pos + len(centertxt):]
+        bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
+        self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
+        self.bar = bartext
         self.percent = new_percent
         if draw: self.draw()
 
 
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
-        output("\r" + self.bar, end=" ")
+        output("\r" + self.printbar, end=" ")
 
 
     def run(self):
         self.is_running = True
-        while self.is_running:
+        while self.is_running and time:
             self.update(self.value), time.sleep(self.interval)
 
 
