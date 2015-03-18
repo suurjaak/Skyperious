@@ -715,4 +715,5 @@ def output(*args, **kwargs):
 
 
 if "__main__" == __name__:
-    run()
+    try: run()
+    except KeyboardInterrupt: sys.exit()
