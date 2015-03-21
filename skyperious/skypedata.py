@@ -28,7 +28,7 @@ import textwrap
 import time
 import traceback
 import urllib
-import xml.etree.cElementTree
+from xml.etree import cElementTree as ElementTree
 
 try:
     import wx
@@ -1522,9 +1522,9 @@ class MessageParser(object):
                                 "merge": False   for merge comparison, inserts
                                                  skypename instead of fullname
         @return                 a string if html or text specified, 
-                                or xml.etree.cElementTree.Element containing
-                                message body, with "xml" as the root tag and
-                                any number of subtags:
+                                or ElementTree.Element containing message body,
+                                with "xml" as the root tag
+                                and any number of subtags:
                                 (a|b|quote|quotefrom|msgstatus|bodystatus),
         """
         result = dom = None
@@ -1596,7 +1596,7 @@ class MessageParser(object):
                 if dom.find("*/encoded_body") is not None:
                     # Message has all content in a single element
                     elem = dom.find("*/encoded_body")
-                    encoded_body = xml.etree.cElementTree.tostring(elem)
+                    encoded_body = ElementTree.tostring(elem)
                     body = encoded_body[14:-15] # Drop <encoded_body> tags
                 elif dom.find("*/body/chunk") is not None:
                     # Message content is in <body>/<chunk> elements
@@ -1643,7 +1643,7 @@ class MessageParser(object):
                 if len(dom) > 0:
                     a.tail = ", "
                 h = util.path_to_url(f["filepath"] or f["filename"])
-                a = xml.etree.cElementTree.SubElement(dom, "a", {"href": h})
+                a = ElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
                 a.tail = "" if i < len(files) - 1 else "."
         elif MESSAGE_TYPE_CONTACTS == message["type"]:
@@ -1655,7 +1655,7 @@ class MessageParser(object):
             for i, c in enumerate(contacts):
                 if len(dom) > 0:
                     b.tail = ", "
-                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b = ElementTree.SubElement(dom, "b")
                 b.text = c["name"] if isinstance(c, dict) else c
                 b.tail = "" if i < len(contacts) - 1 else "."
         elif MESSAGE_TYPE_TOPIC == message["type"]:
@@ -1678,21 +1678,19 @@ class MessageParser(object):
                     except (TypeError, ValueError):
                         pass
             dom.clear()
-            elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
-            elm_stat.text = " Call"
+            ElementTree.SubElement(dom, "msgstatus").text = " Call"
         elif MESSAGE_TYPE_CALL_END == message["type"]:
             dom.clear()
-            elm_stat = xml.etree.cElementTree.SubElement(dom, "msgstatus")
-            elm_stat.text = " Call ended"
+            ElementTree.SubElement(dom, "msgstatus").text = " Call ended"
         elif MESSAGE_TYPE_LEAVE == message["type"]:
             dom.clear()
-            b = xml.etree.cElementTree.SubElement(dom, "b")
+            b = ElementTree.SubElement(dom, "b")
             b.text = get_author_name(message)
             b.tail = " has left the conversation."
         elif MESSAGE_TYPE_INTRO == message["type"]:
             orig = "\n\n" + dom.text if dom.text else ""
             dom.clear()
-            b = xml.etree.cElementTree.SubElement(dom, "b")
+            b = ElementTree.SubElement(dom, "b")
             b.text = get_author_name(message)
             b.tail = " would like to add you on Skype%s" % orig
         elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
@@ -1711,7 +1709,7 @@ class MessageParser(object):
             for i in names:
                 if len(dom) > 0:
                     b.tail = ", "
-                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b = ElementTree.SubElement(dom, "b")
                 b.text = i["name"] if type(i) is dict else i
             if names:
                 b.tail = "."
@@ -1725,7 +1723,7 @@ class MessageParser(object):
                     dom.text = "Removed  from this conversation."
         elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE]:
             if message["edited_timestamp"] and not message["body_xml"]:
-                elm_sub = xml.etree.cElementTree.SubElement(dom, "bodystatus")
+                elm_sub = ElementTree.SubElement(dom, "bodystatus")
                 elm_sub.text = MESSAGE_REMOVED_TEXT
         elif MESSAGE_TYPE_SHARE_VIDEO == message["type"]:
             for elm in dom.findall("videomessage"):
@@ -1735,8 +1733,7 @@ class MessageParser(object):
                             get_author_name(message))
                 if link:
                     elm.text += " - "
-                    a = xml.etree.cElementTree.SubElement(elm, "a", href=link)
-                    a.text = link
+                    ElementTree.SubElement(elm, "a", href=link).text = link
                 elif sid:
                     elm.text += " - code %s" % sid
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
@@ -1748,7 +1745,7 @@ class MessageParser(object):
             for n in names:
                 if len(dom) > 0:
                     b.tail = ", "
-                b = xml.etree.cElementTree.SubElement(dom, "b")
+                b = ElementTree.SubElement(dom, "b")
                 b.text = n["name"] if type(n) is dict else n
             if b is not None:
                 b.tail = " needs to update Skype to participate in this chat."
@@ -1780,8 +1777,7 @@ class MessageParser(object):
                         int(quote.get("timestamp"))
                     ).strftime("%d.%m.%Y %H:%M")
             if footer:
-                elm_sub = xml.etree.cElementTree.SubElement(quote, "quotefrom")
-                elm_sub.text = footer
+                ElementTree.SubElement(quote, "quotefrom").text = footer
             quote.attrib.clear() # Drop the numerous data attributes
         return dom
 
@@ -1791,17 +1787,17 @@ class MessageParser(object):
         result = None
         TAG = "<xml>%s</xml>"
         try:
-            result = xml.etree.cElementTree.fromstring(TAG % text)
+            result = ElementTree.fromstring(TAG % text)
         except Exception:
             text = self.SAFEBYTE_RGX.sub(self.SAFEBYTE_REPL, text)
             try:
-                result = xml.etree.cElementTree.fromstring(TAG % text)
+                result = ElementTree.fromstring(TAG % text)
             except Exception:
                 try:
                     text = text.replace("&", "&amp;")
-                    result = xml.etree.cElementTree.fromstring(TAG % text)
+                    result = ElementTree.fromstring(TAG % text)
                 except Exception as e:
-                    result = xml.etree.cElementTree.fromstring(TAG % "")
+                    result = ElementTree.fromstring(TAG % "")
                     result.text = text
                     main.log("Error parsing message %s, body \"%s\" (%s).", 
                              message["id"], text, e)
@@ -1829,7 +1825,7 @@ class MessageParser(object):
                 b = None
                 for k, part in enumerate(parts):
                     if k % 2: # Text to highlight, wrap in <b>
-                        b = xml.etree.cElementTree.Element("b")
+                        b = ElementTree.Element("b")
                         b.text = part
                         if j: # Processing i.tail
                             parent_map[i].insert(index_insert, b)
@@ -1862,7 +1858,7 @@ class MessageParser(object):
                     templ = step.Template(templates.MESSAGE_QUOTE)
                     template = templ.expand(export=output.get("export"))
                     template = template.replace("\n", " ").strip()
-                    table = xml.etree.cElementTree.fromstring(template)
+                    table = ElementTree.fromstring(template)
                     # Select last, content cell
                     cell = table.findall("*/td")[-1]
                     elem_quotefrom = subelem.find("quotefrom")
@@ -1888,7 +1884,7 @@ class MessageParser(object):
                                        "title=\"%s\">%s</span>"
                             vals = [emot_type, title, emot]
                         span_str = template % tuple(map(cgi.escape, vals))
-                        span = xml.etree.cElementTree.fromstring(span_str)
+                        span = ElementTree.fromstring(span_str)
                         span.tail = subelem.tail
                         elem[index] = span # Replace <ss> element in parent
                 elif subelem.tag in ["msgstatus", "bodystatus"]:
@@ -1905,7 +1901,7 @@ class MessageParser(object):
                         subelem.set("href", urllib.quote(href, ":/=?&#"))
                     else: # Wrap content in system link colour
                         t = "<font color='%s'></font>" % conf.SkypeLinkColour
-                        span = xml.etree.cElementTree.fromstring(t)
+                        span = ElementTree.fromstring(t)
                         span.text = subelem.text
                         for i in list(subelem):
                             span.append(i), subelem.remove(i)
@@ -1918,7 +1914,7 @@ class MessageParser(object):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
         try:
             # Discard <xml></xml> tags from start and end
-            result = xml.etree.cElementTree.tostring(dom, "UTF-8", "html")[5:-6]
+            result = ElementTree.tostring(dom, "UTF-8", "html")[5:-6]
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
@@ -1934,7 +1930,7 @@ class MessageParser(object):
                                      " of %s for \"%s\": %s", attr, val,
                                      type(val), elem, message["body_xml"], e)
             try:
-                result = xml.etree.cElementTree.tostring(dom, "UTF-8", "html")[5:-6]
+                result = ElementTree.tostring(dom, "UTF-8", "html")[5:-6]
             except Exception:
                 main.log("Failed to parse the message \"%s\" from %s.",
                          message["body_xml"], message["author"])
