@@ -1753,10 +1753,14 @@ class MessageParser(object):
                     b.tail = " can now participate in this chat."
 
         # Photo/video sharing: sanitize XML tags like Title|Text|Description|..
-        for uri in dom.iter("URIObject"):
-            for child in [x for x in uri.iter() if "a" != x.tag]:
+        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        blank = lambda x: not (x.text or x.tail or x.getchildren())
+        drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
+        for uri in dom.getiterator("URIObject"):
+            for child in [x for x in uri.getiterator() if "a" != x.tag]:
                 child.attrib.clear()
                 child.tag = "span"
+                if blank(child): drop(parent_map[child], child)
             uri.attrib.clear()
             uri.tag = "span"
 
@@ -1913,8 +1917,8 @@ class MessageParser(object):
             for i, v in enumerate([elem.text, elem.tail]):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
         try:
-            # Discard <xml></xml> tags from start and end
-            result = ElementTree.tostring(dom, "UTF-8", "html")[5:-6]
+            # Discard <?xml ..?><xml> tags from start, </xml> from end
+            result = ElementTree.tostring(dom, "UTF-8")[44:-6]
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
@@ -1930,7 +1934,7 @@ class MessageParser(object):
                                      " of %s for \"%s\": %s", attr, val,
                                      type(val), elem, message["body_xml"], e)
             try:
-                result = ElementTree.tostring(dom, "UTF-8", "html")[5:-6]
+                result = ElementTree.tostring(dom, "UTF-8")[44:-6]
             except Exception:
                 main.log("Failed to parse the message \"%s\" from %s.",
                          message["body_xml"], message["author"])
