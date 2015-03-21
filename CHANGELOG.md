@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-3.3.1b, 2015-03-19
+3.3.1c, 2015-03-21
 ------------------
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
+- fixed HTML output for photo/video sharing messages (#33);
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;
 - command-line output encoded on all platforms, to avoid Unicode errors;
 - avoid stack trace on command-line keyboard interrupt;

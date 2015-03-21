@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.03.2015
+@modified    21.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1755,7 +1755,13 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        for x in dom.findall("*/Text"): x.tag = "span" # photo/video sharing
+        # Photo/video sharing: sanitize XML tags like Title|Text|Description|..
+        for uri in dom.iter("URIObject"):
+            for child in [x for x in uri.iter() if "a" != x.tag]:
+                child.attrib.clear()
+                child.tag = "span"
+            uri.attrib.clear()
+            uri.tag = "span"
 
         # Process Skype message quotation tags, assembling a simple
         # <quote>text<special>footer</special></quote> element.
@@ -1911,8 +1917,8 @@ class MessageParser(object):
             for i, v in enumerate([elem.text, elem.tail]):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
         try:
-            # Discard <?xml ..?><xml> tags from start, </xml> from end
-            result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
+            # Discard <xml></xml> tags from start and end
+            result = xml.etree.cElementTree.tostring(dom, "UTF-8", "html")[5:-6]
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
@@ -1928,7 +1934,7 @@ class MessageParser(object):
                                      " of %s for \"%s\": %s", attr, val,
                                      type(val), elem, message["body_xml"], e)
             try:
-                result = xml.etree.cElementTree.tostring(dom, "UTF-8")[44:-6]
+                result = xml.etree.cElementTree.tostring(dom, "UTF-8", "html")[5:-6]
             except Exception:
                 main.log("Failed to parse the message \"%s\" from %s.",
                          message["body_xml"], message["author"])
