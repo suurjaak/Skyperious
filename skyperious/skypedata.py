@@ -460,7 +460,7 @@ class SkypeDatabase(object):
         res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
             "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (typestr) ORDER BY m.timestamp ASC LIMIT 1"
+            "WHERE m.type IN (%s) ORDER BY m.timestamp ASC LIMIT 1"
             % typestr)
         msg_first = next(res, None)
         if msg_first:
