@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    09.03.2015
+@modified    21.03.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -326,7 +326,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             label="Opinions, ideas for improvement, problems?")
         label_info = self.label_info = wx.StaticText(panel,
             label="For reply, include a contact e-mail.")
-        label_info.ForegroundColour = "grey"
+        label_info.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT)
         sizer_upper.Add(label, flag=wx.GROW)
         sizer_upper.AddStretchSpacer()
         sizer_upper.Add(label_info, flag=wx.ALIGN_RIGHT)
@@ -341,6 +341,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_lower.Add(bmp)
         sizer_controls = wx.BoxSizer(wx.VERTICAL)
         self.button_ok = wx.Button(panel, label="&Confirm")
+        self.button_ok.ToolTipString = "Confirm message before sending"
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
@@ -432,7 +433,8 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         text_short = text[:500] + ".." if len(text) > 500 else text
         bmp = self.cb_bmp.Value and self.screenshot
         if text:
-            ok = wx.MessageBox("Send the entered text%s?\n\n\"%s\"" % (
+            ok = wx.MessageBox("Send the entered text%s? For reply, include "
+                               "a contact e-mail in the text.\n\n\"%s\"" % (
                                " and screenshot" if bmp else "", text_short),
                                self.Title, wx.OK | wx.CANCEL | 
                                wx.ICON_INFORMATION)

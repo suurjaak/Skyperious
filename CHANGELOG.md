@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.3.1a, 2015-03-18
+3.3.1b, 2015-03-19
 ------------------
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
@@ -11,6 +11,7 @@ CHANGELOG
 - stop worker threads instead of using daemons, to avoid zombie messages in CLI;
 - command-line progress bar clears previously printed bar text;
 - started adding opened file name to application title;
+- small UI tweaks;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
 
 3.3, 2015-03-15
