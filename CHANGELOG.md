@@ -11,7 +11,6 @@ CHANGELOG
 - avoid stack trace on command-line keyboard interrupt;
 - stop worker threads instead of using daemons, to avoid zombie messages in CLI;
 - command-line progress bar clears previously printed bar text;
-- started adding opened file name to application title;
 - small UI tweaks;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
 
