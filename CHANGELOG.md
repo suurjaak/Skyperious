@@ -7,6 +7,7 @@ CHANGELOG
 - fixed a parsing issue with certain Skype messages;
 - fixed HTML output for photo/video sharing messages (#33);
 - fixed showing database statistics on information page;
+- added message links to file transfers in chat statistics;
 - add opened file name to application title;
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;
 - command-line output encoded on all platforms, to avoid Unicode errors;

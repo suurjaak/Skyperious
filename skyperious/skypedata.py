@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.03.2015
+@modified    22.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2054,6 +2054,7 @@ class MessageParser(object):
                                 if f["chatmsg_guid"] == message["guid"])
                 files = [f for i, f in sorted(filedict.items)]
                 message["__files"] = files
+            for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
             self.stats["counts"][author]["files"] += len(files)
             size_files = sum([int(i["filesize"]) for i in files])

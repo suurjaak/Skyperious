@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.03.2015
+@modified    22.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3489,8 +3489,9 @@ class DatabasePage(wx.Panel):
     def on_click_html_stats(self, event):
         """
         Handler for clicking a link in chat history statistics, scrolls to
-        anchor if anchor link, sorts the statistics if sort link, otherwise
-        shows the history and finds the word clicked in the word cloud.
+        anchor if anchor link, sorts the statistics if sort link, goes to
+        specific message if transfer author link, otherwise shows the history
+        and finds the word clicked in the word cloud.
         """
         href = event.GetLinkInfo().Href
         if href.startswith("#") and self.html_stats.HasAnchor(href[1:]):
@@ -3512,6 +3513,9 @@ class DatabasePage(wx.Panel):
         elif href.startswith("clouds://"):
             self.stats_expand_clouds = ast.literal_eval(href[9:])
             self.populate_chat_statistics()
+        elif href.startswith("message:"):
+            self.show_stats(False)
+            self.stc_history.FocusMessage(int(href[8:]))
         else:
             self.stc_history.SearchBarVisible = True
             self.show_stats(False)

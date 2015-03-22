@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    03.03.2015
+@modified    22.03.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -389,6 +389,12 @@ from third_party import step
     }
     #transfers table td.remote:first-child {
       color: {{conf.HistoryRemoteAuthorColour}};
+    }
+    #transfers table td:first-child a {
+      color: inherit;
+    }
+    #transfers table td:first-child a:hover {
+      text-decoration: underline;
     }
     #transfers table td:last-child {
       text-align: right;
@@ -877,7 +883,7 @@ dt = datetime.datetime.fromtimestamp(f["starttime"]) if f.get("starttime") else 
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}">{{partner if from_remote else db.account["name"]}}</td><td>
+        <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
           <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
@@ -940,7 +946,7 @@ shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 
 author_class = "remote" if m["author"] != db.id else "local"
 %>
   <tr{{' class="shifted"' if shift_row else ""}}>
-    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}">{{from_name if not is_info else ""}}</td>
+    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}"><a id="message{{m["id"]}}"></a>{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
@@ -1345,7 +1351,7 @@ partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
+    <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
     <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
     <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
