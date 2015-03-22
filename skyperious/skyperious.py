@@ -397,6 +397,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         p = self.notebook.GetPage(self.notebook.GetSelection())
         if not self.pages_visited or self.pages_visited[-1] != p:
             self.pages_visited.append(p)
+        self.Title = conf.Title
+        if hasattr(p, "title"):
+            subtitle = os.path.split(p.db.filename)[-1] \
+                       if isinstance(p, DatabasePage) else p.title
+            self.Title += " - " + subtitle
         self.update_notebook_header()
         if event: event.Skip() # Pass event along to next handler
 
