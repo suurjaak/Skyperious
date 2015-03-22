@@ -1753,16 +1753,8 @@ class MessageParser(object):
                     b.tail = " can now participate in this chat."
 
         # Photo/video sharing: sanitize XML tags like Title|Text|Description|..
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
-        blank = lambda x: not (x.text or x.tail or x.getchildren())
-        drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
-        for uri in dom.getiterator("URIObject"):
-            for child in [x for x in uri.getiterator() if "a" != x.tag]:
-                child.attrib.clear()
-                child.tag = "span"
-                if blank(child): drop(parent_map[child], child)
-            uri.attrib.clear()
-            uri.tag = "span"
+        if any(dom.getiterator("URIObject")):
+            dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
         # Process Skype message quotation tags, assembling a simple
         # <quote>text<special>footer</special></quote> element.
@@ -1978,6 +1970,30 @@ class MessageParser(object):
             if tail:
                 fulltext += tail
         return fulltext
+
+
+    def sanitize(self, dom, known_tags):
+        """Turns unknown tags to span, drops empties and unnests single root."""
+        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        blank = lambda x: not (x.text or x.tail or x.getchildren())
+        drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
+
+        def process_node(node, last=None):
+            for child in node.getchildren():
+                if child.tag not in known_tags:
+                    child.attrib, child.tag = {}, "span"
+                process_node(child)
+                if child.text or child.getchildren(): last = child
+                else:
+                    if child.tail: # Not totally empty: hang tail onto previous
+                        if last: last.tail = (last.tail or "") + child.tail
+                        else:    node.text = (node.text or "") + child.tail
+                    drop(node, child) # Recursively drop empty node from parent
+
+        process_node(dom)
+        while len(dom) == 1 and "span" == dom[0].tag and not dom[0].tail:
+            dom, dom.tag = dom[0], dom.tag # Collapse single spans to root
+        return dom
 
 
     def add_dict_text(self, dictionary, key, text, inter=" "):
