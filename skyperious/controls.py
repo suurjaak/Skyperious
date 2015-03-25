@@ -59,7 +59,7 @@ Stand-alone GUI components for wx:
   http://wxpython-users.1045709.n5.nabble.com/TextCtrlAutoComplete-td2348906.html
 
 - def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
-  Paints and returns a wx.Bitmap with histogram plot from data.
+  Paints and returns (wx.Bitmap, rects) with histogram plot from data.
 
 ------------------------------------------------------------------------------
 This file is part of Skyperious - a Skype database viewer and merger.
@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    08.01.2015
+@modified    23.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3354,7 +3354,11 @@ class TextCtrlAutoComplete(wx.TextCtrl):
 
 
 def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
-    """Paints and returns a wx.Bitmap with histogram bar plot from data."""
+    """
+    Paints and returns (wx.Bitmap, rects) with histogram bar plot from data.
+
+    @return   (wx.Bitmap, [(x1, y1, x2, y2), ])
+    """
     global BRUSH, PEN
     bgcolour, border = "white", 1
     rect_step = barsize[0] + (1 if barsize[0] < 10 else 2)
@@ -3381,4 +3385,5 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     dc.DrawRectangleList(bars)
 
     dc.SelectObject(wx.NullBitmap)
-    return bmp
+    rects = [(x, border, x+w, bmp.Height - 2*border) for x, y, w, h in bars]
+    return bmp, rects

@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-3.3.1d, 2015-03-21
+3.3.1f, 2015-03-25
 ------------------
+- added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
 - fixed HTML output for photo/video sharing messages (#33);

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.03.2015
+@modified    25.03.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1465,11 +1465,14 @@ class MessageParser(object):
     """Replacer callback for low bytes unusable in XML (\x00 etc)."""
     SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape")
 
-    """Number of bins in statistics days histogram."""
-    HISTOGRAM_BINS = 10
-
     """Mapping known failure reason codes to """
     FAILURE_REASONS = {"1": "Failed", "4": "Not enough Skype Credit."}
+
+    """Number of bins in statistics days histogram."""
+    HISTOGRAM_DAY_BINS = 10
+
+    """Convenience class for earliest messages in histogram bins."""
+    MessageStamp = collections.namedtuple("MessageStamp", "date id")
 
 
     def __init__(self, db, chat=None, stats=False, wrapper=None):
@@ -1500,9 +1503,9 @@ class MessageParser(object):
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
                 "authors": set(), # Authors encountered in parsed messages
-                "totalhist": {}, # Chat histograms {"hours": {0: 7,}, "days": {date: 4,}}
-                "hists": {}, # Author histograms {"author1": {"hours": {0: 7, }, "days": {date:  4, }} }
-                "workhist": {}, } # {"hours": {0: {author: count, }}, "days": {all days}}
+                "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
+                "hists": {}, # Author histogram data {author: {"hours", ..} }
+                "workhist": {}, } # {"hours": {0: {author: count}}, "days": ..}}
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -2025,12 +2028,21 @@ class MessageParser(object):
             self.stats["counts"][author] = author_stats.copy()
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
         if not self.stats["workhist"]:
-            factory = lambda: collections.defaultdict(int)
-            self.stats["workhist"] = {"hours": collections.defaultdict(factory),
-                                      "days": collections.defaultdict(factory)}
-        self.stats["workhist"]["hours"][hourkey][author] += 1
-        self.stats["workhist"]["days"][daykey][author] += 1
-
+            MAXSTAMP = MessageParser.MessageStamp(
+                datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
+            intdict = lambda: collections.defaultdict(int)
+            stampdict = lambda: collections.defaultdict(lambda: MAXSTAMP)
+            self.stats["workhist"] = {
+                "hours": collections.defaultdict(intdict),
+                "days": collections.defaultdict(intdict),
+                "hours-firsts": collections.defaultdict(stampdict),
+                "days-firsts": collections.defaultdict(stampdict), }
+        stamp = MessageParser.MessageStamp(message["datetime"], message["id"])
+        for name, key in [("hours", hourkey), ("days", daykey)]:
+            self.stats["workhist"][name][key][author] += 1
+            histobin = self.stats["workhist"][name + "-firsts"][author]
+            if histobin[key] > stamp: histobin[key] = stamp
+            
         len_msg = len(self.stats["last_message"])
         if MESSAGE_TYPE_SMS == message["type"]:
             self.stats["smses"] += 1
@@ -2148,7 +2160,8 @@ class MessageParser(object):
             stats["info_items"].append(("Messages per day", per_day))
 
             # Fill author and chat hourly histogram
-            histbase = {"hours": dict((x, 0) for x in range(24)), "days": {}}
+            histbase = {"hours": dict((x, 0) for x in range(24)), "days": {},
+                        "hours-firsts": {}, "days-firsts": {}}
             stats["totalhist"] = copy.deepcopy(histbase)
             stats["hists"] = {}
             # Fill total histogram hours and initialize author hour structures
@@ -2159,18 +2172,33 @@ class MessageParser(object):
                     if author in counts:
                         stats["hists"][author]["hours"][hour] += counts[author]
                         stats["totalhist"]["hours"][hour] += counts[author]
-            days = util.timedelta_seconds(delta_date) / 86400 / self.HISTOGRAM_BINS
-            step = datetime.timedelta(max(1, int(math.ceil(days))))
+            # Assemble total hourly histogram earliest messages
+            hourstamps = stats["workhist"]["hours-firsts"]
+            for hour in range(24):
+                stamps = [x[hour] for x in hourstamps.values() if hour in x]
+                if stamps:
+                    stats["totalhist"]["hours-firsts"][hour] = min(stamps).id
+            # Assemble author hourly histograms earliest messages
+            for author, stamps in hourstamps.items():
+                authorstamps = dict((k, v.id) for k, v in stamps.items())
+                stats["hists"][author]["hours-firsts"] = authorstamps
+
+            days_per_bin = float(delta_date.days) / self.HISTOGRAM_DAY_BINS
+            step = datetime.timedelta(max(1, int(math.ceil(days_per_bin))))
             # Initialize total histogram day and author day structures
-            for x in range(self.HISTOGRAM_BINS):
-                bindate = (stats["startdate"] + step * x).date()
+            for i in range(self.HISTOGRAM_DAY_BINS):
+                bindate = (stats["startdate"] + step * i).date()
                 stats["totalhist"]["days"][bindate] = 0
                 for author in stats["hists"]:
                     stats["hists"][author]["days"][bindate] = 0
             # Fill total histogram and author days
+            MAXSTAMP = MessageParser.MessageStamp(
+                datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
+            stampfactory = lambda: collections.defaultdict(lambda: MAXSTAMP)
+            daystamps = collections.defaultdict(stampfactory)
             for date, counts in sorted(stats["workhist"]["days"].items()):
                 bindate = stats["startdate"].date()
-                while bindate + step < date: bindate += step
+                while bindate + step <= date: bindate += step
                 for author, count in counts.items():
                     if author not in stats["hists"]:
                         stats["hists"][author] = copy.deepcopy(histbase)
@@ -2178,6 +2206,20 @@ class MessageParser(object):
                         stats["hists"][author]["days"][bindate] = 0
                     stats["hists"][author]["days"][bindate] += count
                     stats["totalhist"]["days"][bindate] += count
+                    stamp = stats["workhist"]["days-firsts"][author].get(date)
+                    if stamp:
+                        daystamps[author][bindate] = \
+                            min(stamp, daystamps[author][bindate])
+            # Assemble total hourly histogram earliest messages
+            for i in range(self.HISTOGRAM_DAY_BINS):
+                date = (stats["startdate"] + step * i).date()
+                stamps = [x[date] for x in daystamps.values() if date in x]
+                if stamps:
+                    stats["totalhist"]["days-firsts"][date] = min(stamps).id
+            # Assemble author hourly histograms earliest messages
+            for author, stamps in daystamps.items():
+                authorstamps = dict((k, v.id) for k, v in stamps.items())
+                stats["hists"][author]["days-firsts"] = authorstamps
 
         # Create main cloudtext
         maincloud = " ".join(stats["cloudtexts"].values())

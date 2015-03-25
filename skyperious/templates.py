@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.03.2015
+@modified    25.03.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -25,7 +25,7 @@ SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 
 """HTML chat history export template."""
 CHAT_HTML = """<%
-import base64, datetime, urllib
+import base64, datetime
 import conf, emoticons, images, skypedata, templates, util
 from third_party import step
 %>
@@ -706,9 +706,11 @@ alt = "%s (%s)" % (p["name"], p["identity"])
 %if stats.get("totalhist", {}).get("hours"):
 <%
 items = sorted(stats["totalhist"]["hours"].items())
+links = dict((i, "#message:%s" % x)
+             for i, x in stats["totalhist"]["hours-firsts"].items())
 maxkey, maxval = max(items, key=lambda x: x[1])
-svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotHoursColour,
-	   "rectsize": conf.PlotHoursUnitSize}
+svgdata = {"data": items, "links": links, "maxval": maxval,
+           "colour": conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize}
 %>
         peak {{util.plural("message", maxval)}}<br />
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
@@ -718,10 +720,12 @@ svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotHoursColour,
 %if stats.get("totalhist", {}).get("days"):
 <%
 items = sorted(stats["totalhist"]["days"].items())
+links = dict((i, "#message:%s" % x)
+             for i, x in stats["totalhist"]["days-firsts"].items())
 maxkey, maxval = max(items, key=lambda x: x[1])
 interval = items[1][0] - items[0][0]
-svgdata = {"data": items, "maxval": maxval, "colour": conf.PlotDaysColour,
-	   "rectsize": conf.PlotDaysUnitSize}
+svgdata = {"data": items, "links": links, "maxval": maxval,
+	       "colour": conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize}
 %>
         peak {{util.plural("message", maxval)}}<br />
 {{step.Template(templates.HISTOGRAM_SVG, strip=False).expand(svgdata)}}
@@ -804,6 +808,7 @@ else:
 <%
 svgdata = {
     "data":     sorted(stats["hists"][p["identity"]]["hours"].items()),
+    "links":    dict((i, "#message:%s" % x) for i, x in stats["hists"][p["identity"]]["hours-firsts"].items()),
     "maxval":   max(stats["totalhist"]["hours"].values()),
     "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
@@ -815,6 +820,7 @@ svgdata = {
 <%
 svgdata = {
     "data":     sorted(stats["hists"][p["identity"]]["days"].items()),
+    "links":    dict((i, "#message:%s" % x) for i, x in stats["hists"][p["identity"]]["days-firsts"].items()),
     "maxval":   max(stats["totalhist"]["days"].values()),
     "colour":   conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize }
 %>
@@ -883,7 +889,7 @@ dt = datetime.datetime.fromtimestamp(f["starttime"]) if f.get("starttime") else 
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
+        <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
           <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
@@ -946,7 +952,7 @@ shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 
 author_class = "remote" if m["author"] != db.id else "local"
 %>
   <tr{{' class="shifted"' if shift_row else ""}}>
-    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}"><a id="message{{m["id"]}}"></a>{{from_name if not is_info else ""}}</td>
+    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}" id="message:{{m["id"]}}">{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
@@ -1191,8 +1197,13 @@ maxkey, maxval = max(items, key=lambda x: x[1])
 %>
       <font color="{{conf.PlotHoursColour}}">
       peak {{util.plural("message", maxval)}}<br />
-      <img src="memory:{{images["hours"]}}" /><br />
+      <img src="memory:{{images["hours"]}}" usemap="#hours-histogram"/><br />
       24h actitity</font>
+      <map name="hours-histogram">
+%for (x1, y1, x2, y2), link in imagemaps["hours"]:
+        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+%endfor
+      </map>
 %endif
     </td>
     <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
@@ -1204,8 +1215,13 @@ interval = items[1][0] - items[0][0]
 %>
       <font color="{{conf.PlotDaysColour}}">
       peak {{util.plural("message", maxval)}}<br />
-      <img src="memory:{{images["days"]}}" /><br />
+      <img src="memory:{{images["days"]}}" usemap="#days-histogram" /><br />
       {{interval.days}}-day intervals</font>
+      <map name="days-histogram">
+%for (x1, y1, x2, y2), link in imagemaps["days"]:
+        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+%endfor
+      </map>
 %endif
     </td>
 %endif
@@ -1286,13 +1302,26 @@ else:
 %endfor
     </td>
     <td valign="top">
+<%
+safe_id = urllib.quote(p["identity"])
+%>
 %if "hours" in authorimages.get(p["identity"] , {}):
-      <img src="memory:{{authorimages[p["identity"]]["hours"]}}"/>
+      <img src="memory:{{authorimages[p["identity"]]["hours"]}}" usemap="#{{safe_id}}-hours" />
+      <map name="{{safe_id}}-hours">
+%for (x1, y1, x2, y2), link in authorimagemaps[p["identity"]]["hours"]:
+        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+%endfor
+      </map>
 %endif
     </td>
     <td valign="top">
 %if "days" in authorimages.get(p["identity"] , {}):
-      <img src="memory:{{authorimages[p["identity"]]["days"]}}"/>
+      <img src="memory:{{authorimages[p["identity"]]["days"]}}" usemap="#{{safe_id}}-days" />
+      <map name="{{safe_id}}-days">
+%for (x1, y1, x2, y2), link in authorimagemaps[p["identity"]]["days"]:
+        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+%endfor
+      </map>
 %endif
     </td>
   </tr>
@@ -2015,7 +2044,7 @@ MESSAGE_CLIPBOARD = """
 
 """Histogram SVG from [(interval, value), ] data."""
 HISTOGRAM_SVG = """<%
-#Expects parameters: data, rectsize, colour, maxval.
+#Expects parameters: data, links, rectsize, colour, maxval.
 import datetime
 import util
 
@@ -2039,10 +2068,16 @@ if hasattr(start, "strftime"):
 else:
     title = "%02d. hour: %s" % (start, util.plural("message", val))
 %>
-<g class="svg_hover_group">
-    <rect width="{{rectsize[0]}}" fill="{{colour}}" height="{{util.round_float(height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{util.round_float(rectsize[1] - height + border, 2)}}" title="{{title}}"><title>{{title}}</title></rect>
-    <rect width="{{rectsize[0]}}" fill="white" height="{{util.round_float(rectsize[1] - height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{border}}" title="{{title}}"><title>{{title}}</title></rect>
-</g>
+  <g class="svg_hover_group">
+%if start in links:
+    <a xlink:title="{{title}}" xlink:href="{{links[start]}}">
+%endif
+      <rect width="{{rectsize[0]}}" fill="{{colour}}" height="{{util.round_float(height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{util.round_float(rectsize[1] - height + border, 2)}}"><title>{{title}}</title></rect>
+      <rect width="{{rectsize[0]}}" fill="white" height="{{util.round_float(rectsize[1] - height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{border}}"><title>{{title}}</title></rect>
+%if start in links:
+    </a>
+%endif
+  </g>
 %endfor
 </svg>
 """

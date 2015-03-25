@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.03.2015
+@modified    25.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4559,6 +4559,7 @@ class DatabasePage(wx.Panel):
             data = {"db": self.db, "participants": [],
                     "chat": self.chat, "sort_by": self.stats_sort_field,
                     "stats": stats, "images": {}, "authorimages": {},
+                    "imagemaps": {}, "authorimagemaps": {},
                     "expand_clouds": self.stats_expand_clouds}
             # Fill avatar images
             fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
@@ -4592,31 +4593,43 @@ class DatabasePage(wx.Panel):
                                   max(stats["totalhist"]["hours"].values())),
                        } if stats["hists"] else {}
             for histtype, histdata in stats["totalhist"].items():
+                if histtype not in ("hours", "days"): continue # for histtype..
                 vals = (self.chat["identity"], histtype,
                         self.db.filename.encode("utf-8"))
                 fn = "%s_%s_%s.png" % tuple(map(urllib.quote, vals))
                 if fn in fs["files"]:
                     fs["handler"].RemoveFile(fn)
                 bardata = sorted(histdata.items())
-                barsize, colour, maxval = PLOTCONF[histtype]
-                bmp = controls.BuildHistogram(bardata, barsize, colour, maxval)
+                bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
                 fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                 fs["files"][fn] = 1
                 data["images"][histtype] = fn
+                areas, msgs = [], stats["totalhist"]["%s-firsts" % histtype]
+                for i, (interval, val) in enumerate(bardata):
+                    if interval in msgs:
+                        areas.append((rects[i], "message:%s" % msgs[interval]))
+                data["imagemaps"][histtype] = areas
             # Fill author histogram plot images
             for author, hists in stats["hists"].items():
                 for histtype, histdata in hists.items():
+                    if histtype not in ("hours", "days"): continue # for histtype..
                     vals = (author, histtype, self.chat["identity"],
                             self.db.filename.encode("utf-8"))
                     fn = "%s_%s_%s_%s.png" % tuple(map(urllib.quote, vals))
                     if fn in fs["files"]:
                         fs["handler"].RemoveFile(fn)
                     bardata = sorted(histdata.items())
-                    barsize, colour, maxval = PLOTCONF[histtype]
-                    bmp = controls.BuildHistogram(bardata, barsize, colour, maxval)
+                    bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
                     fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn
+                    areas, msgs = [], hists["%s-firsts" % histtype]
+                    for i, (interval, val) in enumerate(bardata):
+                        if interval in msgs:
+                            areas.append((rects[i], "message:%s" % msgs[interval]))
+                    if author not in data["authorimagemaps"]:
+                        data["authorimagemaps"][author] = {}
+                    data["authorimagemaps"][author][histtype] = areas
 
             stats_html = step.Template(templates.STATS_HTML).expand(data)
 
