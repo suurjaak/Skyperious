@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.03.2015
+@modified    26.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -399,8 +399,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.pages_visited.append(p)
         self.Title = conf.Title
         if hasattr(p, "title"):
-            subtitle = os.path.split(p.db.filename)[-1] \
-                       if isinstance(p, DatabasePage) else p.title
+            subtitle = p.title
+            if isinstance(p, DatabasePage): # Use parent/file.db or C:/file.db
+                path, file = os.path.split(p.db.filename)
+                subtitle = os.path.join(os.path.split(path)[-1] or path, file)
             self.Title += " - " + subtitle
         self.update_notebook_header()
         if event: event.Skip() # Pass event along to next handler
