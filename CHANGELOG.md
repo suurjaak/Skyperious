@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.3.1f, 2015-03-25
+3.3.1g, 2015-03-31
 ------------------
 - added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
@@ -11,6 +11,7 @@ CHANGELOG
 - added message links to file transfers in chat statistics;
 - add opened file name to application title;
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;
+- fixed error on opening databases with invalid SkypeOut values in account;
 - command-line output encoded on all platforms, to avoid Unicode errors;
 - avoid stack trace on command-line keyboard interrupt;
 - stop worker threads instead of using daemons, to avoid zombie messages in CLI;

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2015
+@modified    31.03.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2726,35 +2726,34 @@ class DatabasePage(wx.Panel):
                   "skypeout_balance", ]
 
         for field in fields:
-            if field in account and account[field]:
-                value = account[field]
-                if "emails" == field:
-                    value = ", ".join(value.split(" "))
-                elif "gender" == field:
-                    value = {1: "male", 2: "female"}.get(value, "")
-                elif "birthday" == field:
-                    try:
-                        value = str(value)
-                        value = "-".join([value[:4], value[4:6], value[6:]])
-                    except Exception: pass
-                if value:
-                    if "skypeout_balance" == field:
-                        value = value / (
-                                10.0 ** account.get("skypeout_precision", 2))
-                        value = "%s %s" % (value,
-                                account.get("skypeout_balance_currency", ""))
-                    if not isinstance(value, basestring):
-                        value = str(value) 
-                    title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
-                    lbltext = wx.StaticText(parent=panel, label="%s:" % title)
-                    valtext = wx.TextCtrl(parent=panel, value=value,
-                        style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
-                    valtext.BackgroundColour = panel.BackgroundColour
-                    valtext.MinSize = (-1, 35)
-                    valtext.SetEditable(False)
-                    lbltext.ForegroundColour = wx.Colour(102, 102, 102)
-                    sizer.Add(lbltext, border=5, flag=wx.LEFT)
-                    sizer.Add(valtext, proportion=1, flag=wx.GROW)
+            if not account.get(field): continue # for field
+            value = account[field]
+            if "emails" == field:
+                value = ", ".join(value.split(" "))
+            elif "gender" == field:
+                value = {1: "male", 2: "female"}.get(value, "")
+            elif "birthday" == field:
+                try:
+                    value = str(value)
+                    value = "-".join([value[:4], value[4:6], value[6:]])
+                except Exception: pass
+            if value:
+                if "skypeout_balance" == field:
+                    precision = account.get("skypeout_precision") or 2
+                    value = "%s %s" % (value / (10.0 ** precision),
+                            (account.get("skypeout_balance_currency") or ""))
+                if not isinstance(value, basestring):
+                    value = str(value) 
+                title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
+                lbltext = wx.StaticText(parent=panel, label="%s:" % title)
+                valtext = wx.TextCtrl(parent=panel, value=value,
+                    style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+                valtext.BackgroundColour = panel.BackgroundColour
+                valtext.MinSize = (-1, 35)
+                valtext.SetEditable(False)
+                lbltext.ForegroundColour = wx.Colour(102, 102, 102)
+                sizer.Add(lbltext, border=5, flag=wx.LEFT)
+                sizer.Add(valtext, proportion=1, flag=wx.GROW)
         panel.Layout()
         panel.Thaw()
 
