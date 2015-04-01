@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    12.03.2015
+@modified    01.04.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -24,16 +24,13 @@ WORDS_MAX = 100
 """Minimum count for words to be included."""
 COUNT_MIN = 2
 
-"""Minimum length for words to be included."""
-LENGTH_MIN = 2
-
 """Minimum font size for words (for wx.html.HtmlWindow)."""
 FONTSIZE_MIN = 0
 
 """Maximum font size for words (for wx.html.HtmlWindow)."""
 FONTSIZE_MAX = 7
 
-OPTIONS = {"COUNT_MIN": COUNT_MIN, "LENGTH_MIN": LENGTH_MIN, "WORDS_MAX": WORDS_MAX,
+OPTIONS = {"COUNT_MIN": COUNT_MIN, "WORDS_MAX": WORDS_MAX,
            "FONTSIZE_MIN": FONTSIZE_MIN, "FONTSIZE_MAX": FONTSIZE_MAX}
 
 """A map of languages and common words."""
@@ -152,44 +149,83 @@ COMMON_WORDS = {
 }
 
 
+class GroupCounter(object):
+    """Counts words for word cloud, supports grouped subcounts."""
 
-def get_cloud(text, additions=None, options=None):
-    """
-    Returns the word cloud for the specified text. If options["COMMONS"] is not
-    given, language of the text is autodetected from among English (default),
-    Estonian and Russian, and pre-defined common words (like 'at') are removed.
+    def __init__(self, minlen=2):
+        self.minlen = minlen # Minimum length of word to count
+        self.commons = None  # List of common words by auto-detected language
+        self.data = collections.defaultdict(lambda: collections.defaultdict(int))
 
-    @param   text       text to analyze, will be split on word boundaries
-    @param   additions  a pre-parsed list of additional words to include
-    @param   options    a dict of options like {"SCALE": 128, "COMMONS": [..]}
-    @return             in descending order of relevance, as
-                        [('word', count, font size 0..7), ]
-    """
-    global OPTIONS
-    result = []
-    options = dict(OPTIONS.items() + (options.items() if options else []))
-    commons = options["COMMONS"] if "COMMONS" in options \
-              else find_commons(text, options)
-    words = re.findall("\\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
-    words += additions or []
-    # Add and count all non-common and not wholly numeric words
-    counts = collections.defaultdict(lambda: 0)
-    for w in (x for x in words if x not in commons and re.search("\\D", x)):
-        counts[w] += 1
-    # Drop rare words, limit total number
-    count_last = options["COUNT_MIN"]
-    if options["WORDS_MAX"] > 0 and len(counts) > options["WORDS_MAX"]:
-        counts_sorted = sorted(counts.values(), reverse=True)
-        count_last = max(count_last, counts_sorted[options["WORDS_MAX"] - 1])
-    counts = dict((w, c) for w, c in counts.items() if c >= count_last)
-    count_min = min(list(counts.values()) or [0])
-    count_max = options.get("SCALE") or max(list(counts.values()) or [0])
-    for word, count in counts.items():
-        result.append((word, count, get_size(count, count_min, count_max, options)))
-    result.sort(key=lambda x: (-x[1], x[0])) # Sort by count, name
-    if options["WORDS_MAX"] > 0:
-        result = result[:options["WORDS_MAX"]]
-    return result
+
+    def add_words(self, words, group=None):
+        """Adds to group words counts."""
+        for w in words: # Drop short or wholly numeric words
+            if len(w) >= self.minlen and re.search("\\D", w):
+                self.data[w][group] += 1
+
+
+    def add_text(self, text, group=None):
+        """Splits the text into words and adds to group word counts."""
+        words = []
+        words = re.findall("\\w{%s,}" % self.minlen, text.lower(), re.U)
+        words = [x for x in words if re.search("\\D", x)] # Drop numerics
+        for w in words: self.data[w][group] += 1
+
+
+    def counts(self, group=None, select=None):
+        """
+        Returns word counts, global if group not given, filtered if select
+        is a list of words to choose.
+        """
+        result = {} # {word: count}
+        for w in self.data if select is None else select:
+            if w not in self.data or not (group and group in self.data[w]):
+                continue # for w
+            vv = self.data[w]
+            result[w] = sum(vv.values()) if group is None else vv.get(group)
+        return result
+
+
+    def cloud(self, group=None, options=None):
+        """
+        Returns word cloud, global if group not given. Identifies probable
+        language and drops common language words (like "at").
+
+        @param   options    a dict of options like {"SCALE": 128, "COUNT_MIN": 2}
+        @return             frequent words in descending order of relevance,
+                            as [(word, count, font size 0..7), ]
+        """
+        global OPTIONS
+        options = dict(OPTIONS.items() + (options.items() if options else []))
+        if self.commons is None:
+            self.commons = find_commons(self.data.iterkeys())
+
+        # Build a flattened counts dictionary
+        counts, top_counts = {}, [1]
+        for w, vv in (x for x in self.data.items() if x[0] not in self.commons):
+            count = sum(vv.values()) if group is None else vv.get(group)
+            if not count: continue # for w, vv
+            counts[w] = count
+            # Keep a tally of biggest counts for later filtering and sizing
+            top_counts.append(count); top_counts.sort(reverse=True)
+            top_counts[:] = top_counts[:options["WORDS_MAX"]]
+
+        # Build result list, dropping words under minimum count
+        count_min = max(options["COUNT_MIN"], top_counts[-1])
+        count_max = options.get("SCALE") or top_counts[0]
+        result, sizes = [], {} # sizes: {count: calculated font size}
+        for word, count in counts.items():
+            if count < count_min: continue # for word, count
+            if count not in sizes:
+                sizes[count] = get_size(count, count_min, count_max, options)
+            result.append((word, count, sizes[count]))
+
+        # Sort final result by (count, name) and trim to given limit
+        result.sort(key=lambda x: (-x[1], x[0]))
+        if options["WORDS_MAX"] > 0: result = result[:options["WORDS_MAX"]]
+        return result
+
 
 
 def get_size(count, count_min, count_max, options):
@@ -209,18 +245,16 @@ def get_size(count, count_min, count_max, options):
     return result
 
 
-def find_commons(text, options=None):
+def find_commons(words):
     """
     Returns the common words found from the specified words, in the language
     that matches best the given words.
 
-    @param   words    text to analyze
-    @param   options  a dict of options like {"LENGTH_MIN": 2}
+    @param   words    word list to analyze
     @return           a set of common words of a language found from the words
     """
+    global COMMON_WORDS
     result = []
-    options = dict(OPTIONS.items() + (options.items() if options else []))
-    words = re.findall("\\w{%s,}" % options["LENGTH_MIN"], text.lower(), re.U)
     words = set(words)
     for commontext in COMMON_WORDS.values():
         allcommons = set(re.findall("\\w+", commontext, re.UNICODE))

@@ -848,7 +848,7 @@ countstring = ";\\n".join("%s from %s" % (c, a) for a, c in sorted(stats["wordco
 %if stats.get("wordclouds"):
 <%
 sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1.1em;", 1: "0.85em", 0: "0.8em;"}
-globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
+globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items())
 %>
     <br /><br />
     <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
@@ -861,7 +861,7 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
-          <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % (100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
+          <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % round(100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
 %endfor
 %else:
           <span class="gray">Not enough words.</span>

@@ -1495,7 +1495,7 @@ class MessageParser(object):
             self.stats = {
                 "smses": 0, "transfers": [], "calls": 0, "messages": 0,
                 "counts": {}, "total": 0, "startdate": None, "enddate": None,
-                "wordclouds": {}, "cloudtexts": {}, # Per-author
+                "wordclouds": {}, # Per-author
                 "wordcloud": [], # [(word, count, size), ]
                 "wordcounts": {}, # {word: {author: count, }, }
                 "links": {}, # {author: [link, ], }
@@ -1503,6 +1503,7 @@ class MessageParser(object):
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
                 "authors": set(), # Authors encountered in parsed messages
+                "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
                 "hists": {}, # Author histogram data {author: {"hours", ..} }
                 "workhist": {}, } # {"hours": {0: {author: count}}, "days": ..}}
@@ -2017,9 +2018,7 @@ class MessageParser(object):
         self.stats["last_message"] = ""
         if message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_MESSAGE]:
             self.collect_dom_stats(message["dom"], message)
-            if not self.stats["cloudtexts"]:
-                self.stats["cloudtexts"] = collections.defaultdict(str)
-            self.stats["cloudtexts"][author] += self.stats["last_cloudtext"] + " "
+            self.stats["cloudcounter"].add_text(self.stats["last_cloudtext"], author)
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
         if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
@@ -2222,32 +2221,27 @@ class MessageParser(object):
                 stats["hists"][author]["days-firsts"] = authorstamps
 
         # Create main cloudtext
-        maincloud = " ".join(stats["cloudtexts"].values())
         options = {"COUNT_MIN": conf.WordCloudCountMin, 
-                   "LENGTH_MIN": conf.WordCloudLengthMin,
                    "WORDS_MAX": conf.WordCloudWordsMax}
-        options["COMMONS"] = wordcloud.find_commons(maincloud, options)
-        additions = sum(stats["links"].values(), [])
-        stats["wordcloud"] = wordcloud.get_cloud(maincloud, additions, options)
-
-        # Author cloudtext analysis to accumulate total word counts
-        options.update(COUNT_MIN=1, WORDS_MAX=-1)
-        stats["wordcounts"] = collections.defaultdict(dict)
-        for author, cloudtext in stats["cloudtexts"].items():
-            additions = stats["links"].get(author)
-            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
-            for word, count, size in cloud:
-                stats["wordcounts"][word][author] = count
+        for author, links in stats["links"].items():
+            stats["cloudcounter"].add_words(links, author)
+        stats["wordcloud"] = stats["cloudcounter"].cloud(options=options)
 
         # Create author cloudtexts, scaled to max word count in main cloud
-        maxcount = max([x[1] for x in stats["wordcloud"]] or [0])
-        options.update(COUNT_MIN=conf.WordCloudCountMin, SCALE=maxcount,
-                   WORDS_MAX=conf.WordCloudWordsAuthorMax,
-                   FONTSIZE_MAX=wordcloud.FONTSIZE_MAX - 1) # 1 step smaller
-        for author, cloudtext in stats["cloudtexts"].items():
-            additions = stats["links"].get(author)
-            cloud = wordcloud.get_cloud(cloudtext, additions, options=options)
+        options.update(SCALE=max([x[1] for x in stats["wordcloud"]] or [0]),
+                       WORDS_MAX=conf.WordCloudWordsAuthorMax,
+                       FONTSIZE_MAX=wordcloud.FONTSIZE_MAX - 1) # 1 step smaller
+        for author in stats["authors"]:
+            cloud = stats["cloudcounter"].cloud(author, options)
             stats["wordclouds"][author] = cloud
+
+        # Accumulate word counts for main cloud hovertexts
+        stats["wordcounts"] = collections.defaultdict(dict)
+        words = set(x[0] for x in stats["wordcloud"])
+        [words.update(y[0] for y in x) for x in stats["wordclouds"].values()]
+        for author in stats["authors"]:
+            for w, c in stats["cloudcounter"].counts(author, words).items():
+                stats["wordcounts"][w][author] = c
 
         return stats
 

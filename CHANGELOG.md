@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.3.1g, 2015-03-31
+3.3.1i, 2015-04-01
 ------------------
 - added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
@@ -9,6 +9,7 @@ CHANGELOG
 - fixed HTML output for photo/video sharing messages (#33);
 - fixed showing database statistics on information page;
 - added message links to file transfers in chat statistics;
+- optimized memory usage in chat word-cloud analysis (#35);
 - add opened file name to application title;
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;
 - fixed error on opening databases with invalid SkypeOut values in account;
