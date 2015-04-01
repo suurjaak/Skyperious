@@ -7,6 +7,7 @@ CHANGELOG
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
 - fixed HTML output for photo/video sharing messages (#33);
+- fixed potential error on chat date histogram analysis;
 - fixed showing database statistics on information page;
 - added message links to file transfers in chat statistics;
 - optimized memory usage in chat word-cloud analysis (#35);

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.03.2015
+@modified    04.01.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2018,7 +2018,8 @@ class MessageParser(object):
         self.stats["last_message"] = ""
         if message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_MESSAGE]:
             self.collect_dom_stats(message["dom"], message)
-            self.stats["cloudcounter"].add_text(self.stats["last_cloudtext"], author)
+            self.stats["cloudcounter"].add_text(self.stats["last_cloudtext"],
+                                                author)
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
         if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
@@ -2190,6 +2191,7 @@ class MessageParser(object):
                 stats["totalhist"]["days"][bindate] = 0
                 for author in stats["hists"]:
                     stats["hists"][author]["days"][bindate] = 0
+            max_bindate = max(stats["totalhist"]["days"])
             # Fill total histogram and author days
             MAXSTAMP = MessageParser.MessageStamp(
                 datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
@@ -2198,6 +2200,7 @@ class MessageParser(object):
             for date, counts in sorted(stats["workhist"]["days"].items()):
                 bindate = stats["startdate"].date()
                 while bindate + step <= date: bindate += step
+                bindate = min(bindate, max_bindate)
                 for author, count in counts.items():
                     if author not in stats["hists"]:
                         stats["hists"][author] = copy.deepcopy(histbase)
