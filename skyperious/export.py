@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.03.2015
+@modified    01.04.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -113,7 +113,7 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
                          chat["title_long_lc"])
                 if progress: progress(message_count)
                 continue # continue for chat in chats
-            main.status("Exporting %s.", chat["title_long_lc"])
+            main.logstatus("Exporting %s.", chat["title_long_lc"])
             if progress: progress(message_count)
             filename = make_filename(chat)
             msgs = messages or db.get_messages(chat)
@@ -147,7 +147,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True, progress=No
             main.log("Skipping exporting %s: no messages.",
                      chat["title_long_lc"])
             continue # continue for chat in chats
-        main.status("Exporting %s.", chat["title_long_lc"])
+        main.logstatus("Exporting %s.", chat["title_long_lc"])
         if progress: progress(message_count)
         parser = skypedata.MessageParser(db, chat=chat, stats=False)
         writer.add_sheet(chat["title"])
