@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.03.2015
+@modified    04.01.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -627,14 +627,14 @@ from third_party import step
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{escape(alt)}}" alt="{{escape(alt)}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
       </div>
 %endfor
 %elif chat_picture_raw:
-      <img id="chat_picture" title="{{chat["title"]}}" alt="{{chat["title"]}}" src="data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}" />
+      <img id="chat_picture" title="{{escape(chat["title"])}}" alt="{{escape(chat["title"])}}" src="data:image/png;base64,{{base64.b64encode(chat_picture_raw)}}" />
 %endif
     </td>
     <td id="header_center">
@@ -665,7 +665,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{escape(alt)}}" alt="{{escape(alt)}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
 %if p["name"] != p["identity"]:
       <br /><span class="identity">{{p["identity"]}}</span>
 %endif
@@ -681,7 +681,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span>{{p["name"]}}<br />
+    <span><span class="avatar_large"><img title="{{escape(alt)}}" alt="{{escape(alt)}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span>{{p["name"]}}<br />
     <span class="identity">
         {{p["identity"]}}
 %if 1 == p.get("rank"):
@@ -756,7 +756,7 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
-        <td><table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{escape(p["name"])}}" alt="{{escape(p["name"])}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -841,7 +841,7 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 <%
 countstring = ";\\n".join("%s from %s" % (c, a) for a, c in sorted(stats["wordcounts"][word].items(), key=lambda x: -x[1]))
 %>
-      <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{countstring}}">({{count}})</span></span> 
+      <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{escape(countstring)}}">({{count}})</span></span> 
 %endfor
     </div>
 
@@ -856,7 +856,7 @@ globalcounts = dict((w, c) for w, c, z in stats["wordcloud"])
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr><td>
-        <table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
+        <table><tr><td class="avatar"><img title="{{escape(p["name"])}}" alt="{{escape(p["name"])}}" src="data:image/png;base64,{{base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
@@ -890,7 +890,7 @@ f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
         <tr><td{{" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
-          <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
+          <a href="{{escape(util.path_to_url(f["filepath"] or f["filename"]))}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
         </td><td title="{{f_datetime_title}}">
@@ -1338,7 +1338,7 @@ safe_id = urllib.quote(p["identity"])
 </tr></table>
 <br /><br />
 %for word, count, size in stats["wordcloud"]:
-<font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
+<font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{escape(word)}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
 %endif
 
@@ -1358,7 +1358,7 @@ safe_id = urllib.quote(p["identity"])
   </td><td valign="top">
 %if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
-    <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
+    <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{escape(word)}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
 %endfor
 %else:
     <font color="gray" size="2">Not enough words.</font>
@@ -1381,7 +1381,7 @@ f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d 
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
-    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
+    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{escape(util.path_to_url(f["filepath"] or f["filename"]))}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
     <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
   </tr>
@@ -2003,7 +2003,7 @@ For searching messages from specific chats, add "chat:name", and from specific c
 MERGE_DB_LINKS = """<%
 import conf
 %>
-<font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+<font color="{{conf.FgColour}}">From <a href="{{escape(db1.filename)}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{escape(db2.filename)}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
 """
 
 
