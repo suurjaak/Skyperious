@@ -21,6 +21,7 @@ CHANGELOG
 - command-line progress bar clears previously printed bar text;
 - small UI tweaks;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
+- upgraded Pillow from 2.7.0 to 2.8.0;
 
 3.3, 2015-03-15
 ------------------

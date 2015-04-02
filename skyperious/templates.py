@@ -1636,7 +1636,7 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 3.0.2.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
-  <li>Pillow{{" 2.7.0" if getattr(sys, 'frozen', False) else ""}},
+  <li>Pillow{{" 2.8.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
