@@ -1850,7 +1850,7 @@ class MessageParser(object):
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
-            greytag, greyattr, greyval = "span", "class", "grey"
+            greytag, greyattr, greyval = "span", "class", "gray"
         for elem in dom.getiterator():
             index = 0
             for subelem in elem:
