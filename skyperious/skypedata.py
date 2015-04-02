@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.01.2015
+@modified    02.04.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1847,6 +1847,7 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
+        other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
             greytag, greyattr, greyval = "span", "class", "grey"
@@ -1907,6 +1908,10 @@ class MessageParser(object):
                             span.append(i), subelem.remove(i)
                         subelem.text = ""
                         subelem.append(span)
+                elif subelem.tag not in other_tags:
+                    # Unknown tag: convert to span
+                    subelem.tag = "span"
+                    subelem.attrib.clear()
                 index += 1
             if not self.wrapfunc:
                 continue # continue for elem in dom.getiterator()

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.03.2015
+@modified    02.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6491,14 +6491,15 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         """
         tagstyle_map = {"b": "bold", "i": "italic", "s": "strike",
                         "bodystatus": "special",  "quotefrom": "special",
-                        "a": "link", "ss": "default" }
+                        "a": "link", "ss": "default"}
+        other_tags = ["blink", "font", "bodystatus", "i", "span", "flag"]
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
         linefeed_final = "\n\n" # Decreased if quotefrom is last
 
         for e in dom.getiterator():
-            # Possible tags: a|b|bodystatus|quote|quotefrom|msgstatus|
-            #                special|xml|font|blink
+            # Possible tags: a|b||i|s|bodystatus|quote|quotefrom|msgstatus|
+            #                span|special|xml|font|blink
             if e in to_skip:
                 continue
             style = tagstyle_map.get(e.tag, "default")
@@ -6534,7 +6535,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 linefeed_final = "\n\n"
             elif "s" == e.tag:
                 text = "~%s~" % text # STC does not support strikethrough style
-            elif e.tag not in ["blink", "font", "bodystatus", "i", "s", "span"]:
+            elif e.tag not in other_tags:
                 text = ""
             if text:
                 self._append_text(text, style, rgx_highlight)
