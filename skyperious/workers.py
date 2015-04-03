@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    18.03.2015
+@modified    03.04.2015
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -115,18 +115,9 @@ class SearchThread(WorkerThread):
                 if not search:
                     continue # continue while self._is_running
 
-                is_text_output = ("text" == search.get("output"))
+                is_html = ("text" != search.get("output"))
                 wrap_html = None # MessageParser wrap function, for HTML output
-                if is_text_output:
-                    TEMPLATES = {
-                        "chat":    templates.SEARCH_ROW_CHAT_TXT, 
-                        "contact": templates.SEARCH_ROW_CONTACT_TXT,
-                        "message": templates.SEARCH_ROW_MESSAGE_TXT,
-                        "table":   templates.SEARCH_ROW_TABLE_HEADER_TXT,
-                        "row":     templates.SEARCH_ROW_TABLE_TXT, }
-                    wrap_b = lambda x: "**%s**" % x.group(0)
-                    output = {"format": "text"}
-                else:
+                if is_html:
                     TEMPLATES = {
                         "chat":    templates.SEARCH_ROW_CHAT_HTML, 
                         "contact": templates.SEARCH_ROW_CONTACT_HTML,
@@ -142,6 +133,16 @@ class SearchThread(WorkerThread):
                             wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
+                else:
+                    TEMPLATES = {
+                        "chat":    templates.SEARCH_ROW_CHAT_TXT, 
+                        "contact": templates.SEARCH_ROW_CONTACT_TXT,
+                        "message": templates.SEARCH_ROW_MESSAGE_TXT,
+                        "table":   templates.SEARCH_ROW_TABLE_HEADER_TXT,
+                        "row":     templates.SEARCH_ROW_TABLE_TXT, }
+                    wrap_b = lambda x: "**%s**" % x.group(0)
+                    output = {"format": "text"}
+                FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
                 main.log('Searching "%(text)s" in %(table)s (%(db)s).' % search)
                 self._stop_work = False
                 self._drop_results = False
@@ -168,7 +169,7 @@ class SearchThread(WorkerThread):
                     chats = search["db"].get_conversations()
                     chats.sort(key=lambda x: x["title"])
                     chat_map = {} # {chat id: {chat data}}
-                    template_chat = step.Template(TEMPLATES["chat"])
+                    template_chat = FACTORY("chat")
                 for chat in chats:
                     chat_map[chat["id"]] = chat
                     if "conversations" == search["table"] and match_words:
@@ -218,7 +219,7 @@ class SearchThread(WorkerThread):
                         "phone_mobile", "homepage", "emails", "about",
                         "mood_text",
                     ]
-                    template_contact = step.Template(TEMPLATES["contact"])
+                    template_contact = FACTORY("contact")
                     for contact in contacts:
                         match = False
                         fields_filled = {}
@@ -249,7 +250,7 @@ class SearchThread(WorkerThread):
 
                 # Find messages with a matching body
                 if not self._stop_work and "messages" == search["table"]:
-                    template_message = step.Template(TEMPLATES["message"])
+                    template_message = FACTORY("message")
                     count, result_type = 0, "messages"
                     chat_messages = {} # {chat id: [message, ]}
                     chat_order = []    # [chat id, ]
@@ -266,13 +267,13 @@ class SearchThread(WorkerThread):
                         key = "message:%s" % m["id"]
                         result["map"][key] = {"chat": chat["id"],
                                               "message": m["id"]}
-                        if is_text_output or (not self._drop_results
+                        if not is_html or (not self._drop_results
                         and not count % conf.SearchResultsChunk):
                             result["count"] = result_count
                             self.postback(result)
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
-                        if self._stop_work or (not is_text_output
+                        if self._stop_work or (is_html
                         and count >= conf.MaxSearchMessages):
                             break # break for m in messages
 
@@ -280,8 +281,8 @@ class SearchThread(WorkerThread):
                 if not self._stop_work and "all tables" == search["table"]:
                     infotext, result_type = "", "table row"
                     # Search over all fields of all tables.
-                    template_table = step.Template(TEMPLATES["table"])
-                    template_row = step.Template(TEMPLATES["row"])
+                    template_table = FACTORY("table")
+                    template_row = FACTORY("row")
                     for table in search["db"].get_tables():
                         table["columns"] = search["db"].get_table_columns(
                             table["name"])
@@ -309,19 +310,19 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
-                            if self._stop_work or (not is_text_output
+                            if self._stop_work or (is_html
                             and result_count >= conf.MaxSearchTableRows):
                                 break # break while row
                             row = rows.fetchone()
                         if not self._drop_results:
-                            if not is_text_output:
+                            if is_html:
                                 result["output"] += "</table>"
                             result["count"] = result_count
                             self.postback(result)
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
                         infotext += " (%s)" % util.plural("result", count)
-                        if self._stop_work or (not is_text_output
+                        if self._stop_work or (is_html
                         and result_count >= conf.MaxSearchTableRows):
                             break # break for table in search["db"]..
                     single_table = ("," not in infotext)
@@ -338,17 +339,17 @@ class SearchThread(WorkerThread):
 
                 if self._stop_work:
                     final_text += " Stopped by user."
-                elif "messages" == result_type and not is_text_output \
+                elif "messages" == result_type and is_html \
                 and count >= conf.MaxSearchMessages:
                     final_text += " Stopped at %s limit %s." % \
                                   (result_type, conf.MaxSearchMessages)
-                elif "table row" == result_type and not is_text_output \
+                elif "table row" == result_type and is_html \
                 and count >= conf.MaxSearchTableRows:
                     final_text += " Stopped at %s limit %s." % \
                                   (result_type, conf.MaxSearchTableRows)
 
                 result["output"] += "</table><br /><br />%s</font>" % final_text
-                if is_text_output: result["output"] = ""
+                if not is_html: result["output"] = ""
                 result["done"] = True
                 result["count"] = result_count
                 self.postback(result)
@@ -420,7 +421,7 @@ class MergeThread(WorkerThread):
             result["count"] += c["messages1"] + c["messages2"]
         result["chatcount"] = len(chats1)
         compared.sort(key=lambda x: x["title"].lower())
-        info_template = step.Template(templates.DIFF_RESULT_ITEM)
+        info_template = step.Template(templates.DIFF_RESULT_ITEM, escape=True)
 
         for index, chat in enumerate(compared):
             result["chatindex"] = index

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    01.04.2015
+@modified    03.04.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -193,9 +193,9 @@ def export_chat_template(chat, filename, db, messages):
         # (500,000+ messages) can take gigabytes.
         tmpname = util.unique_path("%s.messages" % filename)
         tmpfile = open(tmpname, "w+")
-        mtemplate = templates.CHAT_MESSAGES_HTML if is_html \
-                    else templates.CHAT_MESSAGES_TXT
-        step.Template(mtemplate, strip=False).stream(tmpfile, namespace)
+        template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
+                   templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
+        template.stream(tmpfile, namespace)
 
         namespace["stats"] = stats = parser.get_collected_stats()
         namespace.update({
@@ -240,9 +240,9 @@ def export_chat_template(chat, filename, db, messages):
 
         tmpfile.flush(), tmpfile.seek(0)
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), "")
-        template = templates.CHAT_HTML if is_html else templates.CHAT_TXT
         with open(filename, "w") as f:
-            step.Template(template, strip=False).stream(f, namespace)
+            t = templates.CHAT_HTML if is_html else templates.CHAT_TXT
+            step.Template(t, strip=False, escape=is_html).stream(f, namespace)
     finally:
         if tmpfile: util.try_until(tmpfile.close)
         if tmpname: util.try_until(lambda: os.unlink(tmpname))
@@ -351,8 +351,9 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
                     namespace["create_sql"] = re_sql.sub(replacer, create_sql)
 
-                template = templates.GRID_HTML if is_html else templates.SQL_TXT
-                step.Template(template, strip=False).stream(f, namespace)
+                template = step.Template(templates.GRID_HTML if is_html else 
+                           templates.SQL_TXT, strip=False, escape=is_html)
+                template.stream(f, namespace)
 
             result = True
     finally:

@@ -1700,16 +1700,18 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
-            names = sorted(get_contact_name(i)
-                           for i in (message["identities"] or "").split(" "))
+            names = sorted(get_contact_name(x) for x in filter(None,
+                           (message["identities"] or "").split(" ")))
             dom.clear()
             dom.text = "Added "
             if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
-                dom.text = "Has shared contact details with "
+                dom.text = "Has shared contact details"
+                if names: dom.text += " with "
             elif MESSAGE_TYPE_BLOCK == message["type"]:
                 dom.text = "Blocked "
             elif MESSAGE_TYPE_GROUP == message["type"]:
-                dom.text = "Created a group conversation with "
+                dom.text = "Created a group conversation"
+                if names: dom.text += " with "
             for i in names:
                 if len(dom) > 0:
                     b.tail = ", "
@@ -1909,9 +1911,13 @@ class MessageParser(object):
                         subelem.text = ""
                         subelem.append(span)
                 elif subelem.tag not in other_tags:
-                    # Unknown tag: convert to span
-                    subelem.tag = "span"
-                    subelem.attrib.clear()
+                    # Unknown tag: drop if empty, otherwise convert to span
+                    if not (subelem.text or subelem.tail):
+                        elem.remove(subelem)
+                        index -= 1
+                    else:
+                        subelem.tag = "span"
+                        subelem.attrib.clear()
                 index += 1
             if not self.wrapfunc:
                 continue # continue for elem in dom.getiterator()

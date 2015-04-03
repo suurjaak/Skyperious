@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2015
+@modified    03.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3870,7 +3870,7 @@ class DatabasePage(wx.Panel):
             elif conf.SearchInTables:
                 fromtext = data["table"] = "all tables"
             # Partially assembled HTML for current results
-            template = step.Template(templates.SEARCH_HEADER_HTML)
+            template = step.Template(templates.SEARCH_HEADER_HTML, escape=True)
             data["partial_html"] = template.expand(locals())
 
             worker = workers.SearchThread(self.on_searchall_callback)
@@ -4555,7 +4555,7 @@ class DatabasePage(wx.Panel):
 
     def populate_chat_statistics(self):
         """Populates html_stats with chat statistics and word cloud."""
-        stats, stats_html = self.stc_history.GetStatisticsData(), ""
+        stats, html = self.stc_history.GetStatisticsData(), ""
         if stats:
             data = {"db": self.db, "participants": [],
                     "chat": self.chat, "sort_by": self.stats_sort_field,
@@ -4632,12 +4632,12 @@ class DatabasePage(wx.Panel):
                         data["authorimagemaps"][author] = {}
                     data["authorimagemaps"][author][histtype] = areas
 
-            stats_html = step.Template(templates.STATS_HTML).expand(data)
+            html = step.Template(templates.STATS_HTML, escape=True).expand(data)
 
         previous_anchor = self.html_stats.OpenedAnchor
         previous_scrollpos = getattr(self.html_stats, "_last_scroll_pos", None)
         self.html_stats.Freeze()
-        self.html_stats.SetPage(stats_html)
+        self.html_stats.SetPage(html)
         self.html_stats.BackgroundColour = conf.BgColour
         if previous_scrollpos:
             self.html_stats.Scroll(*previous_scrollpos)
@@ -5265,8 +5265,8 @@ class MergerPage(wx.Panel):
         """
         self.db1, self.db2 = self.db2, self.db1
         namespace = {"db1": self.db1, "db2": self.db2}
-        label_title = step.Template(templates.MERGE_DB_LINKS).expand(namespace)
-        self.html_dblabel.SetPage(label_title)
+        template = step.Template(templates.MERGE_DB_LINKS, escape=True)
+        self.html_dblabel.SetPage(template.expand(namespace))
         self.html_dblabel.BackgroundColour = wx.NullColour
         self.con1diff, self.con2diff = self.con2diff, self.con1diff
         self.con1difflist, self.con2difflist = \
@@ -5853,8 +5853,8 @@ class MergerPage(wx.Panel):
     def load_data(self):
         """Loads data from our SkypeDatabases."""
         namespace = {"db1": self.db1, "db2": self.db2}
-        label_title = step.Template(templates.MERGE_DB_LINKS).expand(namespace)
-        self.html_dblabel.SetPage(label_title)
+        template = step.Template(templates.MERGE_DB_LINKS, escape=True)
+        self.html_dblabel.SetPage(template.expand(namespace))
         self.html_dblabel.BackgroundColour = wx.NullColour
 
         try:
