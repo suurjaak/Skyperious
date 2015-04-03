@@ -46,11 +46,6 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
-"""Map of attribute names from old version to new, retain values on upgrade."""
-FileDirectiveCompatiblity = {
-    "SearchInNewTab" : "SearchUseNewTab",
-    "SearchInMessageBody": "SearchInMessages",
-}
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
     "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
@@ -369,8 +364,6 @@ def load():
                     value = value_raw
             return True, value
 
-        for oldname, name in FileDirectiveCompatiblity.items():
-            [setattr(module, name, v) for s, v in [parse_value(oldname)] if s]
         for name in FileDirectives:
             [setattr(module, name, v) for s, v in [parse_value(name)] if s]
         for name in OptionalFileDirectives:
