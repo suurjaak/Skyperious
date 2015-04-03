@@ -33,22 +33,23 @@ import re
 
 class Template(object):
 
-    COMPILED_TEMPLATES = {} # {template string: code object, }
+    COMPILED_TEMPLATES = {} # {(template string, compile options): code object}
     # Regex for stripping all leading, trailing and interleaving whitespace.
     RE_STRIP = re.compile("(^[ \t]+|[ \t]+$|(?<=[ \t])[ \t]+|\A[\r\n]+|[ \t\r\n]+\Z)", re.M)
 
-    def __init__(self, template, strip=True):
+    def __init__(self, template, strip=True, escape=False):
         """Initialize class"""
         super(Template, self).__init__()
         self.template = template
-        self.options  = {"strip": strip}
-        self.builtins = {"escape": lambda s: escape_html(s),
+        self.options  = {"strip": strip, "escape": escape}
+        self.builtins = {"escape": escape_html,
                          "setopt": lambda k, v: self.options.update({k: v}), }
-        if template in Template.COMPILED_TEMPLATES:
-            self.code = Template.COMPILED_TEMPLATES[template]
+        cache_key = (template, bool(escape))
+        if cache_key in Template.COMPILED_TEMPLATES:
+            self.code = Template.COMPILED_TEMPLATES[cache_key]
         else:
             self.code = self._process(self._preprocess(self.template))
-            Template.COMPILED_TEMPLATES[template] = self.code
+            Template.COMPILED_TEMPLATES[cache_key] = self.code
 
     def expand(self, namespace={}, **kw):
         """Return the expanded template string"""
@@ -63,7 +64,7 @@ class Template(object):
     def stream(self, buffer, namespace={}, encoding="utf-8", **kw):
         """Expand the template and stream it to a file-like buffer."""
 
-        def write_buffer(s, flush=False, cache = [""]):
+        def write_buffer(s, flush=False, cache=[""]):
             # Cache output as a single string and write to buffer.
             cache[0] += to_unicode(s)
             if flush and cache[0] or len(cache[0]) > 65536:
@@ -82,14 +83,17 @@ class Template(object):
 
     def _preprocess(self, template):
         """Modify template string before code conversion"""
-        # Replace inline ('%') blocks for easier parsing
-        o = re.compile("(?m)^[ \t]*%((if|for|while|try).+:)")
-        c = re.compile("(?m)^[ \t]*%(((else|elif|except|finally).*:)|(end\w+))")
+        # Replace inline '%' blocks for easier parsing
+        o = re.compile(r"(?m)^[ \t]*%((if|for|while|try).+:)")
+        c = re.compile(r"(?m)^[ \t]*%(((else|elif|except|finally).*:)|(end\w+))")
         template = c.sub(r"<%:\g<1>%>", o.sub(r"<%\g<1>%>", template))
 
-        # Replace ({{x}}) variables with '<%echo(x)%>'
-        v = re.compile("\{\{(.*?)\}\}")
-        template = v.sub(r"<%echo(\g<1>)%>\n", template)
+        # Replace {{!x}} and {{x}} variables with '<%echo(x)%>'.
+        # If auto-escaping is enabled, uses echo(escape(x)) for the second.
+        vars = r"\{\{\s*\!(.*?)\}\}", r"\{\{(.*?)\}\}"
+        subs = [r"<%echo(\g<1>)%>\n"] * 2
+        if self.options["escape"]: subs[1] = r"<%echo(escape(\g<1>))%>\n"
+        for v, s in zip(vars, subs): template = re.sub(v, s, template)
 
         return template
 
