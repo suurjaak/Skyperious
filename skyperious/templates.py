@@ -1555,7 +1555,7 @@ Results for "{{text}}" from {{fromtext}}:
 
 """HTML template for table search results header, start of HTML table."""
 SEARCH_ROW_TABLE_HEADER_HTML = """
-<br /><br /><b>Table {{table["name"]}}:</b><br />
+<br /><br /><b><a name="{{table["name"]}}">Table {{table["name"]}}:</b></b><br />
 <table border="1" cellpadding="4" cellspacing="0" width="1000">
 <tr>
 <th>#</th>
@@ -1588,7 +1588,7 @@ value = row[col["name"]]
 value = value if value is not None else ""
 value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 %>
-<td valign="top">{{!pattern_replace.sub(wrap_b, value)}}</td>
+<td valign="top">{{!pattern_replace.sub(wrap_b, escape(value))}}</td>
 %endfor
 </tr>
 """

@@ -10,6 +10,7 @@ CHANGELOG
 - fixed potential error on chat date histogram analysis;
 - fixed showing database statistics on information page;
 - added message links to file transfers in chat statistics;
+- added table links to result sections in searching over tables;
 - optimized memory usage in chat word-cloud analysis (#35);
 - add opened file name to application title;
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;

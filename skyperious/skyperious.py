@@ -3724,6 +3724,8 @@ class DatabasePage(wx.Panel):
                 thepage = getattr(self, "page_" + page, None)
                 if thepage:
                     self.notebook.SetSelection(self.pageorder[thepage])
+        elif href.startswith("#"): # In-page link
+            event.Skip()
         elif not (href.startswith("chat:") or href.startswith("message:")
         or href.startswith("file:")):
             webbrowser.open(href)

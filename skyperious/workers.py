@@ -290,9 +290,14 @@ class SearchThread(WorkerThread):
                                                                 table)
                         if not sql:
                             continue # continue for table in search["db"]..
-                        infotext += (", " if infotext else "") + table["name"]
                         rows = search["db"].execute(sql, params)
                         row = rows.fetchone()
+                        namepre, namesuf = ("<b>", "</b>") if row else ("", "")
+                        countpre, countsuf = (("<a href='#%s'>" % 
+                            step.escape_html(table["name"]), "</a>") if row
+                            else ("", ""))
+                        infotext += (", " if infotext else "") \
+                                    + namepre + table["name"] + namesuf
                         if not row:
                             continue # continue for table in search["db"]..
                         result["output"] = template_table.expand(locals())
@@ -321,7 +326,8 @@ class SearchThread(WorkerThread):
                             self.postback(result)
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
-                        infotext += " (%s)" % util.plural("result", count)
+                        infotext += " (%s%s%s)" % (countpre, 
+                                    util.plural("result", count), countsuf)
                         if self._stop_work or (is_html
                         and result_count >= conf.MaxSearchTableRows):
                             break # break for table in search["db"]..
