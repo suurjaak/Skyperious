@@ -384,8 +384,8 @@ def save():
     parser.add_section(section)
     try:
         f, fname = open(ConfigFile, "wb"), util.longpath(ConfigFile)
-        f.write("# %s configuration autowritten on %s.\n" %
-                (fname, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        f.write("# %s %s configuration written on %s.\n" % (Title, Version,
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try:
                 parser.set(section, name, json.dumps(getattr(module, name)))
