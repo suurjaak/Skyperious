@@ -41,14 +41,42 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+
+        <h4>v3.4, 2015-04-15:</h4>
+        <ul>
+          <li>added links to earliest messages in chat statistics histogram sectors</li>
+          <li>fixed showing wrong author in transfer statistics for certain messages</li>
+          <li>fixed a parsing issue with certain Skype messages</li>
+          <li>fixed HTML output for photo/video sharing messages (issue #33)</li>
+          <li>fixed getting encoding errors on Excel export</li>
+          <li>fixed potential error on chat date histogram analysis</li>
+          <li>fixed showing database statistics on information page</li>
+          <li>use Skype account timezone setting for message timestamps</li>
+          <li>added message links to file transfers in chat statistics</li>
+          <li>added table links to result sections in searching over tables</li>
+          <li>optimized memory usage in chat word-cloud analysis (issue #35)</li>
+          <li>added opened file name to application title</li>
+          <li>avoid "Broken pipe" errors if command-line output is piped and interrupted</li>
+          <li>fixed error on opening databases with invalid SkypeOut values in account (issue #35)</li>
+          <li>fixed possible invalid HTML in export</li>
+          <li>command-line output encoded on all platforms, to avoid Unicode errors</li>
+          <li>avoid stack trace on command-line keyboard interrupt</li>
+          <li>stop worker threads instead of using daemons, to avoid zombie messages in CLI</li>
+          <li>command-line progress bar clears previously printed bar text</li>
+          <li>small UI tweaks</li>
+          <li>added __main__.py: pip-installed Skyperious can run as `python -m skyperious`</li>
+          <li>upgraded Pillow from 2.7.0 to 2.8.0</li>
+        </ul>
+        <br />
 
         <h4>v3.3, 2015-03-15:</h4>
         <ul>
