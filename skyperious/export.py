@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    03.04.2015
+@modified    15.04.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -487,9 +487,10 @@ class xlsx_writer(object):
                 continue # continue for c, v in enumerate(Values)
 
             # Calculate and update maximum written column width
-            strval = v if isinstance(v, basestring) \
-                     else v.strftime("%Y-%m-%d %H:%M") \
-                     if isinstance(v, datetime.datetime) else str(v)
+            strval = (v.encode("latin1", "replace") if isinstance(v, unicode) 
+                      else v.strftime("%Y-%m-%d %H:%M") \
+                      if isinstance(v, datetime.datetime) else 
+                      v if isinstance(v, basestring) else str(v))
             pixels = max(self._fonts[fmt_name].getsize(x)[0]
                          for x in strval.split("\n"))
             width = float(pixels) / self._unit_widths[fmt_name] + 1
