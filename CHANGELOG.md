@@ -1,22 +1,22 @@
 CHANGELOG
 =========
 
-3.4a, 2015-04-15
+3.4, 2015-04-15
 ------------------
 - added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
-- fixed HTML output for photo/video sharing messages (#33);
+- fixed HTML output for photo/video sharing messages (issue #33);
 - fixed getting encoding errors on Excel export;
 - fixed potential error on chat date histogram analysis;
 - fixed showing database statistics on information page;
 - use Skype account timezone setting for message timestamps;
 - added message links to file transfers in chat statistics;
 - added table links to result sections in searching over tables;
-- optimized memory usage in chat word-cloud analysis (#35);
+- optimized memory usage in chat word-cloud analysis (issue #35);
 - added opened file name to application title;
 - avoid "Broken pipe" errors if command-line output is piped and interrupted;
-- fixed error on opening databases with invalid SkypeOut values in account (#35);
+- fixed error on opening databases with invalid SkypeOut values in account (issue #35);
 - fixed possible invalid HTML in export;
 - command-line output encoded on all platforms, to avoid Unicode errors;
 - avoid stack trace on command-line keyboard interrupt;
