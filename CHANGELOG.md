@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.3.1j, 2015-04-03
+3.4a, 2015-04-15
 ------------------
 - added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
@@ -9,6 +9,7 @@ CHANGELOG
 - fixed HTML output for photo/video sharing messages (#33);
 - fixed potential error on chat date histogram analysis;
 - fixed showing database statistics on information page;
+- used Skype account timezone setting for message timestamps;
 - added message links to file transfers in chat statistics;
 - added table links to result sections in searching over tables;
 - optimized memory usage in chat word-cloud analysis (#35);

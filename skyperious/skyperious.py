@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.04.2015
+@modified    14.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3930,8 +3930,8 @@ class DatabasePage(wx.Panel):
             if type(value) is int and value > 100000000 \
             and ("time" in col_name or "history" in col_name):
                 try:
-                    tip = datetime.datetime.fromtimestamp(value).strftime(
-                        "%Y-%m-%d %H:%M:%S")
+                    tip = self.db.stamp_to_date(value).strftime(
+                          "%Y-%m-%d %H:%M:%S")
                 except Exception:
                     tip = unicode(value)
             else:
@@ -6345,7 +6345,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             colourmap = collections.defaultdict(lambda: "remote")
             colourmap[self._db.id] = "local"
             self._message_positions.clear()
-            previous_day = datetime.date.fromtimestamp(0)
+            previous_day = None
             count = 0
             focus_message_id = None
             self._filelinks.clear()

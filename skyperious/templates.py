@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    03.04.2015
+@modified    14.04.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -885,7 +885,7 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
 partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
-dt = datetime.datetime.fromtimestamp(f["starttime"]) if f.get("starttime") else None
+dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
@@ -918,11 +918,9 @@ for chunk in message_buffer:
 
 """HTML chat history export template for the messages part."""
 CHAT_MESSAGES_HTML = """<%
-import datetime
 import skypedata, util
 
-previous_day = datetime.date.fromtimestamp(0)
-previous_author = None
+previous_day, previous_author = None, None
 %>
 %for m in messages:
 %if m["datetime"].date() != previous_day:
@@ -962,7 +960,7 @@ author_class = "remote" if m["author"] != db.id else "local"
     </div></td>
     <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">
 %if m["edited_timestamp"]:
-    {{m["datetime"].strftime("%H:%M")}}<span class="{{"edited" if m["body_xml"] else "removed"}}" title="{{"Edited" if m["body_xml"] else "Removed"}} {{datetime.datetime.fromtimestamp(m["edited_timestamp"]).strftime("%H:%M:%S")}}">&nbsp;&nbsp;&nbsp;</span>
+    {{m["datetime"].strftime("%H:%M")}}<span class="{{"edited" if m["body_xml"] else "removed"}}" title="{{"Edited" if m["body_xml"] else "Removed"}} {{db.stamp_to_date(m["edited_timestamp"]).strftime("%H:%M:%S")}}">&nbsp;&nbsp;&nbsp;</span>
 %else:
     {{m["datetime"].strftime("%H:%M")}}
 %endif
@@ -997,10 +995,9 @@ for chunk in message_buffer:
 
 """TXT chat history export template for the messages part."""
 CHAT_MESSAGES_TXT = """<%
-import datetime
 import skypedata, util
 
-previous_day = datetime.date.fromtimestamp(0)
+previous_day = None
 %>
 %for m in messages:
 %if m["datetime"].date() != previous_day:
@@ -1172,7 +1169,7 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 
 """HTML statistics template, for use with HtmlWindow."""
 STATS_HTML = """<%
-import datetime, urllib
+import urllib
 import conf, skypedata, util
 %>
 <font color="{{conf.FgColour}}" face="{{conf.HistoryFontName}}" size="3">
@@ -1377,7 +1374,7 @@ safe_id = urllib.quote(p["identity"])
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
 partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
-f_datetime = datetime.datetime.fromtimestamp(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
+f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
@@ -1493,7 +1490,6 @@ import conf, skypedata
 
 """HTML template for search result of chat messages, HTML table row."""
 SEARCH_ROW_MESSAGE_HTML = """<%
-import datetime
 import conf, skypedata
 %>
 %if count <= 1 and result_count > 1:
@@ -1512,7 +1508,7 @@ elif m["author"] == search["db"].id:
 %>
     <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
   </td><td align="right" nowrap>
-    &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
+    &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
   </td>
 </tr>
 <tr><td></td>
@@ -1527,7 +1523,6 @@ elif m["author"] == search["db"].id:
 
 """TXT template for search result item for chat messages."""
 SEARCH_ROW_MESSAGE_TXT = """<%
-import datetime
 import conf, skypedata
 
 after = ""
@@ -1536,7 +1531,7 @@ if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-{{datetime.datetime.fromtimestamp(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{m["from_dispname"]}}{{after}}: {{body}}
+{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{m["from_dispname"]}}{{after}}: {{body}}
 """
 
 

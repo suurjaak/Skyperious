@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2015
+@modified    15.04.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -172,22 +172,11 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception:
-            if log_error:
-                main.log("Error opening database %s.\n\n%s",
-                         filename, traceback.format_exc())
+            if log_error: main.log("Error opening database %s.\n\n%s",
+                                   filename, traceback.format_exc())
             self.close()
             raise
-
-        try:
-            self.account = self.execute("SELECT *, "
-                "COALESCE(fullname, displayname, skypename, '') AS name, "
-                "skypename AS identity FROM accounts LIMIT 1"
-            ).fetchone()
-            self.id = self.account["skypename"]
-        except Exception:
-            if log_error:
-                main.log("Error getting account information from %s.\n\n%s",
-                         filename, traceback.format_exc())
+        self.update_accountinfo(log_error)
 
 
     def __str__(self):
@@ -257,7 +246,7 @@ class SkypeDatabase(object):
         self.get_tables(True)
 
 
-    def update_accountinfo(self):
+    def update_accountinfo(self, log_error=True):
         """Refreshes Skype account information."""
         try:
             self.account = self.execute("SELECT *, "
@@ -265,8 +254,26 @@ class SkypeDatabase(object):
                 "skypename AS identity FROM accounts LIMIT 1").fetchone()
             self.id = self.account["skypename"]
         except Exception:
-            main.log("Error getting account information from %s.\n\n%s",
-                     self, traceback.format_exc())
+            if log_error:
+                main.log("Error getting account information from %s.\n\n%s",
+                         self, traceback.format_exc())
+
+
+    def stamp_to_date(self, timestamp):
+        """
+        Converts the UNIX timestamp to datetime using Account.timezone,
+        or current computer timezone if account setting unavailable.
+        """
+        localtime = time.localtime(timestamp)
+        if self.account and self.account.get("timezone") is not None:
+            result = datetime.datetime.utcfromtimestamp(timestamp)
+            # In Skype Account.timezone, GMT stands for 86400, for some reason
+            result += datetime.timedelta(seconds=self.account["timezone"] % 86400)
+            if localtime.tm_isdst > 0: # Add Daylight Savings Time
+                result += datetime.timedelta(seconds=time.timezone - time.altzone)
+        else: # Fall back to current computer timezone
+            result = datetime.datetime(*localtime[:6])
+        return result
 
 
     def register_consumer(self, consumer):
@@ -343,7 +350,7 @@ class SkypeDatabase(object):
                 count = self.execute("SELECT COUNT(*) AS count FROM messages "
                                      "WHERE timestamp > ?", [now]
                                     ).fetchone()["count"]
-                result = (count, datetime.datetime.fromtimestamp(maxtimestamp))
+                result = (count, self.stamp_to_date(maxtimestamp))
             except Exception:
                 pass
 
@@ -446,7 +453,7 @@ class SkypeDatabase(object):
         msg_last = next(res, None)
         if msg_last:
             if msg_last.get("timestamp"):
-                dt = datetime.datetime.fromtimestamp(msg_last["timestamp"])
+                dt = self.stamp_to_date(msg_last["timestamp"])
                 result["lastmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
             result["lastmessage_from"] = msg_last["from_dispname"]
             result["lastmessage_skypename"] = msg_last["author"]
@@ -465,7 +472,7 @@ class SkypeDatabase(object):
         msg_first = next(res, None)
         if msg_first:
             if msg_first.get("timestamp"):
-                dt = datetime.datetime.fromtimestamp(msg_first["timestamp"])
+                dt = self.stamp_to_date(msg_first["timestamp"])
                 result["firstmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
             result["firstmessage_from"] = msg_first["from_dispname"]
             result["firstmessage_skypename"] = msg_first["author"]
@@ -531,9 +538,8 @@ class SkypeDatabase(object):
                 while message:
                     message["datetime"] = None
                     if message["timestamp"]:
-                        message["datetime"] = datetime.datetime.fromtimestamp(
-                            message["timestamp"]
-                        )
+                        message["datetime"] = self.stamp_to_date(
+                                              message["timestamp"])
                     if chat and use_cache and len(params) == 1:
                         messages.append(message)
                     yield message
@@ -626,7 +632,7 @@ class SkypeDatabase(object):
                     for k, v in [("creation_timestamp", "created_datetime"),
                     ("last_activity_timestamp", "last_activity_datetime")]:
                         if chat[k]:
-                            chat[v] = datetime.datetime.fromtimestamp(chat[k])
+                            chat[v] = self.stamp_to_date(chat[k])
                         
                     chat["type_name"] = CHATS_TYPENAMES.get(chat["type"],
                         "Unknown (%d)" % chat["type"])
@@ -680,10 +686,10 @@ class SkypeDatabase(object):
             chat["message_count"] = 0
             if chat["id"] not in stats: continue # for chat in chats
             data = stats[chat["id"]]
-            stamptodate = datetime.datetime.fromtimestamp
             for n in ["first_message", "last_message"]:
                 if data[n + "_timestamp"]: # Initialize Python datetime fields
-                    data[n + "_datetime"] = stamptodate(data[n + "_timestamp"])
+                    dt = self.stamp_to_date(data[n + "_timestamp"])
+                    data[n + "_datetime"] = dt
             chat.update(data)
         if log and chats:
             main.log("Statistics collected (%s).", self.filename)
@@ -962,8 +968,8 @@ class SkypeDatabase(object):
     def update_fileinfo(self):
         """Updates database file size and modification information."""
         self.filesize = os.path.getsize(self.filename)
-        mod_timestamp = os.path.getmtime(self.filename)
-        self.last_modified = datetime.datetime.fromtimestamp(mod_timestamp)
+        self.last_modified = datetime.datetime.fromtimestamp(
+                             os.path.getmtime(self.filename))
 
 
     def ensure_backup(self):
@@ -1155,8 +1161,7 @@ class SkypeDatabase(object):
                 # Conversations.creation_timestamp must not be later than the
                 # oldest message, Skype will not show messages older than that.
                 chat["creation_timestamp"] = timestamp_earliest
-                chat["created_datetime"] = \
-                    datetime.datetime.fromtimestamp(timestamp_earliest)
+                chat["created_datetime"] = self.stamp_to_date(timestamp_earliest)
                 self.execute("UPDATE conversations SET creation_timestamp = "
                              ":creation_timestamp WHERE id = :id", chat)
             self.connection.commit()
@@ -1775,8 +1780,7 @@ class MessageParser(object):
             footer = get_quote_name(quote)
             if quote.get("timestamp"):
                 footer += (", %s" if footer else "%s") % \
-                    datetime.datetime.fromtimestamp(
-                        int(quote.get("timestamp"))
+                    self.db.stamp_to_date(int(quote.get("timestamp"))
                     ).strftime("%d.%m.%Y %H:%M")
             if footer:
                 ElementTree.SubElement(quote, "quotefrom").text = footer
