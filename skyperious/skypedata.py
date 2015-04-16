@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2015
+@modified    16.04.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -268,7 +268,7 @@ class SkypeDatabase(object):
         if self.account and self.account.get("timezone") is not None:
             result = datetime.datetime.utcfromtimestamp(timestamp)
             # In Skype Account.timezone, GMT stands for 86400, for some reason
-            result += datetime.timedelta(seconds=self.account["timezone"] % 86400)
+            result += datetime.timedelta(seconds=self.account["timezone"] - 86400)
             if localtime.tm_isdst > 0: # Add Daylight Savings Time
                 result += datetime.timedelta(seconds=time.timezone - time.altzone)
         else: # Fall back to current computer timezone

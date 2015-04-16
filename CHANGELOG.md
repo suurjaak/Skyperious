@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+3.4.1a, 2015-04-16
+------------------
+- fixed showing wrong message datetime in zones west of GMT (issue #33);
+
+
 3.4, 2015-04-15
 ------------------
 - added links to earliest messages in chat statistics histogram sectors;
@@ -24,7 +29,7 @@ CHANGELOG
 - command-line progress bar clears previously printed bar text;
 - small UI tweaks;
 - added __main__.py: pip-installed Skyperious can run as `python -m skyperious`;
-- upgraded Pillow from 2.7.0 to 2.8.0;
+- upgraded Pillow from 2.7.0 to 2.8.0.
 
 3.3, 2015-03-15
 ------------------
