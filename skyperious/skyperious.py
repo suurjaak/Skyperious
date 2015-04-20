@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.04.2015
+@modified    20.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2334,6 +2334,7 @@ class DatabasePage(wx.Panel):
             style=wx.BORDER_STATIC | wx.TE_PROCESS_TAB | wx.TE_PROCESS_ENTER)
         stc.Bind(wx.EVT_KEY_DOWN, self.on_keydown_sql)
         stc.SetText(conf.SQLWindowTexts.get(self.db.filename, ""))
+        stc.EmptyUndoBuffer() # So that undo does not clear the STC
         sizer1.Add(label_stc, border=5, flag=wx.ALL)
         sizer1.Add(stc, border=5, proportion=1, flag=wx.GROW | wx.LEFT)
 
