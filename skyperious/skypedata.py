@@ -265,14 +265,19 @@ class SkypeDatabase(object):
         or current computer timezone if account setting unavailable.
         """
         localtime = time.localtime(timestamp)
-        if self.account and self.account.get("timezone") is not None:
-            result = datetime.datetime.utcfromtimestamp(timestamp)
-            # In Skype Account.timezone, GMT stands for 86400, for some reason
-            result += datetime.timedelta(seconds=self.account["timezone"] - 86400)
-            if localtime.tm_isdst > 0: # Add Daylight Savings Time
-                result += datetime.timedelta(seconds=time.timezone - time.altzone)
-        else: # Fall back to current computer timezone
-            result = datetime.datetime(*localtime[:6])
+        if not self.account or self.account.get("timezone") is None:
+            return datetime.datetime(*localtime[:6]) # Use computer time
+        # In Account.timezone, GMT stands for 86400. If timezone_policy=0,
+        # Skype uses computer time: Account.timezone is updated on DST rollover.
+        result = (datetime.datetime.utcfromtimestamp(timestamp) +
+                  datetime.timedelta(seconds=self.account["timezone"] - 86400))
+        if self.account.get("timezone_policy") != 0 and localtime.tm_isdst > 0:
+            result += datetime.timedelta(seconds=time.timezone - time.altzone)
+        elif self.account.get("timezone_policy") == 0:
+            if (localtime.tm_isdst >= 0 
+            and localtime.tm_isdst != time.localtime().tm_isdst):
+                d = datetime.timedelta(seconds=time.timezone - time.altzone)
+                result += d * (1 if localtime.tm_isdst else -1)
         return result
 
 
