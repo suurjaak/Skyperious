@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.04.2015
+@modified    26.04.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1976,10 +1976,10 @@ class MessageParser(object):
             elif "ss" == elem.tag:
                 text = elem.text
             elif elem.tag in ["i", "b", "s"]: # italic bold strikethrough
-                pre = tail = dict(zip("ibs", "_*~"))[elem.tag]
+                pre = post = dict(zip("ibs", "_*~"))[elem.tag]
                 if elem.get("raw_pre"): pre = elem.get("raw_pre")
-                if elem.get("raw_post"): tail = elem.get("raw_post")
-                text = pre + text
+                if elem.get("raw_post"): post = elem.get("raw_post")
+                text, tail = pre + text, post + tail
                 subitems = elem.getchildren()
             if text:
                 fulltext += text

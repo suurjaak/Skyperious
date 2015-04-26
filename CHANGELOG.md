@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-3.4.1a, 2015-04-16
+3.4.1b, 2015-04-26
 ------------------
+- fixed missing content in text/Excel/CSV export (issue #37);
 - fixed showing wrong message datetime in zones west of GMT (issue #33);
 
 
