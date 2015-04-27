@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    23.03.2015
+@modified    27.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -661,9 +661,11 @@ class PropertyDialog(wx.Dialog):
         if bool == typeclass:
             ctrl = wx.CheckBox(self.panel)
             ctrl_flag = wx.ALIGN_CENTER_VERTICAL
+            label_handler = lambda e: ctrl.SetValue(not ctrl.IsChecked())
         else:
             ctrl = wx.TextCtrl(self.panel, style=wx.BORDER_SIMPLE)
             ctrl_flag = wx.GROW | wx.ALIGN_CENTER_VERTICAL
+            label_handler = lambda e: (ctrl.SetFocus(), ctrl.SelectAll())
         tip = wx.StaticText(self.panel, label=help)
 
         ctrl.Value = self._GetValueForCtrl(value, typeclass)
@@ -673,6 +675,7 @@ class PropertyDialog(wx.Dialog):
         tip.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
         tipfont, tipfont.PixelSize = tip.Font, (0, 9)
         tip.Font = tipfont
+        for x in (label, tip): x.Bind(wx.EVT_LEFT_UP, label_handler)
 
         self.sizer_items.Add(label, pos=(row, 0), flag=wx.ALIGN_CENTER_VERTICAL)
         self.sizer_items.Add(ctrl, pos=(row, 1), flag=ctrl_flag)

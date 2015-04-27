@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-3.4.1b, 2015-04-26
+3.4.1c, 2015-04-27
 ------------------
 - fixed missing content in text/Excel/CSV export (issue #37);
 - fixed showing wrong message datetime in zones west of GMT (issue #33);
+- minor UI tweak: added focus-on-click to Advanced Options labels;
 
 
 3.4, 2015-04-15
