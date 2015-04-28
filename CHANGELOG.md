@@ -5,6 +5,7 @@ CHANGELOG
 ------------------
 - fixed missing content in text/Excel/CSV export (issue #37);
 - rolled back using Skype account timezone setting for message timestamps (issue #33);
+- added 40x40 and 256x256 application icons;
 - minor UI tweak: added focus-on-click to Advanced Options dialog labels;
 
 

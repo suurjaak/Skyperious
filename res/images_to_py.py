@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  10.03.2015
+@modified  28.04.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -23,9 +23,9 @@ TARGET = os.path.join("..", "skyperious", "images.py")
 Q3 = '"""'
 
 """Application icons of different size and colour depth."""
-APPICONS = dict(("Icon{0}x{0}_{1}bit.png".format(s, b),
-                 "Skyperious application {0}x{0} icon, {1}-bit colour.".format(s, b))
-                for b in [8, 32] for s in [16, 24, 32, 48, 64])
+APPICONS = [("Icon{0}x{0}_{1}bit.png".format(s, b),
+             "Skyperious application {0}x{0} icon, {1}-bit colour.".format(s, b))
+            for s in (16, 24, 32, 40, 48, 64, 256) for b in (32, 8)]
 IMAGES = {
     "AvatarDefault.png":
         "Default avatar image for contacts without one.",
@@ -154,7 +154,7 @@ def create_py(target):
     global HEADER, APPICONS, IMAGES
     f = open(target, "w")
     f.write(HEADER)
-    icons = [os.path.splitext(i)[0] for i in sorted(APPICONS.keys())]
+    icons = [os.path.splitext(x)[0] for x, _ in APPICONS]
     icon_parts = [", ".join(icons[4*i:4*i+4]) for i in range(len(icons) / 4)]
     iconstr = ",\n        ".join(icon_parts)
     f.write("\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
@@ -164,7 +164,7 @@ def create_py(target):
         "for several sizes and colour depths.",
         Q3, iconstr.replace("'", "").replace("[", "").replace("]", "")
     ))
-    for filename, desc in sorted(APPICONS.items()):
+    for filename, desc in APPICONS:
         name, extension = os.path.splitext(filename)
         f.write("\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
         data = base64.b64encode(open(filename, "rb").read())
