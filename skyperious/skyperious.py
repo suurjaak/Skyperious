@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2015
+@modified    28.04.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4847,8 +4847,7 @@ class MergerPage(wx.Panel):
         self.db1 = db1
         self.db2 = db2
         main.status("Opening databases %s and %s.", self.db1, self.db2)
-        self.db1.register_consumer(self)
-        self.db2.register_consumer(self)
+        self.db1.register_consumer(self), self.db2.register_consumer(self)
         self.title = title
         parent_notebook.InsertPage(1, self, title)
         busy = controls.BusyPanel(
