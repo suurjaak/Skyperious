@@ -1,11 +1,11 @@
 CHANGELOG
 =========
 
-3.4.1c, 2015-04-27
+3.4.1d, 2015-04-28
 ------------------
 - fixed missing content in text/Excel/CSV export (issue #37);
-- fixed showing wrong message datetime in zones west of GMT (issue #33);
-- minor UI tweak: added focus-on-click to Advanced Options labels;
+- rolled back using Skype account timezone setting for message timestamps (issue #33);
+- minor UI tweak: added focus-on-click to Advanced Options dialog labels;
 
 
 3.4, 2015-04-15

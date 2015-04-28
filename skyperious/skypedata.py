@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.04.2015
+@modified    28.04.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -260,25 +260,8 @@ class SkypeDatabase(object):
 
 
     def stamp_to_date(self, timestamp):
-        """
-        Converts the UNIX timestamp to datetime using Account.timezone,
-        or current computer timezone if account setting unavailable.
-        """
-        localtime = time.localtime(timestamp)
-        if not self.account or self.account.get("timezone") is None:
-            return datetime.datetime(*localtime[:6]) # Use computer time
-        # In Account.timezone, GMT stands for 86400. If timezone_policy=0,
-        # Skype uses computer time: Account.timezone is updated on DST rollover.
-        result = (datetime.datetime.utcfromtimestamp(timestamp) +
-                  datetime.timedelta(seconds=self.account["timezone"] - 86400))
-        if self.account.get("timezone_policy") != 0 and localtime.tm_isdst > 0:
-            result += datetime.timedelta(seconds=time.timezone - time.altzone)
-        elif self.account.get("timezone_policy") == 0:
-            if (localtime.tm_isdst >= 0 
-            and localtime.tm_isdst != time.localtime().tm_isdst):
-                d = datetime.timedelta(seconds=time.timezone - time.altzone)
-                result += d * (1 if localtime.tm_isdst else -1)
-        return result
+        """Converts the UNIX timestamp to datetime using localtime."""
+        return datetime.datetime.fromtimestamp(timestamp)
 
 
     def register_consumer(self, consumer):
@@ -1411,9 +1394,7 @@ class SkypeDatabase(object):
 class MessageParser(object):
     """A Skype message parser, able to collect statistics from its input."""
 
-    """
-    Maximum line width in characters for text output.
-    """
+    """Maximum line width in characters for text output."""
     TEXT_MAXWIDTH = 79
 
     """HTML entities in the body to be replaced before feeding to xml.etree."""
