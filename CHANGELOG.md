@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.4.1d, 2015-04-28
+3.4.1, 2015-04-29
 ------------------
 - fixed missing content in text/Excel/CSV export (issue #37);
 - rolled back using Skype account timezone setting for message timestamps (issue #33);
