@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.04.2015
+@modified    04.05.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -501,9 +501,7 @@ class SkypeDatabase(object):
                 self.table_rows["messages"] = {} # {convo_id: [{msg1},]}
             if not use_cache \
             or not (chat and chat["id"] in self.table_rows["messages"]):
-                params = {}
-                # Take only message types we can handle
-                sql = "SELECT m.* FROM messages m "
+                sql, params = "SELECT m.* FROM messages m ", {}
                 if additional_sql and " c." in additional_sql:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
                 # Take only known and supported types of messages.
@@ -1764,7 +1762,7 @@ class MessageParser(object):
                     quote.text += i.tail
                 quote.remove(i)
             footer = get_quote_name(quote)
-            if quote.get("timestamp"):
+            if quote.get("timestamp") and quote.get("timestamp").isdigit():
                 footer += (", %s" if footer else "%s") % \
                     self.db.stamp_to_date(int(quote.get("timestamp"))
                     ).strftime("%d.%m.%Y %H:%M")
