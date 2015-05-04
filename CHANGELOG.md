@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+3.4.2a, 2015-05-04
+------------------
+- avoid caching messages on export to decrease memory overhead;
+- fixed a potential error with unexpected data in quoted messages;
+
+
 3.4.1, 2015-04-29
 ------------------
 - fixed missing content in text/Excel/CSV export (issue #37);

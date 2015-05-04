@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    15.04.2015
+@modified    04.05.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -116,7 +116,7 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
             main.logstatus("Exporting %s.", chat["title_long_lc"])
             if progress: progress(message_count)
             filename = make_filename(chat)
-            msgs = messages or db.get_messages(chat)
+            msgs = messages or db.get_messages(chat, use_cache=False)
             chatarg = [chat] if "xlsx" == format.lower() else chat
             export_func(chatarg, filename, db, msgs)
             message_count += chat["message_count"]
@@ -155,7 +155,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True, progress=No
         writer.writerow(["Time", "Author", "Message", "Skype Name"],
                         {3: "boldhidden"})
         writer.set_header(False)
-        msgs = messages or db.get_messages(chat)
+        msgs = messages or db.get_messages(chat, use_cache=False)
         for m in msgs:
             text = parser.parse(m, output={"format": "text"})
             try:
