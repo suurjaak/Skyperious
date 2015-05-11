@@ -6,6 +6,7 @@ CHANGELOG
 - added support for copying selected list items to clipboard;
 - avoid caching messages on export to decrease memory overhead;
 - fixed a potential error with unexpected data in quoted messages;
+- fixed a potential error message on filtering chat messages;
 
 
 3.4.1, 2015-04-29

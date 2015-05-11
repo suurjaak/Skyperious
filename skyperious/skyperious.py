@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.05.2015
+@modified    11.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6180,7 +6180,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         if not msg_id and pos_msgs and pos_msgs[-1][0][-1] < pos:
             msg_id = pos_msgs[-1][1]
         if msg_id:
-            msg = next((m for m in self._messages_current 
+            msg = next((m for m in self._messages_current or []
                         if msg_id == m["id"]), None)
         menu = wx.Menu()
         item_selection = wx.MenuItem(menu, -1, "&Copy selection")
