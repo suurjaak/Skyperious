@@ -41,7 +41,8 @@ Stand-alone GUI components for wx:
   "Previous", pressing Enter in search box searches upwards.
 
 - SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
-  A sortable list view that can be batch-populated, autosizes its columns.
+  A sortable list view that can be batch-populated, autosizes its columns,
+  supports clipboard copy.
 
 - SQLiteTextCtrl(wx.stc.StyledTextCtrl):
   A StyledTextCtrl configured for SQLite syntax highlighting.
@@ -67,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.04.2015
+@modified    11.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1692,7 +1693,8 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
 class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
     """
     A sortable list view that can be batch-populated, autosizes its columns,
-    can be filtered by string value matched on any row column.
+    can be filtered by string value matched on any row column,
+    supports clipboard copy.
     """
     COL_PADDING = 30
 
@@ -1712,6 +1714,10 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
         self._formatters = collections.defaultdict(frmt)
+        id_copy = wx.NewId()
+        self.SetAcceleratorTable(wx.AcceleratorTable([
+            (wx.ACCEL_CTRL, ord("C"), id_copy)]))
+        self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
 
 
     def SetColumnFormatters(self, formatters):
@@ -1977,6 +1983,22 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 t = col_item.Text.replace(ARROWS[0], "").replace(ARROWS[1], "")
                 new_item.Text = t
                 self.SetColumn(i, new_item)
+
+
+    def OnCopy(self, event):
+        """Copies selected rows to clipboard."""
+        rows, i = [], self.GetFirstSelected()
+        while i >= 0:
+            data = self.GetItemMappedData(i)
+            rows.append("\t".join(self._formatters[n](data, n)
+                                  for n, l in self._columns))
+            i = self.GetNextSelected(i)
+        if rows:
+            clipdata = wx.TextDataObject()
+            clipdata.SetText("\n".join(rows))
+            wx.TheClipboard.Open()
+            wx.TheClipboard.SetData(clipdata)
+            wx.TheClipboard.Close()
 
 
     def _RowMatchesFilter(self, row):

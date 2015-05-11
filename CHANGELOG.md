@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-3.4.2a, 2015-05-04
+3.4.2a, 2015-05-11
 ------------------
+- added support for copying selected list items to clipboard;
 - avoid caching messages on export to decrease memory overhead;
 - fixed a potential error with unexpected data in quoted messages;
 
