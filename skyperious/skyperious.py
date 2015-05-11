@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.04.2015
+@modified    09.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3195,7 +3195,6 @@ class DatabasePage(wx.Panel):
         for i in range(len(selecteds)):
             # - i, as item count is getting smaller one by one
             selected = selecteds[i] - i
-            data = self.list_import_result.GetItemMappedData(selected)
             self.list_import_result.DeleteItem(selected)
         self.label_import_result.Label = "Contacts found in Sk&ype [%s]:" \
                                          % self.list_import_result.ItemCount
@@ -6438,8 +6437,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 length_before = self.STC.Length
                 time_value = m["datetime"].strftime("%H:%M")
                 displayname = m["from_dispname"]
-                special_text = "" # Special text after name, e.g. " SMS"
-                body = m["body_xml"] or ""
                 special_tag = dom.find("msgstatus")
                 # Info messages like "/me is thirsty" -> author on same line.
                 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
