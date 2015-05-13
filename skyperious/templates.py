@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    14.04.2015
+@modified    13.05.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -344,27 +344,38 @@ from third_party import step
       font-size: 1em;
       color: blue;
     }
-    #wordclouds {
+    #wordclouds, #emoticons {
       display: none;
       padding-top: 15px;
     }
-    #wordclouds > table {
+    #wordclouds > table, #emoticons  {
       border-collapse: collapse;
       width: 100%;
     }
-    #wordclouds > table > tbody > tr > td {
+    #wordclouds > table > tbody > tr > td, #emoticons > tbody > tr > td {
       vertical-align: top;
       padding-top: 5px;
       padding-bottom: 10px;
     }
-    #wordclouds > table > tbody > tr {
+    #wordclouds > table > tbody > tr, #emoticons > tbody > tr {
       border-top: 1px solid #99BBFF;
     }
-    #wordclouds > table > tbody > tr > td:first-child {
+    #wordclouds > table > tbody > tr > td:first-child, #emoticons > tbody > tr > td:first-child {
       vertical-align: top;
       width: 150px;
     }
-    #toggle_wordclouds {
+    #emoticons td.total {
+      text-align: right;
+      padding: 13px;
+    }
+    #emoticons table.emoticon_rows td:nth-child(3) {
+      color: {{conf.PlotHoursColour}};
+      text-align: right;
+    }
+    #emoticons table.emoticon_rows td:nth-child(4) {
+      color: #999;
+    }
+    .toggle_plusminus {
       font-size: 1.5em;
       color: blue;
       position: relative;
@@ -608,9 +619,9 @@ from third_party import step
       return false;
     }
 
-    var toggle_wordclouds = function(link) {
+    var toggle_plusminus = function(link, id) {
       link.innerHTML = "+-"["+" == link.innerHTML ? 1 : 0];
-      toggle_element('wordclouds');
+      toggle_element(id);
       return false;
     };
 
@@ -851,7 +862,7 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items())
 %>
     <br /><br />
-    <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_wordclouds(this);" id="toggle_wordclouds">+</a>]
+    <b>Word cloud for individuals</b>&nbsp;&nbsp;[<a title="Click to show/hide word clouds for individuals" href="#" onClick="return toggle_plusminus(this, 'wordclouds');" class="toggle_plusminus">+</a>]
     <div id="wordclouds">
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
@@ -874,6 +885,64 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
 %endif
 %endif
 
+
+%if stats["emoticons"]:
+    <br /><br />
+    <b>Emoticon statistics</b>&nbsp;&nbsp;[<a title="Click to show/hide emoticon statistics" href="#" onClick="return toggle_plusminus(this, 'emoticons');" class="toggle_plusminus">+</a>]
+    <table id="emoticons">
+<%
+emoticon_counts = {"": dict((x, sum(vv.values())) for x, vv in stats["emoticons"].items())}
+for emoticon, counts in stats["emoticons"].items():
+    for author, count in counts.items():
+        emoticon_counts.setdefault(author, {})[emoticon] = count
+total = sum(emoticon_counts[""].values())
+authors = [("", {})] + sorted([(p["identity"], p) for p in participants], key=lambda x: x[1]["name"].lower())
+%>
+%for identity, participant in authors:
+<%
+name = participant.get("name", "TOTAL")
+smalltotal = sum(emoticon_counts.get(identity, {}).values())
+%>
+      <tr>
+%if participant:
+        <td><table><tr><td class="avatar">
+        <img title="{{name}}" alt="{{name}}" src="data:image/png;base64,{{!base64.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" />
+        </td><td><span>{{name}}<br /><span class="identity">{{identity}}</span></span></td></tr></table></td>
+%else:
+        <td style="padding: 13px;">{{name}}</td>
+%endif
+        <td class="total" title="{{"%s%% of %s in total" % (util.round_float(100. * smalltotal / total), total) if participant and smalltotal else ""}}">{{smalltotal or ""}}</td><td>
+%if identity in emoticon_counts:
+        <td><table class="emoticon_rows">
+%endif
+%for emoticon, count in sorted(emoticon_counts.get(identity, {}).items(), key=lambda x: (-x[1], x[0])):
+<%
+if emoticon in emoticons.EmoticonData:
+    title, text = emoticons.EmoticonData[emoticon]["title"], emoticons.EmoticonData[emoticon]["strings"][0]
+    if text != title:
+        title += " " + text
+else:
+    text, title = emoticon, "%s (%s)" % (emoticon.capitalize(), emoticon)
+percent = 100. * count / total
+text_cell1 = "%d%%" % round(percent) if (round(percent) > 14) else ""
+text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
+subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / smalltotal), smalltotal) if participant else "%s%% of %s in total" % (util.round_float(percent), total)
+%>
+        <tr title="{{util.round_float(percent)}}% of {{total}} in total">
+          <td><span class="emoticon {{emoticon}}" title="{{title}}">{{text}}</span></td>
+          <td><table class="plot_row messages" style="width: 200px;"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table></td>
+          <td title="{{subtitle}}">{{count}}</td><td title="{{subtitle}}">{{title}}</td>
+        </tr>
+%endfor
+%if identity in emoticon_counts:
+        </table>
+%else:
+        <td style="padding-top: 13px;"><span class="gray">No emoticons.</span>
+%endif
+      </td></tr>
+%endfor
+</table>
+%endif
 
 
 %if stats["transfers"]:

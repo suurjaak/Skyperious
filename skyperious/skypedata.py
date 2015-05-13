@@ -1474,7 +1474,6 @@ class MessageParser(object):
         self.db = db
         self.chat = chat
         self.stats = None
-        self.emoticons_unique = set()
         self.wrapfunc = wrapper
         self.textwrapfunc = textwrap.TextWrapper(width=self.TEXT_MAXWIDTH,
             expand_tabs=False, replace_whitespace=False,
@@ -1495,7 +1494,8 @@ class MessageParser(object):
                 "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
                 "hists": {}, # Author histogram data {author: {"hours", ..} }
-                "workhist": {}, } # {"hours": {0: {author: count}}, "days": ..}}
+                "workhist": {}, # {"hours": {0: {author: count}}, "days": ..}}
+                "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)), }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -2098,7 +2098,7 @@ class MessageParser(object):
                 self.stats["links"].setdefault(message["author"], []).append(text)
                 self.add_dict_text(self.stats, "last_message", text)
             elif "ss" == elem.tag:
-                self.emoticons_unique.add(elem.get("type"))
+                self.stats["emoticons"][elem.get("type")][message["author"]] += 1
             elif "quotefrom" == elem.tag:
                 self.add_dict_text(self.stats, "last_message", text)
             elif elem.tag in ["xml", "i", "b", "s"]:
