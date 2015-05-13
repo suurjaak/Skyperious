@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.05.2015
+@modified    13.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2100,7 +2100,7 @@ class DatabasePage(wx.Panel):
             "Exports filtered messages straight to file, "
             "without showing them (showing thousands of messages gets slow).")
         button_filter_reset.SetToolTipString(
-            "Restores filter controls to initial values.")
+            "Restores filter controls to initial values and reapplies filter.")
         sizer_filter_buttons.Add(button_filter_apply)
         sizer_filter_buttons.AddSpacer(5)
         sizer_filter_buttons.Add(button_filter_export)
@@ -3961,37 +3961,47 @@ class DatabasePage(wx.Panel):
     def on_filterreset_chat(self, event):
         """
         Handler for clicking to reset current chat history filter, restores
-        initial values to filter controls.
+        initial values to filter controls, and reapplies the filter, scrolling
+        to the message displayed last, if possible.
         """
+        self.edit_filtertext.Value = ""
+        self.range_date.SetValues(*self.chat_filter["startdaterange"])
         for i in range(self.list_participants.GetItemCount()):
             c = self.list_participants.GetItem(i)
             c.Check(True)
             self.list_participants.SetItem(c)
-        self.edit_filtertext.Value = ""
-        self.range_date.SetValues(*self.chat_filter["startdaterange"])
         self.list_participants.Refresh()
 
+        new_filter = self.build_filter()
+        if self.cmp_filter(new_filter): return # Filter unchanged
 
-    def on_filter_chat(self, event):
+        focus_message_id, selected = self.stc_history.GetFocusedMessage()
+        self.on_filter_chat(event, new_filter)
+        if focus_message_id is not None:
+            self.stc_history.FocusMessage(focus_message_id, do_select=selected)
+
+
+    def on_filter_chat(self, event, new_filter=None):
         """
         Handler for clicking to filter current chat history, applies the
         current filter to the chat messages.
         """
-        new_filter, old_filter = self.build_filter(), self.stc_history.Filter
-        current_filter = dict((t, old_filter) for t in new_filter)
-        self.current_filter = current_filter
-        self.new_filter = new_filter
-        if new_filter != current_filter:
+        focus_message_id = None
+        if new_filter is None:
+            new_filter = self.build_filter()
+            if self.cmp_filter(new_filter): return # Filter unchanged
+            focus_message_id, _ = self.stc_history.GetFocusedMessage(selectedonly=True)
+        busy = controls.BusyPanel(self, "Filtering messages.")
+        try:
             self.chat_filter.update(new_filter)
-            busy = controls.BusyPanel(self, "Filtering messages.")
-            try:
-                self.stc_history.SetFilter(self.chat_filter)
-                self.stc_history.RefreshMessages()
-                self.populate_chat_statistics()
-            finally:
-                busy.Close()
-            has_messages = self.chat["message_count"] > 0
-            self.tb_chat.EnableTool(wx.ID_MORE, has_messages)
+            self.stc_history.SetFilter(self.chat_filter)
+            self.stc_history.RefreshMessages()
+            self.populate_chat_statistics()
+        finally:
+            busy.Close()
+        self.tb_chat.EnableTool(wx.ID_MORE, self.chat["message_count"] > 0)
+        if focus_message_id is not None:
+            self.stc_history.FocusMessage(focus_message_id)
 
 
     def build_filter(self):
@@ -4025,6 +4035,16 @@ class DatabasePage(wx.Panel):
             "participants": participants
         }
         return filterdata
+
+
+    def cmp_filter(self, filterdata):
+        """Returns whether chat filter data is same as currently applied."""
+        old_filter = self.stc_history.Filter
+        if "text" not in old_filter: old_filter["text"] = ""
+        if "participants" not in old_filter:
+            everyone = [x["identity"] for x in self.chat["participants"]]
+            old_filter["participants"] = everyone
+        return util.cmp_dicts(filterdata, old_filter)
 
 
     def on_toggle_filter(self, event):
@@ -4511,6 +4531,11 @@ class DatabasePage(wx.Panel):
 
             if center_message_id and self.chat == chat:
                 if not self.stc_history.IsMessageShown(center_message_id):
+                    for i in range(self.list_participants.GetItemCount()):
+                        c = self.list_participants.GetItem(i)
+                        c.Check(True)
+                        self.list_participants.SetItem(c)
+                    self.list_participants.Refresh()
                     self.stc_history.SetFilter(self.chat_filter)
                     self.stc_history.RefreshMessages(center_message_id)
                 else:
@@ -4528,8 +4553,7 @@ class DatabasePage(wx.Panel):
 
             if self.stc_history.GetMessage(0):
                 values = [self.stc_history.GetMessage(0)["datetime"],
-                    self.stc_history.GetMessage(-1)["datetime"]
-                ]
+                          self.stc_history.GetMessage(-1)["datetime"]]
                 dates_values = tuple(i.date() for i in values)
                 if not any(filter(None, dates_range)):
                     dts = "first_message_datetime", "last_message_datetime"
@@ -6651,16 +6675,45 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self.RefreshMessages(center_message_id)
 
 
-    def FocusMessage(self, message_id):
+    def FocusMessage(self, message_id, do_select=True):
         """Selects and scrolls the specified message into view."""
-        if message_id in self._message_positions:
-            padding = -50 # So that selection does not finish at visible edge
-            for p in self._message_positions[message_id]:
+        if message_id not in self._message_positions: return
+        linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
+        viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
+                    for x in [0, self.LinesOnScreen()]]
+        pos, padding = self._message_positions[message_id], 50
+        if not viewport[0] <= pos[0] <= viewport[1]:
+            for p in pos[::-1]:
                 # Ensure that both ends of the selection are visible
                 self.STC.CurrentPos = p + padding
                 self.EnsureCaretVisible()
-                padding = abs(padding)
-            self.STC.SetSelection(*self._message_positions[message_id])
+                padding = -padding
+            self.STC.SelectNone()
+        if do_select: self.STC.SetSelection(*pos)
+
+
+    def GetFocusedMessage(self, selectedonly=False):
+        """
+        Returns the ID of the currently selected or the first visible message,
+        and whether the message text was selected.
+
+        @param   selectedonly  whether to look at selected message only
+        @return  (message ID, is_selected)
+        """
+        linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
+        viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
+                    for x in [0, self.LinesOnScreen()]]
+        selection, curpos, selected = self.Selection, None, False
+        if selection[0] != selection[1] \
+        and any(viewport[0] <= x <= viewport[1] for x in selection):
+            curpos, selected = selection[0], True
+        elif not selectedonly:
+            curpos = viewport[0]
+        if curpos is None: return None, False # No position to check
+            
+        for id, pos in sorted(self._message_positions.items(), key=lambda x: x[1]):
+            if curpos < pos[1]: return id, selected
+        return None, False
 
 
     def IsMessageFilteredOut(self, message):
@@ -6732,7 +6785,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                               "participants": [skypename1, ]}
         """
         filter_data = filter_data or {}
-        if not util.cmp_dicts(self._filter, filter_data):
+        if not util.cmp_dicts(filter_data, self._filter):
             self._filter = copy.deepcopy(filter_data)
             self._filtertext_rgx = None
             self._messages_current = None

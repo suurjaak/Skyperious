@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    06.03.2015
+@modified    13.05.2015
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -123,13 +123,20 @@ def plural(word, items=None, with_items=True):
 
 
 def cmp_dicts(dict1, dict2):
-    """Returns True if dict2 has all the keys and matching values as dict1."""
+    """
+    Returns True if dict2 has all the keys and matching values as dict1.
+    List values are converted to tuples before comparing.
+    """
     result = True
     for key, val in dict1.items():
+        val = tuple(val) if isinstance(val, list) else val
         if key not in dict2:
             result = False
-        elif dict2[key] != val:
-            result = False
+        else:
+            val2 = dict2[key]
+            val2 = tuple(val2) if isinstance(val2, list) else val2
+            if val != val2:
+                result = False
         if not result:
             break # break for key, val
     return result
