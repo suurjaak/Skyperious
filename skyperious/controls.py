@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    11.05.2015
+@modified    12.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1680,12 +1680,9 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
         Handler for scrolling the window, stores scroll position
         (HtmlWindow loses it on resize).
         """
-        self._last_scroll_pos = [
-            self.GetScrollPos(wx.HORIZONTAL), self.GetScrollPos(wx.VERTICAL)
-        ]
-        self._last_scroll_range = [
-            self.GetScrollRange(wx.HORIZONTAL), self.GetScrollRange(wx.VERTICAL)
-        ]
+        p, r = self.GetScrollPos, self.GetScrollRange
+        self._last_scroll_pos   = [p(x) for x in (wx.HORIZONTAL, wx.VERTICAL)]
+        self._last_scroll_range = [r(x) for x in (wx.HORIZONTAL, wx.VERTICAL)]
         event.Skip() # Allow event to propagate wx handler
 
 
