@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.05.2015
+@modified    13.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2335,6 +2335,31 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         "4//8/Q3v/pP9Pnj4FMv8zwDCY4RYU/t8/Kv7/8jXr4JJwCZAkCKfmFf0/euIkRCtMEKuE"
         "d1g0plHYLAcAYhZhHfMXUEMAAAAASUVORK5CYII=")
 
+    """Image for toggle chat search bar button."""
+    IMG_TOGGLE = wx.lib.embeddedimage.PyEmbeddedImage(
+        "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+        "ZSBJbWFnZVJlYWR5ccllPAAABBJJREFUeNq0Vm1oW1UYPveem3tvc7v0Nk269SOxJCVZqR3b"
+        "0qyhbm5WaLvOUf/LNh2yDqQgFIqwKZsKxf7Zn03ETWHtLxGRqrNu1kLcxlyzgKmjwVl0I62a"
+        "ffUjmqTN/dh7bm/LXdqbdYIHHs7lvOc878d53/dcSlVV9H8Oykzg9/s1UBSFMMbaDHAC6kC8"
+        "EWDTt84DkmBoHHCPGCzLMiLz0NAQYsyI8wYH2GEvrww8u2O3z+Wtq6ze5Cy1F7Ncam52PhaL"
+        "3b4aHpl4kJyOwr4xwMIqD0yIidUcoHX7rradjbs7tllYjhWtLFNRyluN++4kZ2dGh7+KRi9/"
+        "dxmsvwRY0Dzw+XyorKwMORwOtNZ9wFqo8fn2XaEXOxspmqYxTSGnjePz91U5SkqaWzuDqqpQ"
+        "kfAwCVuYrNNerxeJoogkSVoFiOXGUmdFMLhn31ZCTg5YOQYzmKLzFZA1gWeZppZ92yCUQXJW"
+        "W1cUpVAS1G8JveBjeZ4D5zT3UpmcHJ/OzZsdwBbeEniupe7CZ5/Wk8tniKUFRpVnc0OFccEC"
+        "MSrbwFkEDltYhsZG2UJOkX6/+0/as3lLJfBWaR48QUGJKNpt4OPK5bgcVojS48TGMJFZLLXb"
+        "gLdkPQpojCmsKJRMrlvLVxNyLTz0kgKYMfBq30wulyukIJWafZAWxPIiSVbl9Vbvv3MP08Cb"
+        "0ixcK3sM+DM+Hk1aWbySloqKTHsLkXEWzMZjkXvkrKaAlHUBjI9888UkkhdQEYtJNaOcpJh6"
+        "IsmKIjAS/+3Q53FyVlMgCAIqgGzij8m5wXNnbopFTDHcLp/NyWvmNU1RNIvRhsGzH8biN8cj"
+        "6XT6L229QCjtUCN7oNLrgg3+V0/1v/uLgBeLeRbbGExzhBBaCAUXyvAWLKhSprjv/RPR82dP"
+        "h7PZ7Ggmk1nKLBNyB5C3VFe7Wg4ePHSkv/+DwRs3Ird+/OFi8pVDr/s693e43G6XAxoZNT01"
+        "Pfv9pYt3Pjn3cfy3W7+GGYYZ5jgus9LLmpub88nLgbzV7X5m5+HDR7r6+t4biETGRhcXFy+A"
+        "rIh0VUAN8VDf/xBwW++iCZZlkc1mQ6AIJRKJVR5sAvK9NTWepqNHu7tOnjxGyK8A+TDI7ut7"
+        "Ek/z4BgVVAD5fo+ndnt3d2/X8eM9A9ev/zQG5F+D7C7ptOTRedqxrKAKyF+urfU39PS83dXb"
+        "+8bAtWtXfwbyL4H4b9IQ1/u0kvqBDDK0y/p6FAqF3jxw4LWPJiam1La2jvNWq/UteCar/4vF"
+        "eW/JUgsJBAK9k5P31fb2lwj5O0DsJY1TB2MA1kEbQBmwSgFZdLrd7iaovMaZmRkG8ncEBFNo"
+        "qYOSopINsxkUHctnHlNA/g5Y3VpK32SEUgBq3vcyVhQ8EmAAk5L6w4z4Fw0AAAAASUVORK5C"
+        "YII="
+    )
 
 
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
@@ -2374,14 +2399,15 @@ class SearchableStyledTextCtrl(wx.PyPanel):
                                      style | wx.BORDER_NONE)
         self._stc = wx.stc.StyledTextCtrl(self, id, style=style_sub, name=name)
 
-        bmp = wx.ArtProvider_GetBitmap(wx.ART_FIND, size=(16, 16))
+        bmp = self.IMG_TOGGLE.GetBitmap()
+        buttonsize = bmp.Width + 4, bmp.Height + 4
         try: # ShapedButton might be unavailable if PIL not installed
             self._button_toggle = wx.lib.agw.shapedbutton.SBitmapButton(
-                parent=self._stc, id=wx.ID_ANY, size=(20, 20), bitmap=bmp)
+                parent=self._stc, id=wx.ID_ANY, size=buttonsize, bitmap=bmp)
             self._button_toggle.SetUseFocusIndicator(False) # Hide focus marquee
         except Exception:
             self._button_toggle = wx.BitmapButton(self._stc, wx.ID_ANY, bmp,
-                (20, 20), style = wx.NO_BORDER)
+                buttonsize, style = wx.NO_BORDER)
             bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
             self._button_toggle.BackgroundColour = bgcolour
         self._button_toggle.SetToolTipString("Show search bar (Ctrl-F)")
