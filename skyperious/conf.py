@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.05.2015
+@modified    14.05.2015
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.4.2b"
-VersionDate = "13.05.2015"
+Version = "3.4.2c"
+VersionDate = "14.05.2015"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -47,11 +47,11 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
-OptionalFileDirectives = ["ExportChatTemplate", "ExportDbTemplate", "LogSQL",
-    "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
-    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
-    "MaxSearchTableRows", "PlotDaysColour", "PlotDaysUnitSize",
-    "PlotHoursColour", "PlotHoursUnitSize",
+OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
+    "ExportDbTemplate", "LogSQL", "MinWindowSize", "MaxConsoleHistory",
+    "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
+    "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
+    "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "SearchContactsChunk", "SearchResultsChunk",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
@@ -316,6 +316,9 @@ AvatarImageLargeSize = (96, 96)
 
 """Width of the chat statistics plots, in pixels."""
 StatisticsPlotWidth = 150
+
+"""Width of the chat emoticons plots, in pixels."""
+EmoticonsPlotWidth = 200
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000

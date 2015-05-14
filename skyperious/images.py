@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    28.04.2015
+@modified    14.05.2015
 ------------------------------------------------------------------------------
 """
 try:
@@ -2279,4 +2279,10 @@ ToolbarTitle = PyEmbeddedImage(
     "AAAACXBIWXMAAAsSAAALEgHS3X78AAAABGdBTUEAALGPC/xhBQAAAEJJREFUeNpjYBhowAhj"
     "JCUl/SdF47x588B6WXBJIBuKTQwGmHBpJmQzUQBkGyGvMRFr2KgBw9oArKkKV+IhKRUSCwAF"
     "qxgZvjJU7QAAAABJRU5ErkJggg=="
+)
+
+
+"""Transparent 1x1 GIF."""
+TransparentPixel = PyEmbeddedImage(
+    "R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
 )

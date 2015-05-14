@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  28.04.2015
+@modified  14.05.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -126,6 +126,8 @@ IMAGES = {
         "Toolbar icon for tabs toggle button on search page.",
     "ToolbarTitle.png":
         "Toolbar icon for title toggle button on search page.",
+    "TransparentPixel.gif":
+        "Transparent 1x1 GIF.",
 }
 HEADER = """%s
 Contains embedded image and icon resources for Skyperious. Auto-generated.

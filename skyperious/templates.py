@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    13.05.2015
+@modified    14.05.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -896,7 +896,7 @@ for emoticon, counts in stats["emoticons"].items():
     for author, count in counts.items():
         emoticon_counts.setdefault(author, {})[emoticon] = count
 total = sum(emoticon_counts[""].values())
-authors = [("", {})] + sorted([(p["identity"], p) for p in participants], key=lambda x: x[1]["name"].lower())
+authors = [("", {})] + sorted([(p["identity"], p) for p in participants if p["identity"] in stats["counts"]], key=lambda x: x[1]["name"].lower())
 %>
 %for identity, participant in authors:
 <%
@@ -930,7 +930,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 %>
         <tr title="{{util.round_float(percent)}}% of {{total}} in total">
           <td><span class="emoticon {{emoticon}}" title="{{title}}">{{text}}</span></td>
-          <td><table class="plot_row messages" style="width: 200px;"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table></td>
+          <td><table class="plot_row messages" style="width: {{conf.EmoticonsPlotWidth}}px;"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table></td>
           <td title="{{subtitle}}">{{count}}</td><td title="{{subtitle}}">{{title}}</td>
         </tr>
 %endfor
@@ -1239,7 +1239,7 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 """HTML statistics template, for use with HtmlWindow."""
 STATS_HTML = """<%
 import urllib
-import conf, skypedata, util
+import conf, emoticons, skypedata, util
 %>
 <font color="{{conf.FgColour}}" face="{{conf.HistoryFontName}}" size="3">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
@@ -1434,6 +1434,83 @@ safe_id = urllib.quote(p["identity"])
 </table>
 %endif
 %endif
+
+%if stats.get("emoticons"):
+<br /><br />
+<b>Emoticons statistics</b> [<a href="emoticons://{{not expand_emoticons}}"><font color="{{conf.LinkColour}}" size="4">{{"+-"[expand_emoticons]}}</font></a>]
+%if expand_emoticons:
+<%
+emoticon_counts = {"": dict((x, sum(vv.values())) for x, vv in stats["emoticons"].items())}
+for emoticon, counts in stats["emoticons"].items():
+    for author, count in counts.items():
+        emoticon_counts.setdefault(author, {})[emoticon] = count
+total = sum(emoticon_counts[""].values())
+authors = [("", {})] + [(p["identity"], p) for p in participants_sorted]
+%>
+<table cellpadding="0" cellspacing="2" width="100%">
+%for identity, participant in authors:
+<%
+name = participant.get("name", "TOTAL")
+smalltotal = sum(emoticon_counts.get(identity, {}).values())
+%>
+  <tr><td colspan="3"><hr /></td></tr>
+%if participant:
+  <tr><td valign="top" width="150">
+    <table cellpadding="0" cellspacing="0"><tr>
+      <td valign="top"><img src="memory:{{authorimages[participant["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
+      <td valign="center"><font size="2">{{participant["name"]}}<br /><font color="gray">{{participant["identity"]}}</font></font></td>
+      <td width="10"></td>
+    </tr></table>
+  </td><td valign="top" align="right">
+%else:
+  <tr><td valign="top" width="150"><table cellpadding="3" cellspacing="0"><tr><td><font size="2">{{name}}</font></td></tr></table></td><td valign="top" align="right">
+%endif
+    <table cellpadding="0" cellspacing="3"><tr><td align="right"><font size="2">{{smalltotal or ""}}</font></td></tr></table></td><td valign="top">
+%if identity in emoticon_counts:
+    <table cellpadding="0" cellspacing="2">
+%endif
+%for emoticon, count in sorted(emoticon_counts.get(identity, {}).items(), key=lambda x: (-x[1], x[0])):
+<%
+if emoticon in emoticons.EmoticonData:
+    title, text = emoticons.EmoticonData[emoticon]["title"], emoticons.EmoticonData[emoticon]["strings"][0]
+    if text != title:
+        title += " " + text
+else:
+    text, title = emoticon, "%s (%s)" % (emoticon.capitalize(), emoticon)
+ratio = util.safedivf(count, total)
+percent = 100. * ratio
+text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 18) else ""
+text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
+%>
+        <tr>
+          <td><img src="memory:emoticon_{{emoticon if hasattr(emoticons, emoticon) else "transparent"}}.png" width="19" height="19"/></td>
+          <td><table cellpadding="0" cellspacing="0" width="{{conf.EmoticonsPlotWidth}}">
+
+            <td bgcolor="{{conf.PlotMessagesColour}}" width="{{int(round(ratio * conf.EmoticonsPlotWidth))}}" align="center">
+%if text_cell1:
+              <font color="#FFFFFF" size="2"><b>{{!text_cell1}}</b></font>
+%endif
+            </td>
+            <td bgcolor="{{conf.PlotBgColour}}" width="{{int(round((1 - ratio) * conf.EmoticonsPlotWidth))}}" align="center">
+%if text_cell2:
+              <font color="{{conf.PlotMessagesColour}}" size="2"><b>{{!text_cell2}}</b></font>
+%endif
+            </td>
+	        </table></td>
+          <td align="right"><font size="2" color="{{conf.PlotHoursColour}}">&nbsp;{{count}}</font></td><td><font size="2" color="gray">&nbsp;{{title}}</font></td>
+        </tr>
+%endfor
+%if identity in emoticon_counts:
+    </table>
+%else:
+    <font color="gray" size="2">No emoticons.</font>
+%endif
+  </td></tr>
+%endfor
+</table>
+%endif
+%endif
+
 
 %if stats.get("transfers"):
 <br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td></tr></table><br /><br />

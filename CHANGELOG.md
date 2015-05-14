@@ -1,9 +1,9 @@
 CHANGELOG
 =========
 
-3.4.2b, 2015-05-13
+3.4.2c, 2015-05-14
 ------------------
-- added emoticon statistics to HTML export;
+- added emoticons to chat statistics;
 - applying or resetting message filter will scroll to last selection;
 - added support for copying selected list items to clipboard;
 - avoid caching messages on export to decrease memory overhead;

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.05.2015
+@modified    14.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -58,6 +58,7 @@ from third_party import step
 
 import conf
 import controls
+import emoticons
 import export
 import guibase
 import images
@@ -1821,6 +1822,7 @@ class DatabasePage(wx.Panel):
         }
         self.stats_sort_field = "name"
         self.stats_expand_clouds = False # Expand individual author word clouds
+        self.stats_expand_emoticons = False # Expand emoticon statistics
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -3514,6 +3516,9 @@ class DatabasePage(wx.Panel):
         elif href.startswith("clouds://"):
             self.stats_expand_clouds = ast.literal_eval(href[9:])
             self.populate_chat_statistics()
+        elif href.startswith("emoticons://"):
+            self.stats_expand_emoticons = ast.literal_eval(href[12:])
+            self.populate_chat_statistics()
         elif href.startswith("message:"):
             self.show_stats(False)
             self.stc_history.FocusMessage(int(href[8:]))
@@ -4587,7 +4592,8 @@ class DatabasePage(wx.Panel):
                     "chat": self.chat, "sort_by": self.stats_sort_field,
                     "stats": stats, "images": {}, "authorimages": {},
                     "imagemaps": {}, "authorimagemaps": {},
-                    "expand_clouds": self.stats_expand_clouds}
+                    "expand_clouds": self.stats_expand_clouds,
+                    "expand_emoticons": self.stats_expand_emoticons}
             # Fill avatar images
             fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
             if defaultavatar not in fs["files"]:
@@ -4657,6 +4663,19 @@ class DatabasePage(wx.Panel):
                     if author not in data["authorimagemaps"]:
                         data["authorimagemaps"][author] = {}
                     data["authorimagemaps"][author][histtype] = areas
+            # Fill emoticon images
+            fn = "emoticon_transparent.png"
+            if fn not in fs["files"]:
+                img = images.TransparentPixel.Image
+                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                fs["files"][fn] = 1
+            for emoticon in stats["emoticons"]:
+                if not hasattr(emoticons, emoticon): continue # for emoticon
+                img = getattr(emoticons, emoticon).Image
+                fn = "emoticon_%s.png" % emoticon
+                if fn not in fs["files"]:
+                    fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                    fs["files"][fn] = 1
 
             html = step.Template(templates.STATS_HTML, escape=True).expand(data)
 
@@ -6688,7 +6707,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self.STC.CurrentPos = p + padding
                 self.EnsureCaretVisible()
                 padding = -padding
-            self.STC.SelectNone()
+            self.STC.SetSelection(p, p)
         if do_select: self.STC.SetSelection(*pos)
 
 
