@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.05.2015
+@modified    22.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5063,7 +5063,7 @@ class MergerPage(wx.Panel):
                       name="chats_label"), flag=wx.ALIGN_CENTER)
         sizer_top.AddStretchSpacer()
         label_filter = wx.StaticText(panel1, label="Filter ch&ats:")
-        sizer_top.Add(label_filter, flag=wx.ALL, border=5)
+        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
         edit_chatfilter = self.edit_chatfilter = wx.TextCtrl(
             parent=panel1, size=(75, -1))
         filter_tooltip = "Filter items in chat list"
@@ -5160,7 +5160,7 @@ class MergerPage(wx.Panel):
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
         lbl = wx.StaticText(parent=panel1, label="New &contacts on the left:",
                             name="contact_list_label")
-        sizer_top.Add(lbl, flag=wx.ALIGN_BOTTOM)
+        sizer_top.Add(lbl, flag=wx.ALIGN_CENTER)
         sizer_top.AddStretchSpacer()
         label_filter = wx.StaticText(panel1, label="Filter c&ontacts:")
         sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER | wx.ALIGN_RIGHT | 
