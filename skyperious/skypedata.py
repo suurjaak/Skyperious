@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.05.2015
+@modified    22.05.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -567,13 +567,16 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_conversations(self):
+    def get_conversations(self, chatnames=None, authornames=None):
         """
         Returns all the chats and message rowcounts in the database, as
         [{"id": integer, "title": "chat title", "created_datetime": datetime,
           "title_long": "Group chat "chat_title"", "title_long_lc": "group..",
           "last_activity_datetime": datetime, "type_name": chat type name}, ..]
         Uses already retrieved cached values if possible.
+
+        @param   chatnames    return chats with names containing given values
+        @param   authornames  return chats with authors containing given values
         """
         conversations = []
         if self.is_open() and "conversations" in self.tables:
@@ -601,15 +604,32 @@ class SkypeDatabase(object):
                         participants[i["convo_id"]].append(i)
                 [i.sort(key=lambda x: (x["contact"].get("name", "")).lower())
                  for i in participants.values()]
+                where, args = "WHERE displayname IS NOT NULL ", {}
+                for i, item in enumerate(chatnames or []):
+                    safe = item.replace("%", "\\%").replace("_", "\\_")
+                    where += (" OR " if i else "AND (") + (
+                             "title LIKE :name%s" % i +
+                             (" ESCAPE '\\'" if safe != item else "") +
+                             (")" if i == len(chatnames) - 1 else ""))
+                    args["name%s" % i] = "%" + safe + "%"
                 rows = self.execute(
                     "SELECT *, "
                     "COALESCE(displayname, meta_topic, identity) AS title, "
                     "NULL AS created_datetime, NULL AS last_activity_datetime "
-                    "FROM conversations WHERE displayname IS NOT NULL "
-                    "ORDER BY last_activity_timestamp DESC"
+                    "FROM conversations %s"
+                    "ORDER BY last_activity_timestamp DESC" % where, args
                 ).fetchall()
                 conversations = []
                 for chat in rows:
+                    chat["participants"] = participants.get(chat["id"], [])
+                    if authornames:
+                        fs = "fullname displayname skypename pstnnumber".split()
+                        vals = [p["contact"].get(field, None) for field in fs
+                                for p in chat["participants"]]
+                        match = any(re.search(name, value, re.I | re.U)
+                                    for name in map(re.escape, authornames)
+                                    for value in vals if value)
+                        if not vals or not match: continue # for chat in rows
                     chat["title_long"] = ("Chat with %s"
                         if CHATS_TYPE_SINGLE == chat["type"]
                         else "Group chat \"%s\"") % chat["title"]
@@ -628,7 +648,6 @@ class SkypeDatabase(object):
                     chat["last_message_timestamp"] = None
                     chat["first_message_datetime"] = None
                     chat["last_message_datetime"] = None
-                    chat["participants"] = participants.get(chat["id"], [])
                     conversations.append(chat)
                 main.log("Conversations and participants retrieved "
                     "(%s chats, %s contacts, %s).",

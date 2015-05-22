@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.03.2015
+@modified    22.05.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -75,6 +75,11 @@ ARGUMENTS = {
                       "text files", },
              {"args": ["FILE"], "nargs": "+",
               "help": "one or more Skype databases to export", }, 
+             {"args": ["-c", "--chat"], "dest": "chat", "required": False,
+              "help": "names of specific chats to export", "nargs": "+"},
+             {"args": ["-a", "--author"], "dest": "author", "required": False,
+              "help": "names of specific authors whose chats to export",
+              "nargs": "+"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -341,7 +346,7 @@ def run_search(filenames, query):
         worker and (worker.stop(), worker.join())
 
 
-def run_export(filenames, format):
+def run_export(filenames, format, chatnames, authornames):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
@@ -360,9 +365,13 @@ def run_export(filenames, format):
             filename = format
         target = filename if is_xlsx_single else export_dir
         try:
-            output("Exporting as %s %sto %s." % 
-                  (format[:4].upper(), dbstr, target))
-            chats = sorted(db.get_conversations(),
+            extras = [("", chatnames)] if chatnames else []
+            extras += [(" with authors", authornames)] if authornames else []
+            output("Exporting%s%s as %s %sto %s." % 
+                  (" chats" if extras else "",
+                   ",".join("%s like %s" % (x, y) for x, y in extras),
+                   format[:4].upper(), dbstr, target))
+            chats = sorted(db.get_conversations(chatnames, authornames),
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
             bar_total = sum(c["message_count"] for c in chats)
@@ -535,7 +544,7 @@ def run(nogui=False):
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type)
+        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
     elif "gui" == arguments.command:

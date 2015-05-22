@@ -49,7 +49,8 @@ In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 browse and copy specific chats and contacts.
 
-Skyperious offers a number of options from the command line:
+Skyperious offers a number of options from the
+[command line](http://suurjaak.github.io/Skyperious/help.html#commandline):
 ```
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
