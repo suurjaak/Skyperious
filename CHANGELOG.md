@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.4.2d, 2015-05-22
+3.4.2e, 2015-05-25
 ------------------
 - added emoticons to chat statistics;
 - added chat and author filters to command-line export;
@@ -11,6 +11,10 @@ CHANGELOG
 - fixed a potential error with unexpected data in quoted messages;
 - fixed a potential error message on filtering chat messages;
 - increased size of message search bar button image;
+- upgraded Python from 2.7.9 to 2.7.10;
+- upgraded dateutil from 2.4.1 to 2.4.2;
+- upgraded Pillow from 2.8.0 to 2.8.1;
+- upgraded XlsxWriter from 0.6.7 to 0.7.3;
 
 
 3.4.1, 2015-04-29
