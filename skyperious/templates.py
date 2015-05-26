@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.05.2015
+@modified    26.05.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -958,7 +958,7 @@ dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td{{!" class='remote'" if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
+        <tr><td{{!' class="remote"' if from_remote else ""}} title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
           <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
         </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
@@ -1018,7 +1018,7 @@ emot_start = '<span class="emoticon '
 shift_row = emot_start in text and (("<br />" not in text and len(text_plain) < 140) or text.index(emot_start) < 140)
 author_class = "remote" if m["author"] != db.id else "local"
 %>
-  <tr{{' class="shifted"' if shift_row else ""}}>
+  <tr{{!' class="shifted"' if shift_row else ""}}>
     <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}" id="message:{{m["id"]}}">{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
@@ -1164,7 +1164,7 @@ import conf, images, util
 %endif
         </td>
     </tr></table>
-</td></tr><tr><td><table class='content_table'>
+</td></tr><tr><td><table class="content_table">
 <tr><th>#</th>
 %for col in columns:
 <th>{{col}}</th>
@@ -1180,7 +1180,7 @@ import conf, images, util
 %endfor
 </table>
 </td></tr></table>
-<div class='footer'>Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
+<div class="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
 </body>
 </html>
 """
