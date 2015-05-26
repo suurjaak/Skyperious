@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    13.05.2015
+@modified    26.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -646,8 +646,8 @@ class PropertyDialog(wx.Dialog):
 
         panel.Sizer.Add(sizer_items, proportion=1, border=5, flag=wx.GROW | wx.RIGHT)
         panelwrap.Sizer.Add(panel, proportion=1, border=10, flag=wx.GROW | wx.ALL)
-        [sizer_buttons.Add(b, border=10, flag=wx.LEFT)
-         for b in (button_save, button_reset, button_cancel)]
+        for b in (button_save, button_reset, button_cancel):
+            sizer_buttons.Add(b, border=10, flag=wx.LEFT)
         panelwrap.Sizer.Add(sizer_buttons, border=10, flag=wx.ALL | wx.ALIGN_RIGHT)
         self.Sizer.Add(panelwrap, proportion=1, flag=wx.GROW)
 
@@ -1712,8 +1712,9 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
         self._formatters = collections.defaultdict(frmt)
         id_copy = wx.NewId()
-        self.SetAcceleratorTable(wx.AcceleratorTable([
-            (wx.ACCEL_CTRL, ord("C"), id_copy)]))
+        entries = [(wx.ACCEL_CTRL, x, id_copy)
+                   for x in (ord("C"), wx.WXK_INSERT, wx.WXK_NUMPAD_INSERT)]
+        self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
 
 
