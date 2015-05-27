@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.05.2015
+@modified    27.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4238,7 +4238,7 @@ class DatabasePage(wx.Panel):
             grid_data = None
             if sql.lower().startswith(("select", "pragma", "explain")):
                 # SELECT statement: populate grid with rows
-                grid_data = SqliteGridBase.from_query(self.db, sql)
+                grid_data = SqliteGridBase(self.db, sql=sql)
                 self.grid_sql.SetTable(grid_data)
                 self.button_reset_grid_sql.Enabled = True
                 self.button_export_sql.Enabled = True
@@ -4420,7 +4420,7 @@ class DatabasePage(wx.Panel):
             try:
                 grid_data = self.db_grids.get(lower)
                 if not grid_data:
-                    grid_data = SqliteGridBase.from_table(self.db, table)
+                    grid_data = SqliteGridBase(self.db, table=table)
                     self.db_grids[lower] = grid_data
                 self.label_table.Label = "Table \"%s\":" % table
                 self.grid_table.SetTable(grid_data)
@@ -6844,76 +6844,13 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
     """How many rows to seek ahead for query grids."""
     SEEK_CHUNK_LENGTH = 100
 
-    @classmethod
-    def from_query(cls, db, sql):
-        """
-        Constructs a SqliteGridBase instance from a full SQL query.
 
-        @param   db   SkypeDatabase instance
-        @param   sql  the SQL query to execute
-        """
-        self = cls()
-        self.is_query = True
+    def __init__(self, db, table="", sql=""):
+        super(SqliteGridBase, self).__init__()
+        self.is_query = bool(sql)
         self.db = db
         self.sql = sql
-        self.row_iterator = self.db.execute(sql)
-        # Fill column information
-        self.columns = []
-        for col in self.row_iterator.description or []:
-            coldata = {"name": col[0], "type": "TEXT"}
-            self.columns.append(coldata)
-
-        # Doing some trickery here: we can only know the row count when we have
-        # retrieved all the rows, which is preferrable not to do at first,
-        # since there is no telling how much time it can take. Instead, we
-        # update the row count chunk by chunk.
-        self.row_count = self.SEEK_CHUNK_LENGTH
-        # ID here is a unique value identifying rows in this object,
-        # no relation to table data
-        self.idx_all = [] # An ordered list of row identifiers in rows_all
-        self.rows_all = {} # Unfiltered, unsorted rows {id: row, }
-        self.rows_current = [] # Currently shown (filtered/sorted) rows
-        self.rowids = {} # SQLite table rowids, not applicable for query
-        self.iterator_index = -1
-        self.sort_ascending = False
-        self.sort_column = None # Index of column currently sorted by
-        self.filters = {} # {col: value, }
-        self.attrs = {} # {"new": wx.grid.GridCellAttr, }
-        try:
-            self.SeekToRow(self.SEEK_CHUNK_LENGTH - 1)
-        except Exception:
-            pass
-        # Seek ahead on rows and get column information from there
-        if self.rows_current:
-            for coldata in self.columns:
-                name = coldata["name"]
-                if type(self.rows_current[0][name]) in [int, long, bool]:
-                    coldata["type"] = "INTEGER"
-                elif type(self.rows_current[0][name]) in [float]:
-                    coldata["type"] = "REAL"
-        return self
-
-
-    @classmethod
-    def from_table(cls, db, table, where="", order=""):
-        """
-        Constructs a SqliteGridBase instance from a single table.
-
-        @param   db     SkypeDatabase instance
-        @param   table  name of table
-        @param   where  SQL WHERE clause, without "where" (e.g. "a=b AND c<3")
-        @param   order  full SQL ORDER clause (e.g. "ORDER BY a DESC, b ASC")
-        """
-        self = cls()
-        self.is_query = False
-        self.db = db
         self.table = table
-        self.where = where
-        self.order = order
-        self.columns = db.get_table_columns(table)
-        self.row_count = list(db.execute(
-            "SELECT COUNT(*) AS rows FROM %s %s %s" % (table, where, order)
-        ))[0]["rows"]
         # ID here is a unique value identifying rows in this object,
         # no relation to table data
         self.idx_all = [] # An ordered list of row identifiers in rows_all
@@ -6925,15 +6862,36 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
         self.idx_new = [] # Unsaved added row indices
         self.rows_deleted = {} # Uncommitted deleted rows {id: deleted_row, }
         self.rowid_name = "ROWID%s" % int(time.time()) # Avoid collisions
-        self.sql = "SELECT rowid AS %s, * FROM %s %s %s" % (self.rowid_name,
-                   table, "WHERE %s" % where if where else "", order)
-        self.row_iterator = db.execute(self.sql)
         self.iterator_index = -1
         self.sort_ascending = False
         self.sort_column = None # Index of column currently sorted by
         self.filters = {} # {col: value, }
         self.attrs = {} # {"new": wx.grid.GridCellAttr, }
-        return self
+
+        if not self.is_query:
+            self.sql = "SELECT rowid AS %s, * FROM %s" % (self.rowid_name, table)
+        self.row_iterator = db.execute(self.sql)
+        if self.is_query:
+            self.columns = [{"name": c[0], "type": "TEXT"}
+                            for c in self.row_iterator.description or ()]
+            # Doing some trickery here: we can only know the row count when we have
+            # retrieved all the rows, which is preferrable not to do at first,
+            # since there is no telling how much time it can take. Instead, we
+            # update the row count chunk by chunk.
+            self.row_count = self.SEEK_CHUNK_LENGTH
+            TYPES = dict((v, k) for k, vv in {"INTEGER": (int, long, bool),
+                         "REAL": (float,)}.items() for v in vv)
+            # Seek ahead on rows and get column information from first values
+            try: self.SeekToRow(self.SEEK_CHUNK_LENGTH - 1)
+            except Exception: pass
+            if self.rows_current:
+                for col in self.columns:
+                    value = self.rows_current[0][col["name"]]
+                    col["type"] = TYPES.get(type(value), col["type"])
+        else:
+            self.columns = db.get_table_columns(table)
+            self.row_count = next(db.execute("SELECT COUNT(*) AS rows FROM %s"
+                                  % table))["rows"]
 
 
     def GetColLabelValue(self, col):
