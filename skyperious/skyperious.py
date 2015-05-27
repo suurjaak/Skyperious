@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.05.2015
+@modified    26.05.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6925,9 +6925,9 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
         self.idx_new = [] # Unsaved added row indices
         self.rows_deleted = {} # Uncommitted deleted rows {id: deleted_row, }
         self.rowid_name = "ROWID%s" % int(time.time()) # Avoid collisions
-        self.row_iterator = db.execute(
-            "SELECT rowid AS %s, * FROM %s %s %s" % (self.rowid_name, table, 
-            "WHERE %s" % where if where else "", order))
+        self.sql = "SELECT rowid AS %s, * FROM %s %s %s" % (self.rowid_name,
+                   table, "WHERE %s" % where if where else "", order)
+        self.row_iterator = db.execute(self.sql)
         self.iterator_index = -1
         self.sort_ascending = False
         self.sort_column = None # Index of column currently sorted by
@@ -7024,6 +7024,11 @@ class SqliteGridBase(wx.grid.PyGridTableBase):
             if row < len(self.rows_current):
                 value = self.rows_current[row]
         return value
+
+
+    def GetRowIterator(self):
+        """Returns a separate iterator producing all grid rows."""
+        return self.db.execute(self.sql)
 
 
     def SetValue(self, row, col, val):

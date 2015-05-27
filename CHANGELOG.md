@@ -1,13 +1,13 @@
 CHANGELOG
 =========
 
-3.4.2e, 2015-05-25
+3.4.2f, 2015-05-27
 ------------------
 - added emoticons to chat statistics;
 - added chat and author filters to command-line export;
 - applying or resetting message filter will scroll to last selection;
 - added support for copying selected list items to clipboard;
-- avoid caching messages on export to decrease memory overhead;
+- stopped caching messages on export to avoid memory shortage;
 - fixed a potential error with unexpected data in quoted messages;
 - fixed a potential error message on filtering chat messages;
 - increased size of message search bar button image;

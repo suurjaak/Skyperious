@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    11.05.2015
+@modified    26.05.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -298,13 +298,6 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
         with open(filename, "w") as f:
             columns = [c["name"] for c in grid.Table.columns]
 
-            def iter_rows():
-                """Iterating row generator."""
-                row, index = grid.Table.GetRow(0), 0
-                while row:
-                    yield row
-                    index += 1; row = grid.Table.GetRow(index)
-
             if is_csv or is_xlsx:
                 if is_csv:
                     dialect = csv.excel
@@ -323,7 +316,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     writer.writerow(*a)
                 writer.writerow(*([header, "bold"] if is_xlsx else [header]))
                 writer.set_header(False) if is_xlsx else 0
-                for row in iter_rows():
+                for row in grid.Table.GetRowIterator():
                     values = []
                     for col in columns:
                         val = "" if row[col] is None else row[col]
@@ -339,7 +332,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     "title":       title,
                     "columns":     columns,
                     "row_count":   grid.NumberRows,
-                    "rows":        iter_rows(),
+                    "rows":        grid.Table.GetRowIterator(),
                     "sql":         sql_query,
                     "table":       table,
                     "app":         conf.Title,
