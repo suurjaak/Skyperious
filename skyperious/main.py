@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.05.2015
+@modified    31.05.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -494,8 +494,7 @@ def run(nogui=False):
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
     for arg in ARGUMENTS["arguments"]:
-        names = arg["args"]; del arg["args"]
-        argparser.add_argument(*names, **arg)
+        argparser.add_argument(*arg.pop("args"), **arg)
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
