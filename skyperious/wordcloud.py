@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    01.04.2015
+@modified    02.06.2015
 ------------------------------------------------------------------------------
 """
 import collections
@@ -41,7 +41,7 @@ COMMON_WORDS = {
         them their theirs themselves what which who whom whose this that these
         those am is are was were be been being have has had having do does did
         doing will would should can could ought i'm you're he's she's it's
-        we're they're i've  you've we've they've i'd you'd he'd she'd we'd
+        we're they're i've you've we've they've i'd you'd he'd she'd we'd
         they'd i'll you'll he'll she'll we'll they'll isn't aren't wasn't
         weren't hasn't  haven't hadn't doesn't don't didn't won't wouldn't
         werent hasnt havent hadnt doesnt dont didnt wont wouldnt
@@ -53,8 +53,8 @@ COMMON_WORDS = {
         off over under again further then once here there when where why how
         all any both each few more most other some such no nor not only own
         same so than too very say says said shall just ok now much like also
-        well really probably still hey hi around quite one two yeah many see
-        get go
+        well really probably still hey hi around quite one two yes yeah many
+        see get go
         """,
     "et": u"""
         a aga aha ahaa ainult alates all alla alles alt asemel ciao edasi ees 
