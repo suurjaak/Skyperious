@@ -146,7 +146,7 @@ https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
 Binaries compiled with PyInstaller 2.1, http://www.pyinstaller.org
 
-Installers created with Nullsoft Scriptable Install System 3.0a2,
+Installers created with Nullsoft Scriptable Install System 3.0b1,
 http://nsis.sourceforge.net/
 
 
