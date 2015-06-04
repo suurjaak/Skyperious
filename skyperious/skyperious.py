@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.05.2015
+@modified    04.06.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1864,7 +1864,7 @@ class DatabasePage(wx.Panel):
         sizer.Layout() # To avoid searchbox moving around during page creation
 
         bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version_info[0:] == [2]
+        if (wx.version().startswith("2.8") and sys.version_info.major == 2
         and sys.version_info < (2, 7, 3)):
             # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
             bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
@@ -1894,7 +1894,7 @@ class DatabasePage(wx.Panel):
         notebook.SetPageImage(4, idx5)
         notebook.SetPageImage(5, idx6)
 
-        sizer.Add(notebook,proportion=1, border=5, flag=wx.GROW | wx.ALL)
+        sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
         self.dialog_savefile = wx.FileDialog(
             parent=self,
@@ -5620,11 +5620,7 @@ class MergerPage(wx.Panel):
         for d in result.get("chats", []):
             self.chats_diffdata[d["chat"]["identity"]] = d
         if result.get("output") and "done" not in result:
-            self.html_report.Freeze()
-            scrollpos = self.html_report.GetScrollPos(wx.VERTICAL)
             self.html_report.AppendToPage(result["output"])
-            self.html_report.Scroll(0, scrollpos)
-            self.html_report.Thaw()
         if "status" in result:
             main.status_flash(result["status"])
         if "index" in result:
@@ -5650,11 +5646,13 @@ class MergerPage(wx.Panel):
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
+                self.html_report.Freeze()
                 self.html_report.AppendToPage(
                     "<br /><br />New in %s: %s in %s." % 
                     (self.db1, count_msgs, count_chats))
-                scrollpos = (0, self.html_report.GetScrollRange(wx.VERTICAL))
-                self.html_report.Scroll(*scrollpos)
+                scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
+                self.html_report.Scroll(0, scrollpos)
+                self.html_report.Thaw()
             else:
                 self.html_report.SetPage("<body bgcolor='%s'>No new messages."
                     "</body>" % conf.MergeHtmlBackgroundColour)
@@ -5726,10 +5724,12 @@ class MergerPage(wx.Panel):
             main.log("%s error.\n\n%s", action, result["error"])
             msg = "%s error.\n\n%s" % (action, 
                   result.get("error_short", result["error"]))
-            scrollpos = (0, self.html_report.GetScrollPos(wx.VERTICAL))
+            self.html_report.Freeze()
             self.html_report.AppendToPage("<br /> <b>Error merging chats:</b>"
                                           + result["error"])
-            self.html_report.Scroll(*scrollpos)
+            scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
+            self.html_report.Scroll(0, scrollpos)
+            self.html_report.Thaw()
             wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
             wx.CallAfter(support.report_error, result["error"])
         if "status" in result:
@@ -5753,8 +5753,8 @@ class MergerPage(wx.Panel):
                 text = "<br /><br /> %s" % result["output"]
                 self.html_report.Freeze()
                 self.html_report.AppendToPage(text)
-                scrollpos = (0, self.html_report.GetScrollRange(wx.VERTICAL))
-                self.html_report.Scroll(*scrollpos)
+                scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
+                self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
                 wx.MessageBox(info, conf.Title, wx.OK | wx.ICON_INFORMATION)
             self.button_merge_all.Note = self.MERGE_BUTTON_NOTE
@@ -5771,11 +5771,7 @@ class MergerPage(wx.Panel):
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
         elif "output" in result and result["output"]:
-            scrollpos = (0, self.html_report.GetScrollPos(wx.VERTICAL))
-            self.html_report.Freeze()
             self.html_report.AppendToPage("<br /> %s" % result["output"])
-            self.html_report.Scroll(*scrollpos)
-            self.html_report.Thaw()
 
 
     def update_gauge(self, gauge, value, message=""):

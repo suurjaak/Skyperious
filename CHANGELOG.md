@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.4.2f, 2015-06-04
+3.4.2g, 2015-06-04
 ------------------
 - added emoticons to chat statistics;
 - added chat and author filters to command-line export;
@@ -10,6 +10,7 @@ CHANGELOG
 - stopped caching messages on export to avoid memory shortage;
 - fixed a potential error with unexpected data in quoted messages;
 - fixed a potential error message on filtering chat messages;
+- made database comparison report window retain scroll position at the bottom;
 - increased size of message search bar button image;
 - upgraded Python from 2.7.9 to 2.7.10;
 - upgraded dateutil from 2.4.1 to 2.4.2;

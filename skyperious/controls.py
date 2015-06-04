@@ -31,7 +31,7 @@ Stand-alone GUI components for wx:
   numeric and date/time values.
 
 - ScrollingHtmlWindow(wx.html.HtmlWindow):
-  HtmlWindow that remembers its scroll position on resize.
+  HtmlWindow that remembers its scroll position on resize and append.
     
 - SearchableStyledTextCtrl(wx.PyPanel):
   A wx.stc.StyledTextCtrl with a search bar that appears on demand, top or
@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.05.2015
+@modified    04.06.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1642,7 +1642,7 @@ class RangeSlider(wx.PyPanel):
 
 class ScrollingHtmlWindow(wx.html.HtmlWindow):
     """
-    HtmlWindow that remembers its scroll position on resize.
+    HtmlWindow that remembers its scroll position on resize and append.
     """
 
     def __init__(self, *args, **kwargs):
@@ -1650,7 +1650,7 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
         self.Bind(wx.EVT_SCROLLWIN, self._OnScroll)
         self.Bind(wx.EVT_SIZE, self._OnSize)
         self._last_scroll_pos = [0, 0]
-        self._last_scroll_range = [0, 0]
+        self._last_scroll_range = [0, 1]
 
 
     def _OnSize(self, event):
@@ -1658,24 +1658,23 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
         Handler for sizing the HtmlWindow, sets new scroll position based
         previously stored one (HtmlWindow loses its scroll position on resize).
         """
-        if hasattr(self, "_last_scroll_pos"):
-            for i in range(2):
-                orient = wx.VERTICAL if i else wx.HORIZONTAL
-                # Division can be > 1 on first resizings, bound it to 1.
-                pos, rng = self._last_scroll_pos[i], self._last_scroll_range[i]
-                ratio = pos / float(rng) if rng else 0.0
-                ratio = min(1, pos / float(rng) if rng else 0.0)
-                self._last_scroll_pos[i] = ratio * self.GetScrollRange(orient)
+        for i in range(2):
+            orient = wx.VERTICAL if i else wx.HORIZONTAL
+            # Division can be > 1 on first resizings, bound it to 1.
+            pos, rng = self._last_scroll_pos[i], self._last_scroll_range[i]
+            ratio = pos / float(rng) if rng else 0.0
+            ratio = min(1, pos / float(rng) if rng else 0.0)
+            self._last_scroll_pos[i] = ratio * self.GetScrollRange(orient)
+        try:
             # Execute scroll later as something resets it after this handler
-            try:
-                wx.CallLater(50, lambda:
-                    self.Scroll(*self._last_scroll_pos) if self else None)
-            except Exception:
-                pass # CallLater fails if not called from the main thread
+            wx.CallLater(50, lambda:
+                self.Scroll(*self._last_scroll_pos) if self else None)
+        except Exception:
+            pass # CallLater fails if not called from the main thread
         event.Skip() # Allow event to propagate wx handler
 
 
-    def _OnScroll(self, event):
+    def _OnScroll(self, event=None):
         """
         Handler for scrolling the window, stores scroll position
         (HtmlWindow loses it on resize).
@@ -1683,7 +1682,35 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
         p, r = self.GetScrollPos, self.GetScrollRange
         self._last_scroll_pos   = [p(x) for x in (wx.HORIZONTAL, wx.VERTICAL)]
         self._last_scroll_range = [r(x) for x in (wx.HORIZONTAL, wx.VERTICAL)]
-        event.Skip() # Allow event to propagate wx handler
+        if event: event.Skip() # Allow event to propagate wx handler
+
+
+    def Scroll(self, x, y):
+        """Scrolls the window so the view start is at the given point."""
+        self._last_scroll_pos = [x, y]
+        return super(ScrollingHtmlWindow, self).Scroll(x, y)
+
+
+    def SetPage(self, source):
+        """Sets the source of a page and displays it."""
+        self._last_scroll_pos, self._last_scroll_range = [0, 0], [0, 1]
+        return super(ScrollingHtmlWindow, self).SetPage(source)
+
+
+    def AppendToPage(self, source):
+        """
+        Appends HTML fragment to currently displayed text, refreshes the window
+        and restores scroll position.
+        """
+        self.Freeze()
+        p, r, s = self.GetScrollPos, self.GetScrollRange, self.GetScrollPageSize
+        pos, rng, size = (x(wx.VERTICAL) for x in [p, r, s])
+        result = super(ScrollingHtmlWindow, self).AppendToPage(source)
+        if size != s(wx.VERTICAL) or pos + size >= rng:
+            pos = r(wx.VERTICAL) # Keep scroll at bottom edge
+        self.Scroll(0, pos), self._OnScroll()
+        self.Thaw()
+        return result
 
 
 
