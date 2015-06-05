@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    13.05.2015
+@modified    04.06.2015
 ------------------------------------------------------------------------------
 """
 import cStringIO
@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import urllib
+import warnings
 
 try: # Most functionality works without PIL, used for image resizing
     from PIL import Image, ImageFile
@@ -98,8 +99,10 @@ def format_seconds(seconds, insert=""):
 
 def format_exc(e):
     """Formats an exception as Class: message, or Class: (arg1, arg2, ..)."""
-    msg = to_unicode(e.message) if e.message \
-          else u"(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore") # DeprecationWarning on e.message
+        msg = to_unicode(e.message) if e.message \
+              else u"(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
     result = u"%s%s" % (type(e).__name__, ": " + msg if msg else "")
     return result
 
