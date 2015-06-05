@@ -91,7 +91,7 @@ Installation
 Windows: download and launch the latest setup from
 http://suurjaak.github.io/Skyperious/downloads.html.
 
-Mac/Linux/other:
+Mac/Linux/other: install Python, wxPython, pip, and run
 `pip install skyperious`
 
 The pip installation will add the `skyperious` command to path.
