@@ -8,15 +8,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.05.2015
+@modified    12.06.2015
 ------------------------------------------------------------------------------
 """
 import cgi
 import collections
+import cookielib
 import copy
 import cStringIO
 import csv
 import datetime
+import json
 import math
 import os
 import re
@@ -28,7 +30,9 @@ import textwrap
 import time
 import traceback
 import urllib
+import urllib2
 from xml.etree import cElementTree as ElementTree
+from bs4 import BeautifulSoup
 
 try:
     import wx
@@ -40,6 +44,7 @@ from third_party import step
 import conf
 import emoticons
 import main
+import support
 import templates
 import util
 import wordcloud
@@ -182,6 +187,34 @@ class SkypeDatabase(object):
     def __str__(self):
         if self and hasattr(self, "filename"):
             return self.filename
+
+
+    def authenticate_shared(self, format):
+        """@todo """
+        import images
+        if not (self.id and conf.SharedImageAutoDownload
+        and format.lower().endswith("html")): return
+        if not SharedImageDownload.has_login(self.id):
+            M = "To include shared photos in exported HTML, enter the Skype password for '%s'.\n\n%s can automatically download shared images from Skype web.\nThis can be disabled via File -> Advanced options -> SharedImageAutoDownload.\nThe password is retained for this %s session only." % (self.id, conf.Title, conf.Title)
+            d = wx.PasswordEntryDialog(parent=None, message=M, caption=conf.Title)
+            d.SetIcons(images.get_appicons())
+            while True:
+                d.Value = ""
+                if wx.ID_OK != d.ShowModal(): break # while True
+                pw = d.Value
+                if not pw: continue # while True
+                try:
+                    SharedImageDownload.login(self.id, pw)
+                    break # while True
+                except Exception as e:
+                    main.log("Error signing in %s on Skype web.\n\n%s",
+                             self.id, traceback.format_exc())
+                    msg = "%s\n\nTry again?" % unicode(e)
+                    if WX_OK != wx.MessageBox(msg, conf.Title,
+                    wx.ICON_WARNING | wx.OK | wx.CANCEL):
+                        break # while True
+                    d = wx.PasswordEntryDialog(parent=None, message="Enter Skype password for '%s':" % self.id, caption=conf.Title)
+                    d.SetIcons(images.get_appicons())
 
 
     def check_integrity(self):
@@ -1492,7 +1525,7 @@ class MessageParser(object):
         """
         self.db = db
         self.chat = chat
-        self.stats = None
+        self.stats = {}
         self.wrapfunc = wrapper
         self.textwrapfunc = textwrap.TextWrapper(width=self.TEXT_MAXWIDTH,
             expand_tabs=False, replace_whitespace=False,
@@ -1514,7 +1547,8 @@ class MessageParser(object):
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
                 "hists": {}, # Author histogram data {author: {"hours", ..} }
                 "workhist": {}, # {"hours": {0: {author: count}}, "days": ..}}
-                "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)), }
+                "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
+                "shared_images": {}} # {message_id: {url, datetime, author, author_name}, }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1547,8 +1581,9 @@ class MessageParser(object):
             dom = message["dom"] # Cached DOM already exists
         if dom is None:
             dom = self.parse_message_dom(message, output)
-            if not output.get("merge"): # Cache DOM, only not for merge as that
-                message["dom"] = dom    # produces a DOM with different content
+            if not (output.get("merge")
+            or message["id"] in self.stats.get("shared_images", {})):
+                message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None and is_html: # Create a copy, HTML will mutate dom
             dom = copy.deepcopy(dom)
@@ -1567,7 +1602,7 @@ class MessageParser(object):
         else:
             result = dom
 
-        self.stats and self.collect_message_stats(message)
+        self.stats and self.collect_message_stats(message, dom)
         return result
 
 
@@ -1768,6 +1803,24 @@ class MessageParser(object):
 
         # Photo/video sharing: sanitize XML tags like Title|Text|Description|..
         if any(dom.getiterator("URIObject")):
+            link, url = next(dom.getiterator("a"), None), None
+            if link:
+                url = link.get("href")
+            else: # Parse link from message contents
+                text = ElementTree.tostring(dom, "utf-8", "text")
+                match = re.search("(https?://[^\s<]+)", text)
+                if match:
+                    url = match.group(0)
+                    # Make link clickable
+                    linktempl = step.Template('<a href="{{url}}">{{url}}</a>')
+                    text2 = text.replace(url, linktempl.expand(url=url))
+                    dom = self.make_xml(text2, message) or dom
+                else:
+                    url = dom.find("URIObject").get("uri")
+            if url and self.stats:
+                self.stats["shared_images"][message["id"]] = dict(url=url,
+                    success=False, author_name=get_author_name(message),
+                    author=message["author"], datetime=message["datetime"])
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
         # Process Skype message quotation tags, assembling a simple
@@ -1856,6 +1909,13 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
+        shared_image = self.stats.get("shared_images", {}).get(message["id"])
+        if shared_image and conf.SharedImageAutoDownload and output.get("export"):
+            raw = SharedImageDownload.get_image(self.db.id, shared_image["url"])
+            if raw:
+                shared_image["success"] = True
+                ns = dict(shared_image, image=raw, message_id=message["id"])
+                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns)
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
@@ -2023,7 +2083,7 @@ class MessageParser(object):
         dictionary[key] += (inter if dictionary[key] else "") + text
 
 
-    def collect_message_stats(self, message):
+    def collect_message_stats(self, message, dom):
         """Adds message statistics to accumulating data."""
         author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
@@ -2035,7 +2095,7 @@ class MessageParser(object):
         self.stats["total"] += 1
         self.stats["last_message"] = ""
         if message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_MESSAGE]:
-            self.collect_dom_stats(message["dom"], message)
+            self.collect_dom_stats(dom, message)
             self.stats["cloudcounter"].add_text(self.stats["last_cloudtext"],
                                                 author)
             self.stats["last_cloudtext"] = ""
@@ -2265,6 +2325,118 @@ class MessageParser(object):
                 stats["wordcounts"][w][author] = c
 
         return stats
+
+
+
+class SharedImageDownload(object):
+    """
+    Static class for maintaining Skype user login sessions to Skype website 
+    and downloading shared images.
+    """
+    LOGINS = {} # {username: True, }
+    OPENERS = {} # {username: urllib2.OpenerDirector, }
+    STARTURL = ("https://login.skype.com/login?application=asm&return_url="
+                "https%3A%2F%2Fapi.asm.skype.com%2Fv1%2Fskypetokenauth%3F"
+                "redirectUrl%3Dhttps%3A%2F%2Fapi.asm.skype.com%2Fs%2Fi%3F&"
+                "message=signin_continue")
+
+    @classmethod
+    def has_login(cls, username):
+        """Returns whether an active login session exists for username."""
+        return cls.LOGINS.get(username, False)
+
+
+    @classmethod
+    def get_image(cls, username, url):
+        """Returns image raw data, or None if not available."""
+        if not cls.has_login(username): return None
+        main.log("Retrieving shared image %s.", url)
+        content = None
+        try:
+            statusurl = (url.replace("skype.com/s/i?", "skype.com/v1/objects/")
+                         + "/views/imgo/status")
+            statuscontent, _ = cls.request(username, statusurl)
+            if statuscontent: # Actual image URL given in web service JSON
+                imagedata = json.loads(statuscontent)
+                if not imagedata or "view_location" not in imagedata:
+                    err = ("Response unrecognized from %s.\n\n%s." %
+                           (statusurl, statuscontent))
+                    main.log(err), support.report_error(err)
+                else:
+                    imageurl = imagedata["view_location"]
+                    content, _ = cls.request(username, imageurl)
+        except Exception:
+            err = ("Error retrieving %s from Skype web.\n\n%s" %
+                   (url, traceback.format_exc()))
+            main.log(err), support.report_error(err)
+        return content
+
+
+    @classmethod
+    def login(cls, username, password):
+        """Logs in to Skype online successfully or raises exception."""
+        main.log("Logging in to Skype web as '%s'.", username)
+        for dct in (cls.LOGINS, cls.OPENERS): dct.pop(username, None)
+
+        # 1. Retrieve Skype website login form variables.
+        content1, code1 = cls.request(username, cls.STARTURL)
+        if not content1:
+            raise Exception("Response %s from start page." % code1)
+        soup1 = BeautifulSoup(content1)
+        form1 = soup1.find("form", {"id": "loginForm"})
+        if not form1:
+            raise Exception("No login form detected on start page.")
+        loginurl = form1["action"]
+        logindata = dict((x["name"], x.get("value", ""))
+                          for x in form1.findAll("input"))
+        logindata.update(username=username, password=password)
+
+        # 2. Post login data, retrieve cookie form variables.
+        data2 = urllib.urlencode(logindata)
+        content2, code2 = cls.request(username, loginurl, data2)
+        if not content2:
+            raise Exception("Response %s from login page." % code2)
+        soup2 = BeautifulSoup(content2)
+        loginfailed = soup2.find("div", {"class": "messageBox message_error"})
+        if loginfailed:
+            elem = loginfailed.find("span")
+            raise Exception("Response '%s' from https://login.skype.com/." %
+                            (elem.text if elem else "LOGIN FAILED"))
+        form2 = soup2.find("form", {"id": "redirectForm"})
+        if not form2:
+            raise Exception("No redirect form detected on token page.")
+        tokenurl = form2["action"]
+        tokendata = dict((f["name"], f.get("value", ""))
+                          for f in form2.findAll("input"))
+
+        # 3. Post cookie token data to finalize login.
+        data3 = urllib.urlencode(tokendata)
+        content3, code3 = cls.request(username, tokenurl, data3)
+        if not content3:
+            raise Exception("Response %s from token page." % code3)
+        cls.LOGINS[username] = True
+
+
+    @classmethod
+    def request(cls, username, url, data=None):
+        """Returns (URL contents, HTTP code) or (None, None)."""
+        content, code = None, None
+        if username not in cls.OPENERS:
+            cookiehandler = urllib2.HTTPCookieProcessor(cookielib.CookieJar())
+            cls.OPENERS[username] = urllib2.build_opener(cookiehandler)
+        try:
+            resp = cls.OPENERS[username].open(url, data)
+            code, content = resp.code, resp.read()
+        except HTTPError as e:
+            code = e.code
+            err = "Response %s from %s.\n\n%s" % (e.code, url, e.read())
+            main.log(err), support.report_error(err)
+        except URLError:
+            err = ("Error retrieving %s from Skype web.\n\n%s" %
+                   (url, traceback.format_exc()))
+            main.log(err), support.report_error(err)
+        return content, code
+
 
 
 def is_sqlite_file(filename, path=None):

@@ -85,7 +85,10 @@ Skyperious has been built using the following open-source software:
 - XlsxWriter 0.7.3 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.4.2, (http://pypi.python.org/pypi/python-dateutil)
 - Skype4Py 1.0.35, (https://github.com/awahlig/skype4py)
-- pyinstaller 2.1 (http://www.pyinstaller.org/)
+- BeautifulSoup 4.3.2 (http://www.crummy.com/software/BeautifulSoup/)
+
+Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
+(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the Skype Component License 1.0.
@@ -101,7 +104,9 @@ Several icons from:
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Installer created with Nullsoft Scriptable Install System 3.0a2,
+Binaries compiled with PyInstaller 2.1, http://www.pyinstaller.org
+
+Installer created with Nullsoft Scriptable Install System 3.0b1,
 http://nsis.sourceforge.net/
 
 

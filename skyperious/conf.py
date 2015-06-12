@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.06.2015
+@modified    12.06.2015
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.4.2g"
-VersionDate = "04.06.2015"
+Version = "3.4.2h"
+VersionDate = "12.06.2015"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -52,7 +52,7 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
     "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
     "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchContactsChunk", "SearchResultsChunk",
+    "SearchContactsChunk", "SearchResultsChunk", "SharedImageAutoDownload",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
     "WordCloudWordsAuthorMax"
@@ -319,6 +319,11 @@ StatisticsPlotWidth = 150
 
 """Width of the chat emoticons plots, in pixels."""
 EmoticonsPlotWidth = 200
+
+"""
+Ask for Skype password and download shared images from Skype web for HTML export.
+"""
+SharedImageAutoDownload = True
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000

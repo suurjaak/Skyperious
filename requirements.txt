@@ -1,4 +1,5 @@
 argparse
+bs4
 Pillow
 pyparsing
 python-dateutil

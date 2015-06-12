@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.06.2015
+@modified    12.06.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1133,6 +1133,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
             if not error:
+                db.authenticate_shared(extname)
                 chats = db.get_conversations()
                 busy = controls.BusyPanel(
                     self, "Exporting all %s from \"%s\"\nas %s\nunder %s." %
@@ -1821,8 +1822,8 @@ class DatabasePage(wx.Panel):
             "participants": None    # Messages from [skype name, ]
         }
         self.stats_sort_field = "name"
-        self.stats_expand_clouds = False # Expand individual author word clouds
-        self.stats_expand_emoticons = False # Expand emoticon statistics
+        self.stats_expand = {"clouds": False, "emoticons": False,
+                             "shared_images": False}
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -3223,6 +3224,7 @@ class DatabasePage(wx.Panel):
             if not filename.lower().endswith(".%s" % extname):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, filename)
+            self.db.authenticate_shared(extname)
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
@@ -3333,6 +3335,7 @@ class DatabasePage(wx.Panel):
                 extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
                 format = extname
 
+            self.db.authenticate_shared(extname)
             msg = "Exporting %s from \"%s\"\nas %s under %s." % \
                 (util.plural("chat", chats), self.db.filename,
                  extname.upper(), dirname)
@@ -3378,6 +3381,7 @@ class DatabasePage(wx.Panel):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, extname)
 
+            self.db.authenticate_shared(extname)
             busy = controls.BusyPanel(self,
                    "Filtering and exporting \"%s\"." % self.chat["title"])
             try:
@@ -3510,14 +3514,14 @@ class DatabasePage(wx.Panel):
                     % (filepath),
                     conf.Title, wx.OK | wx.ICON_INFORMATION
                 )
+        elif href.startswith("http:") or href.startswith("https:"):
+            webbrowser.open(href)
         elif href.startswith("sort://"):
             self.stats_sort_field = href[7:]
             self.populate_chat_statistics()
-        elif href.startswith("clouds://"):
-            self.stats_expand_clouds = ast.literal_eval(href[9:])
-            self.populate_chat_statistics()
-        elif href.startswith("emoticons://"):
-            self.stats_expand_emoticons = ast.literal_eval(href[12:])
+        elif href.startswith("expand://"):
+            section = href[9:]
+            self.stats_expand[section] = not self.stats_expand[section]
             self.populate_chat_statistics()
         elif href.startswith("message:"):
             self.show_stats(False)
@@ -4592,8 +4596,7 @@ class DatabasePage(wx.Panel):
                     "chat": self.chat, "sort_by": self.stats_sort_field,
                     "stats": stats, "images": {}, "authorimages": {},
                     "imagemaps": {}, "authorimagemaps": {},
-                    "expand_clouds": self.stats_expand_clouds,
-                    "expand_emoticons": self.stats_expand_emoticons}
+                    "expand": self.stats_expand}
             # Fill avatar images
             fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
             if defaultavatar not in fs["files"]:
@@ -5251,6 +5254,7 @@ class MergerPage(wx.Panel):
             if not filename.lower().endswith(".%s" % extname):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, filename)
+            self.db1.authenticate_shared(extname)
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )

@@ -112,6 +112,7 @@ The following are also listed in `requirements.txt` for pip:
 * XlsxWriter (https://pypi.python.org/pypi/XlsxWriter)
 * Pillow (https://pypi.python.org/pypi/Pillow)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
+* BeautifulSoup (http://www.crummy.com/software/BeautifulSoup/)
 * Skype4Py (https://pypi.python.org/pypi/Skype4Py)
 
 If wxPython is not available, the command line interface will function
@@ -129,6 +130,9 @@ Attribution
 
 Skyperious includes step, Simple Template Engine for Python,
 (c) 2012, Daniele Mazzocchio (https://github.com/dotpy/step).
+
+Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
+(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the [Skype Component License 1.0](res/emoticons/Skype Component License.txt).
@@ -153,6 +157,6 @@ http://nsis.sourceforge.net/
 License
 -------
 
-Copyright (C) 2011 by Erki Suurjaak.
+Copyright (c) 2011 by Erki Suurjaak.
 Released as free open source software under the MIT License,
 see [LICENSE.md](LICENSE.md) for full details.

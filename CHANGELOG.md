@@ -1,9 +1,10 @@
 CHANGELOG
 =========
 
-3.4.2g, 2015-06-04
+3.4.2h, 2015-06-12
 ------------------
 - added emoticons to chat statistics;
+- added shared image download for HTML export;
 - added chat and author filters to command-line export;
 - applying or resetting message filter will scroll to last selection;
 - added support for copying selected list items to clipboard;
