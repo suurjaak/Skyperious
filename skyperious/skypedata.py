@@ -2234,7 +2234,10 @@ class MessageParser(object):
 
         if delta_date is not None:
             per_day = util.safedivf(stats["messages"], delta_date.days + 1)
-            per_day = util.round_float(per_day)
+            if stats["messages"] and not round(per_day, 1):
+                per_day = "<1"
+            else:
+                per_day = util.round_float(per_day)
             stats["info_items"].append(("Messages per day", per_day))
 
             # Fill author and chat hourly histogram
