@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.06.2015
+@modified    15.06.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1770,10 +1770,11 @@ class MessageParser(object):
                     b.tail = " from this conversation."
                 else:
                     dom.text = "Removed  from this conversation."
-        elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE]:
-            if message["edited_timestamp"] and not message["body_xml"]:
-                elm_sub = ElementTree.SubElement(dom, "bodystatus")
-                elm_sub.text = MESSAGE_REMOVED_TEXT
+        elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE,
+        MESSAGE_TYPE_SHARE_PHOTO, MESSAGE_TYPE_SHARE_VIDEO] \
+        and message["edited_timestamp"] and not message["body_xml"]:
+            elm_sub = ElementTree.SubElement(dom, "bodystatus")
+            elm_sub.text = MESSAGE_REMOVED_TEXT
         elif MESSAGE_TYPE_SHARE_VIDEO == message["type"]:
             for elm in dom.findall("videomessage"):
                 elm.tag = "span"
