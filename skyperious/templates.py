@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    12.06.2015
+@modified    15.06.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -974,7 +974,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 %endif
 
 
-%if any(not x["success"] for x in stats["shared_images"].values()):
+%if stats["shared_images"]:
     <div id="shared_images">
 
     <b>Shared images</b>&nbsp;&nbsp;[<a title="Click to show/hide shared image links" href="#" onClick="return toggle_plusminus(this, 'shared_images_table');" class="toggle_plusminus">+</a>]
