@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.06.2015
+@modified    15.06.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -290,6 +290,37 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # Schedule a check for due date, should the program run that long.
         millis = min(sys.maxint, util.timedelta_seconds(interval) * 1000)
         wx.CallLater(millis, self.update_check)
+
+
+    def authenticate_shared(self, db, format):
+        """
+        Asks the user for Skype password if format is HTML and there is no 
+        active login session yet.
+        """
+        if not (db.id and conf.SharedImageAutoDownload
+        and format.lower().endswith("html")) \
+        or skypedata.SharedImageDownload.has_login(db.id): return
+        msg = ("To include shared photos in exported HTML, enter the Skype "
+               "password for '%s'.\n\n%s can automatically download shared "
+               "images from Skype web.\nThis can be disabled via File -> "
+               "Advanced options -> SharedImageAutoDownload.\nThe password "
+               "is retained for this %s session only." %
+               (db.id, conf.Title, conf.Title))
+        while not skypedata.SharedImageDownload.has_login(db.id):
+            dlg = wx.PasswordEntryDialog(self, msg, conf.Title)
+            dlg.SetIcons(images.get_appicons())
+            dlg.Value = ""
+            if wx.ID_OK != dlg.ShowModal(): break # while True
+            if not dlg.Value: continue # while True
+            try:
+                skypedata.SharedImageDownload.login(db.id, dlg.Value)
+            except Exception as e:
+                main.log("Error signing in %s on Skype web.\n\n%s",
+                         db.id, traceback.format_exc())
+                if wx.OK != wx.MessageBox("%s\n\nTry again?" % unicode(e),
+                conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL):
+                    break # while True
+                msg = "Enter Skype password for '%s':" % db.id
 
 
     def on_tray_search(self, event):
@@ -1133,7 +1164,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
             if not error:
-                db.authenticate_shared(extname)
+                self.authenticate_shared(db, extname)
                 chats = db.get_conversations()
                 busy = controls.BusyPanel(
                     self, "Exporting all %s from \"%s\"\nas %s\nunder %s." %
@@ -3224,7 +3255,7 @@ class DatabasePage(wx.Panel):
             if not filename.lower().endswith(".%s" % extname):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, filename)
-            self.db.authenticate_shared(extname)
+            self.TopLevelParent.authenticate_shared(self.db, extname)
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
@@ -3335,7 +3366,7 @@ class DatabasePage(wx.Panel):
                 extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
                 format = extname
 
-            self.db.authenticate_shared(extname)
+            self.TopLevelParent.authenticate_shared(self.db, extname)
             msg = "Exporting %s from \"%s\"\nas %s under %s." % \
                 (util.plural("chat", chats), self.db.filename,
                  extname.upper(), dirname)
@@ -3381,7 +3412,7 @@ class DatabasePage(wx.Panel):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, extname)
 
-            self.db.authenticate_shared(extname)
+            self.TopLevelParent.authenticate_shared(self.db, extname)
             busy = controls.BusyPanel(self,
                    "Filtering and exporting \"%s\"." % self.chat["title"])
             try:
@@ -5254,7 +5285,7 @@ class MergerPage(wx.Panel):
             if not filename.lower().endswith(".%s" % extname):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, filename)
-            self.db1.authenticate_shared(extname)
+            self.TopLevelParent.authenticate_shared(self.db1, extname)
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )

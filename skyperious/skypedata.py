@@ -189,34 +189,6 @@ class SkypeDatabase(object):
             return self.filename
 
 
-    def authenticate_shared(self, format):
-        """@todo """
-        import images
-        if not (self.id and conf.SharedImageAutoDownload
-        and format.lower().endswith("html")): return
-        if not SharedImageDownload.has_login(self.id):
-            M = "To include shared photos in exported HTML, enter the Skype password for '%s'.\n\n%s can automatically download shared images from Skype web.\nThis can be disabled via File -> Advanced options -> SharedImageAutoDownload.\nThe password is retained for this %s session only." % (self.id, conf.Title, conf.Title)
-            d = wx.PasswordEntryDialog(parent=None, message=M, caption=conf.Title)
-            d.SetIcons(images.get_appicons())
-            while True:
-                d.Value = ""
-                if wx.ID_OK != d.ShowModal(): break # while True
-                pw = d.Value
-                if not pw: continue # while True
-                try:
-                    SharedImageDownload.login(self.id, pw)
-                    break # while True
-                except Exception as e:
-                    main.log("Error signing in %s on Skype web.\n\n%s",
-                             self.id, traceback.format_exc())
-                    msg = "%s\n\nTry again?" % unicode(e)
-                    if WX_OK != wx.MessageBox(msg, conf.Title,
-                    wx.ICON_WARNING | wx.OK | wx.CANCEL):
-                        break # while True
-                    d = wx.PasswordEntryDialog(parent=None, message="Enter Skype password for '%s':" % self.id, caption=conf.Title)
-                    d.SetIcons(images.get_appicons())
-
-
     def check_integrity(self):
         """Checks SQLite database integrity, returning a list of errors."""
         result = []
@@ -2431,11 +2403,11 @@ class SharedImageDownload(object):
         try:
             resp = cls.OPENERS[username].open(url, data)
             code, content = resp.code, resp.read()
-        except HTTPError as e:
+        except urllib2.HTTPError as e:
             code = e.code
             err = "Response %s from %s.\n\n%s" % (e.code, url, e.read())
             main.log(err), support.report_error(err)
-        except URLError:
+        except urllib2.URLError:
             err = ("Error retrieving %s from Skype web.\n\n%s" %
                    (url, traceback.format_exc()))
             main.log(err), support.report_error(err)
