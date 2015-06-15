@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.4.2h, 2015-06-12
+3.5a, 2015-06-15
 ------------------
 - added emoticons to chat statistics;
 - added shared image download for HTML export;

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.05.2015
+@modified    15.06.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -19,8 +19,10 @@ import codecs
 import collections
 import datetime
 import errno
+import getpass
 import glob
 import locale
+import io
 import itertools
 import Queue
 import os
@@ -29,6 +31,7 @@ import sys
 import threading
 import time
 import traceback
+import warnings
 
 try:
     import wx
@@ -80,6 +83,10 @@ ARGUMENTS = {
              {"args": ["-a", "--author"], "dest": "author", "required": False,
               "help": "names of specific authors whose chats to export",
               "nargs": "+"},
+             {"args": ["-p", "--password"], "dest": "ask_password",
+              "action": "store_true", "required": False,
+              "help": "ask for Skype password on HTML export, "
+                      "to download shared images"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -346,12 +353,28 @@ def run_search(filenames, query):
         worker and (worker.stop(), worker.join())
 
 
-def run_export(filenames, format, chatnames, authornames):
+def run_export(filenames, format, chatnames, authornames, ask_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
 
     for db in dbs:
+        if (ask_password and db.id and conf.SharedImageAutoDownload
+        and format.lower().endswith("html")):
+            prompt = "Enter Skype password for '%s': " % db.id
+            while not skypedata.SharedImageDownload.has_login(db.id):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore") # possible GetPassWarning
+                    output(prompt, end="") # getpass output can raise errors
+                    pw = getpass.getpass("", io.BytesIO())
+                if not pw: continue # while
+                try:
+                    skypedata.SharedImageDownload.login(db.id, pw)
+                except Exception as e:
+                    log("Error signing in %s on Skype web.\n\n%s",
+                        db.id, util.format_exc(e))
+                    prompt = "%s\nEnter Skype password for '%s': " % (e, db.id)
+
         formatargs = collections.defaultdict(str)
         formatargs["skypename"] = os.path.basename(db.filename)
         formatargs.update(db.account or {})
@@ -543,7 +566,8 @@ def run(nogui=False):
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author)
+        run_export(arguments.FILE, arguments.type, arguments.chat,
+                   arguments.author, arguments.ask_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
     elif "gui" == arguments.command:
