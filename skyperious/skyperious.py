@@ -306,6 +306,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                "Advanced options -> SharedImageAutoDownload.\nThe password "
                "is retained for this %s session only." %
                (db.id, conf.Title, conf.Title))
+        busy = controls.BusyPanel(self, "Logging into Skype.")
         while not skypedata.SharedImageDownload.has_login(db.id):
             dlg = wx.PasswordEntryDialog(self, msg, conf.Title)
             dlg.SetIcons(images.get_appicons())
@@ -321,6 +322,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL):
                     break # while True
                 msg = "Enter Skype password for '%s':" % db.id
+        busy.Close()
 
 
     def on_tray_search(self, event):
