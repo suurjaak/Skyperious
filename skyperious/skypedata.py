@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.06.2015
+@modified    26.06.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1782,11 +1782,10 @@ class MessageParser(object):
             else: # Parse link from message contents
                 text = ElementTree.tostring(dom, "utf-8", "text")
                 match = re.search("(https?://[^\s<]+)", text)
-                if match:
+                if match: # Make link clickable
                     url = match.group(0)
-                    # Make link clickable
-                    linktempl = step.Template('<a href="{{url}}">{{url}}</a>')
-                    text2 = text.replace(url, linktempl.expand(url=url))
+                    a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
+                    text2 = text.replace(url, a.encode("utf-8"))
                     dom = self.make_xml(text2, message) or dom
                 else:
                     url = dom.find("URIObject").get("uri")
