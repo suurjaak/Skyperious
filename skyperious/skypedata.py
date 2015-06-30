@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.06.2015
+@modified    30.06.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1604,7 +1604,9 @@ class MessageParser(object):
             body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
         dom = self.make_xml(body, message)
 
-        if MESSAGE_TYPE_SMS == message["type"]:
+        if MESSAGE_TYPE_SMS == message["type"] \
+        or (MESSAGE_TYPE_INFO == message["type"]
+        and "<sms" in message["body_xml"]):
             # SMS body can be plaintext, or can be XML. Relevant tags:
             # <sms alt="It's hammer time."><status>6</status>
             # <failurereason>0</failurereason><targets>
@@ -1993,37 +1995,19 @@ class MessageParser(object):
 
     def dom_to_text(self, dom):
         """Returns a plaintext representation of the message DOM."""
-        fulltext = ""
-        to_skip = {} # {element to skip: True, }
-        for elem in dom.getiterator():
-            if elem in to_skip:
-                continue
-            text = elem.text or ""
-            tail = elem.tail or ""
-            subitems = []
-            if "quote" == elem.tag:
-                text = "\"" + text
-                subitems = elem.getchildren()
-            elif "quotefrom" == elem.tag:
-                text = "\"\r\n%s\r\n" % text
-            elif "msgstatus" == elem.tag:
-                text = "[%s]\r\n" % text.strip()
-            elif "ss" == elem.tag:
-                text = elem.text
-            elif elem.tag in ["i", "b", "s"]: # italic bold strikethrough
-                pre = post = dict(zip("ibs", "_*~"))[elem.tag]
-                if elem.get("raw_pre"): pre = elem.get("raw_pre")
-                if elem.get("raw_post"): post = elem.get("raw_post")
-                text, tail = pre + text, post + tail
-                subitems = elem.getchildren()
-            if text:
-                fulltext += text
-            for i in subitems:
-                fulltext += self.dom_to_text(i)
-                to_skip[i] = True
-            if tail:
-                fulltext += tail
-        return fulltext
+        text, tail = dom.text or "", dom.tail or ""
+        if "quote" == dom.tag:
+            text = "\"" + text
+        elif "quotefrom" == dom.tag:
+            text = "\"\r\n%s\r\n" % text
+        elif "msgstatus" == dom.tag:
+            text = "[%s]\r\n" % text.strip()
+        elif dom.tag in ["i", "b", "s"]: # italic bold strikethrough
+            pre = post = dict(i="_", b="*", s="~")[dom.tag]
+            if dom.get("raw_pre"): pre = dom.get("raw_pre")
+            if dom.get("raw_post"): post = dom.get("raw_post")
+            text, tail = pre + text, post + tail
+        return text + "".join(self.dom_to_text(x) for x in dom) + tail
 
 
     def sanitize(self, dom, known_tags):

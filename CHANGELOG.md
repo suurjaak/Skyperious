@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.5a, 2015-06-15
+3.5c, 2015-06-30
 ------------------
 - added emoticons to chat statistics;
 - added shared image download for HTML export;
@@ -9,6 +9,7 @@ CHANGELOG
 - applying or resetting message filter will scroll to last selection;
 - added support for copying selected list items to clipboard;
 - stopped caching messages on export to avoid memory shortage;
+- fixed parsing messages with deeply nested HTML (issue #38);
 - fixed a potential error with unexpected data in quoted messages;
 - fixed a potential error message on filtering chat messages;
 - made database comparison report window retain scroll position at the bottom;
