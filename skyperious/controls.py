@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    04.06.2015
+@modified    03.07.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1738,11 +1738,13 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
         self._formatters = collections.defaultdict(frmt)
-        id_copy = wx.NewId()
+        id_copy, id_selectall = wx.NewId(), wx.NewId()
         entries = [(wx.ACCEL_CTRL, x, id_copy)
                    for x in (ord("C"), wx.WXK_INSERT, wx.WXK_NUMPAD_INSERT)]
+        entries += [(wx.ACCEL_CTRL, ord("A"), id_selectall)]
         self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
+        self.Bind(wx.EVT_MENU, self.OnSelectAll, id=id_selectall)
 
 
     def SetColumnFormatters(self, formatters):
@@ -2024,6 +2026,11 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             wx.TheClipboard.Open()
             wx.TheClipboard.SetData(clipdata)
             wx.TheClipboard.Close()
+
+
+    def OnSelectAll(self, event):
+        """Selects all rows."""
+        for i in range(self.ItemCount): self.Select(i)
 
 
     def _RowMatchesFilter(self, row):
