@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.5c, 2015-06-30
+3.5d, 2015-07-06
 ------------------
 - added emoticons to chat statistics;
 - added shared image download for HTML export;
@@ -17,6 +17,7 @@ CHANGELOG
 - upgraded Python from 2.7.9 to 2.7.10;
 - upgraded dateutil from 2.4.1 to 2.4.2;
 - upgraded Pillow from 2.8.0 to 2.8.1;
+- upgraded SQLite from 3.6.21 to 3.8.10.2;
 - upgraded XlsxWriter from 0.6.7 to 0.7.3;
 - upgraded Nullsoft Scriptable Install System from 3.0a2 to 3.0b2;
 
