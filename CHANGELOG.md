@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.5d, 2015-07-06
+3.5e, 2015-07-08
 ------------------
 - added emoticons to chat statistics;
 - added shared image download for HTML export;
@@ -10,6 +10,7 @@ CHANGELOG
 - added support for copying selected list items to clipboard;
 - stopped caching messages on export to avoid memory shortage;
 - fixed parsing messages with deeply nested HTML (issue #38);
+- fixed chat date range component error when switching to empty chat;
 - fixed a potential error with unexpected data in quoted messages;
 - fixed a potential error message on filtering chat messages;
 - made database comparison report window retain scroll position at the bottom;

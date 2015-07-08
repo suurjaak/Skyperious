@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    03.07.2015
+@modified    08.07.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1347,7 +1347,7 @@ class RangeSlider(wx.PyPanel):
 
 
     def OnMouseEvent(self, event):
-        if not self.Enabled:
+        if not self.Enabled or not any(filter(None, self._rng)):
             return
 
         if not self._box_area:
