@@ -8,11 +8,11 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    04.06.2015
+@modified    08.07.2015
 ------------------------------------------------------------------------------
 """
-import cStringIO
 import ctypes
+import io
 import locale
 import math
 import os
@@ -23,14 +23,11 @@ import time
 import urllib
 import warnings
 
-try: # Most functionality works without PIL, used for image resizing
-    from PIL import Image, ImageFile
-except ImportError:
-    Image = ImageFile = None
-try: # Most functionality works without wx, used for image resizing
-    import wx
-except ImportError:
-    wx = None
+Image = ImageFile = wx = None # For image resize, most functions work without
+try: from PIL import Image, ImageFile
+except ImportError: pass
+try: import wx
+except ImportError: pass
 
 
 def m(o, name, case_insensitive=True):
@@ -48,6 +45,7 @@ def safedivf(a, b):
 
 
 def safe_filename(filename):
+    """Returns the filename with characters like \:*?"<>| removed."""
     return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "", filename)
 
 
@@ -101,8 +99,8 @@ def format_exc(e):
     """Formats an exception as Class: message, or Class: (arg1, arg2, ..)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore") # DeprecationWarning on e.message
-        msg = to_unicode(e.message) if e.message \
-              else u"(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
+        msg = to_unicode(e.message) if getattr(e, "message", None) \
+              else "(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
     result = u"%s%s" % (type(e).__name__, ": " + msg if msg else "")
     return result
 
@@ -131,17 +129,13 @@ def cmp_dicts(dict1, dict2):
     List values are converted to tuples before comparing.
     """
     result = True
-    for key, val in dict1.items():
-        val = tuple(val) if isinstance(val, list) else val
-        if key not in dict2:
-            result = False
-        else:
-            val2 = dict2[key]
-            val2 = tuple(val2) if isinstance(val2, list) else val2
-            if val != val2:
-                result = False
+    for key, v1 in dict1.items():
+        result, v2 = key in dict2, dict2.get(key)
+        if result:
+            v1, v2 = (tuple(x) if isinstance(x, list) else x for x in [v1, v2])
+            result = (v1 == v2)
         if not result:
-            break # break for key, val
+            break # break for key, v1
     return result
 
 
@@ -166,11 +160,8 @@ def try_until(func, count=1, sleep=0.5):
 
 def to_int(value):
     """Returns the value as integer, or None if not integer."""
-    try:
-        result = int(value)
-    except ValueError:
-        result = None
-    return result
+    try: return int(value)
+    except ValueError: return None
 
 
 def unique_path(pathname):
@@ -208,14 +199,12 @@ def start_file(filepath):
     success, error = True, ""
     try:
         if "nt" == os.name:
-            try:
-                os.startfile(filepath)
+            try: os.startfile(filepath)
             except WindowsError as e:
                 if 1155 == e.winerror: # ERROR_NO_ASSOCIATION
                     cmd = "Rundll32.exe SHELL32.dll, OpenAs_RunDLL %s"
                     os.popen(cmd % filepath)
-                else:
-                    raise
+                else: raise
         elif "mac" == os.name:
             subprocess.call(("open", filepath))
         elif "posix" == os.name:
@@ -227,9 +216,8 @@ def start_file(filepath):
 
 def is_os_64bit():
     """Returns whether the operating system is 64-bit (Windows-only)."""
-    if 'PROCESSOR_ARCHITEW6432' in os.environ:
-        return True
-    return os.environ['PROCESSOR_ARCHITECTURE'].endswith('64')
+    return ('PROCESSOR_ARCHITEW6432' in os.environ 
+            or os.environ['PROCESSOR_ARCHITECTURE'].endswith('64'))
 
 
 def round_float(value, precision=1):
@@ -237,8 +225,7 @@ def round_float(value, precision=1):
     Returns the float as a string, rounded to the specified precision and
     with trailing zeroes (and . if no decimals) removed.
     """
-    result = str(round(value, precision)).rstrip("0").rstrip(".")
-    return result
+    return str(round(value, precision)).rstrip("0").rstrip(".")
 
 
 def divide_delta(td1, td2):
@@ -253,14 +240,14 @@ def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
     """Recodes and/or resizes the raw image, using wx or PIL."""
     result = raw
     if wx:
-        img = wx.ImageFromStream(cStringIO.StringIO(raw))
+        img = wx.ImageFromStream(io.BytesIO(raw))
         if size: img = img_wx_resize(img, size, aspect_ratio)
         result = img_wx_to_raw(img, format)
     elif ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         img = imgparser.close()
         if size: img = img_pil_resize(img, size, aspect_ratio)
-        stream = cStringIO.StringIO()
+        stream = io.BytesIO()
         img.save(stream, format)
         result = stream.getvalue()
     return result
@@ -270,7 +257,7 @@ def img_size(raw):
     """Returns the size of the as (width, height), using wx or PIL."""
     result = None
     if wx:
-        result = tuple(wx.ImageFromStream(cStringIO.StringIO(raw)).GetSize())
+        result = tuple(wx.ImageFromStream(io.BytesIO(raw)).GetSize())
     elif ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         result = tuple(imgparser.close().size)
@@ -279,7 +266,7 @@ def img_size(raw):
 
 def img_wx_to_raw(img, format="PNG"):
     """Returns the wx.Image or wx.Bitmap as raw data of specified type."""
-    stream = cStringIO.StringIO()
+    stream = io.BytesIO()
     img = img if isinstance(img, wx.Image) else img.ConvertToImage()
     fmttype = getattr(wx, "BITMAP_TYPE_" + format.upper(), wx.BITMAP_TYPE_PNG)
     img.SaveStream(stream, fmttype)
@@ -355,26 +342,21 @@ def add_unique(lst, item, direction=1, maxlen=sys.maxint):
     """
     if item in lst:
         lst.remove(item)
-    lst.insert(0, item) if (direction < 0) else lst.append(item)
+    lst.insert(0, item) if direction < 0 else lst.append(item)
     if len(lst) > maxlen:
-        lst[:] = lst[:maxlen] if (direction < 0) else lst[-maxlen:]
+        lst[:] = lst[:maxlen] if direction < 0 else lst[-maxlen:]
     return lst
 
 
 def get_locale_day_date(dt):
     """Returns a formatted (weekday, weekdate) in current locale language."""
-    weekday = dt.strftime("%A")
-    weekdate = dt.strftime("%d. %B %Y")
+    weekday, weekdate = dt.strftime("%A"), dt.strftime("%d. %B %Y")
     if locale.getpreferredencoding():
-        try:
-            weekday = weekday.decode(locale.getpreferredencoding())
-            weekdate = weekdate.decode(locale.getpreferredencoding())
-        except Exception:
+        for enc in (locale.getpreferredencoding(), "latin1"):
             try:
-                weekday = weekday.decode("latin1")
-                weekdate = weekdate.decode("latin1")
-            except Exception:
-                pass
+                weekday, weekdate = (x.decode(enc) for x in [weekday, weekdate])
+                break
+            except Exception: pass
     weekday = weekday.capitalize()
     return weekday, weekdate
 
@@ -383,25 +365,20 @@ def path_to_url(path, encoding="utf-8"):
     """
     Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
     """
-    if isinstance(path, unicode):
-        path = path.encode(encoding)
-
-    if not ":" in path:
+    path = path.encode(encoding) if isinstance(path, unicode) else path
+    if ":" not in path:
         # No drive specifier, just convert slashes and quote the name
         if path[:2] == "\\\\":
             path = "\\\\" + path
         url = urllib.quote("/".join(path.split("\\")))
     else:
-        parts = path.split(":")
-        url = ""
-
+        url, parts = "", path.split(":")
         if len(parts[0]) == 1: # Looks like a proper drive, e.g. C:\
             url = "///" + urllib.quote(parts[0].upper()) + ":"
             parts = parts[1:]
         components = ":".join(parts).split("\\")
         for part in filter(None, components):
             url += "/" + urllib.quote(part)
-
     url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
     return url
 
@@ -412,8 +389,8 @@ def to_unicode(value, encoding=None):
     locale encoading fails.
     """
     result = value
-    encoding = encoding or locale.getpreferredencoding()
     if not isinstance(value, unicode):
+        encoding = encoding or locale.getpreferredencoding()
         if isinstance(value, str):
             try:
                 result = unicode(value, encoding)
@@ -425,7 +402,7 @@ def to_unicode(value, encoding=None):
 
 
 def longpath(path):
-    """Returns the path in long Windows form (not shortened to PROGRA~1)."""
+    """Returns the path in long Windows form ("Program Files" not PROGRA~1)."""
     result = path
     try:
         buf = ctypes.create_unicode_buffer(65536)
