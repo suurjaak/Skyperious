@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.06.2015
+@modified    10.07.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -592,23 +592,23 @@ class SkypeDatabase(object):
                              "retrieving all (%s).", self.filename)
                     self.get_contacts()
                     self.get_table_rows("participants")
-                    for i in self.table_objects["participants"].values():
-                        if i["convo_id"] not in participants:
-                            participants[i["convo_id"]] = []
-                        if i["identity"] == self.id:
-                            i["contact"] = self.account
+                    for p in self.table_objects["participants"].values():
+                        if p["convo_id"] not in participants:
+                            participants[p["convo_id"]] = []
+                        if p["identity"] == self.id:
+                            p["contact"] = self.account
                         else:
                             # Fake a dummy contact object if no contact row
-                            i["contact"] = self.table_objects["contacts"].get(
-                                i["identity"], {"skypename":   i["identity"],
-                                                "identity":    i["identity"],
-                                                "name":        i["identity"],
-                                                "fullname":    i["identity"],
-                                                "displayname": i["identity"]}
+                            p["contact"] = self.table_objects["contacts"].get(
+                                p["identity"], {"skypename":   p["identity"],
+                                                "identity":    p["identity"],
+                                                "name":        p["identity"],
+                                                "fullname":    p["identity"],
+                                                "displayname": p["identity"]}
                             )
-                        participants[i["convo_id"]].append(i)
-                [i.sort(key=lambda x: (x["contact"].get("name", "")).lower())
-                 for i in participants.values()]
+                        participants[p["convo_id"]].append(p)
+                [p.sort(key=lambda x: (x["contact"].get("name") or "").lower())
+                 for p in participants.values()]
                 where, args = "WHERE displayname IS NOT NULL ", {}
                 for i, item in enumerate(chatnames or []):
                     safe = item.replace("%", "\\%").replace("_", "\\_")
