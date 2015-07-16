@@ -32,12 +32,11 @@ import traceback
 import urllib
 import urllib2
 from xml.etree import cElementTree as ElementTree
-from bs4 import BeautifulSoup
 
-try:
-    import wx
-except ImportError:
-    pass # Most functionality works without wx
+try: from bs4 import BeautifulSoup # For Skype shared photo login
+except ImportError: pass
+try: import wx # For avatar bitmaps in GUI program
+except ImportError: pass
 
 from third_party import step
 
