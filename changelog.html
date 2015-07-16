@@ -6,7 +6,6 @@
     
     <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/pygment_trac.css">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -41,15 +40,38 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
 
+
+        <h4>v3.5, 2015-07-16:</h4>
+        <ul>
+          <li>added emoticons to chat statistics</li>
+          <li>added shared image download for HTML export</li>
+          <li>added chat and author filters to command-line export</li>
+          <li>applying or resetting message filter will scroll to last selection</li>
+          <li>added support for copying selected list items to clipboard</li>
+          <li>stopped caching messages on export to avoid memory shortage</li>
+          <li>fixed parsing messages with deeply nested HTML (issue #38)</li>
+          <li>fixed chat date range component error when switching to empty chat</li>
+          <li>fixed a potential error with unexpected data in quoted messages</li>
+          <li>fixed a potential error message on filtering chat messages</li>
+          <li>made database comparison report window retain scroll position at the bottom</li>
+          <li>increased size of message search bar button image</li>
+          <li>upgraded Python from 2.7.9 to 2.7.10</li>
+          <li>upgraded dateutil from 2.4.1 to 2.4.2</li>
+          <li>upgraded Pillow from 2.8.0 to 2.8.1</li>
+          <li>upgraded SQLite from 3.6.21 to 3.8.10.2</li>
+          <li>upgraded XlsxWriter from 0.6.7 to 0.7.3</li>
+          <li>upgraded Nullsoft Scriptable Install System from 3.0a2 to 3.0b2</li>
+        </ul>
+        <br />
 
         <h4>v3.4.1, 2015-04-29:</h4>
         <ul>

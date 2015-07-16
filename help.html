@@ -6,7 +6,6 @@
     
     <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico" />
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/pygment_trac.css">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -46,9 +45,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.4.1-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -266,7 +265,9 @@ optional arguments:
 <pre>
 <code>$ skyperious -h export</code>
 
-usage: skyperious export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [--verbose]
+usage: main.py export [-h] [-t {html,xlsx,csv,txt,xlsx_single}]
+                      [-c CHAT [CHAT ...]] [-a AUTHOR [AUTHOR ...]]
+                      [--verbose]
                       FILE [FILE ...]
 
 Export all message history from a Skype database into files under a new
@@ -281,6 +282,12 @@ optional arguments:
                         export type: HTML files (default), Excel workbooks,
                         CSV spreadsheets, text files, or a single Excel
                         workbook with separate sheets
+  -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
+                        names of specific chats to export
+  -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
+                        names of specific authors whose chats to export
+  -p, --password        ask for Skype password on HTML export, to download
+                        shared images
   --verbose             print detailed progress messages to stderr
 </pre>
 
