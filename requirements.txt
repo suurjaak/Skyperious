@@ -1,5 +1,5 @@
 argparse
-bs4
+BeautifulSoup4
 Pillow
 pyparsing
 python-dateutil
