@@ -302,10 +302,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         or skypedata.SharedImageDownload.has_login(db.id): return
         msg = ("To include shared photos in exported HTML, enter the Skype "
                "password for '%s'.\n\n%s can automatically download shared "
-               "images from Skype web.\nThis can be disabled via File -> "
-               "Advanced options -> SharedImageAutoDownload.\nThe password "
-               "is retained for this %s session only." %
-               (db.id, conf.Title, conf.Title))
+               "photos from Skype web.\nThis can be disabled via File -> "
+               "Advanced options -> SharedImageAutoDownload.\n\nThe password "
+               "is only used for retrieving the images, and is not retained." %
+               (db.id, conf.Title))
         busy = controls.BusyPanel(self, "Logging into Skype.")
         while not skypedata.SharedImageDownload.has_login(db.id):
             dlg = wx.PasswordEntryDialog(self, msg, conf.Title)
