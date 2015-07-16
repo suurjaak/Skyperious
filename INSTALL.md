@@ -54,7 +54,7 @@ The graphical user interface needs wxPython, preferably version 2.9 or later.
 wxPython 2.8 is also supported (2.8.12+), with some layout quirks.
 
 If wxPython is not available, the command line interface will function regardless.
-if the other Python libraries are not available, the program will function 
+If the other Python libraries are not available, the program will function 
 regardless, only with lesser service - like lacking Excel export.
 
 To run from source if Python, pip and git are installed:
