@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    15.06.2015
+@modified    16.07.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -1878,7 +1878,7 @@ under the MIT License.
   <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">
       <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
 %endif
-</ul><br /><br /><br />
+</ul><br /><br />
 
 
 
