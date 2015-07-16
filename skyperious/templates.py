@@ -1869,7 +1869,7 @@ under the MIT License.
       <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
   <li>Skype4Py{{" 1.0.35" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/awahlig/skype4py">
       <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>
-  <li>BeautifulSoup{{" 4.3.2" if getattr(sys, 'frozen', False) else ""}}, <a href="http://www.crummy.com/software/BeautifulSoup">
+  <li>BeautifulSoup{{" 4.4" if getattr(sys, 'frozen', False) else ""}}, <a href="http://www.crummy.com/software/BeautifulSoup">
       <font color="{{conf.LinkColour}}">crummy.com/software/BeautifulSoup</font></a></li>
   <li>jsOnlyLightbox{{" 0.5.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
       <font color="{{conf.LinkColour}}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
