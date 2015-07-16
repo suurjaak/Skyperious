@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.07.2015
+@modified    16.07.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1557,10 +1557,11 @@ class MessageParser(object):
             or message["id"] in self.stats.get("shared_images", {})):
                 message["dom"] = dom # Cache DOM if it was not mutated
 
-        if dom is not None and is_html: # Create a copy, HTML will mutate dom
-            dom = copy.deepcopy(dom)
-        if dom is not None and rgx_highlight and is_html:
-            self.highlight_text(dom, rgx_highlight)
+        if dom is not None:
+            self.stats and self.collect_message_stats(message, dom)
+            if is_html: # Create a copy, HTML will mutate dom
+                dom = copy.deepcopy(dom)
+                rgx_highlight and self.highlight_text(dom, rgx_highlight)
 
         if dom is not None and is_html:
             result = self.dom_to_html(dom, output, message)
@@ -1574,7 +1575,6 @@ class MessageParser(object):
         else:
             result = dom
 
-        self.stats and self.collect_message_stats(message, dom)
         return result
 
 
