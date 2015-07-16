@@ -2340,7 +2340,7 @@ class SharedImageDownload(object):
         content1, code1 = cls.request(username, cls.STARTURL)
         if not content1:
             raise Exception("Response %s from start page." % code1)
-        soup1 = BeautifulSoup(content1)
+        soup1 = BeautifulSoup(content1, "html.parser")
         form1 = soup1.find("form", {"id": "loginForm"})
         if not form1:
             raise Exception("No login form detected on start page.")
@@ -2354,7 +2354,7 @@ class SharedImageDownload(object):
         content2, code2 = cls.request(username, loginurl, data2)
         if not content2:
             raise Exception("Response %s from login page." % code2)
-        soup2 = BeautifulSoup(content2)
+        soup2 = BeautifulSoup(content2, "html.parser")
         loginfailed = soup2.find("div", {"class": "messageBox message_error"})
         if loginfailed:
             elem = loginfailed.find("span")
