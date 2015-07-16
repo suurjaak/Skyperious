@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-3.5e, 2015-07-08
-------------------
+3.5, 2015-07-16
+---------------
 - added emoticons to chat statistics;
 - added shared image download for HTML export;
 - added chat and author filters to command-line export;
@@ -20,11 +20,11 @@ CHANGELOG
 - upgraded Pillow from 2.8.0 to 2.8.1;
 - upgraded SQLite from 3.6.21 to 3.8.10.2;
 - upgraded XlsxWriter from 0.6.7 to 0.7.3;
-- upgraded Nullsoft Scriptable Install System from 3.0a2 to 3.0b2;
+- upgraded Nullsoft Scriptable Install System from 3.0a2 to 3.0b1;
 
 
 3.4.1, 2015-04-29
-------------------
+-----------------
 - fixed missing content in text/Excel/CSV export (issue #37);
 - rolled back using Skype account timezone setting for message timestamps (issue #33);
 - added 40x40 and 256x256 application icons;
@@ -32,7 +32,7 @@ CHANGELOG
 
 
 3.4, 2015-04-15
-------------------
+---------------
 - added links to earliest messages in chat statistics histogram sectors;
 - fixed showing wrong author in transfer statistics for certain messages;
 - fixed a parsing issue with certain Skype messages;
@@ -57,7 +57,7 @@ CHANGELOG
 - upgraded Pillow from 2.7.0 to 2.8.0.
 
 3.3, 2015-03-15
-------------------
+---------------
 - added per-contact word clouds to chat statistics;
 - added 24h and date activity histograms to chat statistics;
 - added support for bold, italic and strike-through formatting in Skype 7 (issue #31);

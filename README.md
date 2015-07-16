@@ -1,4 +1,4 @@
-Skyperious 3.4
+Skyperious 3.5
 ==============
 
 Skyperious is a Skype database viewer and merger, written in Python.
@@ -44,6 +44,13 @@ You can use keywords to search among specific authors or chats only
 (`from:john`, `chat:links`), or from certain dates only 
 (`date:2012`, `date:2010..2013-06`). Search supports 
 wildcards, exact phrases, grouping, excluding, and either-or queries.
+
+HTML export can download shared photos and embed them in the resulting HTML.
+This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.  
+As shared photos are kept on the web, Skyperious needs to ask for Skype account
+password on HTML export. The password is only used for retrieving the images,
+and is not retained.  
+Image download is also supported in the command-line interface.
 
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
