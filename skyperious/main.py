@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.06.2015
+@modified    17.07.2015
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -57,7 +57,9 @@ ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
     "arguments": [
         {"args": ["--verbose"], "action": "store_true",
-         "help": "print detailed progress messages to stderr"}, ],
+         "help": "print detailed progress messages to stderr"},
+        {"args": ["-v", "--version"], "action": "version",
+         "version": "%s %s, %s." % (conf.Title, conf.Version, conf.VersionDate)}],
     "commands": [
         {"name": "export",
          "help": "export Skype databases as HTML, text or spreadsheet",
