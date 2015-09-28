@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+3.5.1a, 2015-09-28
+---------------
+- added support for updated Skype chat structure (issue #40);
+- added --version flag to command-line interface.
+
+
 3.5, 2015-07-16
 ---------------
 - added emoticons to chat statistics;

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.06.2015
+@modified    28.09.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5940,12 +5940,20 @@ class MergerPage(wx.Panel):
             chats2 = self.db2.get_conversations()
             c1map = dict((c["identity"], c) for c in chats1)
             c2map = dict((c["identity"], c) for c in chats2)
+            for mm, cc in (c1map, chats1), (c2map, chats2):
+                for c in (c for c in cc if c.get("__link")):
+                    mm[c["__link"]["identity"]] = c
+            def get_matched(cmap, c):
+                x = cmap.get(c["identity"])
+                x = x or c.get("__link") and cmap.get(c["__link"]["identity"])
+                return x
+
             compared = []
             for c1 in chats1:
-                c1["c1"], c1["c2"] = c1.copy(), c2map.get(c1["identity"])
+                c1["c1"], c1["c2"] = c1.copy(), get_matched(c2map, c1)
                 compared.append(c1)
             for c2 in chats2:
-                if c2["identity"] not in c1map:
+                if not get_matched(c1map, c2):
                     c2["c1"], c2["c2"] = None, c2.copy()
                     compared.append(c2)
             for c in compared:

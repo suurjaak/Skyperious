@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.07.2015
+@modified    28.09.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -512,8 +512,11 @@ class SkypeDatabase(object):
                 sql += "WHERE m.type IN (%s)" % ", ".join(
                        map(str, MESSAGE_TYPES_MESSAGE))
                 if chat:
-                    sql += " AND m.convo_id = :convo_id"
-                    params["convo_id"] = chat["id"]
+                    cc = [x for x in (chat, chat.get("__link")) if x]
+                    ff = [":convo_id%s" % i for i in range(len(cc))]
+                    sql += " AND m.convo_id IN (%s)" % ", ".join(ff)
+                    for i, c in enumerate(cc):
+                        params["convo_id%s" % i] = c["id"]
                 if timestamp_from:
                     sql += " AND m.timestamp %s :timestamp" % "<>"[ascending]
                     params["timestamp"] = timestamp_from
@@ -573,10 +576,11 @@ class SkypeDatabase(object):
 
     def get_conversations(self, chatnames=None, authornames=None):
         """
-        Returns all the chats and message rowcounts in the database, as
+        Returns chats as
         [{"id": integer, "title": "chat title", "created_datetime": datetime,
           "title_long": "Group chat "chat_title"", "title_long_lc": "group..",
           "last_activity_datetime": datetime, "type_name": chat type name}, ..]
+        Combines migrated chats into a single one under {"__link": {oldchat}}.
         Uses already retrieved cached values if possible.
 
         @param   chatnames    return chats with names containing given values
@@ -624,6 +628,24 @@ class SkypeDatabase(object):
                     "ORDER BY last_activity_timestamp DESC" % where, args
                 ).fetchall()
                 conversations = []
+                # Chats can refer to older entries, prior to system from Skype 7.
+                # Collate such chats automatically, with merged statistics.
+                idmap = dict((x["identity"], x) for x in rows)
+                for c in rows:
+                    if c.get("alt_identity") in idmap: # Pointing to new ID
+                        idmap[c["alt_identity"]]["__link"] = c
+                    if "thread.skype" not in c["identity"]: continue
+                    # Can contain old chat ID base64-encoded into new identity:
+                    # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
+                    pattern = r"(\d+:)([^@]+)(.*)"
+                    repl = lambda x: x.group(2).decode("base64")
+                    try:
+                        oldid = re.sub(pattern, repl, str(c["identity"]))
+                        if oldid in idmap:
+                            c["__link"] = idmap[oldid]
+                    except Exception: pass
+                oldset = set(x["__link"]["identity"] for x in rows
+                             if x.get("__link"))
                 for chat in rows:
                     chat["participants"] = participants.get(chat["id"], [])
                     if authornames:
@@ -648,11 +670,10 @@ class SkypeDatabase(object):
                         "Unknown (%d)" % chat["type"])
                     # Set stats attributes presence
                     chat["message_count"] = None
-                    chat["first_message_timestamp"] = None
-                    chat["last_message_timestamp"] = None
                     chat["first_message_datetime"] = None
                     chat["last_message_datetime"] = None
-                    conversations.append(chat)
+                    if chat["identity"] not in oldset: # Available in link
+                        conversations.append(chat)
                 main.log("Conversations and participants retrieved "
                     "(%s chats, %s contacts, %s).",
                     len(conversations), len(self.table_rows["contacts"]),
@@ -671,6 +692,7 @@ class SkypeDatabase(object):
         {"first_message_timestamp": int, "first_message_datetime": datetime,
          "last_message_timestamp": int, "last_message_datetime": datetime,
          "message_count": message count, }.
+        Combines linked chat statistics into parent chat statistics.
 
         @param   chats  list of chats, as returned from get_conversations()
         """
@@ -679,9 +701,10 @@ class SkypeDatabase(object):
         stats = {}
         if self.is_open() and "messages" in self.tables:
             and_str, and_val = "", []
-            if chats and len(chats) == 1:
-                and_str = " AND convo_id in (%s)" % ", ".join(["?"]*len(chats))
-                and_val = [c["id"] for c in chats]
+            if 1 == len(chats):
+                cc = [x for x in (chats[0], chats[0].get("__link")) if x]
+                and_str = " AND convo_id IN (%s)" % ", ".join("?" * len(cc))
+                and_val = [c["id"] for c in cc]
             sql = ("SELECT convo_id AS id, COUNT(*) AS message_count, "
                    "MIN(timestamp) AS first_message_timestamp, "
                    "MAX(timestamp) AS last_message_timestamp, "
@@ -693,13 +716,29 @@ class SkypeDatabase(object):
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
             chat["message_count"] = 0
-            if chat["id"] not in stats: continue # for chat in chats
-            data = stats[chat["id"]]
-            for n in ["first_message", "last_message"]:
-                if data[n + "_timestamp"]: # Initialize Python datetime fields
-                    dt = self.stamp_to_date(data[n + "_timestamp"])
-                    data[n + "_datetime"] = dt
-            chat.update(data)
+            cc = [x for x in (chat, chat.get("__link")) if x]
+            datas = [stats[x["id"]] for x in cc if x["id"] in stats]
+            if not datas: continue
+            for data in datas: # Initialize datetime objects
+                for n in ["first_message", "last_message"]:
+                    if data[n + "_timestamp"]:
+                        dt = self.stamp_to_date(data[n + "_timestamp"])
+                        data[n + "_datetime"] = dt
+
+            def merge_participants(datas):
+                pmap = dict((p["identity"], p) for pp in datas for p in pp)
+                sortkey = lambda x: (x["contact"].get("name") or "").lower()
+                return sorted(pmap.values(), key=sortkey)
+            for n, f in zip(["first_message_datetime", "last_message_datetime",
+                "created_datetime", "creation_timestamp", "message_count",
+                "last_activity_datetime", "last_activity_timestamp",
+                "participants"],
+                [min, max, min, min, sum, max, max, merge_participants]
+            ): # Combine 
+                values = [d.get(n, c.get(n)) for c, d in zip(cc, datas)]
+                values = [x for x in values if x is not None]
+                chat[n] = f(values) if values else None
+
         if log and chats:
             main.log("Statistics collected (%s).", self.filename)
 
@@ -858,7 +897,8 @@ class SkypeDatabase(object):
                 videos = self.table_rows["videos"]
 
         if chat:
-            videos = [v for v in videos if v["convo_id"] == chat["id"]]
+            ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]
+            videos = [v for v in videos if v["convo_id"] in ids]
         return videos
 
 
@@ -886,43 +926,9 @@ class SkypeDatabase(object):
                 calls = self.table_rows["calls"]
 
         if chat:
-            calls = [c for c in calls if c["conv_dbid"] == chat["id"]]
+            ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]
+            calls = [c for c in calls if c["conv_dbid"] in ids]
         return calls
-
-
-    def get_conversation_participants(self, chat):
-        """
-        Returns the participants of the chat, as
-        [{name, all Participant columns, "contact": {all Contact columns}}]
-        (excluding database account owner).
-        """
-        participants = []
-        if self.is_open() and "contacts" in self.tables:
-            if "contacts" not in self.table_objects:
-                # Retrieve and cache all contacts
-                self.table_objects["contacts"] = {}
-                rows = self.execute(
-                    "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity "
-                    "FROM contacts").fetchall()
-                for row in rows:
-                    self.table_objects["contacts"][row["identity"]] = row
-            rows = self.execute(
-                "SELECT COALESCE(c.fullname, c.displayname, c.skypename, "
-                                "c.pstnnumber, '') AS name, "
-                "c.skypename, p.* "
-                "FROM contacts AS c INNER JOIN participants AS p "
-                "ON p.identity = c.skypename "
-                "WHERE p.convo_id = :id AND c.skypename != :skypename "
-                "ORDER BY name COLLATE NOCASE",
-                {"id": chat["id"], "skypename": self.account["skypename"]}
-            ).fetchall()
-            for p in rows:
-                p["contact"] = self.table_objects["contacts"].get(p["identity"])
-                if not p["contact"]:
-                    p["contact"] = self.get_contact(p["identity"])
-                participants.append(p)
-
-        return participants
 
 
     def get_contact(self, identity):
@@ -1033,6 +1039,8 @@ class SkypeDatabase(object):
 
     def insert_chat(self, chat, source_db):
         """Inserts the specified chat into the database and returns its ID."""
+        # @todo insert_chat võiks renameda insert_conversation, kuna kõik
+        #       teised meetodid on convo-nime peal
         if self.is_open() and not self.account and source_db.account:
             self.insert_account(source_db.account)
         if self.is_open() and "conversations" not in self.tables:
@@ -1083,9 +1091,10 @@ class SkypeDatabase(object):
             self.ensure_backup()
             # Messages.chatname corresponds to Chats.name, and Chats entries
             # must exist for Skype application to be able to find the messages.
-            chatrows_source = dict([(i["name"], i) for i in 
-                source_db.execute("SELECT * FROM chats WHERE conv_dbid = ?",
-                                  [source_chat["id"]])])
+            cc = [x for x in (source_chat, source_chat.get("__link")) if x]
+            chatrows_source = dict((i["name"], i) for i in 
+                source_db.execute("SELECT * FROM chats WHERE conv_dbid IN (%s)"
+                    % ", ".join("?" * len(cc)), [x["id"] for x in cc]))
             chatrows_present = dict([(i["name"], 1)
                 for i in self.execute("SELECT name FROM chats")])
             col_data = self.get_table_columns("messages")
@@ -1096,17 +1105,18 @@ class SkypeDatabase(object):
             transfer_fields = [col["name"] for col in transfer_col_data
                                if col["name"] != "id"]
             transfer_cols = ", ".join(transfer_fields)
-            transfer_vals = ", ".join(["?"] * len(transfer_fields))
+            transfer_vals = ", ".join("?" * len(transfer_fields))
             sms_col_data = self.get_table_columns("smses")
             sms_fields = [col["name"] for col in sms_col_data
                           if col["name"] != "id"]
             sms_cols = ", ".join(sms_fields)
-            sms_vals = ", ".join(["?"] * len(sms_fields))
+            sms_vals = ", ".join("?" * len(sms_fields))
             chat_col_data = self.get_table_columns("chats")
             chat_fields = [col["name"] for col in chat_col_data
-                           if col["name"] != "id"]
-            chat_cols = ", ".join(chat_fields)
-            chat_vals = ", ".join(["?"] * len(chat_fields))
+                           if col["name"] not in ("id", "conv_dbid")]
+            chat_cols = ", ".join(chat_fields + ["conv_dbid"])
+            chat_vals = ", ".join("?" * (len(chat_fields) + 1))
+
             timestamp_earliest = source_chat["creation_timestamp"] \
                                  or sys.maxsize
 
@@ -1118,6 +1128,7 @@ class SkypeDatabase(object):
                     chatrow = [chatrowdata.get(col, "") for col in chat_fields]
                     chatrow = self.blobs_to_binary(
                         chatrow, chat_fields, chat_col_data)
+                    chatrow.append(chat["id"]) # For conv_dbid
                     sql = "INSERT INTO chats (%s) VALUES (%s)" % \
                           (chat_cols, chat_vals)
                     self.execute(sql, chatrow)

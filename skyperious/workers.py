@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    03.04.2015
+@modified    13.08.2015
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -172,6 +172,7 @@ class SearchThread(WorkerThread):
                     template_chat = FACTORY("chat")
                 for chat in chats:
                     chat_map[chat["id"]] = chat
+                    if chat.get("__link"): chat_map[chat["__link"]["id"]] = chat
                     if "conversations" == search["table"] and match_words:
                         title_matches = False
                         matching_authors = []
@@ -416,9 +417,13 @@ class MergeThread(WorkerThread):
         chats1 = params.get("chats") or db1.get_conversations()
         chats2 = db2.get_conversations()
         c2map = dict((c["identity"], c) for c in chats2)
+        for c in (c for c in chats2 if c.get("__link")):
+            c2map[c["__link"]["identity"]] = c
         compared = []
         for c1 in chats1:
             c2 = c2map.get(c1["identity"])
+            if not c2 and c1.get("__link"):
+                c2 = c2map.get(c1["__link"]["identity"])
             c = c1.copy()
             c["messages1"] = c1["message_count"] or 0
             c["messages2"] = c2["message_count"] or 0 if c2 else 0
@@ -482,8 +487,12 @@ class MergeThread(WorkerThread):
             chats1 = params.get("chats") or db1.get_conversations()
             chats2 = db2.get_conversations()
             c2map = dict((c["identity"], c) for c in chats2)
+            for c in (c for c in chats2 if c.get("__link")):
+                c2map[c["__link"]["identity"]] = c
             for c1 in chats1:
                 c2 = c2map.get(c1["identity"])
+                if not c2 and c1.get("__link"):
+                    c2 = c2map.get(c1["__link"]["identity"])
                 c = c1.copy()
                 c["messages1"] = c1["message_count"] or 0
                 c["messages2"] = c2["message_count"] or 0 if c2 else 0
