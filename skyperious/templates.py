@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    16.07.2015
+@modified    30.09.2015
 ------------------------------------------------------------------------------
 """
 import re
@@ -1619,8 +1619,9 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 SEARCH_ROW_CHAT_HTML = """<%
 import re
 import conf
+from third_party import step
 
-title = chat["title"]
+title = step.escape_html(chat["title"])
 if title_matches:
     title = pattern_replace.sub(lambda x: "<b>%s</b>" % x.group(0), title)
 %>
@@ -1629,7 +1630,7 @@ if title_matches:
     <font color="{{conf.HistoryGreyColour}}">{{result_count}}</font>
   </td><td colspan="2">
     <a href="chat:{{chat["id"]}}">
-    <font color="{{conf.SkypeLinkColour}}">{{title}}</font></a><br />
+    <font color="{{conf.SkypeLinkColour}}">{{!title}}</font></a><br />
 %if title_matches:
     Title matches.<br />
 %endif
