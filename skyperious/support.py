@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    21.03.2015
+@modified    14.10.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -181,6 +181,7 @@ def reporting_write(write):
             report_error(text)
         del cached[:]
     def cache_text(string):
+        if "Gtk" in string and "eprecat" in string: return # Hide GTK warnings
         if not cached:
             # CallLater fails if not called from main thread
             wx.CallAfter(wx.CallLater, 500, handle_error)
