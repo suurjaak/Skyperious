@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    21.03.2015
+@modified    17.11.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -24,13 +24,14 @@ import traceback
 import urllib
 import urllib2
 import urlparse
-import wx
+try: import wx # For GUI, error reporting works without
+except ImportError: wx = None
 
 import conf
-import controls
 import main
 import util
-import wx_accel
+try: import controls, wx_accel # For GUI, error reporting works without
+except ImportError: controls = wx_accel = None
 
 """Current update dialog window, if any, for avoiding concurrent updates."""
 update_window = None
@@ -301,7 +302,8 @@ def canonic_version(v):
 
 
 
-class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
+class FeedbackDialog(wx_accel.AutoAcceleratorMixIn if wx_accel else type("", (), {}),
+                     wx.Dialog if wx else type("", (), {})):
     """
     A non-modal dialog for sending feedback with an optional screenshot,
     stays on top of parent.
@@ -483,6 +485,6 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
 url_opener.addheaders = [("User-agent", "%s %s (%s) (Python %s; wx %s; %s)" % (
     conf.Title, conf.Version, get_install_type(),
     ".".join(map(str, sys.version_info[:3])),
-    ".".join(map(str, wx.VERSION[:4])),
+    ".".join(map(str, wx.VERSION[:4])) if wx else "unavailable",
     platform.platform() + ("-x64" if platform.machine().endswith("64") else "")
 ))]
