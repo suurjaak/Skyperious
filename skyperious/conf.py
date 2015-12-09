@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.09.2015
+@modified    09.12.2015
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.5.1b"
-VersionDate = "28.09.2015"
+Version = "3.5.1c"
+VersionDate = "09.12.2015"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -361,24 +361,18 @@ def load():
             try: # parser.get can throw an error if value not found
                 value_raw = parser.get(section, name)
             except Exception:
-                return False, None
-            # First, try to interpret as JSON
-            try:
+                return None, False
+            try: # Try to interpret as JSON, fall back on raw string
                 value = json.loads(value_raw)
-            except ValueError: # JSON failed, try to eval it
-                try:
-                    value = eval(value_raw)
-                except SyntaxError: # Fall back to string
-                    value = value_raw
-            return True, value
+            except ValueError:
+                value = value_raw
+            return value, True
 
         for name in FileDirectives:
-            [setattr(module, name, v) for s, v in [parse_value(name)] if s]
+            [setattr(module, name, v) for v, s in [parse_value(name)] if s]
         for name in OptionalFileDirectives:
             OptionalFileDirectiveDefaults[name] = getattr(module, name, None)
-            success, value = parse_value(name)
-            if success:
-                setattr(module, name, value)
+            [setattr(module, name, v) for v, s in [parse_value(name)] if s]
     except Exception:
         pass # Fail silently
 
@@ -395,8 +389,7 @@ def save():
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
-            try:
-                parser.set(section, name, json.dumps(getattr(module, name)))
+            try: parser.set(section, name, json.dumps(getattr(module, name)))
             except Exception: pass
         for name in OptionalFileDirectives:
             try:
