@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.09.2015
+@modified    08.12.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1020,14 +1020,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "Remove %s from database list?" % filename,
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ):
-            if filename in conf.DBFiles:
-                conf.DBFiles.remove(filename)
-            if filename in conf.LastSelectedFiles:
-                conf.LastSelectedFiles.remove(filename)
-            if filename in conf.LastSearchResults:
-                del conf.LastSearchResults[filename]
-            if filename in self.db_filenames:
-                del self.db_filenames[filename]
+            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+                if filename in lst: lst.remove(filename)
+            for dct in conf.LastSearchResults, self.db_filenames:
+                dct.pop(filename, None)
             for i in range(self.list_db.GetItemCount()):
                 if self.list_db.GetItemText(i) == filename:
                     self.list_db.DeleteItem(i)
@@ -1053,20 +1049,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             # - i, as item count is getting smaller one by one
             selected = selecteds[i] - i
             filename = self.list_db.GetItemText(selected)
-            if filename in conf.DBFiles:
-                conf.DBFiles.remove(filename)
-            if filename in conf.LastSelectedFiles:
-                conf.LastSelectedFiles.remove(filename)
-            if filename in self.db_filenames:
-                del self.db_filenames[filename]
+            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+                if filename in lst: lst.remove(filename)
+            for dct in conf.LastSearchResults, self.db_filenames:
+                dct.pop(filename, None)
             self.list_db.DeleteItem(selected)
+        self.update_database_list()
+
+        if not selecteds: return
         # Remove from recent file history
         historyfiles = [(i, self.history_file.GetHistoryFile(i))
                         for i in range(self.history_file.Count)]
         for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
             if f in filenames: self.history_file.RemoveFileFromHistory(i)
         conf.save()
-        self.update_database_list()
 
 
     def on_showhide_log(self, event):
