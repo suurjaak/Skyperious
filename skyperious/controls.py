@@ -68,7 +68,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    14.10.2015
+@modified    21.12.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1757,6 +1757,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
         self.Bind(wx.EVT_MENU, self.OnSelectAll, id=id_selectall)
+        self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
 
 
     def SetColumnFormatters(self, formatters):
@@ -1779,7 +1780,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         """
         self._col_widths.clear()
         self._row_colours.clear()
-        self._id_rows = [(wx.NewId(), r) for r in rows]
+        self._id_rows = [(self.counter(), r) for r in rows]
         self.RefreshRows()
 
 
@@ -1789,7 +1790,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
         @param   data     item data dictionary
         """
-        item_id = wx.NewId()
+        item_id = self.counter()
         if self._RowMatchesFilter(data):
             columns = [c[0] for c in self._columns]
             index = self.ItemCount

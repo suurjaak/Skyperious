@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.12.2015
+@modified    21.12.2015
 ------------------------------------------------------------------------------
 """
 import ast
@@ -684,56 +684,56 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu.Append(menu_file, "&File")
 
         menu_open_database = self.menu_open_database = menu_file.Append(
-            id=wx.NewId(), text="&Open database...\tCtrl-O",
+            id=wx.ID_ANY, text="&Open database...\tCtrl-O",
             help="Choose a database file to open."
         )
         menu_recent = self.menu_recent = wx.Menu()
-        menu_file.AppendMenu(id=wx.NewId(), text="&Recent databases",
+        menu_file.AppendMenu(id=wx.ID_ANY, text="&Recent databases",
             submenu=menu_recent, help="Recently opened databases.")
         menu_file.AppendSeparator()
         menu_options = self.menu_options = \
-            menu_file.Append(id=wx.NewId(), text="&Advanced options",
+            menu_file.Append(id=wx.ID_ANY, text="&Advanced options",
                 help="Edit advanced program options")
         menu_iconize = self.menu_iconize = \
-            menu_file.Append(id=wx.NewId(), text="Minimize to &tray",
+            menu_file.Append(id=wx.ID_ANY, text="Minimize to &tray",
                 help="Minimize %s window to notification area" % conf.Title)
         menu_exit = self.menu_exit = \
-            menu_file.Append(id=wx.NewId(), text="E&xit\tAlt-X", help="Exit")
+            menu_file.Append(id=wx.ID_ANY, text="E&xit\tAlt-X", help="Exit")
 
         menu_help = wx.Menu()
         menu.Append(menu_help, "&Help")
 
-        menu_update = self.menu_update = menu_help.Append(id=wx.NewId(),
+        menu_update = self.menu_update = menu_help.Append(id=wx.ID_ANY,
             text="Check for &updates",
             help="Check whether a new version of %s is available" % conf.Title)
-        menu_feedback = self.menu_feedback = menu_help.Append(id=wx.NewId(),
+        menu_feedback = self.menu_feedback = menu_help.Append(id=wx.ID_ANY,
             text="Send &feedback",
             help="Send feedback or report a problem to program author")
-        menu_homepage = self.menu_homepage = menu_help.Append(id=wx.NewId(),
+        menu_homepage = self.menu_homepage = menu_help.Append(id=wx.ID_ANY,
             text="Go to &homepage",
             help="Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
         menu_help.AppendSeparator()
-        menu_log = self.menu_log = menu_help.Append(id=wx.NewId(),
+        menu_log = self.menu_log = menu_help.Append(id=wx.ID_ANY,
             kind=wx.ITEM_CHECK, text="Show &log window",
             help="Show/hide the log messages window")
-        menu_console = self.menu_console = menu_help.Append(id=wx.NewId(),
+        menu_console = self.menu_console = menu_help.Append(id=wx.ID_ANY,
             kind=wx.ITEM_CHECK, text="Show Python &console\tCtrl-E",
             help="Show/hide a Python shell environment window")
         menu_help.AppendSeparator()
-        menu_tray = self.menu_tray = menu_help.Append(id=wx.NewId(),
+        menu_tray = self.menu_tray = menu_help.Append(id=wx.ID_ANY,
             kind=wx.ITEM_CHECK, text="Display &icon in notification area",
             help="Show/hide %s icon in system tray" % conf.Title)
         menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(
-            id=wx.NewId(), kind=wx.ITEM_CHECK,
+            id=wx.ID_ANY, kind=wx.ITEM_CHECK,
             text="Automatic up&date check",
             help="Automatically check for program updates periodically")
         menu_error_reporting = self.menu_error_reporting = menu_help.Append(
-            id=wx.NewId(), kind=wx.ITEM_CHECK,
+            id=wx.ID_ANY, kind=wx.ITEM_CHECK,
             text="Automatic &error reporting",
             help="Automatically report software errors to program author")
         menu_help.AppendSeparator()
         menu_about = self.menu_about = menu_help.Append(
-            id=wx.NewId(), text="&About %s" % conf.Title,
+            id=wx.ID_ANY, text="&About %s" % conf.Title,
             help="Show program information and copyright")
 
         self.history_file = wx.FileHistory(conf.MaxRecentFiles)
@@ -1103,7 +1103,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_remove_type_menu(self, event):
         """Handler to remove files from the database list by type."""
         menu = wx.lib.agw.flatmenu.FlatMenu()
-        [menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
+        [menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
          "Remove %s databases" % x)) for x in "all other SQLite", "Skype"]
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_remove_type, item)
@@ -1135,12 +1135,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return self.on_export_database(None)
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
-        item_sel = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export into separate &files in one folder "
-               "(HTML, text, Excel, or CSV)")
+        item_sel = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY, "Export "
+            "into separate &files in one folder (HTML, text, Excel, or CSV)")
         menu.AppendItem(item_sel)
-        item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export into a single &Excel workbook, with separate sheets")
+        item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+            label="Export into a single &Excel workbook, with separate sheets")
         menu.AppendItem(item_all)
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_export_database, item)
@@ -1316,7 +1315,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         fm = wx.lib.agw.flatmenu
         menu = fm.FlatMenu()
-        item = fm.FlatMenuItem(menu, wx.NewId(),
+        item = fm.FlatMenuItem(menu, wx.ID_ANY,
                                "&Select a file from your computer..")
         menu.AppendItem(item)
         recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
@@ -1325,20 +1324,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if recents or others:
             menu.AppendSeparator()
         if recents:
-            item = fm.FlatMenuItem(menu, wx.NewId(), "Recent files")
+            item = fm.FlatMenuItem(menu, wx.ID_ANY, "Recent files")
             item.Enable(False)
             menu.AppendItem(item)
             for i, f in enumerate(recents, 1):
-                menu.AppendItem(fm.FlatMenuItem(menu, wx.NewId(),
-                                                "&%s %s" % (i, f)))
+                menu.AppendItem(
+                    fm.FlatMenuItem(menu, wx.ID_ANY, "&%s %s" % (i, f)))
             if others:
                 menu.AppendSeparator()
-                item = fm.FlatMenuItem(menu, wx.NewId(), "Rest of list")
+                item = fm.FlatMenuItem(menu, wx.ID_ANY, "Rest of list")
                 item.Enable(False)
                 menu.AppendItem(item)
         for i, f in enumerate(sorted(others)):
             menu.AppendItem(fm.FlatMenuItem(
-                            menu, wx.NewId(), "&%s %s" % (chr(97+i%26), f)))
+                            menu, wx.ID_ANY, "&%s %s" % (chr(97+i%26), f)))
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_compare_menu, item)
 
@@ -1896,6 +1895,7 @@ class DatabasePage(wx.Panel):
         self.skype_handler = skype_handler
         parent_notebook.InsertPage(1, self, title)
         busy = controls.BusyPanel(self, "Loading \"%s\"." % db.filename)
+        self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
 
         self.chat = None # Currently viewed chat
         self.chats = []  # All chats in database
@@ -2392,8 +2392,8 @@ class DatabasePage(wx.Panel):
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
                   self.on_filter_grid_column)
         grid.Bind(wx.grid.EVT_GRID_CELL_CHANGE, self.on_change_table)
-        label_help = wx.StaticText(panel2, wx.NewId(),
-            "Double-click on column header to sort, right click to filter.")
+        label_help = wx.StaticText(panel2, label="Double-click on column "
+                                   "header to sort, right click to filter.")
         label_help.ForegroundColour = "grey"
         sizer2.Add(sizer_tb, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
         sizer2.Add(grid, border=5, proportion=2,
@@ -2468,8 +2468,8 @@ class DatabasePage(wx.Panel):
         grid.Bind(wx.EVT_SCROLL_CHANGED, self.on_scroll_grid_sql)
         grid.Bind(wx.EVT_KEY_DOWN, self.on_scroll_grid_sql)
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
-        label_help_grid = wx.StaticText(panel2, wx.NewId(),
-            "Double-click on column header to sort, right click to filter.")
+        label_help_grid = wx.StaticText(panel2, label="Double-click on column "
+                                        "header to sort, right click to filter.")
         label_help_grid.ForegroundColour = "grey"
 
         sizer2.Add(label_help, border=5, flag=wx.GROW | wx.LEFT | wx.BOTTOM)
@@ -3191,7 +3191,7 @@ class DatabasePage(wx.Panel):
             self.button_import_add.Enabled = False
             self.button_import_clear.Enabled = False
 
-            data = {"id": wx.NewId(), "handler": self.skype_handler,
+            data = {"id": self.counter(), "handler": self.skype_handler,
                     "values": search_values}
             self.search_data_contact.update(data)
             self.worker_search_contacts.work(data)
@@ -3345,23 +3345,23 @@ class DatabasePage(wx.Panel):
             selected = self.list_chats.GetNextSelected(selected)
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
-        item_sel = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export selected chats into individual &files")
+        item_sel = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu, wx.ID_ANY, "Export selected chats into individual &files")
         item_sel.Enable(len(selecteds))
         menu.AppendItem(item_sel)
         if export.xlsxwriter:
-            item_sel2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
+            item_sel2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                 "Export selected into a single &Excel workbook, "
                 "with separate sheets")
             item_sel2.Enable(len(selecteds))
             menu.AppendItem(item_sel2)
         menu.AppendSeparator()
-        item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
+        item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                "Export &all chats into individual files")
         item_all.Enable(len(self.chats))
         menu.AppendItem(item_all)
         if export.xlsxwriter:
-            item_all2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
+            item_all2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                 "Export all &into a single Excel workbook, "
                 "with separate sheets")
             item_all2.Enable(len(self.chats))
@@ -3949,7 +3949,7 @@ class DatabasePage(wx.Panel):
             main.status_flash("Searching for \"%s\" in %s.",
                               text, self.db.filename)
             html = self.html_searchall
-            data = {"id": wx.NewId(), "db": self.db, "text": text, "map": {},
+            data = {"id": self.counter(), "db": self.db, "text": text, "map": {},
                     "width": html.Size.width * 5/9, "table": "",
                     "partial_html": ""}
             fromtext = "" # "Searching for "text" in fromtext"
@@ -4843,7 +4843,7 @@ class DatabasePage(wx.Panel):
                 title = last_search.get("title", "")
                 html = last_search.get("content", "")
                 info = last_search.get("info")
-                tabid = wx.NewId() if 0 != last_search.get("id") else 0
+                tabid = self.counter() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
 
             # Populate the chats list

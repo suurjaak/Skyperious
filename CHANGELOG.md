@@ -7,6 +7,7 @@ CHANGELOG
 - added "Remove by type" button to start page (issue #47);
 - fixed escaping bolded words in search chat title and participants link;
 - fixed command-line interface requiring wx (issue #45);
+- fixed potential error message on long sessions;
 - added "Send feedback" button to About-box;
 - added --version flag to command-line interface.
 
