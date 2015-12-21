@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-3.5.1b, 2015-09-28
+3.5.1c, 2015-12-21
 ---------------
 - added support for updated Skype chat structure (issue #40);
 - fixed escaping bolded words in search chat title and participants link;
+- added "Send feedback" button to About-box;
 - added --version flag to command-line interface.
 
 

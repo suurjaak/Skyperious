@@ -7498,17 +7498,20 @@ class AboutDialog(wx.Dialog):
                            style=wx.CAPTION | wx.CLOSE_BOX)
         html = self.html = wx.html.HtmlWindow(self)
         button_update = wx.Button(self, label="Check for &updates")
+        button_feedback = wx.Button(self, label="Send &feedback")
 
         html.SetPage(content)
         html.BackgroundColour = conf.BgColour
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
         button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
+        button_feedback.Bind(wx.EVT_BUTTON, parent.on_open_feedback)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
         sizer_buttons = self.CreateButtonSizer(wx.OK)
-        sizer_buttons.Insert(0, button_update, border=150, flag=wx.RIGHT)
+        sizer_buttons.Insert(0, button_update, border=50, flag=wx.RIGHT)
+        sizer_buttons.Insert(1, button_feedback, border=50, flag=wx.RIGHT)
         self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER | wx.ALL)
         self.Layout()
         self.Size = (self.Size[0], html.VirtualSize[1] + 60)
