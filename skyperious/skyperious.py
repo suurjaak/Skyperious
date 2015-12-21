@@ -1263,9 +1263,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for clicking to compare a selected database with another, shows
         a popup menu for choosing the second database file.
         """
-        menu = wx.lib.agw.flatmenu.FlatMenu()
-        item = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Select a file from your computer..")
+        fm = wx.lib.agw.flatmenu
+        menu = fm.FlatMenu()
+        item = fm.FlatMenuItem(menu, wx.NewId(),
+                               "&Select a file from your computer..")
         menu.AppendItem(item)
         recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
         others = [f for f in conf.DBFiles
@@ -1273,22 +1274,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if recents or others:
             menu.AppendSeparator()
         if recents:
-            item = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-                                                    "Recent files")
+            item = fm.FlatMenuItem(menu, wx.NewId(), "Recent files")
             item.Enable(False)
             menu.AppendItem(item)
-            for f in recents:
-                i = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(), f)
-                menu.AppendItem(i)
+            for i, f in enumerate(recents, 1):
+                menu.AppendItem(fm.FlatMenuItem(menu, wx.NewId(),
+                                                "&%s %s" % (i, f)))
             if others:
                 menu.AppendSeparator()
-                item = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-                                                        "Rest of list")
+                item = fm.FlatMenuItem(menu, wx.NewId(), "Rest of list")
                 item.Enable(False)
                 menu.AppendItem(item)
-        for f in sorted(others):
-            item = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(), f)
-            menu.AppendItem(item)
+        for i, f in enumerate(sorted(others)):
+            menu.AppendItem(fm.FlatMenuItem(
+                            menu, wx.NewId(), "&%s %s" % (chr(97+i%26), f)))
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_compare_menu, item)
 
