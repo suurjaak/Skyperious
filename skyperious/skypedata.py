@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.09.2015
+@modified    08.12.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2407,6 +2407,22 @@ class SharedImageDownload(object):
         return content, code
 
 
+def is_skype_database(filename):
+    """Returns whether the file looks to be a Skype database file."""
+    result, conn = False, None
+    try:
+        conn = sqlite3.connect(filename)
+        [conn.execute("SELECT * FROM %s LIMIT 1" % x)
+         for x in "Accounts", "Conversations", "Messages"]
+        result = True
+    except Exception:
+        main.log("Error checking database %s.\n\n%s", filename,
+                 traceback.format_exc())
+    finally:
+        conn and conn.close()
+
+    return result
+
 
 def is_sqlite_file(filename, path=None):
     """Returns whether the file looks to be an SQLite database file."""
@@ -2468,7 +2484,7 @@ def detect_databases():
 
 
 def find_databases(folder):
-    """Yields a list of all Skype databases under the specified folder."""
+    """Yields a list of all SQLite databases under the specified folder."""
     for root, dirs, files in os.walk(folder):
         for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)

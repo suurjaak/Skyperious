@@ -571,13 +571,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "(*.db files)."),
             ("missing", "Remove missing", images.ButtonRemoveMissing,
              "Remove non-existing files from the database list."),
+            ("type", "Remove by type", images.ButtonRemoveType,
+             "Choose to remove Skype databases, or other SQLite databases."),
             ("clear", "C&lear list", images.ButtonClear,
              "Clear the current database list."), ]
         for name, label, img, note in BUTTONS_MAIN:
             button = controls.NoteButton(panel_main, label, note, img.Bitmap)
             setattr(self, "button_" + name, button)
             exec("button_%s = self.button_%s" % (name, name)) in {}, locals()
-        button_missing.Hide(); button_clear.Hide()
+        button_missing.Hide(); button_type.Hide(); button_clear.Hide()
 
         # Create detail page labels, values and buttons
         label_db = self.label_db = wx.TextCtrl(parent=panel_detail, value="",
@@ -639,6 +641,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
         button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
         button_missing.Bind(wx.EVT_BUTTON,       self.on_remove_missing)
+        button_type.Bind(wx.EVT_BUTTON,          self.on_remove_type_menu)
         button_clear.Bind(wx.EVT_BUTTON,         self.on_clear_databases)
         button_open.Bind(wx.EVT_BUTTON,          self.on_open_current_database)
         button_compare.Bind(wx.EVT_BUTTON,       self.on_compare_databases)
@@ -653,6 +656,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(button_folder, flag=wx.GROW)
         panel_main.Sizer.AddStretchSpacer()
         panel_main.Sizer.Add(button_missing, flag=wx.GROW)
+        panel_main.Sizer.Add(button_type, flag=wx.GROW)
         panel_main.Sizer.Add(button_clear, flag=wx.GROW)
         panel_detail.Sizer.Add(label_db, border=10, flag=wx.ALL | wx.GROW)
         panel_detail.Sizer.Add(sizer_labels, border=10, flag=wx.ALL | wx.GROW)
@@ -938,6 +942,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     result = True
 
         self.button_missing.Shown = (self.list_db.GetItemCount() > 1)
+        self.button_type.Shown = (self.list_db.GetItemCount() > 1)
         self.button_clear.Shown = (self.list_db.GetItemCount() > 1)
         if self.Shown:
             self.list_db.SetColumnWidth(0, self.list_db.Size.width - 5)
@@ -1063,6 +1068,52 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
             if f in filenames: self.history_file.RemoveFileFromHistory(i)
         conf.save()
+
+
+    def on_remove_type(self, event):
+        """Handler for type selection to remove files from the database list."""
+        nitems = enumerate(event.EventObject.GetMenuItems())
+        other = not next((i for i, m in nitems if m.GetId() == event.Id), None)
+
+        selecteds = range(1, self.list_db.GetItemCount())
+        filter_func = lambda i: (
+          other ^ skypedata.is_skype_database(self.list_db.GetItemText(i)))
+        selecteds = list(filter(filter_func, selecteds))
+        filenames = list(map(self.list_db.GetItemText, selecteds))
+        for i in range(len(selecteds)):
+            # - i, as item count is getting smaller one by one
+            selected = selecteds[i] - i
+            filename = self.list_db.GetItemText(selected)
+            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+                if filename in lst: lst.remove(filename)
+            for dct in conf.LastSearchResults, self.db_filenames:
+                dct.pop(filename, None)
+            self.list_db.DeleteItem(selected)
+        self.update_database_list()
+
+        if not selecteds: return
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
+            if f in filenames: self.history_file.RemoveFileFromHistory(i)
+        conf.save()
+
+
+    def on_remove_type_menu(self, event):
+        """Handler to remove files from the database list by type."""
+        menu = wx.lib.agw.flatmenu.FlatMenu()
+        [menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
+         "Remove %s databases" % x)) for x in "all other SQLite", "Skype"]
+        for item in menu.GetMenuItems():
+            self.Bind(wx.EVT_MENU, self.on_remove_type, item)
+
+        sz_btn, pt_btn = event.EventObject.Size, event.EventObject.Position
+        pt_btn = event.EventObject.Parent.ClientToScreen(pt_btn)
+        menu.SetOwnerHeight(sz_btn.y)
+        if menu.Size.width < sz_btn.width:
+            menu.Size = sz_btn.width, menu.Size.height
+        menu.Popup((pt_btn), self)
 
 
     def on_showhide_log(self, event):

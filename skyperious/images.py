@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    14.05.2015
+@modified    08.12.2015
 ------------------------------------------------------------------------------
 """
 try:
@@ -793,6 +793,22 @@ ButtonRemoveMissing = PyEmbeddedImage(
     "z88AnE5OYWaYCUOY/+BglFUSm0+PyBwzsT0cUiZkFmSRyITLKCjqApJxe3dDeBCjr3PH42Pv"
     "HjQmJtBPNVhZWv1az+9IGL4UDF+K7wK9Xu93gU/4dys3m++dmHDSOdzbGYv9jkyOXwHmFJKW"
     "bHJGnQAAAABJRU5ErkJggg=="
+)
+
+
+"""Small icon for remove by type button on start page."""
+ButtonRemoveType = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB6ElEQVQ4y42TvWtTURjGf+fk"
+    "kubzXslQ7JJBcBMj1dFNhYJ1EA0iOHUKCP4JERyyuStksWvGKpTOTmKsdJIsarRqk9wbEvOd"
+    "8+HQpEmo1rzwwuFwnofn/fEewaSy2ewdYI3l6mepVNoBcKY3w+FwrVgsvux2u/T7fZTS1Osd"
+    "+n1DJBIlmUziui6e55LLPXg81TnztkopWq0Wvu+jlKZW+81gaIjHkyitkCFJLB5diCLPDCrA"
+    "AlaY4+a4lzfAToR2ItZY9MKL+RHKhULhdSaT2TTG0Ov1JqMoIpEIiUQCz/OoVCq7wPu/GVzN"
+    "5/Ob8xBrjTbdwYjwSphEMo7nuty6fXfjSW5rB3j3X4hHjRbd0YhoPMrYnANpcMKSIAjskhBn"
+    "sxuhTxikUimxlIExanZGY4TBoBcSnAlxrMcEjeAEou95vKlUdlOpVPmUgTHmFMTq4S8+16tc"
+    "2HvL8GAfLFyXcuPil+/rD+GbhfKJQafTsYsQFUGrCUBwsM/9K5dnWTOXVoHVV9vbswS+7zv/"
+    "WiaTWefFxw8AhKSk+vWwm2gefXLmE/i+H3McB8/zCIfDKKUJrUSJDdrIrXucTzzCnezCzWs3"
+    "nv5o8nyBQbvd9tPp9DOtNdbayU9ACCEQQiClRAhhhRCEQiF/qvsD5gYPZnfJMf4AAAAASUVO"
+    "RK5CYII="
 )
 
 

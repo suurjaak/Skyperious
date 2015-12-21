@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  14.05.2015
+@modified  08.12.2015
 ------------------------------------------------------------------------------
 """
 import base64
@@ -57,6 +57,8 @@ IMAGES = {
         "Small icon for remove database button on start page.",
     "ButtonRemoveMissing.png":
         "Small icon for remove missing button on start page.",
+    "ButtonRemoveType.png":
+        "Small icon for remove by type button on start page.",
     "ButtonSaveAs.png":
         "Small icon for save as button on start page.",
     "ButtonScanDiff.png":

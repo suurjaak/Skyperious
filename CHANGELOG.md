@@ -4,7 +4,9 @@ CHANGELOG
 3.5.1c, 2015-12-21
 ---------------
 - added support for updated Skype chat structure (issue #40);
+- added "Remove by type" button to start page (issue #47);
 - fixed escaping bolded words in search chat title and participants link;
+- fixed command-line interface requiring wx (issue #45);
 - added "Send feedback" button to About-box;
 - added --version flag to command-line interface.
 
