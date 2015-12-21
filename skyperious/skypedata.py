@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.12.2015
+@modified    21.12.2015
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2407,12 +2407,13 @@ class SharedImageDownload(object):
         return content, code
 
 
-def is_skype_database(filename):
+def is_skype_database(filename, path=None):
     """Returns whether the file looks to be a Skype database file."""
     result, conn = False, None
     try:
+        filename = os.path.join(path, filename) if path else filename
         conn = sqlite3.connect(filename)
-        [conn.execute("SELECT * FROM %s LIMIT 1" % x)
+        [conn.execute("SELECT id FROM %s LIMIT 1" % x)
          for x in "Accounts", "Conversations", "Messages"]
         result = True
     except Exception:
@@ -2469,7 +2470,7 @@ def detect_databases():
                 dirs[:] = [x for x in dirs if "skype" == x.lower()]
             results = []
             for f in files:
-                if "main.db" == f.lower() and is_sqlite_file(f, root):
+                if "main.db" == f.lower() and is_skype_database(f, root):
                     results.append(os.path.realpath(os.path.join(root, f)))
             if results: yield results
 
@@ -2478,7 +2479,7 @@ def detect_databases():
     main.log("Looking for Skype databases under %s.", search_path)
     for root, dirs, files in os.walk(search_path):
         results = []
-        for f in (x for x in files if is_sqlite_file(x, root)):
+        for f in (x for x in files if is_skype_database(x, root)):
             results.append(os.path.realpath(os.path.join(root, f)))
         if results: yield results
 
