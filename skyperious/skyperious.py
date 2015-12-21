@@ -1085,11 +1085,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
         item_sel = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export into separate files in one folder "
+               "Export into separate &files in one folder "
                "(HTML, text, Excel, or CSV)")
         menu.AppendItem(item_sel)
         item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export into a single Excel workbook, with separate sheets")
+               "Export into a single &Excel workbook, with separate sheets")
         menu.AppendItem(item_all)
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_export_database, item)
@@ -1210,7 +1210,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         indexitem = [(i, m) for i, m in nitems if m.GetId() == event.Id]
         i, item = indexitem[0] if indexitem else (-1, None)
         if i > 0 and item:
-            filename2 = item.GetLabel()
+            filename2 = item.GetLabel().split(" ", 1).pop()
         elif not i: # First menu item: open a file from computer
             dialog = wx.FileDialog(
                 parent=self, message="Open", defaultFile="",
@@ -3295,23 +3295,23 @@ class DatabasePage(wx.Panel):
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
         item_sel = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export selected chats into individual files")
+               "Export selected chats into individual &files")
         item_sel.Enable(len(selecteds))
         menu.AppendItem(item_sel)
         if export.xlsxwriter:
             item_sel2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-                "Export selected into a single Excel workbook, "
+                "Export selected into a single &Excel workbook, "
                 "with separate sheets")
             item_sel2.Enable(len(selecteds))
             menu.AppendItem(item_sel2)
         menu.AppendSeparator()
         item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-               "Export all chats into individual files")
+               "Export &all chats into individual files")
         item_all.Enable(len(self.chats))
         menu.AppendItem(item_all)
         if export.xlsxwriter:
             item_all2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.NewId(),
-                "Export all into a single Excel workbook, "
+                "Export all &into a single Excel workbook, "
                 "with separate sheets")
             item_all2.Enable(len(self.chats))
             menu.AppendItem(item_all2)
