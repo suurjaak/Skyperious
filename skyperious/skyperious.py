@@ -1373,14 +1373,19 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         updates database list.
         """
         if self.dialog_selectfolder.ShowModal() == wx.ID_OK:
+            if self.button_folder.FindFocus() == self.button_folder:
+                self.list_db.SetFocus()
+            self.button_folder.Enabled = False
             folder = self.dialog_selectfolder.GetPath()
             main.logstatus("Detecting databases under %s.", folder)
+            wx.YieldIfNeeded()
             count = 0
             for filename in skypedata.find_databases(folder):
                 if filename not in self.db_filenames:
                     main.log("Detected database %s.", filename)
                     self.update_database_list(filename)
                     count += 1
+            self.button_folder.Enabled = True
             main.logstatus_flash("Detected %s under %s.",
                 util.plural("new database", count), folder)
 
