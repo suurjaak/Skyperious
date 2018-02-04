@@ -6507,7 +6507,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     previous_day = m["datetime"].date()
                     weekday, weekdate = util.get_locale_day_date(previous_day)
                     self._append_text("\n%s" % weekday, "bold")
-                    self._append_text(", %s\n\n" % weekdate)
+                    self._append_text(", ")
+                    self._datelinks[self.STC.Length] = [previous_day, previous_day]
+                    self._append_text("%s\n\n" % weekdate, "link")
 
                 dom = self._parser.parse(m)
                 length_before = self.STC.Length
