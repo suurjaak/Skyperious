@@ -1,3 +1,18 @@
+
+Important notice, 2019-09-21
+============================
+
+
+As of Skype version 8.50 or thereabouts, conversation history is ***no longer
+available*** on the user machine. Previously, all chat history was kept in a 
+local SQLite database file. With the new versions, chat messages seem to 
+be kept on cloud servers only, retrieved on command by the Skype client,
+unavailable to external tools.
+
+As such, Skyperious is now ***obsolete***, further development is discontinued.
+
+
+
 Skyperious 3.5
 ==============
 
