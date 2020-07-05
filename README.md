@@ -45,13 +45,6 @@ You can use keywords to search among specific authors or chats only
 (`date:2012`, `date:2010..2013-06`). Search supports 
 wildcards, exact phrases, grouping, excluding, and either-or queries.
 
-HTML export can download shared photos and embed them in the resulting HTML.
-This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.  
-As shared photos are kept on the web, Skyperious needs to ask for Skype account
-password on HTML export. The password is only used for retrieving the images,
-and is not retained.  
-Image download is also supported in the command-line interface.
-
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 browse and copy specific chats and contacts.
@@ -119,7 +112,6 @@ The following are also listed in `requirements.txt` for pip:
 * XlsxWriter (https://pypi.python.org/pypi/XlsxWriter)
 * Pillow (https://pypi.python.org/pypi/Pillow)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
-* BeautifulSoup (http://www.crummy.com/software/BeautifulSoup/)
 * Skype4Py (https://pypi.python.org/pypi/Skype4Py)
 
 If wxPython is not available, the command line interface will function
@@ -137,9 +129,6 @@ Attribution
 
 Skyperious includes step, Simple Template Engine for Python,
 (c) 2012, Daniele Mazzocchio (https://github.com/dotpy/step).
-
-Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
-(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the [Skype Component License 1.0](res/emoticons/Skype Component License.txt).

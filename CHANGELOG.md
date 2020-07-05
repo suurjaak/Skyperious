@@ -3,6 +3,7 @@ CHANGELOG
 
 3.6, 2020-07-06
 ---------------
+- dropped shared image download functionality as obsolete;
 - upgraded wxPython to v4.
 
 

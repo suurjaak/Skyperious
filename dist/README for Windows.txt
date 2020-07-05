@@ -42,13 +42,6 @@ You can use keywords to search among specific authors or chats only
 Search supports wildcards, exact phrases, grouping, excluding,
 and either-or queries.
 
-HTML export can download shared photos and embed them in the resulting HTML.
-This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
-As shared photos are kept on the web, Skyperious needs to ask for Skype account
-password on HTML export. The password is only used for retrieving the images,
-and is not retained.
-Image download is also supported in the command-line interface.
-
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 browse and copy specific chats and contacts.
@@ -83,18 +76,14 @@ Attribution
 -----------
 
 Skyperious has been built using the following open-source software:
-- Python 2.7.10 (http://www.python.org)
-- wxPython 3.0.2 (http://www.wxpython.org)
-- Pillow 2.8.1 (https://pypi.python.org/pypi/Pillow)
+- Python 2.7.18 (http://www.python.org)
+- wxPython 4.1.0 (http://www.wxpython.org)
+- Pillow 6.2.2 (https://pypi.python.org/pypi/Pillow)
 - pyparsing 2.0.3 (http://pyparsing.wikispaces.com/)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
 - XlsxWriter 0.7.3 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.4.2, (http://pypi.python.org/pypi/python-dateutil)
 - Skype4Py 1.0.35, (https://github.com/awahlig/skype4py)
-- BeautifulSoup 4.3.2 (http://www.crummy.com/software/BeautifulSoup/)
-
-Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
-(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the Skype Component License 1.0.
@@ -110,9 +99,9 @@ Several icons from:
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Binaries compiled with PyInstaller 2.1, http://www.pyinstaller.org
+Binaries compiled with PyInstaller, http://www.pyinstaller.org
 
-Installer created with Nullsoft Scriptable Install System 3.0b1,
+Installer created with Nullsoft Scriptable Install System,
 http://nsis.sourceforge.net/
 
 
