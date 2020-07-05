@@ -23,7 +23,7 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.6.dev3"
+Version = "3.6.dev4"
 VersionDate = "05.07.2020"
 
 if getattr(sys, "frozen", False):

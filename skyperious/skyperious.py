@@ -540,7 +540,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             ("open", "&Open", images.ButtonOpen, 
              "Open the database for searching and exploring."),
             ("compare", "Compare and &merge", images.ButtonCompare,
-             "Choose another database to compare with, in order to merge "
+             "Choose another Skype database to compare with, in order to merge "
              "their differences."),
             ("export", "&Export messages", images.ButtonExport,
              "Export all conversations from the database as "

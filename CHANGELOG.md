@@ -3,6 +3,7 @@ CHANGELOG
 
 3.6, 2020-07-06
 ---------------
+- marked program as obsolete;
 - dropped support functionality;
 - dropped contacts search and import functionality as unavailable;
 - dropped shared image download functionality as unavailable;

@@ -1,5 +1,19 @@
-Skyperious 3.5
+Skyperious 3.6
 ==============
+
+Obsolescence Notice
+-------------------
+
+This program no longer works with modern Skype, as Skype has started to store
+its message history on its own servers, and nothing is kept locally any more
+that can easily be accessed with an external program. 
+
+The program can still be used to work with older Skype `main.db` files, but more
+recent message history is unavailable, and nothing can be merged back to an
+active Skype account.
+
+---
+
 
 Skyperious is a Skype database viewer and merger, written in Python.
 
@@ -19,9 +33,6 @@ Additionally, it doubles as a useful database browser for any SQLite file.
 Also, a command line interface is available with key functions like
 exporting, searching, and merging. 
 The graphical version includes a Python console window.
-
-Making a backup of the database file is recommended before making any changes.
-There is an easy "Save as" button for that on the database index page.
 
 Downloads, help texts, and more screenshots at
 http://suurjaak.github.io/Skyperious.
@@ -55,9 +66,6 @@ Skyperious offers a number of options from the command line:
 
 Skyperious can be minimized to tray, clicking the tray icon opens 
 a search popup.
-
-Skyperious can usually read from the same file Skype is currently using, although
-this can cause temporary program errors. Writing to such a file is ill-advised.
 
 The program itself is stand-alone, can work from any directory, and does not 
 need additional installation, Windows installers have been provided for 

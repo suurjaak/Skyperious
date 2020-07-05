@@ -1,5 +1,20 @@
-Skyperious 3.5
+Skyperious 3.6
 ==============
+
+
+Obsolescence Notice
+-------------------
+
+This program no longer works with modern Skype, as Skype has started to store
+its message history on its own servers, and nothing is kept locally any more
+that can easily be accessed with an external program. 
+
+The program can still be used to work with older Skype `main.db` files, but more
+recent message history is unavailable, and nothing can be merged back to an
+active Skype account.
+
+---
+
 
 Skyperious is a Skype database viewer and merger, written in Python.
 
@@ -19,9 +34,6 @@ Additionally, it doubles as a useful database tool for any SQLite file.
 Also, a [command line interface](http://suurjaak.github.io/Skyperious/help.html#commandline)
 is available with key functions like exporting, searching, and merging.
 The graphical version includes a Python console window.
-
-Making a backup of the database file is recommended before making any changes.
-There is an easy "Save as" button for that on the database index page.
 
 Downloads, help texts, and more screenshots at
 http://suurjaak.github.io/Skyperious.
@@ -61,9 +73,6 @@ Skyperious offers a number of options from the
 Skyperious can be minimized to tray, clicking the tray icon opens 
 a search popup.
 
-Skyperious can usually read from the same file Skype is currently using, although
-this can cause temporary program errors. Writing to such a file is ill-advised.
-
 The program itself is stand-alone, can work from any directory, and does not 
 need additional installation, Windows installers have been provided for 
 convenience. The installed program can be copied to a USB stick and used
@@ -102,13 +111,12 @@ Source Dependencies
 
 If running from source code, Skyperious needs Python 2.7 or 2.6,
 and the following 3rd-party Python packages:
-* wxPython 2.9+ (http://wxpython.org/)
+* wxPython 4.0+ (http://wxpython.org/)
 The following are also listed in `requirements.txt` for pip:
 * pyparsing (http://pyparsing.wikispaces.com/)
 * XlsxWriter (https://pypi.python.org/pypi/XlsxWriter)
 * Pillow (https://pypi.python.org/pypi/Pillow)
 * dateutil (http://pypi.python.org/pypi/python-dateutil)
-* Skype4Py (https://pypi.python.org/pypi/Skype4Py)
 
 If wxPython is not available, the command line interface will function
 regardless.
@@ -116,8 +124,7 @@ If other Python libraries are not available, the program will function
 regardless, only with lesser service - like lacking Excel export or full 
 search syntax.
 
-Skyperious can also run under wxPython 2.8.12+, with some layout quirks.
-Python 2.6 will need the argparse library. Python 3 is yet unsupported.
+Python 3 is not supported.
 
 
 Attribution
@@ -140,7 +147,7 @@ Several icons from:
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Binaries compiled with PyInstaller 2.1, http://www.pyinstaller.org
+Binaries compiled with PyInstaller 3.5, http://www.pyinstaller.org
 
 Installers created with Nullsoft Scriptable Install System 3.0b1,
 http://nsis.sourceforge.net/
@@ -149,6 +156,6 @@ http://nsis.sourceforge.net/
 License
 -------
 
-Copyright (c) 2011 by Erki Suurjaak.
+Copyright (c) by Erki Suurjaak.
 Released as free open source software under the MIT License,
 see [LICENSE.md](LICENSE.md) for full details.
