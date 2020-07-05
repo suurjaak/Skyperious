@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  08.12.2015
+@modified  05.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -71,8 +71,6 @@ IMAGES = {
         "Removed image icon for removed messages in exported chat HTML.",
     "HelpChats.png":
         "Help image on default search page for chats page.",
-    "HelpContacts.png":
-        "Help image on default search page for contacts import page.",
     "HelpTables.png":
         "Help image on default search page for tables page.",
     "HelpInfo.png":

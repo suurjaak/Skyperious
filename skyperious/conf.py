@@ -23,7 +23,7 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.6.dev1"
+Version = "3.6.dev3"
 VersionDate = "05.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -39,9 +39,8 @@ ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
-    "ErrorsReportedOnDay", "ErrorReportsAutomatic", "ErrorReportHashes",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
-    "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
+    "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
@@ -52,8 +51,7 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
     "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
     "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchContactsChunk", "SearchResultsChunk", 
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "SearchResultsChunk",  "StatisticsPlotWidth", "StatusFlashLength",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
     "WordCloudWordsAuthorMax"
 ]
@@ -69,15 +67,6 @@ DBFiles = []
 
 """History of commands entered in console."""
 ConsoleHistoryCommands = []
-
-"""Whether caught errors are reported automatically to author."""
-ErrorReportsAutomatic = False
-
-"""Errors reported on day X, e.g. {'20130530': 4, '20130531': 1, }."""
-ErrorsReportedOnDay = {}
-
-"""Saved hashes of automatically reported errors."""
-ErrorReportHashes = []
 
 """Index of last active page in database tab, {db path: index}."""
 LastActivePage = {}
@@ -124,9 +113,6 @@ ExportDbTemplate = u"Export from %(fullname)s"
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
-"""Whether the program checks for updates every UpdateCheckInterval."""
-UpdateCheckAutomatic = True
-
 """Whether the program has been minimized and hidden."""
 WindowIconized = False
 
@@ -144,10 +130,9 @@ LogEnabled = True
 """Whether to log all SQL statements to log window."""
 LogSQL = False
 
-"""URLs for download list, changelog, submitting feedback and homepage."""
+"""URLs for download list, changelog, and homepage."""
 DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
 ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
-ReportURL    = "http://erki.lap.ee/downloads/Skyperious/feedback"
 HomeUrl = "http://suurjaak.github.com/Skyperious/"
 
 """Maximum number of error reports sent per day."""
@@ -190,9 +175,6 @@ MaxSearchTableRows = 500
 
 """Number of search results to yield in one chunk from search thread."""
 SearchResultsChunk = 50
-
-"""Number of contact search results to yield in one chunk."""
-SearchContactsChunk = 10
 
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"

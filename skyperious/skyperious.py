@@ -45,15 +45,9 @@ import wx.lib.newevent
 import wx.lib.scrolledpanel
 import wx.stc
 
-# Core functionality can work without these modules
-try:
-    import Skype4Py
-except ImportError:
-    Skype4Py = None
-try:
-    from dateutil.relativedelta import relativedelta
-except ImportError:
-    relativedelta = None
+# Core functionality can work without this
+try: from dateutil.relativedelta import relativedelta
+except ImportError: relativedelta = None
 
 from third_party import step
 
@@ -65,7 +59,6 @@ import guibase
 import images
 import main
 import skypedata
-import support
 import templates
 import util
 import workers
@@ -73,7 +66,6 @@ import workers
 
 """Custom application events for worker results."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
-ContactWorkerEvent, EVT_CONTACT_WORKER = wx.lib.newevent.NewEvent()
 DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
 
@@ -147,7 +139,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.dialog_search.SetChoices(list(filter(None, conf.SearchHistory)))
         self.dialog_search.SetIcons(icons)
 
-        self.skype_handler = SkypeHandler() if Skype4Py else None
         # Memory file system for showing images in wx.HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
         wx.FileSystem.AddHandler(self.memoryfs["handler"])
@@ -159,7 +150,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         tint_colour = wx.Colour(conf.BgColour)
         tint_factor = [((4 * x) % 256) / 255. for x in tint_colour]
         # Images shown on the default search content page
-        for name in ["Search", "Chats", "Info", "Tables", "SQL", "Contacts"]:
+        for name in ["Search", "Chats", "Info", "Tables", "SQL"]:
             bmp = getattr(images, "Help" + name, None)
             if not bmp: continue # Continue for name in [..]
             bmp = bmp.Image.AdjustChannels(*tint_factor)
@@ -234,7 +225,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(self.on_toggle_iconize)
         else:
             self.Show(True)
-        wx.CallLater(20000, self.update_check)
 
 
     def init_colours(self):
@@ -265,31 +255,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     finally: wx.WHITE_BRUSH = HackContainer.BRUSH1
                     return result
             wx.lib.agw.labelbook.ImageContainer = HackContainer
-
-
-    def update_check(self):
-        """
-        Checks for an updated Skyperious version if sufficient time
-        from last check has passed, and opens a dialog for upgrading
-        if new version available. Schedules a new check on due date.
-        """
-        if not conf.UpdateCheckAutomatic: 
-            return
-        interval = datetime.timedelta(days=conf.UpdateCheckInterval)
-        due_date = datetime.datetime.now() - interval
-        if not (conf.WindowIconized or support.update_window) \
-        and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
-            callback = lambda resp: self.on_check_update_callback(resp, False)
-            support.check_newest_version(callback)
-        elif not support.update_window:
-            try:
-                dt = datetime.datetime.strptime(conf.LastUpdateCheck, "%Y%m%d")
-                interval = (dt + interval) - datetime.datetime.now()
-            except (TypeError, ValueError):
-                pass
-        # Schedule a check for due date, should the program run that long.
-        millis = min(sys.maxint, util.timedelta_seconds(interval) * 1000)
-        wx.CallLater(millis, self.update_check)
 
 
     def on_tray_search(self, event):
@@ -670,12 +635,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_help = wx.Menu()
         menu.Append(menu_help, "&Help")
 
-        menu_update = self.menu_update = menu_help.Append(wx.ID_ANY,
-            "Check for &updates",
-            "Check whether a new version of %s is available" % conf.Title)
-        menu_feedback = self.menu_feedback = menu_help.Append(wx.ID_ANY,
-            "Send &feedback",
-            "Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
             "Go to &homepage",
             "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
@@ -689,12 +648,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_tray = self.menu_tray = menu_help.Append(wx.ID_ANY,
             "Display &icon in notification area",
             "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
-        menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(
-            wx.ID_ANY, "Automatic up&date check",
-            "Automatically check for program updates periodically", wx.ITEM_CHECK)
-        menu_error_reporting = self.menu_error_reporting = menu_help.Append(
-            wx.ID_ANY, "Automatic &error reporting",
-            "Automatically report software errors to program author", wx.ITEM_CHECK)
         menu_help.AppendSeparator()
         menu_about = self.menu_about = menu_help.Append(
             wx.ID_ANY, "&About %s" % conf.Title,
@@ -707,36 +660,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU_RANGE, self.on_recent_file, id=wx.ID_FILE1,
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
-        menu_error_reporting.Check(conf.ErrorReportsAutomatic)
 
         self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
         self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
         self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
         self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
-        self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
-        self.Bind(wx.EVT_MENU, self.on_open_feedback, menu_feedback)
         self.Bind(wx.EVT_MENU, self.on_menu_homepage, menu_homepage)
         self.Bind(wx.EVT_MENU, self.on_showhide_log, menu_log)
         self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
         self.Bind(wx.EVT_MENU, self.on_toggle_trayicon, menu_tray)
-        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check,
-                  menu_autoupdate_check)
-        self.Bind(wx.EVT_MENU, self.on_toggle_error_reporting,
-                  menu_error_reporting)
         self.Bind(wx.EVT_MENU, self.on_about, menu_about)
-
-
-    def on_toggle_error_reporting(self, event):
-        """Handler for toggling automatic error reporting, changes conf."""
-        conf.ErrorReportsAutomatic = event.IsChecked()
-        conf.save()
-
-
-    def on_toggle_autoupdate_check(self, event):
-        """Handler for toggling automatic update checking, changes conf."""
-        conf.UpdateCheckAutomatic = event.IsChecked()
-        conf.save()
 
 
     def on_list_db_key(self, event):
@@ -752,16 +685,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         event.Skip()
 
 
-    def on_open_feedback(self, event):
-        """Handler for clicking to send feedback, opens the feedback form."""
-        if support.feedback_window:
-            if not support.feedback_window.Shown:
-                support.feedback_window.Show()
-            support.feedback_window.Raise()
-        else:
-            support.feedback_window = support.FeedbackDialog(self)
-
-
     def on_menu_homepage(self, event):
         """Handler for opening Skyperious webpage from menu,"""
         webbrowser.open(conf.HomeUrl)
@@ -773,57 +696,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         text = step.Template(templates.ABOUT_TEXT).expand()
         AboutDialog(self, text).ShowModal()
-
-
-    def on_check_update(self, event):
-        """
-        Handler for checking for updates, starts a background process for
-        checking for and downloading the newest version.
-        """
-        if not support.update_window:
-            main.status("Checking for new version of %s.", conf.Title)
-            wx.CallAfter(support.check_newest_version,
-                         self.on_check_update_callback)
-        elif hasattr(support.update_window, "Raise"):
-            support.update_window.Raise()
-
-
-    def on_check_update_callback(self, check_result, full_response=True):
-        """
-        Callback function for processing update check result, offers new
-        version for download if available.
-
-        @param   full_response  if False, show message only if update available
-        """
-        if not self:
-            return
-        support.update_window = True
-        main.status("")
-        if check_result:
-            version, url, changes = check_result
-            MAX = 1000
-            changes = changes[:MAX] + ".." if len(changes) > MAX else changes
-            main.status_flash("New %s version %s available.",
-                              conf.Title, version)
-            if wx.OK == wx.MessageBox(
-                "Newer version (%s) available. You are currently on "
-                "version %s.%s\nDownload and install %s %s?" %
-                (version, conf.Version, "\n\n%s\n" % changes,
-                 conf.Title, version),
-                "Update information", wx.OK | wx.CANCEL | wx.ICON_INFORMATION
-            ):
-                wx.CallAfter(support.download_and_install, url)
-        elif full_response and check_result is not None:
-            wx.MessageBox("You are using the latest version of %s, %s.\n\n " %
-                (conf.Title, conf.Version), "Update information",
-                wx.OK | wx.ICON_INFORMATION)
-        elif full_response:
-            wx.MessageBox("Could not contact download server.",
-                          "Update information", wx.OK | wx.ICON_WARNING)
-        if check_result is not None:
-            conf.LastUpdateCheck = datetime.date.today().strftime("%Y%m%d")
-            conf.save()
-        support.update_window = None
 
 
     def on_detect_databases(self, event):
@@ -957,25 +829,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             except Exception as e:
                 main.log("%r when trying to copy %s to %s.",
                          e, original, newpath)
-                if self.skype_handler and self.skype_handler.is_running():
-                    response = wx.MessageBox(
-                        "Could not save a copy of \"%s\" as \"%s\".\n\n"
-                        "Probably because Skype is running. "
-                        "Close Skype and try again?" % (original, newpath),
-                        conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
-                    if wx.OK == response:
-                        self.skype_handler.shutdown()
-                        func = lambda: shutil.copyfile(original, newpath)
-                        success, _ = util.try_until(func, count=3)
-                        if not success:
-                            wx.MessageBox(
-                                "Still could not copy \"%s\" to \"%s\"." %
-                                (original, newpath), conf.Title,
-                                wx.OK | wx.ICON_WARNING)
-                else:
-                    wx.MessageBox("Failed to copy \"%s\" to \"%s\"." %
-                                  (original, newpath), conf.Title,
-                                  wx.OK | wx.ICON_WARNING)
+                wx.MessageBox("Failed to copy \"%s\" to \"%s\"." %
+                              (original, newpath), conf.Title,
+                              wx.OK | wx.ICON_WARNING)
             if success:
                 main.logstatus_flash("Saved a copy of %s as %s.",
                                      original, newpath)
@@ -1202,7 +1058,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             elif errormsg:
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
             if db and not db.has_consumers():
                 del self.dbs[db.filename]
                 db.close()
@@ -1211,7 +1066,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_export.Enabled = True
         if focused_control: focused_control.SetFocus()
             
-
 
     def on_compare_menu(self, event):
         """
@@ -1548,7 +1402,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     del conf.LastActivePage[page.db.filename]
                 page.save_page_conf()
                 for worker in page.workers_search.values(): worker.stop()
-                page.worker_search_contacts.stop()
             for page in self.merger_pages: page.worker_merge.stop()
             self.worker_detection.stop()
 
@@ -1615,7 +1468,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del conf.LastActivePage[page.db.filename]
 
             for worker in page.workers_search.values(): worker.stop()
-            page.worker_search_contacts.stop()
             page.save_page_conf()
 
             if page in self.db_pages:
@@ -1720,23 +1572,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                             is_accessible = True
                     except Exception:
                         pass
-                    if not is_accessible and self.skype_handler \
-                    and self.skype_handler.is_running():
-                        response = wx.MessageBox(
-                            "Could not open %s.\n\n"
-                            "Probably because Skype is running. "
-                            "Close Skype and try again?" % filename,
-                            conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
-                        if wx.OK == response:
-                            self.skype_handler.shutdown()
-                            try_result, db = util.try_until(lambda:
-                                skypedata.SkypeDatabase(filename, False),
-                                count=3)
-                            if not try_result:
-                                wx.MessageBox(
-                                    "Still could not open %s." % filename,
-                                    conf.Title, wx.OK | wx.ICON_WARNING)
-                    elif not is_accessible:
+                    if not is_accessible:
                         wx.MessageBox(
                             "Could not open %s.\n\n"
                             "Some other process may be using the file."
@@ -1760,7 +1596,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     util.add_unique(conf.RecentFiles, filename, -1,
                                     conf.MaxRecentFiles)
                     conf.save()
-                    self.check_future_dates(db)
             else:
                 wx.MessageBox("Nonexistent file: %s." % filename,
                               conf.Title, wx.OK | wx.ICON_WARNING)
@@ -1786,8 +1621,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if db:
                 main.status_flash("Opening database file %s." % db)
                 tab_title = self.get_unique_tab_title(db.filename)
-                page = DatabasePage(self.notebook, tab_title, db,
-                                    self.memoryfs, self.skype_handler)
+                page = DatabasePage(self.notebook, tab_title, db, self.memoryfs)
                 self.db_pages[page] = db
                 self.UpdateAccelerators()
                 conf.save()
@@ -1806,38 +1640,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         return page
 
 
-    def check_future_dates(self, db):
-        """
-        Checks the database for messages with a future date and asks the user
-        about fixing them.
-        """
-        future_count, max_datetime = db.check_future_dates()
-        if future_count:
-            delta = datetime.datetime.now() - max_datetime
-            dialog = DayHourDialog(parent=self,
-                message="The database has %s with a "
-                "future timestamp (last being %s).\nThis can "
-                "happen if the computer\"s clock has been set "
-                "to a future date when the messages were "
-                "received.\n\n"
-                "If you want to fix these messages, "
-                "enter how many days/hours to move them:" %
-                  (util.plural("message", future_count), max_datetime),
-                caption=conf.Title, days=delta.days, hours=0)
-            dialog_result = dialog.ShowModal()
-            days, hours = dialog.GetValues()
-            if (wx.ID_OK == dialog_result) and (days or hours):
-                db.move_future_dates(days, hours)
-                wx.MessageBox(
-                    "Set timestamp of %s %s%s back." % (
-                        util.plural("message", future_count),
-                        util.plural("day", days) if days else "",
-                        (" and " if days else "") +
-                        util.plural("hour", hours) if hours else "",
-                    ),
-                    conf.Title, wx.OK)
-
-
 
 class DatabasePage(wx.Panel):
     """
@@ -1846,7 +1648,7 @@ class DatabasePage(wx.Panel):
     database tables, information and contact import.
     """
 
-    def __init__(self, parent_notebook, title, db, memoryfs, skype_handler):
+    def __init__(self, parent_notebook, title, db, memoryfs):
         wx.Panel.__init__(self, parent=parent_notebook)
         self.parent_notebook = parent_notebook
         self.title = title
@@ -1857,7 +1659,6 @@ class DatabasePage(wx.Panel):
         self.db.register_consumer(self)
         self.db_grids = {} # {"tablename": SqliteGridBase, }
         self.memoryfs = memoryfs
-        self.skype_handler = skype_handler
         parent_notebook.InsertPage(1, self, title)
         busy = controls.BusyPanel(self, "Loading \"%s\"." % db.filename)
         self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
@@ -1876,11 +1677,7 @@ class DatabasePage(wx.Panel):
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
-        self.Bind(EVT_CONTACT_WORKER, self.on_search_contacts_result)
         self.workers_search = {} # {search ID: workers.SearchThread, }
-        self.worker_search_contacts = \
-            workers.ContactSearchThread(self.on_search_contacts_callback)
-        self.search_data_contact = {"id": None} # Current contacts search data
 
         sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -1926,7 +1723,6 @@ class DatabasePage(wx.Panel):
         idx3 = il.Add(images.PageInfo.Bitmap)
         idx4 = il.Add(images.PageTables.Bitmap)
         idx5 = il.Add(images.PageSQL.Bitmap)
-        idx6 = il.Add(images.PageContacts.Bitmap)
         notebook.AssignImageList(il)
 
         self.create_page_search(notebook)
@@ -1934,14 +1730,12 @@ class DatabasePage(wx.Panel):
         self.create_page_info(notebook)
         self.create_page_tables(notebook)
         self.create_page_sql(notebook)
-        self.create_page_contacts(notebook)
 
         notebook.SetPageImage(0, idx1)
         notebook.SetPageImage(1, idx2)
         notebook.SetPageImage(2, idx3)
         notebook.SetPageImage(3, idx4)
         notebook.SetPageImage(4, idx5)
-        notebook.SetPageImage(5, idx6)
 
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
@@ -1950,13 +1744,6 @@ class DatabasePage(wx.Panel):
             defaultDir=os.getcwd(),
             defaultFile="",
             style=wx.FD_SAVE | wx.RESIZE_BORDER)
-        self.dialog_importfile = wx.FileDialog(
-            parent=self,
-            message="Select contacts file",
-            defaultDir=os.getcwd(),
-            wildcard="CSV spreadsheet (*.csv)|*.csv|All files (*.*)|*.*",
-            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER
-        )
 
         self.TopLevelParent.page_db_latest = self
         self.TopLevelParent.run_console(
@@ -2444,169 +2231,6 @@ class DatabasePage(wx.Panel):
         splitter.SplitHorizontally(panel1, panel2, sashPosition=sash_pos)
 
 
-    def create_page_contacts(self, notebook):
-        """Creates a page for importing contacts from file."""
-        page = self.page_contacts = wx.Panel(parent=notebook)
-        self.pageorder[page] = len(self.pageorder)
-        notebook.AddPage(page, "Contacts+")
-        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
-        splitter = self.splitter_import = wx.SplitterWindow(
-            parent=page, style=wx.BORDER_NONE)
-        splitter.SetMinimumPaneSize(100)
-
-        panel1 = wx.Panel(parent=splitter)
-        sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer_header = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_top1 = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_selectbuttons = wx.BoxSizer(wx.VERTICAL)
-
-        label_header = wx.StaticText(parent=panel1, 
-            label="Import people to your Skype contacts from a CSV file, "
-                  "like ones exported from MSN or GMail.\n"
-                  "Skype needs to be running and logged in.\n\n"
-                  "For exporting your MSN contacts, log in to live.com "
-                  "with your MSN account and find \"Export contacts\" under "
-                  "People.\n"
-                  "For exporting your GMail contacts, log in to gmail.com and "
-                  "find \"Download data\" under \"Account\".\n"
-                  "For other CSV sources: header row should have fields "
-                  "\"Name\", \"Phone\", \"E-mail\", or \"Skypename\"."
-                  )
-        label_header.ForegroundColour = "grey"
-        button_import = self.button_import_file = \
-            wx.Button(panel1, label="Se&lect contacts file")
-        button_import_db = self.button_import_db = \
-            wx.Button(panel1, label="Use &database contacts")
-        button_import.Bind(wx.EVT_BUTTON, self.on_choose_import_file)
-        button_import_db.Bind(wx.EVT_BUTTON, self.on_choose_import_db)
-        sizer_selectbuttons.Add(button_import, flag=wx.GROW)
-        sizer_selectbuttons.AddStretchSpacer()
-        sizer_selectbuttons.Add(button_import_db, flag=wx.ALIGN_CENTER_HORIZONTAL)
-        sizer_header.Add(sizer_selectbuttons, border=10, flag=wx.RIGHT | wx.GROW)
-        sizer_header.Add(label_header, border=60, flag=wx.LEFT)
-
-        label_source = self.label_import_source = \
-            wx.StaticText(parent=panel1, label="C&ontacts in source file:")
-        sizer_top1.Add(label_source, flag=wx.ALIGN_BOTTOM)
-        sizer_top1.AddStretchSpacer()
-        label_filter = wx.StaticText(panel1, label="Filter c&ontacts:")
-        sizer_top1.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_contactfilter = self.edit_contactfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in contact list"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_contactfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_import_sourcefilter,
-                  edit_contactfilter)
-        sizer_top1.Add(edit_contactfilter)
-
-        sourcelist = self.list_import_source = \
-            controls.SortableListView(parent=panel1, style=wx.LC_REPORT)
-        cols = [("name", "Name"), ("e-mail", "E-mail"), ("phone", "Phone")]
-        sourcelist.SetColumns(cols)
-        sourcelist.Bind(wx.EVT_LIST_ITEM_SELECTED,
-                        self.on_select_import_sourcelist)
-        sourcelist.Bind(wx.EVT_LIST_ITEM_DESELECTED,
-                        self.on_select_import_sourcelist)
-        sourcelist.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
-                        self.on_import_search)
-
-        sizer1.Add(sizer_header, border=5, flag=wx.ALL)
-        sizer1.Add(sizer_top1, border=5, flag=wx.ALL | wx.GROW)
-        sizer1.Add(sourcelist, border=5, proportion=1,
-                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
-
-        panel2 = wx.Panel(parent=splitter)
-        sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
-        button_search_selected = self.button_import_search_selected = \
-            wx.Button(panel2, label="Search for selected contacts in Skype")
-        button_select_all = self.button_import_select_all = \
-            wx.Button(panel2, label="Select all")
-        self.Bind(wx.EVT_BUTTON, self.on_import_search, button_search_selected)
-        self.Bind(wx.EVT_BUTTON, self.on_import_select_all, button_select_all)
-        button_search_selected.SetToolTip("Search for the selected "
-            "contacts through the running Skype application.")
-        button_search_selected.Enabled = button_select_all.Enabled = False
-        label_search = wx.StaticText(parent=panel2,
-                                     label="Skype use&rbase search:")
-        edit_search = self.edit_import_search_free = wx.TextCtrl(
-            parent=panel2, size=(100, -1), style=wx.TE_PROCESS_ENTER)
-        button_search_free = self.button_import_search_free = \
-            wx.Button(panel2, label="Search in Skype")
-        self.Bind(wx.EVT_TEXT_ENTER, self.on_import_search, edit_search)
-        self.Bind(wx.EVT_BUTTON, self.on_import_search, button_search_free)
-        for control in [label_search, edit_search, button_search_free]:
-            control.SetToolTip("Search for the entered value in Skype userbase.")
-
-        sizer_buttons.Add(button_search_selected, flag=wx.ALIGN_LEFT)
-        sizer_buttons.Add(button_select_all, border=5, flag=wx.LEFT)
-        sizer_buttons.AddStretchSpacer()
-        sizer_buttons.Add(label_search, flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_buttons.Add(edit_search, border=5, flag=wx.LEFT)
-        sizer_buttons.Add(button_search_free, border=5, flag=wx.LEFT)
-
-        label_searchinfo = wx.StaticText(parent=panel2,
-            label="Skype will be launched if not already running. Might bring "
-                  "up a notification screen in Skype to allow access for "
-                  "%s.\nSearching for many contacts at once can "
-                  "take a long time." % conf.Title)
-        label_searchinfo.ForegroundColour = "grey"
-
-        sizer_resultlabel = wx.BoxSizer(wx.HORIZONTAL)
-        label_result = self.label_import_result = \
-            wx.StaticText(parent=panel2, label="Contacts found in Sk&ype:")
-        resultlist = self.list_import_result = \
-            controls.SortableListView(parent=panel2, style=wx.LC_REPORT)
-        result_columns = [("#", "#"), ("FullName", "Name"),
-            ("Handle", "Skype handle"), ("IsAuthorized", "Already added"),
-            ("PhoneMobile", "Phone"), ("City", "City"), ("Country", "Country"),
-            ("Sex", "Gender"), ("Birthday", "Birthday"),
-            ("Language", "Language")]
-        resultlist.SetColumns(result_columns)
-
-        resultlist.Bind(
-            wx.EVT_LIST_ITEM_SELECTED,   self.on_select_import_resultlist)
-        resultlist.Bind(
-            wx.EVT_LIST_ITEM_DESELECTED, self.on_select_import_resultlist)
-        resultlist.Bind(wx.EVT_LIST_ITEM_ACTIVATED,self.on_import_add_contacts)
-
-        sizer_footer = wx.BoxSizer(wx.HORIZONTAL)
-        button_add = self.button_import_add = \
-            wx.Button(panel2, label="Add the selected to your Skype contacts")
-
-        label_filter = wx.StaticText(panel2, label="Filter res&ults:")
-        edit_resultfilter = wx.TextCtrl(parent=panel2, size=(75, -1))
-        filter_tooltip = "Filter items in Skype results list"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_resultfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_import_resultfilter,
-                  edit_resultfilter)
-        button_clear = self.button_import_clear = \
-            wx.Button(panel2, label="Clear selected from list")
-        self.Bind(wx.EVT_BUTTON, self.on_import_add_contacts, button_add)
-        self.Bind(wx.EVT_BUTTON, self.on_import_clear_contacts, button_clear)
-        button_add.SetToolTip("Opens an authorization request in Skype")
-        button_add.Enabled = button_clear.Enabled = False
-        sizer_footer.Add(button_add, flag=wx.ALIGN_LEFT)
-        sizer_footer.AddStretchSpacer()
-        sizer_footer.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        sizer_footer.Add(edit_resultfilter, flag=wx.ALIGN_TOP)
-        sizer_footer.Add(button_clear, flag=wx.LEFT, border=20)
-
-        sizer2.Add(sizer_buttons, border=5, flag=wx.GROW | wx.ALL)
-        sizer_resultlabel.Add(label_result, flag=wx.ALIGN_BOTTOM)
-        sizer_resultlabel.Add(label_searchinfo, border=60, flag=wx.LEFT)
-        sizer2.Add(sizer_resultlabel, border=5, flag=wx.ALL)
-        sizer2.Add(resultlist, border=5, proportion=1,
-                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
-        sizer2.Add(sizer_footer, border=5, flag=wx.GROW | wx.ALL)
-
-        sizer.Add(splitter, proportion=1, flag=wx.GROW)
-        splitter.SplitHorizontally(panel1, panel2,
-                                   sashPosition=self.Size[1]*2/5)
-
-
     def create_page_info(self, notebook):
         """Creates a page for seeing general database information."""
         page = self.page_info = wx.lib.scrolledpanel.ScrolledPanel(notebook)
@@ -3014,236 +2638,9 @@ class DatabasePage(wx.Panel):
                     event.EventObject.SetSelection(*sel)
 
 
-    def on_change_import_resultfilter(self, event):
-        """
-        Handler for changing text in contacts import result filter box,
-        filters Skype userbase results list.
-        """
-        self.list_import_result.SetFilter(event.String.strip())
-
-
     def on_change_chatfilter(self, event):
         """Handler for changing text in chat filter box, filters chat list."""
         self.list_chats.SetFilter(event.String.strip())
-
-
-    def on_change_import_sourcefilter(self, event):
-        """
-        Handler for changing text in contacts import source filter box,
-        filters contacts source list.
-        """
-        self.list_import_source.SetFilter(event.String.strip())
-
-
-    def on_choose_import_file(self, event):
-        """Handler for clicking to choose a CSV file for contact import."""
-        contacts = None
-        if wx.ID_OK == self.dialog_importfile.ShowModal():
-            filename = self.dialog_importfile.GetPath()
-            try:
-                contacts = skypedata.import_contacts_file(filename)
-            except Exception as e:
-                errormsg = "Error reading \"%s\".\n\n%s" % (filename, util.format_exc(e))
-                main.logstatus_flash(errormsg)
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
-        if contacts is not None:
-            self.list_import_result.DeleteAllItems()
-            cols = [("name", "Name"), ("e-mail", "E-mail"), ("phone", "Phone")]
-            self.list_import_source.SetColumns(cols)
-            self.list_import_source.Populate(contacts)
-            self.button_import_add.Enabled = False
-            self.button_import_clear.Enabled = False
-            self.button_import_search_selected.Enabled = False
-            self.label_import_source.Label = \
-                "C&ontacts in source file %s [%s]:" % (filename, len(contacts))
-            self.label_import_result.Label = "Contacts found in Sk&ype:"
-            self.button_import_select_all.Enabled = len(contacts)
-            main.logstatus_flash("Found %s in file %s.",
-                                 util.plural("contact", contacts), filename)
-
-
-    def on_choose_import_db(self, event):
-        """Handler for clicking to choose to import contacts from current DB."""
-        contacts = [{"e-mail": x["emails"] if "@" in (x["emails"] or "") else "", 
-                     "name": x["name"], "skypename": x["skypename"], 
-                     "phone": x["phone_mobile_normalized"]}
-                    for x in self.db.get_contacts()]
-        contacts = [x for x in contacts if any(x.values())]
-        self.list_import_result.DeleteAllItems()
-        cols = [("skypename", "Skypename"), ("name", "Name"), 
-                ("e-mail", "E-mail"), ("phone", "Phone")]
-        self.list_import_source.SetColumns(cols)
-        self.list_import_source.Populate(contacts)
-        self.button_import_add.Enabled = False
-        self.button_import_clear.Enabled = False
-        self.button_import_search_selected.Enabled = False
-        self.label_import_source.Label = \
-            "C&ontacts in database %s [%s]:" % (self.db, len(contacts))
-        self.label_import_result.Label = "Contacts found in Sk&ype:"
-        self.button_import_select_all.Enabled = len(contacts)
-
-
-    def on_select_import_sourcelist(self, event):
-        """
-        Handler when a row is selected in the import contacts source list,
-        enables UI buttons.
-        """
-        count = self.list_import_source.GetSelectedItemCount()
-        self.button_import_search_selected.Enabled = (count > 0)
-
-
-    def on_select_import_resultlist(self, event):
-        """
-        Handler when a row is selected in the import contacts result list,
-        enables UI buttons.
-        """
-        count = self.list_import_result.GetSelectedItemCount()
-        self.button_import_add.Enabled = (count > 0)
-        self.button_import_clear.Enabled = (count > 0)
-
-
-    def on_import_select_all(self, event):
-        """Handler for clicking to select all imported contacts."""
-        [self.list_import_source.Select(i)
-         for i in range(self.list_import_source.ItemCount)]
-        self.list_import_source.SetFocus()
-
-
-    def on_import_search(self, event):
-        """
-        Handler for choosing to search Skype for contacts in the import source
-        list.
-        """
-        if not self.skype_handler:
-            msg = "Skype4Py not installed, cannot search."
-            return wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
-        search_values = []
-        lst, lst2 = self.list_import_source, self.list_import_result
-        if event.EventObject in [self.button_import_search_free,
-                                 self.edit_import_search_free]:
-            value = self.edit_import_search_free.Value.strip()
-            if value:
-                search_values.append(value)
-                infotext = "Searching Skype userbase for \"%s\"." % value
-        else:
-            values_unique, contacts_unique = set(), set()
-            selected = lst.GetFirstSelected()
-            while selected >= 0:
-                contact = lst.GetItemMappedData(selected)
-                for key in ["skypename", "name", "phone", "e-mail"]:
-                    if contact.get(key) and contact[key] not in values_unique:
-                        search_values.append(contact[key])
-                        values_unique.add(contact[key])
-                        contacts_unique.add(id(contact))
-                selected = lst.GetNextSelected(selected)
-            info = "\"%s\"" % "\", \"".join(search_values)
-            if len(info) > 60:
-                info = info[:60] + ".."
-            infotext = "Searching Skype userbase for %s (%s)." \
-                        % (util.plural("contact", contacts_unique), info)
-        if search_values:
-            main.logstatus_flash(infotext)
-            lst2.DeleteAllItems()
-            self.button_import_add.Enabled = False
-            self.button_import_clear.Enabled = False
-
-            data = {"id": self.counter(), "handler": self.skype_handler,
-                    "values": search_values}
-            self.search_data_contact.update(data)
-            self.worker_search_contacts.work(data)
-            self.label_import_result.Label = "Contacts found in Sk&ype:"
-
-
-    def on_search_contacts_result(self, event):
-        """
-        Handler for getting results from contact search thread, adds the
-        results to the import list.
-        """
-        result = event.result
-        # If search ID is different, results are from the previous search still
-        lst2 = self.list_import_result
-        if result["search"]["id"] == self.search_data_contact["id"]:
-            lst2.Freeze()
-            scrollpos = lst2.GetScrollPos(wx.VERTICAL)
-
-            for user in result["results"]:
-                data = {"user": user, "#": lst2.GetItemCountFull() + 1, }
-                for k in ["FullName", "Handle", "IsAuthorized", "PhoneMobile",
-                          "City", "Country", "Sex", "Birthday", "Language"]:
-                    val = getattr(user, k)
-                    if "IsAuthorized" == k:
-                        val = "Yes" if val else "No"
-                    elif "Sex" == k:
-                        val = "" if ("UNKNOWN" == val) else val.lower()
-                    data[k] = val
-                lst2.AppendRow(data)
-                if user.IsAuthorized:
-                    lst2.SetItemTextColour(lst2.ItemCount - 1, "gray")
-
-            lst2.SetScrollPos(wx.VERTICAL, scrollpos)
-            lst2.Thaw()
-            self.label_import_result.Label = \
-                "Contacts found in Sk&ype [%s]:" % lst2.ItemCount
-            if "done" in result:
-                wx.Bell()
-                main.logstatus_flash("Found %s in Skype userbase.",
-                                     util.plural("contact", lst2.ItemCount))
-            lst2.Update()
-
-
-    def on_import_add_contacts(self, event):
-        """
-        Handler for adding an imported contact in Skype, opens an authorization
-        request window in Skype.
-        """
-        lst = self.list_import_result
-        selected, contacts = lst.GetFirstSelected(), []
-        while selected >= 0:
-            contacts.append(lst.GetItemMappedData(selected))
-            selected = lst.GetNextSelected(selected)
-        info = ", ".join([c["Handle"] for c in contacts])
-        if len(info) > 60:
-            info = info[:60] + ".."
-        msg = "Add %s to your Skype contacts (%s)?" % (
-              util.plural("person", contacts), info)
-        if self.skype_handler and wx.OK == wx.MessageBox(msg,
-            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ):
-            busy = controls.BusyPanel(self,
-                "Adding %s to your Skype contacts."
-                % util.plural("person", contacts)
-            )
-            try:
-                self.skype_handler.add_to_contacts(c["user"] for c in contacts)
-                main.logstatus_flash("Added %s to your Skype contacts (%s).",
-                                     util.plural("person", contacts), info)
-            except Exception:
-                msg = "Error adding contacts:\n\n%s" % traceback.format_exc()
-                main.logstatus_flash(msg)
-                wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, msg)
-            finally:
-                busy.Close()
-
-
-    def on_import_clear_contacts(self, event):
-        """
-        Handler for clicking to remove selected items from contact import
-        result list.
-        """
-        selected, selecteds = self.list_import_result.GetFirstSelected(), []
-        while selected >= 0:
-            selecteds.append(selected)
-            selected = self.list_import_result.GetNextSelected(selected)
-        for i in range(len(selecteds)):
-            # - i, as item count is getting smaller one by one
-            selected = selecteds[i] - i
-            self.list_import_result.DeleteItem(selected)
-        self.label_import_result.Label = "Contacts found in Sk&ype [%s]:" \
-                                         % self.list_import_result.ItemCount
-        self.button_import_add.Enabled = False
-        self.button_import_clear.Enabled = False
 
 
     def on_export_chat(self, event):
@@ -3284,7 +2681,6 @@ class DatabasePage(wx.Panel):
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
                 wx.CallAfter(util.try_until, lambda: os.unlink(filepath))
             finally:
                 busy.Close()
@@ -3397,7 +2793,6 @@ class DatabasePage(wx.Panel):
             else:
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
 
 
     def on_filterexport_chat(self, event):
@@ -3446,7 +2841,6 @@ class DatabasePage(wx.Panel):
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
             finally:
                 busy.Close()
 
@@ -3879,19 +3273,12 @@ class DatabasePage(wx.Panel):
             errormsg = "Error searching %s:\n\n%s" % \
                        (self.db, result.get("error_short", result["error"]))
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            wx.CallAfter(support.report_error, errormsg)
 
 
     def on_searchall_callback(self, result):
         """Callback function for SearchThread, posts the data to self."""
         if self: # Check if instance is still valid (i.e. not destroyed by wx)
             wx.PostEvent(self, WorkerEvent(result=result))
-
-
-    def on_search_contacts_callback(self, result):
-        """Callback function for ContactSearchThread, posts result to self."""
-        if self: # Check if instance is still valid (i.e. not destroyed by wx)
-            wx.PostEvent(self, ContactWorkerEvent(result=result))
 
 
     def on_searchall(self, event):
@@ -4217,7 +3604,6 @@ class DatabasePage(wx.Panel):
                           (filename, traceback.format_exc())
                     main.logstatus_flash(msg)
                     wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
-                    wx.CallAfter(support.report_error, msg)
                 finally:
                     busy.Close()
 
@@ -4330,7 +3716,6 @@ class DatabasePage(wx.Panel):
                 msg, msgfull = template % e, template % traceback.format_exc()
                 main.status_flash(msg), main.log(msgfull)
                 wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, msgfull)
                 break # break for grid
         return result
 
@@ -4483,7 +3868,6 @@ class DatabasePage(wx.Panel):
                            (table, traceback.format_exc())
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
 
 
     def on_change_list_chats(self, event):
@@ -4812,7 +4196,6 @@ class DatabasePage(wx.Panel):
             errormsg = "Could not load chat list from %s.\n\n%s" % \
                        (self.db, traceback.format_exc())
             main.logstatus_flash(errormsg)
-            wx.CallAfter(support.report_error, errormsg)
         wx.CallLater(500, self.update_info_page, False)
         wx.CallLater(200, self.load_tables_data)
 
@@ -4848,7 +4231,6 @@ class DatabasePage(wx.Panel):
                 errormsg = "Error loading additional data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
                 main.logstatus_flash(errormsg)
-                wx.CallAfter(support.report_error, errormsg)
         if self:
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(),
@@ -4895,7 +4277,6 @@ class DatabasePage(wx.Panel):
                 errormsg = "Error loading table data from %s.\n\n%s" % \
                            (self.db, traceback.format_exc())
                 main.log(errormsg)
-                wx.CallAfter(support.report_error, errormsg)
 
 
     def update_tabheader(self):
@@ -5301,7 +4682,6 @@ class MergerPage(wx.Panel):
                            (filepath, traceback.format_exc())
                 main.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(support.report_error, errormsg)
             finally:
                 busy.Close()
 
@@ -5765,7 +5145,6 @@ class MergerPage(wx.Panel):
             self.html_report.Scroll(0, scrollpos)
             self.html_report.Thaw()
             wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
-            wx.CallAfter(support.report_error, result["error"])
         if "status" in result:
             main.status_flash(result["status"])
         if "done" in result:
@@ -5970,7 +5349,6 @@ class MergerPage(wx.Panel):
                        (self.db1, self.db2, traceback.format_exc())
             main.logstatus_flash(errormsg)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            wx.CallAfter(support.report_error, errormsg)
 
 
     def load_later_data(self):
@@ -7425,92 +6803,21 @@ class DayHourDialog(wx.Dialog):
 
 
 
-class SkypeHandler(Skype4Py.Skype if Skype4Py else object):
-    """A convenience wrapper around Skype4Py functionality."""
-
-    def __init__(self):
-        if Skype4Py:
-            # Hack Skype4Py to avoid uncatchable error on refusing Skype access.
-            # The original attachment_changed raises an exception on refusal,
-            # and it cannot be caught as it rises in a callback thread.
-            def attach_override(self, status):
-                try:
-                    self.skype._CallEventHandler("AttachmentStatus", status)
-                    if status == Skype4Py.apiAttachRefused:
-                        wx.CallAfter(wx.MessageBox, "Skype API access failed.", 
-                                     conf.Title, wx.ICON_WARNING)
-                except Exception: pass
-            try:
-                Skype4Py.skype.APINotifier.attachment_changed = attach_override
-            except Exception: pass
-            Skype4Py.Skype.__init__(self)
-
-
-    def shutdown(self):
-        """Posts a message to the running Skype application to close itself."""
-        self.Client.Shutdown()
-
-
-    def is_running(self):
-        """Returns whether Skype is currently running."""
-        return self.Client.IsRunning
-
-
-    def launch(self):
-        """Tries to launch Skype."""
-        self.Client.Start()
-
-
-    def search_users(self, value):
-        """
-        Searches for users with the specified value (either name, phone or
-        e-mail) in the currently running Skype application.
-        """
-        if not self.is_running():
-            self.launch()
-        self.FriendlyName = conf.Title
-        self.Attach() # Should open a confirmation dialog in Skype
-
-        result = list(self.SearchForUsers(value))
-        return result
-
-
-    def add_to_contacts(self, users):
-        """
-        Adds the specified Skype4Py.User instances to Skype contacts in the
-        currently running Skype application.
-        """
-        if not self.is_running():
-            self.launch()
-        self.FriendlyName = conf.Title
-        self.Attach() # Should open a confirmation dialog in Skype
-        for user in users:
-            user.BuddyStatus = Skype4Py.enums.budPendingAuthorization
-        self.Client.Focus()
-
-
-
 class AboutDialog(wx.Dialog):
  
     def __init__(self, parent, content):
         wx.Dialog.__init__(self, parent, title="About %s" % conf.Title,
                            style=wx.CAPTION | wx.CLOSE_BOX)
         html = self.html = wx.html.HtmlWindow(self)
-        button_update = wx.Button(self, label="Check for &updates")
-        button_feedback = wx.Button(self, label="Send &feedback")
 
         html.SetPage(content)
         html.BackgroundColour = conf.BgColour
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
-        button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
-        button_feedback.Bind(wx.EVT_BUTTON, parent.on_open_feedback)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
         sizer_buttons = self.CreateButtonSizer(wx.OK)
-        sizer_buttons.Insert(0, button_update, border=50, flag=wx.RIGHT)
-        sizer_buttons.Insert(1, button_feedback, border=50, flag=wx.RIGHT)
         self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.ALL)
         self.Layout()
         self.Size = (self.Size[0], html.VirtualSize[1] + 60)

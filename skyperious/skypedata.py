@@ -39,7 +39,6 @@ from third_party import step
 import conf
 import emoticons
 import main
-import support
 import templates
 import util
 import wordcloud
@@ -319,48 +318,6 @@ class SkypeDatabase(object):
         affected_rows = res.rowcount
         self.connection.commit()
         return affected_rows
-
-
-    def check_future_dates(self):
-        """
-        Checks whether any messages in the database have a timestamp in the
-        future (this can happen if the computer clock has been erraneously
-        set to a future date when receing messages).
-
-        @return  (future message count, max future datetime)
-        """
-        result = (None, None)
-        if self.is_open() and "messages" in self.tables:
-            now = self.future_check_timestamp = int(time.time())
-            try:
-                maxtimestamp = self.execute("SELECT MAX(timestamp) AS max "
-                                             "FROM messages").fetchone()["max"]
-                count = self.execute("SELECT COUNT(*) AS count FROM messages "
-                                     "WHERE timestamp > ?", [now]
-                                    ).fetchone()["count"]
-                result = (count, self.stamp_to_date(maxtimestamp))
-            except Exception:
-                pass
-
-        return result
-
-
-    def move_future_dates(self, days, hours):
-        """
-        Updates the timestamp of future messages.
-
-        @param   days   days to move, positive or negative number
-        @param   hours  hours to move, positive or negative number
-        """
-        if self.is_open() and "messages" in self.tables:
-            self.ensure_backup()
-            seconds = (days * 24 + hours) * 3600
-            self.execute(
-                "UPDATE messages SET timestamp = timestamp + ? "
-                "WHERE timestamp > ?", [seconds, self.future_check_timestamp]
-            )
-            self.connection.commit()
-            self.last_modified = datetime.datetime.now()
 
 
     def is_open(self):

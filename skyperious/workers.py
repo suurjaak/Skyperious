@@ -757,56 +757,6 @@ class MergeThread(WorkerThread):
 
 
 
-class ContactSearchThread(WorkerThread):
-    """
-    Contact search background thread, uses a running Skype application to
-    search Skype userbase for contacts, yielding results back to main thread
-    in chunks.
-    """
-
-    def run(self):
-        self._is_running = True
-        while self._is_running:
-            search = self._queue.get()
-            self._stop_work = False
-            self._drop_results = False
-            found = {} # { Skype handle: 1, }
-            result = {"search": search, "results": []}
-            if search and search["handler"]:
-                for value in search["values"]:
-                    main.log("Searching Skype contact directory for '%s'.",
-                             value)
-
-                    try:
-                        for user in search["handler"].search_users(value):
-                            if user.Handle not in found:
-                                result["results"].append(user)
-                                found[user.Handle] = 1
-
-                            if not (self._drop_results 
-                            or len(result["results"]) % conf.SearchContactsChunk):
-                                self.postback(result)
-                                result = {"search": search, "results": []}
-
-                            if self._stop_work:
-                                break # break for user in search["handler"].searc..
-                    except Exception:
-                        main.log("Error searching Skype contacts:\n\n%s",
-                                 traceback.format_exc())
-
-                    if result["results"] and not self._drop_results:
-                        self.postback(result)
-                        result = {"search": search, "results": []}
-
-                    if self._stop_work:
-                        break # break for value in search["values"]
-
-                if not self._drop_results:
-                    result["done"] = True
-                    self.postback(result)
-
-
-
 class DetectDatabaseThread(WorkerThread):
     """
     Skype database detection background thread, goes through potential

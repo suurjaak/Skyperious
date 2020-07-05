@@ -3,7 +3,9 @@ CHANGELOG
 
 3.6, 2020-07-06
 ---------------
-- dropped shared image download functionality as obsolete;
+- dropped support functionality;
+- dropped contacts search and import functionality as unavailable;
+- dropped shared image download functionality as unavailable;
 - upgraded wxPython to v4.
 
 

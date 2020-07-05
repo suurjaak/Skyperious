@@ -49,7 +49,6 @@ import workers
 if is_gui_possible:
     import guibase
     import skyperious
-    import support
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
@@ -468,17 +467,13 @@ def run_gui(filenames):
     locale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
     window = sys.modules["main"].window = skyperious.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
-    # Decorate write to catch printed errors
-    try: sys.stdout.write = support.reporting_write(sys.stdout.write)
-    except Exception: pass
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
     window.run_console("import conf, controls, emoticons, export, guibase, "
                        "images, main, searchparser, skypedata, skyperious, "
-                       "support, templates, util, wordcloud, workers, "
-                       "wx_accel")
+                       "templates, util, wordcloud, workers, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     log("Started application on %s.", datetime.date.today())

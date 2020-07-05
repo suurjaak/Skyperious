@@ -1824,7 +1824,7 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 3.0.2.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
-  <li>Pillow{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}},
+  <li>Pillow{{" 6.2.2" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
@@ -1835,11 +1835,9 @@ under the MIT License.
           github.com/jmcnamara/XlsxWriter</font></a></li>
   <li>dateutil{{" 2.4.2" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
       <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
-  <li>Skype4Py{{" 1.0.35" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/awahlig/skype4py">
-      <font color="{{conf.LinkColour}}">github.com/awahlig/skype4py</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.10, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
-  <li>PyInstaller 2.1, <a href="http://www.pyinstaller.org">
+  <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
+  <li>PyInstaller 3.5, <a href="http://www.pyinstaller.org">
       <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br />
@@ -1938,16 +1936,6 @@ import conf
         check database integrity for corruption and recovery.
       </td></tr><tr><td nowrap align="center">
         <a href="page:info"><b><font color="{{conf.FgColour}}">Information</font></b></a>
-    </td></tr></table>
-  </td>
-  <td>
-    <table cellpadding="0" cellspacing="2"><tr><td>
-        <a href="page:contacts"><img src="memory:HelpContacts.png" /></a>
-      </td><td width="10"></td><td valign="center">
-        Import contacts to Skype from a CSV file,<br />
-        like ones exported from MSN or GMail.
-      </td></tr><tr><td nowrap align="center">
-        <a href="page:contacts"><b><font color="{{conf.FgColour}}">Contacts+</font></b></a>
     </td></tr></table>
   </td>
 </tr>

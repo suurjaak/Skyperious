@@ -7,7 +7,6 @@ You can open Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
 - browse chat history and export as HTML or spreadsheet, see chat statistics
-- import contacts from a CSV file to your Skype contacts
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -80,9 +79,6 @@ If running from pip installation, run `skyperious` from the command-line.
 If running from straight source code, launch `skyperious.sh` where shell 
 scripts are supported, or launch `skyperious.bat` under Windows, or open 
 a terminal and run `python skyperious/main.py` in Skyperious directory.
-
-If you encounter a bug in the Skyperious GUI, you can send a report from menu
-Help -> Send feedback.
 
 
 Installation

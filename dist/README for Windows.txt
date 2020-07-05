@@ -7,7 +7,6 @@ You can open Skype SQLite databases and look at their contents:
 
 - search across all messages and contacts
 - browse chat history and export as HTML or spreadsheet, see chat statistics
-- import contacts from a CSV file to your Skype contacts
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -68,9 +67,6 @@ elsewhere.
 Skyperious has been tested under Windows 7, Windows Vista, Windows XP, and 
 reported to work under Windows 8.
 
-If you encounter a bug in the Skyperious GUI, you can send a report from menu
-Help -> Send feedback.
-
 
 Attribution
 -----------
@@ -83,7 +79,6 @@ Skyperious has been built using the following open-source software:
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
 - XlsxWriter 0.7.3 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.4.2, (http://pypi.python.org/pypi/python-dateutil)
-- Skype4Py 1.0.35, (https://github.com/awahlig/skype4py)
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the Skype Component License 1.0.
