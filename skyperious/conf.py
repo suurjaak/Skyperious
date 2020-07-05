@@ -41,11 +41,11 @@ ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
-    "LastActivePage", "LastSearchResults", "LastSelectedFiles", "Login",
-    "RecentFiles", "SearchHistory", "SearchInChatInfo",
-    "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
-    "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
-    "WindowIconized", "WindowPosition", "WindowSize",
+    "LastActivePage", "LastSearchResults", "LastSelectedFiles",
+    "LastUpdateCheck", "Login", "RecentFiles", "SearchHistory",
+    "SearchInChatInfo", "SearchInContacts", "SearchInMessages",
+    "SearchUseNewTab", "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
+    "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
@@ -54,8 +54,8 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
     "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "SearchResultsChunk", "SharedImageAutoDownload", "StatisticsPlotWidth",
-    "StatusFlashLength", "WordCloudLengthMin", "WordCloudCountMin",
-    "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
+    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -124,6 +124,9 @@ ExportDbTemplate = u"Export from %(fullname)s"
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
+"""Whether the program checks for updates every UpdateCheckInterval."""
+UpdateCheckAutomatic = True
+
 """Whether the program has been minimized and hidden."""
 WindowIconized = False
 
@@ -143,7 +146,8 @@ LogSQL = False
 
 """URLs for download list, changelog, and homepage."""
 DownloadURL  = "https://erki.lap.ee/downloads/Skyperious/"
-ChangelogURL = "https://suurjaak.github.com/Skyperious/changelog.html"
+ChangelogURL = "https://suurjaak.github.io/Skyperious/changelog.html"
+ReportURL    = "https://erki.lap.ee/downloads/Skyperious/feedback"
 HomeUrl = "https://suurjaak.github.io/Skyperious/"
 
 """Maximum number of error reports sent per day."""
@@ -157,6 +161,12 @@ MinWindowSize = (600, 400)
 
 """Console window size in pixels, (width, height)."""
 ConsoleSize = (800, 300)
+
+"""Days between automatic update checks."""
+UpdateCheckInterval = 7
+
+"""Date string of last time updates were checked."""
+LastUpdateCheck = None
 
 """Maximum number of console history commands to store."""
 MaxConsoleHistory = 1000

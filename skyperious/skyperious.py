@@ -61,6 +61,7 @@ from . import guibase
 from . import images
 from . import live
 from . import skypedata
+from . import support
 from . import templates
 from . import util
 from . import workers
@@ -244,6 +245,32 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(self.on_toggle_iconize)
         else:
             self.Show(True)
+        wx.CallLater(20000, self.update_check)
+
+
+    def update_check(self):
+        """
+        Checks for an updated Skyperious version if sufficient time
+        from last check has passed, and opens a dialog for upgrading
+        if new version available. Schedules a new check on due date.
+        """
+        if self or not conf.UpdateCheckAutomatic: return
+
+        interval = datetime.timedelta(days=conf.UpdateCheckInterval)
+        due_date = datetime.datetime.now() - interval
+        if not (conf.WindowIconized or support.update_window) \
+        and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
+            callback = lambda resp: self.on_check_update_callback(resp, False)
+            support.check_newest_version(callback)
+        elif not support.update_window:
+            try:
+                dt = datetime.datetime.strptime(conf.LastUpdateCheck, "%Y%m%d")
+                interval = (dt + interval) - datetime.datetime.now()
+            except (TypeError, ValueError): pass
+
+        # Schedule a check for next due date, should the program run that long.
+        millis = min(sys.maxint, util.timedelta_seconds(interval) * 1000)
+        wx.CallLater(millis, self.update_check)
 
 
     def on_tray_search(self, event):
@@ -683,6 +710,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_help = wx.Menu()
         menu.Append(menu_help, "&Help")
 
+        menu_update = self.menu_update = menu_help.Append(wx.ID_ANY,
+            "Check for &updates",
+            "Check whether a new version of %s is available" % conf.Title)
+        menu_feedback = self.menu_feedback = menu_help.Append(wx.ID_ANY,
+            "Send &feedback",
+            "Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
             "Go to &homepage",
             "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
@@ -696,6 +729,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_tray = self.menu_tray = menu_help.Append(wx.ID_ANY,
             "Display &icon in notification area",
             "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
+        menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(wx.ID_ANY,
+            "Automatic up&date check",
+            "Automatically check for program updates periodically", wx.ITEM_CHECK)
         menu_help.AppendSeparator()
         menu_about = self.menu_about = menu_help.Append(
             wx.ID_ANY, "&About %s" % conf.Title,
@@ -708,16 +744,26 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU_RANGE, self.on_recent_file, id=wx.ID_FILE1,
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         menu_tray.Check(conf.TrayIconEnabled)
+        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
 
         self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
         self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
         self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
+        self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
+        self.Bind(wx.EVT_MENU, self.on_open_feedback, menu_feedback)
         self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
         self.Bind(wx.EVT_MENU, self.on_menu_homepage, menu_homepage)
         self.Bind(wx.EVT_MENU, self.on_showhide_log, menu_log)
         self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
         self.Bind(wx.EVT_MENU, self.on_toggle_trayicon, menu_tray)
+        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
         self.Bind(wx.EVT_MENU, self.on_about, menu_about)
+
+
+    def on_toggle_autoupdate_check(self, event):
+        """Handler for toggling automatic update checking, changes conf."""
+        conf.UpdateCheckAutomatic = event.IsChecked()
+        conf.save()
 
 
     def on_list_db_key(self, event):
@@ -733,6 +779,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         event.Skip()
 
 
+    def on_open_feedback(self, event):
+        """Handler for clicking to send feedback, opens the feedback form."""
+        if support.feedback_window:
+            if not support.feedback_window.Shown:
+                support.feedback_window.Show()
+            support.feedback_window.Raise()
+        else:
+            support.feedback_window = support.FeedbackDialog(self)
+
+
     def on_menu_homepage(self, event):
         """Handler for opening Skyperious webpage from menu,"""
         webbrowser.open(conf.HomeUrl)
@@ -744,6 +800,56 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         maketext = lambda: step.Template(templates.ABOUT_TEXT).expand()
         AboutDialog(self, maketext).ShowModal()
+
+
+    def on_check_update(self, event):
+        """
+        Handler for checking for updates, starts a background process for
+        checking for and downloading the newest version.
+        """
+        if not support.update_window:
+            guibase.status("Checking for new version of %s.", conf.Title)
+            wx.CallAfter(support.check_newest_version,
+                         self.on_check_update_callback)
+        elif hasattr(support.update_window, "Raise"):
+            support.update_window.Raise()
+
+
+    def on_check_update_callback(self, check_result, full_response=True):
+        """
+        Callback function for processing update check result, offers new
+        version for download if available.
+
+        @param   full_response  if False, show message only if update available
+        """
+        if not self: return
+
+        support.update_window = True
+        guibase.status()
+        if check_result:
+            version, url, changes = check_result
+            MAX = 1000
+            changes = changes[:MAX] + ".." if len(changes) > MAX else changes
+            guibase.status("New %s version %s available.", conf.Title, version)
+            if wx.OK == wx.MessageBox(
+                "Newer version (%s) available. You are currently on "
+                "version %s.%s\nDownload and install %s %s?" %
+                (version, conf.Version, "\n\n%s\n" % changes,
+                 conf.Title, version),
+                "Update information", wx.OK | wx.CANCEL | wx.ICON_INFORMATION
+            ):
+                wx.CallAfter(support.download_and_install, url)
+        elif full_response and check_result is not None:
+            wx.MessageBox("You are using the latest version of %s, %s.\n\n " %
+                (conf.Title, conf.Version), "Update information",
+                wx.OK | wx.ICON_INFORMATION)
+        elif full_response:
+            wx.MessageBox("Could not contact download server.",
+                          "Update information", wx.OK | wx.ICON_WARNING)
+        if check_result is not None:
+            conf.LastUpdateCheck = datetime.date.today().strftime("%Y%m%d")
+            conf.save()
+        support.update_window = None
 
 
     def on_detect_databases(self, event):
@@ -7311,17 +7417,23 @@ class AboutDialog(wx.Dialog):
     def __init__(self, parent, content):
         wx.Dialog.__init__(self, parent, title="About %s" % conf.Title,
                            style=wx.CAPTION | wx.CLOSE_BOX)
-        html = self.html = wx.html.HtmlWindow(self)
         self.content = content
+        html = self.html = wx.html.HtmlWindow(self)
+        button_update = wx.Button(self, label="Check for &updates")
+        button_feedback = wx.Button(self, label="Send &feedback")
 
         html.SetPage(content() if callable(content) else content)
         html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
+        button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
+        button_feedback.Bind(wx.EVT_BUTTON, parent.on_open_feedback)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
         sizer_buttons = self.CreateButtonSizer(wx.OK)
+        sizer_buttons.Insert(0, button_update, border=50, flag=wx.RIGHT)
+        sizer_buttons.Insert(1, button_feedback, border=50, flag=wx.RIGHT)
         self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.ALL)
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
 

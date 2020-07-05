@@ -558,7 +558,7 @@ def run_gui(filenames):
     window.run_console("# All %s modules:" % conf.Title)
     window.run_console("from . import conf, controls, emoticons, export, guibase, "
                        "images, live, main, searchparser, skypedata, skyperious, "
-                       "templates, util, wordcloud, workers, wx_accel")
+                       "support, templates, util, wordcloud, workers, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     logger.info("Started application on %s.", datetime.date.today())
