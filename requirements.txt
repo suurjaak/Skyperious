@@ -1,10 +1,8 @@
 argparse
 BeautifulSoup4
-Pillow
+Pillow<=6.2.2
 pyparsing
 python-dateutil
 Skype4Py
 XlsxWriter
-
-# wxPython is not available via pip. Can be installed in Ubuntu with:
-#   sudo apt-get install python-wxgtk2.8 python-wxtools wx2.8-i18n libwxgtk2.8-dev libgtk2.0-dev
+wxPython>=4.0

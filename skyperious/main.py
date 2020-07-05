@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2015
+@modified    05.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -483,6 +483,7 @@ def run_gui(filenames):
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
+    locale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
     window = sys.modules["main"].window = skyperious.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
     # Decorate write to catch printed errors
@@ -497,7 +498,7 @@ def run_gui(filenames):
                        "support, templates, util, wordcloud, workers, "
                        "wx_accel")
 
-    window.run_console("self = main.window # Application main window instance")
+    window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     log("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    13.08.2015
+@modified    05.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -130,7 +130,7 @@ class SearchThread(WorkerThread):
                     if width > 0:
                         dc = wx.MemoryDC()
                         dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
-                            wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
+                            wx.FONTWEIGHT_NORMAL, faceName=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
                 else:

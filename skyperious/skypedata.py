@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.12.2015
+@modified    05.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1039,7 +1039,7 @@ class SkypeDatabase(object):
 
     def insert_chat(self, chat, source_db):
         """Inserts the specified chat into the database and returns its ID."""
-        # @todo insert_chat võiks renameda insert_conversation, kuna kõik
+        # @todo insert_chat vï¿½iks renameda insert_conversation, kuna kï¿½ik
         #       teised meetodid on convo-nime peal
         if self.is_open() and not self.account and source_db.account:
             self.insert_account(source_db.account)
@@ -1412,7 +1412,7 @@ class SkypeDatabase(object):
         else:
             for pk in [c["name"] for c in col_data if c["pk"]]:
                 pk_key = "PK%s" % int(time.time())
-                values[pk_key] = original_row[pk]
+                values[pk_key] = row[pk]
                 where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
         if not where:
             return False # Sanity check: no primary key and no rowid
@@ -2583,7 +2583,7 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
                         datadict.get("profile_attachments") or "")
     if raw:
         try:
-            img = wx.ImageFromStream(cStringIO.StringIO(raw))
+            img = wx.Image(cStringIO.StringIO(raw))
             if size and list(size) != list(img.GetSize()):
                 img = util.img_wx_resize(img, size, aspect_ratio)
             result = img.ConvertToBitmap()

@@ -33,7 +33,9 @@ Released under the MIT License.
 @modified    22.01.2015
 ------------------------------------------------------------------------------
 """
+import functools
 import re
+
 import wx
 
 DEBUG = False
@@ -135,7 +137,7 @@ def collect_shortcuts(control, use_heuristics=True):
                     result.append(key)
                     if DEBUG and key:
                         print("Parsed '%s' in label '%s'." % (key, ctrl.Label))
-                    break # break for part in filter
+                    break # for part
         return result
 
 
@@ -170,7 +172,7 @@ def collect_shortcuts(control, use_heuristics=True):
 
     collect_recurse(control, result, nameds, statics)
     if not use_heuristics: return result
-        
+
     result_values = set(j for i in result.values() for j in i)
     for ctrl, key in statics.items():
         # For wx.StaticTexts, see if the next sibling, or control with the
@@ -208,7 +210,7 @@ def collect_shortcuts(control, use_heuristics=True):
                     item = ctrl.ContainingSizer.GetItem(len(sizer_items))
                     sizer_items.append(item.Window)
                 except Exception:
-                    break # Reached item limit
+                    break # while True
             index = sizer_items.index(ctrl)
             if index < len(sizer_items) - 1:
                 next_ctrl = sizer_items[index + 1]
@@ -227,10 +229,9 @@ def collect_shortcuts(control, use_heuristics=True):
     strip_rgx = re.compile(r"(^label[_ \/.]*)|([_ \/.]*label$)", re.I)
     nameds_lc = dict((k.lower(), v) for k, v in nameds.items())
     for name, ctrl in nameds.items():
-        basename = strip_rgx.sub(name, "").lower()
-        if len(basename) < len(name) or not isinstance(ctrl, wx.StaticText):
+        basename = strip_rgx.sub("", name).lower()
+        if basename == name or not isinstance(ctrl, wx.StaticText):
             continue # for name, ctrl
-        print name, basename
         target = nameds_lc.get(basename)
         if not target:
             continue # for name, ctrl
@@ -239,8 +240,8 @@ def collect_shortcuts(control, use_heuristics=True):
         if DEBUG:
             print("Name %s matches potential %s, key=%s." % (
                   name, basename, key))
-        if key and target not in result_values:
-            if target not in result[key]:
+        if target not in result_values:
+            if target not in result.get(key, []):
                 result.setdefault(key, []).append((target, ctrl))
             result_values.add(target)
             if DEBUG:
@@ -253,7 +254,7 @@ def collect_shortcuts(control, use_heuristics=True):
 
 
 
-def accelerate(window, use_heuristics=True, skipclicklabels=set()):
+def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=None):
     """
     Assigns global keyboard shortcuts to all controls under the specified
     wx.Window that have a shortcut key defined in their label (e.g. a button
@@ -264,9 +265,15 @@ def accelerate(window, use_heuristics=True, skipclicklabels=set()):
                              accelerator table reset
     @param   use_heuristics  whether to use heuristic analysis to detect
                              connected label-control pairs
-    @return                  a map of detected shortcut chars and their target
-                             controls
+    @param   accelerators    additional accelerator entries to bind,
+                             as [(wx.ACCEL_*, key, id), ]
+    @return                  (list of accelerator entries,
+                              map of detected shortcut chars and their target controls)
     """
+    CHK_3STATE_NEXT = {wx.CHK_CHECKED:      wx.CHK_UNDETERMINED,
+                       wx.CHK_UNCHECKED:    wx.CHK_CHECKED,
+                       wx.CHK_UNDETERMINED: wx.CHK_UNCHECKED}
+    if skipclicklabels is None: skipclicklabels = set()
 
     def eventhandler(targets, key, shortcut_event):
         """
@@ -281,7 +288,7 @@ def accelerate(window, use_heuristics=True, skipclicklabels=set()):
         if DEBUG:
             print("Handling target %s" %
                   [(type(t), t.Id, t.Label) for t in targets])
-        event = None
+        event, target = None, None
         for target in targets:
             if (isinstance(target, wx.Control) # has not been destroyed
             and target.IsShownOnScreen()       # visible on current panel
@@ -299,8 +306,11 @@ def accelerate(window, use_heuristics=True, skipclicklabels=set()):
                     target.Value = not target.Value
                 elif isinstance(target, wx.CheckBox):
                     event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, target.Id)
+                    event.SetEventObject(target)
                     # Need to change value, as event goes directly to handler
-                    target.Value = not target.Value
+                    if target.Is3State():
+                        target.Set3StateValue(CHK_3STATE_NEXT[target.Get3StateValue()])
+                    else: target.Value = not target.Value
                     target.SetFocus()
                 elif isinstance(target, wx.ToolBar):
                     # Toolbar shortcuts are defined in their shorthelp texts
@@ -319,12 +329,12 @@ def accelerate(window, use_heuristics=True, skipclicklabels=set()):
                             event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
                             event.SetEventObject(target)
                             target.ToggleTool(id, not target.GetToolState(id))
-                            break # break for i in range(target.GetToolsCount)
+                            break # for tool
                 else:
                     target.SetFocus()
                     if isinstance(target, wx.TextCtrl):
                         target.SelectAll()
-                break # break for target in targets
+                break # for target
         if event:
             if DEBUG: print("Chose target %s." % (target.Label or target))
 
@@ -338,25 +348,25 @@ def accelerate(window, use_heuristics=True, skipclicklabels=set()):
             if DEBUG: print("Removing dummy menu item '%s'" % menu_item.Label)
             window.Unbind(wx.EVT_MENU, menu_item)
         del window.__ampersand_shortcut_menu
+    accelerators = list(accelerators or [])
     shortcuts = collect_shortcuts(window, use_heuristics)
     if shortcuts:
-        accelerators = []
         dummy_menu = wx.Menu()
         for key, targets in shortcuts.items():
             for ctrl, label in [x for x in targets if len(x) > 1]:
                 if label in skipclicklabels: continue # for ctrl, label
                 if DEBUG:
                     print("Binding click from label %s to %s." % (label, ctrl))
-                label.Bind(wx.EVT_LEFT_UP, lambda e: eventhandler([ctrl], "", e))
+                label.Bind(wx.EVT_LEFT_UP, functools.partial(eventhandler, [ctrl], ""))
                 skipclicklabels.add(label)
             if not key: continue # for key, targets
             ctrls = [t[0] for t in targets]
             if DEBUG: print("Binding %s to targets %s." %
                             (key, [type(t) for t in ctrls]))
-            menu_item = dummy_menu.Append(wx.ID_ANY, text="&%s" % key)
-            window.Bind(wx.EVT_MENU, lambda e: eventhandler(ctrls, key, e),
+            menu_item = dummy_menu.Append(wx.ID_ANY, "&%s" % key)
+            window.Bind(wx.EVT_MENU, functools.partial(eventhandler, ctrls, key),
                         menu_item)
             accelerators.append((wx.ACCEL_ALT, ord(key), menu_item.Id))
         window.SetAcceleratorTable(wx.AcceleratorTable(accelerators))
         window.__ampersand_shortcut_menu = dummy_menu
-    return shortcuts
+    return accelerators, shortcuts

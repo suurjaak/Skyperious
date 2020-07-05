@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    16.07.2015
+@modified    05.07.2020
 ------------------------------------------------------------------------------
 """
 import glob
@@ -29,7 +29,7 @@ setuptools.setup(
     platforms=["any"],
     keywords="skype sqlite merge export",
 
-    install_requires=["pyparsing", "XlsxWriter", "Pillow", "python-dateutil", "BeautifulSoup4", "Skype4Py"],
+    install_requires=["pyparsing", "XlsxWriter", "Pillow<=6.2.2", "python-dateutil", "BeautifulSoup4", "Skype4Py", "wxPython>=4.0"],
     entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
     packages=setuptools.find_packages(),

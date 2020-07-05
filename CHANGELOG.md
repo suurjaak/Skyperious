@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+3.6, 2020-07-06
+---------------
+- upgraded wxPython to v4.
+
+
 3.5.1c, 2015-12-21
 ---------------
 - added support for updated Skype chat structure (issue #40);

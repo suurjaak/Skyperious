@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    14.10.2015
+@modified    05.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -209,13 +209,11 @@ def take_screenshot(fullscreen=True):
             rect.height       += title_bar_height + border_width
 
     dc = wx.ScreenDC()
-    bmp = wx.EmptyBitmap(rect.width, rect.height)
+    bmp = wx.Bitmap(rect.width, rect.height)
     dc_bmp = wx.MemoryDC()
     dc_bmp.SelectObject(bmp)
     dc_bmp.Blit(0, 0, rect.width, rect.height, dc, rect.x, rect.y)
     dc_bmp.SelectObject(wx.NullBitmap)
-    # Hack to drop screen transparency, wx issue when blitting from screen
-    bmp = wx.BitmapFromIcon(wx.IconFromBitmap(bmp))
     return bmp
 
 
@@ -330,7 +328,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         label_info.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT)
         sizer_upper.Add(label, flag=wx.GROW)
         sizer_upper.AddStretchSpacer()
-        sizer_upper.Add(label_info, flag=wx.ALIGN_RIGHT)
+        sizer_upper.Add(label_info)
         sizer.Add(sizer_upper, border=8, flag=wx.GROW | wx.ALL)
 
         edit = self.edit_text = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
@@ -342,7 +340,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_lower.Add(bmp)
         sizer_controls = wx.BoxSizer(wx.VERTICAL)
         self.button_ok = wx.Button(panel, label="&Confirm")
-        self.button_ok.ToolTipString = "Confirm message before sending"
+        self.button_ok.ToolTip = "Confirm message before sending"
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
@@ -350,7 +348,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_controls.Add(sizer_buttons)
         self.cb_fullscreen = wx.CheckBox(panel, label="&Full screen")
         self.button_saveimage = wx.Button(panel, label="Save &image")
-        self.button_saveimage.ToolTipString = "Save screenshot to file."
+        self.button_saveimage.ToolTip = "Save screenshot to file."
         self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
         sizer_controls.AddStretchSpacer()
         sizer_imagectrls = wx.BoxSizer(wx.VERTICAL)
@@ -362,7 +360,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_lower.AddStretchSpacer()
         sizer_lower.Add(sizer_controls, flag=wx.GROW)
         sizer.Add(sizer_lower, border=8, flag=wx.LEFT | wx.RIGHT |
-                  wx.BOTTOM | wx.ALIGN_BOTTOM | wx.GROW)
+                  wx.BOTTOM | wx.GROW)
 
         self.Sizer.Add(panel, proportion=1, flag=wx.GROW)
         self.Bind(wx.EVT_CHECKBOX, self.OnToggleFullScreen, self.cb_fullscreen)
@@ -399,10 +397,10 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         self.screenshot = bitmap
         thumb = wx.NullBitmap
         if bitmap:
-            img = wx.ImageFromBitmap(bitmap)
-            img = img.ResampleBox(*self.THUMB_SIZE)
+            img = bitmap.ConvertToImage()
+            img = img.Rescale(*self.THUMB_SIZE)
             # wx.BitmapFromImage/img.ConvertToBitmap can yield buggy bitmaps
-            thumb = wx.BitmapFromBuffer(img.Width, img.Height, img.Data)
+            thumb = wx.Bitmap.FromBuffer(img.Width, img.Height, img.GetData())
         self.cb_bmp.Value = bool(bitmap)
         self.bmp.SetBitmap(thumb)
         self.bmp.Show(self.cb_bmp.Value)
