@@ -4,9 +4,10 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  14.03.2015
+@modified  06.07.2020
 """
 import os
+import struct
 import sys
 
 os.chdir("..")
@@ -20,8 +21,7 @@ DO_DEBUG_VERSION = False
 DO_WINDOWS = ("nt" == os.name)
 
 def do_64bit():
-    if "PROCESSOR_ARCHITEW6432" in os.environ:
-        return True
+    return (struct.calcsize("P") * 8 == 64)
 
 
 app_file = "skyperious_%s%s" % (conf.Version, "_x64" if do_64bit() else "")
