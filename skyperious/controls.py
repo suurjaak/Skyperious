@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -470,7 +470,11 @@ class NoteButton(wx.Panel, wx.Button):
         label = self._label
         self._text_label = label
         self._text_note = self._note
-        WORDWRAP = wx.lib.wordwrap.wordwrap
+
+        def WORDWRAP(text, width, dc):
+            try: return wx.lib.wordwrap.wordwrap(text, width, dc)
+            except Exception: return text
+
         if width > 20 and height > 20:
             dc = wx.ClientDC(self)
         else: # Not properly sized yet: assume a reasonably fitting size
