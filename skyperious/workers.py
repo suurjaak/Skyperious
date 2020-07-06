@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -190,7 +190,13 @@ class SearchThread(WorkerThread):
                         if title_matches or matching_authors:
                             count += 1
                             result_count += 1
-                            result["output"] += template_chat.expand(locals())
+                            try: result["output"] += template_chat.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for chat %s in %s.\n\n%s",
+                                         chat, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for chat
                             key = "chat:%s" % chat["id"]
                             result["map"][key] = {"chat": chat["id"]}
                             if not count % conf.SearchResultsChunk \
@@ -234,7 +240,13 @@ class SearchThread(WorkerThread):
                         if match:
                             count += 1
                             result_count += 1
-                            result["output"] += template_contact.expand(locals())
+                            try: result["output"] += template_contact.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for contact %s in %s.\n\n%s",
+                                         contact, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for contact
                             if not (self._drop_results
                             or count % conf.SearchResultsChunk):
                                 result["count"] = result_count
@@ -264,7 +276,13 @@ class SearchThread(WorkerThread):
                                             else None, output)
                         count += 1
                         result_count += 1
-                        result["output"] += template_message.expand(locals())
+                        try: result["output"] += template_message.expand(locals())
+                        except Exception:
+                            main.log("Error formatting search result for message %s in %s.\n\n%s",
+                                     m, search["db"], traceback.format_exc())
+                            count -= 1
+                            result_count -= 1
+                            continue # for m
                         key = "message:%s" % m["id"]
                         result["map"][key] = {"chat": chat["id"],
                                               "message": m["id"]}
@@ -306,7 +324,13 @@ class SearchThread(WorkerThread):
                         while row:
                             count += 1
                             result_count += 1
-                            result["output"] += template_row.expand(locals())
+                            try: result["output"] += template_row.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for row %s in %s.\n\n%s",
+                                         row, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for contact
                             key = "table:%s:%s" % (table["name"], count)
                             result["map"][key] = {"table": table["name"],
                                                   "row": row}
