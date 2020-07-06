@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1982,7 +1982,8 @@ class MessageParser(object):
                     if child.tail: # Not totally empty: hang tail onto previous
                         if last: last.tail = (last.tail or "") + child.tail
                         else:    node.text = (node.text or "") + child.tail
-                    drop(node, child) # Recursively drop empty node from parent
+                    try: drop(node, child) # Recursively drop empty node from parent
+                    except Exception: pass
 
         process_node(dom)
         while len(dom) == 1 and "span" == dom[0].tag and not dom[0].tail:

@@ -7,6 +7,7 @@ CHANGELOG
 - dropped support functionality;
 - dropped contacts search and import functionality as unavailable;
 - dropped shared image download functionality as unavailable;
+- fixed some remaining stability issues;
 - upgraded wxPython to v4.
 
 
