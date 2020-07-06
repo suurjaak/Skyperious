@@ -83,10 +83,10 @@ Skyperious has been built using the following open-source software:
 - Python 2.7.18 (http://www.python.org)
 - wxPython 4.1.0 (http://www.wxpython.org)
 - Pillow 6.2.2 (https://pypi.python.org/pypi/Pillow)
-- pyparsing 2.0.3 (http://pyparsing.wikispaces.com/)
+- pyparsing 2.4.7 (http://pyparsing.wikispaces.com/)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 0.7.3 (https://github.com/jmcnamara/XlsxWriter)
-- dateutil 2.4.2, (http://pypi.python.org/pypi/python-dateutil)
+- XlsxWriter 1.2.9 (https://github.com/jmcnamara/XlsxWriter)
+- dateutil 2.8.1, (http://pypi.python.org/pypi/python-dateutil)
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the Skype Component License 1.0.

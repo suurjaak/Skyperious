@@ -2,6 +2,5 @@ argparse
 Pillow<=6.2.2
 pyparsing
 python-dateutil
-Skype4Py
 XlsxWriter
 wxPython>=4.0
