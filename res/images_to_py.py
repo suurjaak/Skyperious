@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  05.07.2020
+@modified  06.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -84,8 +84,7 @@ IMAGES = {
     "PageChats.png":
         "Icon for the Chats page in a database tab.",
     "PageContacts.png":
-        "Icon for the Contacts+ page in a database tab, and\n"
-        "Merge Contacts page in a merger tab.",
+        "Icon for the Merge Contacts page in a merger tab.",
     "PageTables.png":
         "Icon for the Data tables page in a database tab.",
     "PageInfo.png":
