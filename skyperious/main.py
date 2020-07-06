@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -725,9 +725,13 @@ def win32_unicode_argv():
     return result
 
 
-def output(*args, **kwargs):
+def output(s, **kwargs):
     """Print wrapper, avoids "Broken pipe" errors if piping is interrupted."""
-    print(*args, **kwargs)
+    try: print(s, **kwargs)
+    except UnicodeError:
+        try:
+            if isinstance(s, str): print(s.decode(errors="replace"), **kwargs)
+        except Exception: pass
     try:
         sys.stdout.flush() # Uncatchable error otherwise if interrupted
     except IOError as e:
