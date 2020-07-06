@@ -1,5 +1,5 @@
 """Package entry point."""
-from skyperious import main
+from . import main
 
 if "__main__" == __name__:
     main.run()

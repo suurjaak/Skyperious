@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -26,8 +26,8 @@ SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 """HTML chat history export template."""
 CHAT_HTML = """<%
 import base64, datetime
-import conf, emoticons, images, skypedata, templates, util
-from third_party import step
+from skyperious import conf, emoticons, images, skypedata, templates, util
+from skyperious.third_party import step
 %>
 <!DOCTYPE HTML><html>
 <head>
@@ -1015,7 +1015,7 @@ for chunk in message_buffer:
 
 """HTML chat history export template for the messages part."""
 CHAT_MESSAGES_HTML = """<%
-import skypedata, util
+from skyperious import skypedata, util
 
 previous_day, previous_author = None, None
 %>
@@ -1073,7 +1073,7 @@ previous_author = m["author"]
 """TXT chat history export template."""
 CHAT_TXT = """<%
 import datetime
-import conf, skypedata, util
+from skyperious import conf, skypedata, util
 %>History of Skype {{chat["title_long_lc"]}}.
 Showing {{util.plural("message", message_count)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
 Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0)}} in total.
@@ -1090,7 +1090,7 @@ for chunk in message_buffer:
 
 """TXT chat history export template for the messages part."""
 CHAT_MESSAGES_TXT = """<%
-import skypedata, util
+from skyperious import skypedata, util
 
 previous_day = None
 %>
@@ -1122,7 +1122,7 @@ previous_day = m["datetime"].date()
 """HTML data grid export template."""
 GRID_HTML = """<%
 import datetime
-import conf, images, util
+from skyperious import conf, images, util
 %><!DOCTYPE HTML><html>
 <head>
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
@@ -1215,7 +1215,7 @@ import conf, images, util
 """TXT SQL insert statements export template."""
 SQL_TXT = """<%
 import datetime, re, string
-import conf
+from skyperious import conf
 
 UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.printable))
 RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
@@ -1265,7 +1265,7 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 """HTML statistics template, for use with HtmlWindow."""
 STATS_HTML = """<%
 import urllib
-import conf, emoticons, skypedata, util
+from skyperious import conf, emoticons, skypedata, util
 %>
 <font color="{{conf.FgColour}}" face="{{conf.HistoryFontName}}" size="3">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
@@ -1585,8 +1585,8 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 """HTML template for search result row for a matched chat, HTML table row."""
 SEARCH_ROW_CHAT_HTML = """<%
 import re
-import conf
-from third_party import step
+from skyperious import conf
+from skyperious.third_party import step
 
 title = step.escape_html(chat["title"])
 if title_matches:
@@ -1620,7 +1620,7 @@ identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace
 """TXT template for search result row for a matched chat."""
 SEARCH_ROW_CHAT_TXT = """<%
 import re
-import conf
+from skyperious import conf
 
 title = chat["title"]
 if title_matches:
@@ -1646,7 +1646,7 @@ identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace
 
 """HTML template for search result row of a matched contact, HTML table row."""
 SEARCH_ROW_CONTACT_HTML = """<%
-import conf, skypedata
+from skyperious import conf, skypedata
 %>
 %if count <= 1 and result_count > 1:
 <tr><td colspan='3'><hr /></td></tr>
@@ -1669,7 +1669,7 @@ import conf, skypedata
 
 """TXT template for search result row of a matched contact."""
 SEARCH_ROW_CONTACT_TXT = """<%
-import conf, skypedata
+from skyperious import conf, skypedata
 %>
 %if count <= 1 and result_count > 1:
 -------------------------------------------------------------------------------
@@ -1684,7 +1684,7 @@ import conf, skypedata
 
 """HTML template for search result of chat messages, HTML table row."""
 SEARCH_ROW_MESSAGE_HTML = """<%
-import conf, skypedata
+from skyperious import conf, skypedata
 %>
 %if count <= 1 and result_count > 1:
 <tr><td colspan='3'><hr /></td></tr>
@@ -1717,7 +1717,7 @@ elif m["author"] == search["db"].id:
 
 """TXT template for search result item for chat messages."""
 SEARCH_ROW_MESSAGE_TXT = """<%
-import conf, skypedata
+from skyperious import conf, skypedata
 
 after = ""
 if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
@@ -1731,7 +1731,7 @@ elif m["author"] == search["db"].id:
 
 """HTML template for search results header, start of HTML table."""
 SEARCH_HEADER_HTML = """<%
-import conf
+from skyperious import conf
 %>
 <font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
 Results for "{{text}}" from {{fromtext}}:
@@ -1767,7 +1767,7 @@ Table {{table["name"]}}:
 """HTML template for search result of DB table row, HTML table row."""
 SEARCH_ROW_TABLE_HTML = """<%
 import re
-import conf, templates
+from skyperious import conf, templates
 %>
 <tr>
 <td align="right" valign="top"><a href="table:{{table["name"]}}:{{count}}">{{count}}</a></td>
@@ -1786,7 +1786,7 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 """TXT template for search result of DB table row."""
 SEARCH_ROW_TABLE_TXT = """<%
 import re
-import conf, templates
+from skyperious import conf, templates
 %>
 {{count}}
 %for col in table["columns"]:
@@ -1803,7 +1803,7 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 """Text shown in Help -> About dialog (HTML content)."""
 ABOUT_TEXT = """<%
 import sys
-import conf
+from skyperious import conf
 %>
 <font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
@@ -1871,7 +1871,7 @@ Installer created with Nullsoft Scriptable Install System 3.0b1,
 
 """Contents of the default page on search page."""
 SEARCH_WELCOME_HTML = """<%
-import conf
+from skyperious import conf
 %>
 <font face="{{conf.HistoryFontName}}" size="2" color="{{conf.FgColour}}">
 <center>
@@ -1947,7 +1947,7 @@ import conf
 
 """Long help text shown in a separate tab on search page."""
 SEARCH_HELP_LONG = """<%
-import conf
+from skyperious import conf
 try:
     import pyparsing
 except ImportError:
@@ -2163,7 +2163,7 @@ except ImportError:
 """Short help text shown on search page."""
 SEARCH_HELP_SHORT = """<%
 import os
-import conf
+from skyperious import conf
 helplink = "Search help"
 if "nt" == os.name: # In Windows, wx.HtmlWindow shows link whitespace quirkily
     helplink = helplink.replace(" ", "_")
@@ -2177,7 +2177,7 @@ For searching messages from specific chats, add "chat:name", and from specific c
 
 """Database links on merge page."""
 MERGE_DB_LINKS = """<%
-import conf
+from skyperious import conf
 %>
 <font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
 """
@@ -2192,7 +2192,7 @@ MESSAGE_QUOTE = """
 </tr></table>
 %else:
 <%
-import conf
+from skyperious import conf
 %>
 <table cellpadding="0" cellspacing="0"><tr>
     <td valign="top"><font color="{{conf.DisabledColour}}" size="7">&quot;|</font></td>
@@ -2204,7 +2204,7 @@ import conf
 
 """Chat row in database diff results list."""
 DIFF_RESULT_ITEM = """<%
-import conf
+from skyperious import conf
 %>
 <a href="{{chat["identity"]}}"><font color="{{conf.LinkColour}}">{{chat["title_long"]}}</font></a>
 """
@@ -2220,7 +2220,7 @@ MESSAGE_CLIPBOARD = """
 HISTOGRAM_SVG = """<%
 #Expects parameters: data, links, rectsize, colour, maxval.
 import datetime
-import util
+from skyperious import util
 
 border = 1
 rectstep = rectsize[0] + (1 if rectsize[0] < 10 else 2)

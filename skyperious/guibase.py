@@ -9,25 +9,152 @@ GUI frame template:
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    27.04.2014
+@modified    06.07.2020
 """
+import datetime
 import os
-import wx
-import wx.lib.inspection
-import wx.lib.newevent
-import wx.py
+import sys
 
-import conf
-import wx_accel
-
-
-"""Custom application event for adding to log."""
-LogEvent,    EVT_LOG =    wx.lib.newevent.NewEvent()
-"""Custom application event for setting main window status."""
-StatusEvent, EVT_STATUS = wx.lib.newevent.NewEvent()
+try:
+    import wx
+    import wx.lib.inspection
+    import wx.lib.newevent
+    import wx.py
+except ImportError: wx = None
 
 
-class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn):
+from . import conf
+from . import wx_accel
+
+
+if wx:
+    """Custom application event for adding to log."""
+    LogEvent,    EVT_LOG =    wx.lib.newevent.NewEvent()
+    """Custom application event for setting main window status."""
+    StatusEvent, EVT_STATUS = wx.lib.newevent.NewEvent()
+
+
+deferred_logs = []    # Log messages cached before main window is available
+deferred_status = []  # Last status cached before main window is available
+
+
+def log(text, *args):
+    """
+    Logs a timestamped message to main window.
+
+    @param   args  string format arguments, if any, to substitute in text
+    """
+    global deferred_logs
+    now = datetime.datetime.now()
+    try:
+        finaltext = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        finaltext = text % args if args else text
+    if "\n" in finaltext: # Indent all linebreaks
+        finaltext = finaltext.replace("\n", "\n\t\t")
+    msg = "%s.%03d\t%s" % (now.strftime("%H:%M:%S"), now.microsecond / 1000,
+                           finaltext)
+    try: window = wx.GetApp().TopWindow
+    except Exception: window = None
+    if window:
+        process_deferreds()
+        wx.PostEvent(window, LogEvent(text=msg))
+    elif conf.IsCLI and conf.IsCLIVerbose:
+        sys.stderr.write(msg + "\n"), sys.stderr.flush()
+    else:
+        deferred_logs.append(msg)
+
+
+def status(text, *args):
+    """
+    Sets main window status text.
+
+    @param   args  string format arguments, if any, to substitute in text
+    """
+    global deferred_status
+    try:
+        msg = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        msg = text % args if args else text
+    try: window = wx.GetApp().TopWindow
+    except Exception: window = None
+    if window:
+        process_deferreds()
+        wx.PostEvent(window, StatusEvent(text=msg))
+    elif conf.IsCLI and conf.IsCLIVerbose:
+        sys.stderr.write(msg + "\n")
+    else:
+        deferred_status[:] = [msg]
+
+
+
+def status_flash(text, *args):
+    """
+    Sets main window status text that will be cleared after a timeout.
+
+    @param   args  string format arguments, if any, to substitute in text
+    """
+    global deferred_status
+    try:
+        msg = text % args if args else text
+    except UnicodeError:
+        args = tuple(map(util.to_unicode, args))
+        msg = text % args if args else text
+    try: window = wx.GetApp().TopWindow
+    except Exception: window = None
+    if window:
+        process_deferreds()
+        wx.PostEvent(window, StatusEvent(text=msg))
+        def clear_status():
+            if window.StatusBar and window.StatusBar.StatusText == msg:
+                window.SetStatusText("")
+        wx.CallLater(max(1, conf.StatusFlashLength), clear_status)
+    else:
+        deferred_status[:] = [msg]
+
+
+def logstatus(text, *args):
+    """
+    Logs a timestamped message to main window and sets main window status text.
+
+    @param   args  string format arguments, if any, to substitute in text
+    """
+    log(text, *args)
+    status(text, *args)
+
+
+def logstatus_flash(text, *args):
+    """
+    Logs a timestamped message to main window and sets main window status text
+    that will be cleared after a timeout.
+
+    @param   args  string format arguments, if any, to substitute in text
+    """
+    log(text, *args)
+    status_flash(text, *args)
+
+
+def process_deferreds():
+    """
+    Forwards log messages and status, cached before main window was available.
+    """
+    global deferred_logs, deferred_status
+    try: window = wx.GetApp().TopWindow
+    except Exception: window = None
+    if window:
+        if deferred_logs:
+            for msg in deferred_logs:
+                wx.PostEvent(window, LogEvent(text=msg))
+            del deferred_logs[:]
+        if deferred_status:
+            wx.PostEvent(window, StatusEvent(text=deferred_status[0]))
+            del deferred_status[:]
+
+
+
+class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
     """Application main window."""
 
     def __init__(self):

@@ -34,14 +34,14 @@ from xml.etree import cElementTree as ElementTree
 try: import wx # For avatar bitmaps in GUI program
 except ImportError: pass
 
-from third_party import step
+from . third_party import step
 
-import conf
-import emoticons
-import main
-import templates
-import util
-import wordcloud
+from . import conf
+from . import emoticons
+from . import guibase
+from . import templates
+from . import util
+from . import wordcloud
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat
@@ -171,8 +171,8 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception:
-            if log_error: main.log("Error opening database %s.\n\n%s",
-                                   filename, traceback.format_exc())
+            if log_error: guibase.log("Error opening database %s.\n\n%s",
+                                      filename, traceback.format_exc())
             self.close()
             raise
         self.update_accountinfo(log_error)
@@ -214,9 +214,9 @@ class SkypeDatabase(object):
                 self.execute(sql)
             except Exception as e:
                 result.append(repr(e))
-                main.log("Error copying table %s from %s to %s.\n\n%s",
-                         t["name"], self.filename, filename,
-                         traceback.format_exc())
+                guibase.log("Error copying table %s from %s to %s.\n\n%s",
+                            t["name"], self.filename, filename,
+                            traceback.format_exc())
         # Create indexes
         indexes = []
         try:
@@ -224,16 +224,16 @@ class SkypeDatabase(object):
             indexes = self.execute(sql, ("index", )).fetchall()
         except Exception as e:
             result.append(repr(e))
-            main.log("Error getting indexes from %s.\n\n%s",
-                     self.filename, traceback.format_exc())
+            guibase.log("Error getting indexes from %s.\n\n%s",
+                        self.filename, traceback.format_exc())
         for i in (x for x in indexes if x.get("sql")):
             sql  = i["sql"].replace("CREATE INDEX ", "CREATE INDEX new.")
             try:
                 self.execute(sql)
             except Exception as e:
                 result.append(repr(e))
-                main.log("Error creating index %s for %s.\n\n%s",
-                         i["name"], filename, traceback.format_exc())
+                guibase.log("Error creating index %s for %s.\n\n%s",
+                            i["name"], filename, traceback.format_exc())
         self.execute("DETACH DATABASE new")
         return result
 
@@ -254,8 +254,8 @@ class SkypeDatabase(object):
             self.id = self.account["skypename"]
         except Exception:
             if log_error:
-                main.log("Error getting account information from %s.\n\n%s",
-                         self, traceback.format_exc())
+                guibase.log("Error getting account information from %s.\n\n%s",
+                            self, traceback.format_exc())
 
 
     def stamp_to_date(self, timestamp):
@@ -302,8 +302,8 @@ class SkypeDatabase(object):
         result = None
         if self.connection:
             if log and conf.LogSQL:
-                main.log("SQL: %s%s", sql,
-                         ("\nParameters: %s" % params) if params else "")
+                guibase.log("SQL: %s%s", sql,
+                            ("\nParameters: %s" % params) if params else "")
             result = self.connection.execute(sql, params)
         return result
 
@@ -352,8 +352,8 @@ class SkypeDatabase(object):
                     table["rows"] = res.fetchone()["count"]
                 except sqlite3.DatabaseError:
                     table["rows"] = 0
-                    main.log("Error getting %s row count for %s.\n\n%s",
-                             table, self.filename, traceback.format_exc())
+                    guibase.log("Error getting %s row count for %s.\n\n%s",
+                                table, self.filename, traceback.format_exc())
                 # Here and elsewhere in this module - table names are turned to
                 # lowercase when used as keys.
                 tables[table["name"].lower()] = table
@@ -544,8 +544,8 @@ class SkypeDatabase(object):
             if "conversations" not in self.table_rows:
                 participants = {}
                 if "contacts" in self.tables and "participants" in self.tables:
-                    main.log("Conversations and participants: "
-                             "retrieving all (%s).", self.filename)
+                    guibase.log("Conversations and participants: "
+                                "retrieving all (%s).", self.filename)
                     self.get_contacts()
                     self.get_table_rows("participants")
                     for p in self.table_objects["participants"].values():
@@ -627,7 +627,7 @@ class SkypeDatabase(object):
                     chat["last_message_datetime"] = None
                     if chat["identity"] not in oldset: # Available in link
                         conversations.append(chat)
-                main.log("Conversations and participants retrieved "
+                guibase.log("Conversations and participants retrieved "
                     "(%s chats, %s contacts, %s).",
                     len(conversations), len(self.table_rows["contacts"]),
                     self.filename
@@ -650,7 +650,7 @@ class SkypeDatabase(object):
         @param   chats  list of chats, as returned from get_conversations()
         """
         if log and chats:
-            main.log("Statistics collection starting (%s).", self.filename)
+            guibase.log("Statistics collection starting (%s).", self.filename)
         stats = {}
         if self.is_open() and "messages" in self.tables:
             and_str, and_val = "", []
@@ -693,7 +693,7 @@ class SkypeDatabase(object):
                 chat[n] = f(values) if values else None
 
         if log and chats:
-            main.log("Statistics collected (%s).", self.filename)
+            guibase.log("Statistics collected (%s).", self.filename)
 
 
     def get_contactgroups(self):
@@ -927,8 +927,8 @@ class SkypeDatabase(object):
                     for row in res.fetchall():
                         table_columns.append(row)
                 except sqlite3.DatabaseError:
-                    main.log("Error getting %s column data for %s.\n\n%s",
-                             table, self.filename, traceback.format_exc())
+                    guibase.log("Error getting %s column data for %s.\n\n%s",
+                                table, self.filename, traceback.format_exc())
                 self.tables[table]["columns"] = table_columns
         return table_columns
 
@@ -1038,9 +1038,9 @@ class SkypeDatabase(object):
         if self.is_open() and "chats" not in self.tables:
             self.create_table("chats")
         if self.is_open() and "messages" in self.tables:
-            main.log("Merging %s (%s) into %s.",
-                     util.plural("chat message", messages),
-                     chat["title_long_lc"], self.filename)
+            guibase.log("Merging %s (%s) into %s.",
+                        util.plural("chat message", messages),
+                        chat["title_long_lc"], self.filename)
             self.ensure_backup()
             # Messages.chatname corresponds to Chats.name, and Chats entries
             # must exist for Skype application to be able to find the messages.
@@ -1154,7 +1154,7 @@ class SkypeDatabase(object):
         if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
         if self.is_open() and "participants" in self.tables:
-            main.log("Merging %d chat participants (%s) into %s.",
+            guibase.log("Merging %d chat participants (%s) into %s.",
                 len(participants), chat["title_long_lc"], self.filename
             )
             self.ensure_backup()
@@ -1184,7 +1184,7 @@ class SkypeDatabase(object):
             self.create_table("accounts")
             self.get_tables(True, "accounts")
         if self.is_open() and "accounts" in self.tables:
-            main.log("Inserting account \"%s\" into %s.",
+            guibase.log("Inserting account \"%s\" into %s.",
                 account["skypename"], self.filename
             )
             self.ensure_backup()
@@ -1214,7 +1214,7 @@ class SkypeDatabase(object):
         if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
         if self.is_open() and "contacts" in self.tables:
-            main.log(
+            guibase.log(
                 "Merging %d contacts into %s.", len(contacts), self.filename
             )
             self.ensure_backup()
@@ -1241,7 +1241,7 @@ class SkypeDatabase(object):
         if self.is_open() and "contactgroups" not in self.tables:
             self.create_table("contactgroups")
         if self.is_open() and "contactgroups" in self.tables:
-            main.log("Merging %d contact groups into %s.",
+            guibase.log("Merging %d contact groups into %s.",
                 len(groups), self.filename
             )
             self.ensure_backup()
@@ -1298,8 +1298,8 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table, where = table.lower(), ""
-        main.log("Updating 1 row in table %s, %s.",
-                 self.tables[table]["name"], self.filename)
+        guibase.log("Updating 1 row in table %s, %s.",
+                    self.tables[table]["name"], self.filename)
         self.ensure_backup()
         col_data = self.get_table_columns(table)
         values, where = row.copy(), ""
@@ -1329,8 +1329,8 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table = table.lower()
-        main.log("Inserting 1 row into table %s, %s.",
-                 self.tables[table]["name"], self.filename)
+        guibase.log("Inserting 1 row into table %s, %s.",
+                    self.tables[table]["name"], self.filename)
         self.ensure_backup()
         col_data = self.get_table_columns(table)
         fields = [col["name"] for col in col_data]
@@ -1354,8 +1354,8 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table, where = table.lower(), ""
-        main.log("Deleting 1 row from table %s, %s.",
-                 self.tables[table]["name"], self.filename)
+        guibase.log("Deleting 1 row from table %s, %s.",
+                    self.tables[table]["name"], self.filename)
         self.ensure_backup()
         col_data = self.get_table_columns(table)
         values, where = row.copy(), ""
@@ -1798,8 +1798,8 @@ class MessageParser(object):
                 except Exception as e:
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
-                    main.log("Error parsing message %s, body \"%s\" (%s).", 
-                             message["id"], text, e)
+                    guibase.log("Error parsing message %s, body \"%s\" (%s).", 
+                                message["id"], text, e)
         return result
 
 
@@ -1926,7 +1926,7 @@ class MessageParser(object):
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
-            main.log("Exception for %s: %s", message["body_xml"], e)
+            guibase.log("Exception for %s: %s", message["body_xml"], e)
             for elem in dom.findall("*"):
                 for attr in ["text", "tail"]:
                     val = getattr(elem, attr)
@@ -1934,14 +1934,14 @@ class MessageParser(object):
                         try:
                             setattr(elem, attr, val.decode("utf-8"))
                         except Exception as e:
-                            main.log("Error decoding %s value \"%s\" (type %s)"
-                                     " of %s for \"%s\": %s", attr, val,
-                                     type(val), elem, message["body_xml"], e)
+                            guibase.log("Error decoding %s value \"%s\" (type %s)"
+                                        " of %s for \"%s\": %s", attr, val,
+                                        type(val), elem, message["body_xml"], e)
             try:
                 result = ElementTree.tostring(dom, "UTF-8")[44:-6]
             except Exception:
-                main.log("Failed to parse the message \"%s\" from %s.",
-                         message["body_xml"], message["author"])
+                guibase.log("Failed to parse the message \"%s\" from %s.",
+                            message["body_xml"], message["author"])
                 raise
         # emdash workaround, cElementTree won't handle unknown entities
         result = result.replace("{EMDASH}", "&mdash;") \
@@ -2254,8 +2254,8 @@ def is_skype_database(filename, path=None):
          for x in "Accounts", "Conversations", "Messages"]
         result = True
     except Exception:
-        main.log("Error checking database %s.\n\n%s", filename,
-                 traceback.format_exc())
+        guibase.log("Error checking database %s.\n\n%s", filename,
+                    traceback.format_exc())
     finally:
         conn and conn.close()
 
@@ -2300,7 +2300,7 @@ def detect_databases():
 
     WINDOWS_APPDIRS = ["application data", "roaming"]
     for search_path in filter(os.path.exists, search_paths):
-        main.log("Looking for Skype databases under %s.", search_path)
+        guibase.log("Looking for Skype databases under %s.", search_path)
         for root, dirs, files in os.walk(search_path):
             if os.path.basename(root).lower() in WINDOWS_APPDIRS:
                 # Skip all else under "Application Data" or "AppData\Roaming".
@@ -2313,7 +2313,7 @@ def detect_databases():
 
     # Then search current working directory for *.db files.
     search_path = util.to_unicode(os.getcwd())
-    main.log("Looking for Skype databases under %s.", search_path)
+    guibase.log("Looking for Skype databases under %s.", search_path)
     for root, dirs, files in os.walk(search_path):
         results = []
         for f in (x for x in files if is_skype_database(x, root)):
@@ -2425,8 +2425,8 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
                 img = util.img_wx_resize(img, size, aspect_ratio)
             result = img.ConvertToBitmap()
         except Exception:
-            main.log("Error loading avatar image for %s.\n\n%s",
-                     datadict["skypename"], traceback.format_exc())
+            guibase.log("Error loading avatar image for %s.\n\n%s",
+                        datadict["skypename"], traceback.format_exc())
     return result
 
 
@@ -2447,8 +2447,8 @@ def get_avatar_raw(datadict, size=None, aspect_ratio=True, format="PNG"):
         try:
             result = util.img_recode(result, format, size, aspect_ratio)
         except Exception:
-            main.log("Error creating avatar for %s.\n\n%s",
-                     datadict["skypename"], traceback.format_exc())
+            guibase.log("Error creating avatar for %s.\n\n%s",
+                        datadict["skypename"], traceback.format_exc())
     return result
 
 

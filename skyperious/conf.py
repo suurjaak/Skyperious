@@ -19,11 +19,10 @@ import json
 import os
 import sys
 
-import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.6.dev10"
+Version = "3.6.dev11"
 VersionDate = "06.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -43,7 +42,7 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
     "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
-    "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
+    "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
@@ -67,6 +66,12 @@ DBFiles = []
 
 """History of commands entered in console."""
 ConsoleHistoryCommands = []
+
+"""Is program running in command-line interface mode."""
+IsCLI = False
+
+"""Is command-line interface verbose."""
+IsCLIVerbose = False
 
 """Index of last active page in database tab, {db path: index}."""
 LastActivePage = {}
@@ -152,12 +157,6 @@ MaxConsoleHistory = 1000
 
 """Maximum number of search texts to store."""
 MaxSearchHistory = 500
-
-"""Days between automatic update checks."""
-UpdateCheckInterval = 7
-
-"""Date string of last time updates were checked."""
-LastUpdateCheck = None
 
 """Maximum number of messages shown initially in chat history."""
 MaxHistoryInitialMessages = 1500
@@ -362,7 +361,7 @@ def save():
     parser.optionxform = str # Force case-sensitivity on names
     parser.add_section(section)
     try:
-        f, fname = open(ConfigFile, "wb"), util.longpath(ConfigFile)
+        f = open(ConfigFile, "wb")
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:

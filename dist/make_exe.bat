@@ -15,7 +15,7 @@ goto :EOF
 :: Runs pyinstaller with %1 spec, copies exe, cleans up.
 :LOOPBODY
 echo Making EXE for %1.
-pyinstaller "%1" >> "makeexe.log" 2>&1
+pyinstaller --clean --onefile "%1" >> "makeexe.log" 2>&1
 if exist dist\*.exe (
     FOR %%E IN (dist\*.exe) DO (
         move %%E . > NUL

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.05.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -26,14 +26,14 @@ try:
 except ImportError:
     xlsxwriter = None
 
-from third_party import step
+from . third_party import step
 
-import conf
-import emoticons
-import main
-import skypedata
-import templates
-import util
+from . import conf
+from . import emoticons
+from . import guibase
+from . import skypedata
+from . import templates
+from . import util
 
 try: # Used in measuring text extent for Excel column auto-width
     FONT_XLSX = ImageFont.truetype(conf.FontXlsxFile, 15)
@@ -91,10 +91,10 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
             filename = os.path.join(path, util.safe_filename(filename))
             filename = util.unique_path(filename)
         return filename
-    main.logstatus("Exporting %s from %s %sto %s.",
-                   util.plural("chat", chats), db.filename,
-                   "" if len(format) > 4 else "as %s " % format.upper(),
-                   format if len(format) > 4 else path)
+    guibase.logstatus("Exporting %s from %s %sto %s.",
+                      util.plural("chat", chats), db.filename,
+                      "" if len(format) > 4 else "as %s " % format.upper(),
+                      format if len(format) > 4 else path)
 
     if format.lower().endswith(".xlsx"):
         filename = make_filename(chats[0])
@@ -109,11 +109,11 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
         message_count = 0
         for chat in chats:
             if skip and not messages and not chat["message_count"]:
-                main.log("Skipping exporting %s: no messages.",
-                         chat["title_long_lc"])
+                guibase.log("Skipping exporting %s: no messages.",
+                            chat["title_long_lc"])
                 if progress: progress(message_count)
                 continue # continue for chat in chats
-            main.logstatus("Exporting %s.", chat["title_long_lc"])
+            guibase.logstatus("Exporting %s.", chat["title_long_lc"])
             if progress: progress(message_count)
             filename = make_filename(chat)
             msgs = messages or db.get_messages(chat, use_cache=False)
@@ -144,10 +144,10 @@ def export_chats_xlsx(chats, filename, db, messages=None, skip=True, progress=No
     message_count = 0
     for chat in chats:
         if skip and not messages and not chat["message_count"]:
-            main.log("Skipping exporting %s: no messages.",
-                     chat["title_long_lc"])
+            guibase.log("Skipping exporting %s: no messages.",
+                        chat["title_long_lc"])
             continue # continue for chat in chats
-        main.logstatus("Exporting %s.", chat["title_long_lc"])
+        guibase.logstatus("Exporting %s.", chat["title_long_lc"])
         if progress: progress(message_count)
         parser = skypedata.MessageParser(db, chat=chat, stats=False)
         writer.add_sheet(chat["title"])

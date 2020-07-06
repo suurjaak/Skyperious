@@ -12,6 +12,7 @@ import sys
 
 os.chdir("..")
 APPPATH = os.path.join(os.getcwd(), "skyperious")
+ROOTPATH  = os.path.dirname(APPPATH)
 sys.path.append(APPPATH)
 
 import conf
@@ -28,15 +29,18 @@ app_file = "skyperious_%s%s" % (conf.Version, "_x64" if do_64bit() else "")
 if DO_WINDOWS:
     app_file += ".exe"
 
-a = Analysis([os.path.join(APPPATH, "main.py")])
-# Workaround for PyInstaller 2.1 buggy warning about existing pyconfig.h
-for d in a.datas:
-    if 'pyconfig' in d[0]: 
-        a.datas.remove(d)
-        break
+a = Analysis(
+    [os.path.join(ROOTPATH, "launch.py")],
+    excludes=["FixTk", "numpy", "tcl", "tk", "_tkinter", "tkinter", "Tkinter"],
+)
 a.datas += [("conf.py", "skyperious/conf.py", "DATA"), # For configuration docstrings
             ("res/Carlito.ttf", "skyperious/res/Carlito.ttf", "DATA"),
             ("res/CarlitoBold.ttf", "skyperious/res/CarlitoBold.ttf", "DATA"), ]
+a.binaries = a.binaries - TOC([
+    ('tcl85.dll', None, None),
+    ('tk85.dll',  None, None),
+    ('_tkinter',  None, None)
+])
 pyz = PYZ(a.pure)
 
 exe = EXE(

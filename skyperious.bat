@@ -1,1 +1,1 @@
-@start pythonw "%~dp0\skyperious\main.py" %*
+@start pythonw -m "skyperious.main" %*

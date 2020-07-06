@@ -41,14 +41,14 @@ try: # For printing to a console from a packaged Windows binary
 except ImportError:
     win32console = None
 
-import conf
-import export
-import skypedata
-import util
-import workers
+from . import conf
+from . import export
+from . import guibase
+from . import skypedata
+from . import util
+from . import workers
 if is_gui_possible:
-    import guibase
-    import skyperious
+    from . import skyperious
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
@@ -82,10 +82,6 @@ ARGUMENTS = {
              {"args": ["-a", "--author"], "dest": "author", "required": False,
               "help": "names of specific authors whose chats to export",
               "nargs": "+"},
-             {"args": ["-p", "--password"], "dest": "ask_password",
-              "action": "store_true", "required": False,
-              "help": "ask for Skype password on HTML export, "
-                      "to download shared images"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -148,117 +144,6 @@ ARGUMENTS = {
 
 
 window = None         # Application main window instance
-deferred_logs = []    # Log messages cached before main window is available
-deferred_status = []  # Last status cached before main window is available
-is_cli = False        # Is program running in command-line interface mode
-is_verbose = False    # Is command-line interface verbose
-
-
-def log(text, *args):
-    """
-    Logs a timestamped message to main window.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    global deferred_logs, is_cli, is_verbose, window
-    now = datetime.datetime.now()
-    try:
-        finaltext = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        finaltext = text % args if args else text
-    if "\n" in finaltext: # Indent all linebreaks
-        finaltext = finaltext.replace("\n", "\n\t\t")
-    msg = "%s.%03d\t%s" % (now.strftime("%H:%M:%S"), now.microsecond / 1000,
-                           finaltext)
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, guibase.LogEvent(text=msg))
-    elif is_cli and is_verbose:
-        sys.stderr.write(msg + "\n"), sys.stderr.flush()
-    else:
-        deferred_logs.append(msg)
-
-
-def status(text, *args):
-    """
-    Sets main window status text.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    global deferred_status, is_cli, is_verbose, window
-    try:
-        msg = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        msg = text % args if args else text
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, guibase.StatusEvent(text=msg))
-    elif is_cli and is_verbose:
-        sys.stderr.write(msg + "\n")
-    else:
-        deferred_status[:] = [msg]
-
-
-
-def status_flash(text, *args):
-    """
-    Sets main window status text that will be cleared after a timeout.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    global deferred_status, window
-    try:
-        msg = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        msg = text % args if args else text
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, guibase.StatusEvent(text=msg))
-        def clear_status():
-            if window.StatusBar and window.StatusBar.StatusText == msg:
-                window.SetStatusText("")
-        wx.CallLater(max(1, conf.StatusFlashLength), clear_status)
-    else:
-        deferred_status[:] = [msg]
-
-
-def logstatus(text, *args):
-    """
-    Logs a timestamped message to main window and sets main window status text.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    log(text, *args)
-    status(text, *args)
-
-
-def logstatus_flash(text, *args):
-    """
-    Logs a timestamped message to main window and sets main window status text
-    that will be cleared after a timeout.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    log(text, *args)
-    status_flash(text, *args)
-
-
-def process_deferreds():
-    """
-    Forwards log messages and status, cached before main window was available.
-    """
-    global deferred_logs, deferred_status, window
-    if window:
-        if deferred_logs:
-            for msg in deferred_logs:
-                wx.PostEvent(window, guibase.LogEvent(text=msg))
-            del deferred_logs[:]
-        if deferred_status:
-            wx.PostEvent(window, guibase.StatusEvent(text=deferred_status[0]))
-            del deferred_status[:]
 
 
 def run_merge(filenames, output_filename=None):
@@ -303,7 +188,7 @@ def run_merge(filenames, output_filename=None):
                     bar.max = result["count"]
                     bar.update(result["index"])
                 if result.get("output"):
-                    log(result["output"])
+                    guibase.log(result["output"])
             if not db1:
                 break # break for db1 in dbs
             bar.stop()
@@ -333,7 +218,7 @@ def run_search(filenames, query):
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            log("Searching \"%s\" in %s." % (query, db))
+            guibase.log("Searching \"%s\" in %s." % (query, db))
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()
@@ -342,9 +227,9 @@ def run_search(filenames, query):
                           (db, result.get("error_short", result["error"])))
                     break # break while True
                 if "done" in result:
-                    log("Finished searching for \"%s\" in %s.", query, db)
+                    guibase.log("Finished searching for \"%s\" in %s.", query, db)
                     break # break while True
-                if result.get("count", 0) or is_verbose:
+                if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
                         output("%s:" % db, end=" ")
                     output(result["output"])
@@ -392,8 +277,8 @@ def run_export(filenames, format, chatnames, authornames):
                 bar.afterword = " Exported %s to %s. " % (db, target)
                 bar.update(bar_total)
                 output()
-                log("Exported %s %sto %s as %s.", util.plural("chat", count),
-                     dbstr, target, format)
+                guibase.log("Exported %s %sto %s as %s.", util.plural("chat", count),
+                            dbstr, target, format)
             else:
                 output("\nNo messages to export%s." %
                       ("" if len(dbs) == 1 else " from %s" % db))
@@ -444,7 +329,7 @@ def run_diff(filename1, filename2):
                 bar.max = result["count"]
                 bar.update(result["index"])
             if result.get("output"):
-                log(result["output"])
+                guibase.log(result["output"])
     finally:
         worker and (worker.stop(), worker.join())
 
@@ -456,27 +341,23 @@ def run_diff(filename1, filename2):
 
 def run_gui(filenames):
     """Main GUI program entrance."""
-    global deferred_logs, deferred_status, window
-
-    # Values in some threads would otherwise not be the same
-    sys.modules["main"].deferred_logs = deferred_logs
-    sys.modules["main"].deferred_status = deferred_status
+    global window
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
     locale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
-    window = sys.modules["main"].window = skyperious.MainWindow()
+    window = skyperious.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
-    window.run_console("import conf, controls, emoticons, export, guibase, "
+    window.run_console("from skyperious import conf, controls, emoticons, export, guibase, "
                        "images, main, searchparser, skypedata, skyperious, "
                        "templates, util, wordcloud, workers, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
-    log("Started application on %s.", datetime.date.today())
+    guibase.log("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
     app.MainLoop()
@@ -484,7 +365,7 @@ def run_gui(filenames):
 
 def run(nogui=False):
     """Parses command-line arguments and either runs GUI, or a CLI action."""
-    global is_cli, is_gui_possible, is_verbose
+    global is_gui_possible
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
@@ -493,7 +374,7 @@ def run(nogui=False):
     if "main" not in sys.modules: # E.g. setuptools install, calling main.run
         srcdir = os.path.abspath(os.path.dirname(__file__))
         if srcdir not in sys.path: sys.path.append(srcdir)
-        sys.modules["main"] = __import__("main")
+        #sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
     for arg in ARGUMENTS["arguments"]:
@@ -534,8 +415,8 @@ def run(nogui=False):
         sys.exit(status)
     elif "gui" != arguments.command:
         conf.load()
-        is_cli = sys.modules["main"].is_cli = True
-        is_verbose = sys.modules["main"].is_verbose = arguments.verbose
+        conf.IsCLI = True
+        conf.IsCLIVerbose = arguments.verbose
         # Avoid Unicode errors when printing to console.
         enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
         sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
@@ -725,7 +606,7 @@ def win32_unicode_argv():
     return result
 
 
-def output(s, **kwargs):
+def output(s="", **kwargs):
     """Print wrapper, avoids "Broken pipe" errors if piping is interrupted."""
     try: print(s, **kwargs)
     except UnicodeError:

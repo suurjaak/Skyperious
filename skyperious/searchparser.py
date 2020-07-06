@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    08.01.2015
+@modified    06.07.2020
 """
 import calendar
 import collections
@@ -38,7 +38,7 @@ try:
 except ImportError:
     ParserElement = None
 
-import util
+from . import util
 
 UNPRINTABLES = "".join(set(unichr(i) for i in range(128))
                        .difference(string.printable))
