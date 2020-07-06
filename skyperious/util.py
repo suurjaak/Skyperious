@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    08.07.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import ctypes
@@ -46,7 +46,7 @@ def safedivf(a, b):
 
 def safe_filename(filename):
     """Returns the filename with characters like \:*?"<>| removed."""
-    return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "", filename)
+    return re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
 
 
 def format_bytes(size, precision=2, max_units=True):
@@ -240,7 +240,7 @@ def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
     """Recodes and/or resizes the raw image, using wx or PIL."""
     result = raw
     if wx:
-        img = wx.ImageFromStream(io.BytesIO(raw))
+        img = wx.Image(io.BytesIO(raw))
         if size: img = img_wx_resize(img, size, aspect_ratio)
         result = img_wx_to_raw(img, format)
     elif ImageFile:
@@ -257,7 +257,7 @@ def img_size(raw):
     """Returns the size of the as (width, height), using wx or PIL."""
     result = None
     if wx:
-        result = tuple(wx.ImageFromStream(io.BytesIO(raw)).GetSize())
+        result = tuple(wx.Image(io.BytesIO(raw)).GetSize())
     elif ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         result = tuple(imgparser.close().size)

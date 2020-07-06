@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    03.04.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -130,7 +130,7 @@ class SearchThread(WorkerThread):
                     if width > 0:
                         dc = wx.MemoryDC()
                         dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
-                            wx.FONTWEIGHT_NORMAL, face=conf.HistoryFontName))
+                            wx.FONTWEIGHT_NORMAL, faceName=conf.HistoryFontName))
                         wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
                         output["wrap"] = True
                 else:
@@ -172,6 +172,7 @@ class SearchThread(WorkerThread):
                     template_chat = FACTORY("chat")
                 for chat in chats:
                     chat_map[chat["id"]] = chat
+                    if chat.get("__link"): chat_map[chat["__link"]["id"]] = chat
                     if "conversations" == search["table"] and match_words:
                         title_matches = False
                         matching_authors = []
@@ -189,7 +190,13 @@ class SearchThread(WorkerThread):
                         if title_matches or matching_authors:
                             count += 1
                             result_count += 1
-                            result["output"] += template_chat.expand(locals())
+                            try: result["output"] += template_chat.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for chat %s in %s.\n\n%s",
+                                         chat, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for chat
                             key = "chat:%s" % chat["id"]
                             result["map"][key] = {"chat": chat["id"]}
                             if not count % conf.SearchResultsChunk \
@@ -233,7 +240,13 @@ class SearchThread(WorkerThread):
                         if match:
                             count += 1
                             result_count += 1
-                            result["output"] += template_contact.expand(locals())
+                            try: result["output"] += template_contact.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for contact %s in %s.\n\n%s",
+                                         contact, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for contact
                             if not (self._drop_results
                             or count % conf.SearchResultsChunk):
                                 result["count"] = result_count
@@ -263,7 +276,13 @@ class SearchThread(WorkerThread):
                                             else None, output)
                         count += 1
                         result_count += 1
-                        result["output"] += template_message.expand(locals())
+                        try: result["output"] += template_message.expand(locals())
+                        except Exception:
+                            main.log("Error formatting search result for message %s in %s.\n\n%s",
+                                     m, search["db"], traceback.format_exc())
+                            count -= 1
+                            result_count -= 1
+                            continue # for m
                         key = "message:%s" % m["id"]
                         result["map"][key] = {"chat": chat["id"],
                                               "message": m["id"]}
@@ -305,7 +324,13 @@ class SearchThread(WorkerThread):
                         while row:
                             count += 1
                             result_count += 1
-                            result["output"] += template_row.expand(locals())
+                            try: result["output"] += template_row.expand(locals())
+                            except Exception:
+                                main.log("Error formatting search result for row %s in %s.\n\n%s",
+                                         row, search["db"], traceback.format_exc())
+                                count -= 1
+                                result_count -= 1
+                                continue # for contact
                             key = "table:%s:%s" % (table["name"], count)
                             result["map"][key] = {"table": table["name"],
                                                   "row": row}
@@ -416,9 +441,13 @@ class MergeThread(WorkerThread):
         chats1 = params.get("chats") or db1.get_conversations()
         chats2 = db2.get_conversations()
         c2map = dict((c["identity"], c) for c in chats2)
+        for c in (c for c in chats2 if c.get("__link")):
+            c2map[c["__link"]["identity"]] = c
         compared = []
         for c1 in chats1:
             c2 = c2map.get(c1["identity"])
+            if not c2 and c1.get("__link"):
+                c2 = c2map.get(c1["__link"]["identity"])
             c = c1.copy()
             c["messages1"] = c1["message_count"] or 0
             c["messages2"] = c2["message_count"] or 0 if c2 else 0
@@ -482,8 +511,12 @@ class MergeThread(WorkerThread):
             chats1 = params.get("chats") or db1.get_conversations()
             chats2 = db2.get_conversations()
             c2map = dict((c["identity"], c) for c in chats2)
+            for c in (c for c in chats2 if c.get("__link")):
+                c2map[c["__link"]["identity"]] = c
             for c1 in chats1:
                 c2 = c2map.get(c1["identity"])
+                if not c2 and c1.get("__link"):
+                    c2 = c2map.get(c1["__link"]["identity"])
                 c = c1.copy()
                 c["messages1"] = c1["message_count"] or 0
                 c["messages2"] = c2["message_count"] or 0 if c2 else 0
@@ -745,56 +778,6 @@ class MergeThread(WorkerThread):
             if result:
                 break # break for hour in range(..
         return result
-
-
-
-class ContactSearchThread(WorkerThread):
-    """
-    Contact search background thread, uses a running Skype application to
-    search Skype userbase for contacts, yielding results back to main thread
-    in chunks.
-    """
-
-    def run(self):
-        self._is_running = True
-        while self._is_running:
-            search = self._queue.get()
-            self._stop_work = False
-            self._drop_results = False
-            found = {} # { Skype handle: 1, }
-            result = {"search": search, "results": []}
-            if search and search["handler"]:
-                for value in search["values"]:
-                    main.log("Searching Skype contact directory for '%s'.",
-                             value)
-
-                    try:
-                        for user in search["handler"].search_users(value):
-                            if user.Handle not in found:
-                                result["results"].append(user)
-                                found[user.Handle] = 1
-
-                            if not (self._drop_results 
-                            or len(result["results"]) % conf.SearchContactsChunk):
-                                self.postback(result)
-                                result = {"search": search, "results": []}
-
-                            if self._stop_work:
-                                break # break for user in search["handler"].searc..
-                    except Exception:
-                        main.log("Error searching Skype contacts:\n\n%s",
-                                 traceback.format_exc())
-
-                    if result["results"] and not self._drop_results:
-                        self.postback(result)
-                        result = {"search": search, "results": []}
-
-                    if self._stop_work:
-                        break # break for value in search["values"]
-
-                if not self._drop_results:
-                    result["done"] = True
-                    self.postback(result)
 
 
 

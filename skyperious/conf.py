@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.07.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -23,8 +23,8 @@ import util
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "3.5"
-VersionDate = "16.07.2015"
+Version = "3.6.dev10"
+VersionDate = "06.07.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -39,9 +39,8 @@ ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
-    "ErrorsReportedOnDay", "ErrorReportsAutomatic", "ErrorReportHashes",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
-    "LastUpdateCheck", "RecentFiles", "SearchHistory", "SearchInChatInfo",
+    "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
@@ -52,8 +51,7 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
     "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
     "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchContactsChunk", "SearchResultsChunk", "SharedImageAutoDownload",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "SearchResultsChunk",  "StatisticsPlotWidth", "StatusFlashLength",
     "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
     "WordCloudWordsAuthorMax"
 ]
@@ -69,15 +67,6 @@ DBFiles = []
 
 """History of commands entered in console."""
 ConsoleHistoryCommands = []
-
-"""Whether caught errors are reported automatically to author."""
-ErrorReportsAutomatic = False
-
-"""Errors reported on day X, e.g. {'20130530': 4, '20130531': 1, }."""
-ErrorsReportedOnDay = {}
-
-"""Saved hashes of automatically reported errors."""
-ErrorReportHashes = []
 
 """Index of last active page in database tab, {db path: index}."""
 LastActivePage = {}
@@ -124,9 +113,6 @@ ExportDbTemplate = u"Export from %(fullname)s"
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
-"""Whether the program checks for updates every UpdateCheckInterval."""
-UpdateCheckAutomatic = True
-
 """Whether the program has been minimized and hidden."""
 WindowIconized = False
 
@@ -144,10 +130,9 @@ LogEnabled = True
 """Whether to log all SQL statements to log window."""
 LogSQL = False
 
-"""URLs for download list, changelog, submitting feedback and homepage."""
+"""URLs for download list, changelog, and homepage."""
 DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
 ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
-ReportURL    = "http://erki.lap.ee/downloads/Skyperious/feedback"
 HomeUrl = "http://suurjaak.github.com/Skyperious/"
 
 """Maximum number of error reports sent per day."""
@@ -190,9 +175,6 @@ MaxSearchTableRows = 500
 
 """Number of search results to yield in one chunk from search thread."""
 SearchResultsChunk = 50
-
-"""Number of contact search results to yield in one chunk."""
-SearchContactsChunk = 10
 
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"
@@ -320,11 +302,6 @@ StatisticsPlotWidth = 150
 """Width of the chat emoticons plots, in pixels."""
 EmoticonsPlotWidth = 200
 
-"""
-Ask for Skype password and download shared images from Skype web for HTML export.
-"""
-SharedImageAutoDownload = True
-
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000
 
@@ -361,24 +338,18 @@ def load():
             try: # parser.get can throw an error if value not found
                 value_raw = parser.get(section, name)
             except Exception:
-                return False, None
-            # First, try to interpret as JSON
-            try:
+                return None, False
+            try: # Try to interpret as JSON, fall back on raw string
                 value = json.loads(value_raw)
-            except ValueError: # JSON failed, try to eval it
-                try:
-                    value = eval(value_raw)
-                except SyntaxError: # Fall back to string
-                    value = value_raw
-            return True, value
+            except ValueError:
+                value = value_raw
+            return value, True
 
         for name in FileDirectives:
-            [setattr(module, name, v) for s, v in [parse_value(name)] if s]
+            [setattr(module, name, v) for v, s in [parse_value(name)] if s]
         for name in OptionalFileDirectives:
             OptionalFileDirectiveDefaults[name] = getattr(module, name, None)
-            success, value = parse_value(name)
-            if success:
-                setattr(module, name, value)
+            [setattr(module, name, v) for v, s in [parse_value(name)] if s]
     except Exception:
         pass # Fail silently
 
@@ -395,8 +366,7 @@ def save():
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
-            try:
-                parser.set(section, name, json.dumps(getattr(module, name)))
+            try: parser.set(section, name, json.dumps(getattr(module, name)))
             except Exception: pass
         for name in OptionalFileDirectives:
             try:

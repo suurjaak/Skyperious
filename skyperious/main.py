@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.06.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -19,7 +19,6 @@ import codecs
 import collections
 import datetime
 import errno
-import getpass
 import glob
 import locale
 import io
@@ -31,7 +30,6 @@ import sys
 import threading
 import time
 import traceback
-import warnings
 
 try:
     import wx
@@ -51,13 +49,14 @@ import workers
 if is_gui_possible:
     import guibase
     import skyperious
-    import support
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
     "arguments": [
         {"args": ["--verbose"], "action": "store_true",
-         "help": "print detailed progress messages to stderr"}, ],
+         "help": "print detailed progress messages to stderr"},
+        {"args": ["-v", "--version"], "action": "version",
+         "version": "%s %s, %s." % (conf.Title, conf.Version, conf.VersionDate)}],
     "commands": [
         {"name": "export",
          "help": "export Skype databases as HTML, text or spreadsheet",
@@ -221,7 +220,7 @@ def status_flash(text, *args):
         def clear_status():
             if window.StatusBar and window.StatusBar.StatusText == msg:
                 window.SetStatusText("")
-        wx.CallLater(conf.StatusFlashLength, clear_status)
+        wx.CallLater(max(1, conf.StatusFlashLength), clear_status)
     else:
         deferred_status[:] = [msg]
 
@@ -353,28 +352,12 @@ def run_search(filenames, query):
         worker and (worker.stop(), worker.join())
 
 
-def run_export(filenames, format, chatnames, authornames, ask_password):
+def run_export(filenames, format, chatnames, authornames):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
 
     for db in dbs:
-        if (ask_password and db.id and conf.SharedImageAutoDownload
-        and format.lower().endswith("html")):
-            prompt = "Enter Skype password for '%s': " % db.id
-            while not skypedata.SharedImageDownload.has_login(db.id):
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore") # possible GetPassWarning
-                    output(prompt, end="") # getpass output can raise errors
-                    pw = getpass.getpass("", io.BytesIO())
-                if not pw: continue # while
-                try:
-                    skypedata.SharedImageDownload.login(db.id, pw)
-                except Exception as e:
-                    log("Error signing in %s on Skype web.\n\n%s",
-                        db.id, util.format_exc(e))
-                    prompt = "%s\nEnter Skype password for '%s': " % (e, db.id)
-
         formatargs = collections.defaultdict(str)
         formatargs["skypename"] = os.path.basename(db.filename)
         formatargs.update(db.account or {})
@@ -481,21 +464,18 @@ def run_gui(filenames):
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
+    locale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
     window = sys.modules["main"].window = skyperious.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
-    # Decorate write to catch printed errors
-    try: sys.stdout.write = support.reporting_write(sys.stdout.write)
-    except Exception: pass
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
     window.run_console("import conf, controls, emoticons, export, guibase, "
                        "images, main, searchparser, skypedata, skyperious, "
-                       "support, templates, util, wordcloud, workers, "
-                       "wx_accel")
+                       "templates, util, wordcloud, workers, wx_accel")
 
-    window.run_console("self = main.window # Application main window instance")
+    window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     log("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
@@ -566,8 +546,7 @@ def run(nogui=False):
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.chat,
-                   arguments.author, arguments.ask_password)
+        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
     elif "gui" == arguments.command:
@@ -746,9 +725,13 @@ def win32_unicode_argv():
     return result
 
 
-def output(*args, **kwargs):
+def output(s, **kwargs):
     """Print wrapper, avoids "Broken pipe" errors if piping is interrupted."""
-    print(*args, **kwargs)
+    try: print(s, **kwargs)
+    except UnicodeError:
+        try:
+            if isinstance(s, str): print(s.decode(errors="replace"), **kwargs)
+        except Exception: pass
     try:
         sys.stdout.flush() # Uncatchable error otherwise if interrupted
     except IOError as e:

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  14.05.2015
+@modified  06.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -57,6 +57,8 @@ IMAGES = {
         "Small icon for remove database button on start page.",
     "ButtonRemoveMissing.png":
         "Small icon for remove missing button on start page.",
+    "ButtonRemoveType.png":
+        "Small icon for remove by type button on start page.",
     "ButtonSaveAs.png":
         "Small icon for save as button on start page.",
     "ButtonScanDiff.png":
@@ -69,8 +71,6 @@ IMAGES = {
         "Removed image icon for removed messages in exported chat HTML.",
     "HelpChats.png":
         "Help image on default search page for chats page.",
-    "HelpContacts.png":
-        "Help image on default search page for contacts import page.",
     "HelpTables.png":
         "Help image on default search page for tables page.",
     "HelpInfo.png":
@@ -84,8 +84,7 @@ IMAGES = {
     "PageChats.png":
         "Icon for the Chats page in a database tab.",
     "PageContacts.png":
-        "Icon for the Contacts+ page in a database tab, and\n"
-        "Merge Contacts page in a merger tab.",
+        "Icon for the Merge Contacts page in a merger tab.",
     "PageTables.png":
         "Icon for the Data tables page in a database tab.",
     "PageInfo.png":

@@ -1,6 +1,27 @@
 CHANGELOG
 =========
 
+3.6, 2020-07-06
+---------------
+- marked program as obsolete;
+- dropped support functionality;
+- dropped contacts search and import functionality as unavailable;
+- dropped shared image download functionality as unavailable;
+- fixed some remaining stability issues;
+- upgraded wxPython to v4.
+
+
+3.5.1c, 2015-12-21
+---------------
+- added support for updated Skype chat structure (issue #40);
+- added "Remove by type" button to start page (issue #47);
+- fixed escaping bolded words in search chat title and participants link;
+- fixed command-line interface requiring wx (issue #45);
+- fixed potential error message on long sessions;
+- added "Send feedback" button to About-box;
+- added --version flag to command-line interface.
+
+
 3.5, 2015-07-16
 ---------------
 - added emoticons to chat statistics;
@@ -18,7 +39,7 @@ CHANGELOG
 - upgraded Python from 2.7.9 to 2.7.10;
 - upgraded dateutil from 2.4.1 to 2.4.2;
 - upgraded Pillow from 2.8.0 to 2.8.1;
-- upgraded SQLite from 3.6.21 to 3.8.10.2;
+- upgraded SQLite from 3.6.21 to 3.8.10.2 (issue #39);
 - upgraded XlsxWriter from 0.6.7 to 0.7.3;
 - upgraded Nullsoft Scriptable Install System from 3.0a2 to 3.0b1;
 

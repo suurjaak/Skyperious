@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-
 Stand-alone GUI components for wx:
 
 - BusyPanel(wx.Window):
@@ -14,7 +13,7 @@ Stand-alone GUI components for wx:
 - NonModalOKDialog(wx.Dialog):
   A simple non-modal dialog with an OK button, stays on top of parent.
 
-- NoteButton(wx.PyPanel, wx.Button):
+- NoteButton(wx.Panel, wx.Button):
   A large button with a custom icon, main label, and additional note.
   Inspired by wx.CommandLinkButton, which does not support custom icons
   (at least not of wx 2.9.4).
@@ -26,14 +25,14 @@ Stand-alone GUI components for wx:
 - ProgressWindow(wx.Dialog):
   A simple non-modal ProgressDialog, stays on top of parent frame.
 
-- RangeSlider(wx.PyPanel):
+- RangeSlider(wx.Panel):
   A horizontal slider with two markers for selecting a value range. Supports
   numeric and date/time values.
 
 - ScrollingHtmlWindow(wx.html.HtmlWindow):
   HtmlWindow that remembers its scroll position on resize and append.
     
-- SearchableStyledTextCtrl(wx.PyPanel):
+- SearchableStyledTextCtrl(wx.Panel):
   A wx.stc.StyledTextCtrl with a search bar that appears on demand, top or
   bottom of the control.
   Search bar has a text box, next-previous buttons, search options and a
@@ -47,7 +46,7 @@ Stand-alone GUI components for wx:
 - SQLiteTextCtrl(wx.stc.StyledTextCtrl):
   A StyledTextCtrl configured for SQLite syntax highlighting.
 
-- TabbedHtmlWindow(wx.PyPanel):
+- TabbedHtmlWindow(wx.Panel):
   wx.html.HtmlWindow with tabs for different content pages.
     
 - TextCtrlAutoComplete(wx.TextCtrl):
@@ -68,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    14.10.2015
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -146,7 +145,7 @@ class NonModalOKDialog(wx.Dialog):
                        border=2*8, flag=wx.ALL)
         sizer_buttons = self.CreateButtonSizer(wx.OK)
         self.Sizer.Add(sizer_buttons, proportion=0, border=8,
-                       flag=wx.ALIGN_CENTER | wx.BOTTOM)
+                       flag=wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM)
         self.Bind(wx.EVT_BUTTON, self.OnClose, id=wx.ID_OK)
         self.Bind(wx.EVT_CLOSE, self.OnClose)
         self.Fit()
@@ -193,7 +192,7 @@ class EntryDialog(wx.Dialog):
         bmp = wx.ArtProvider.GetBitmap(wx.ART_GO_FORWARD, wx.ART_TOOLBAR,
                                        (16, 16))
         tb.SetToolBitmapSize(bmp.Size)
-        tb.AddLabelTool(wx.ID_FIND, "", bitmap=bmp, shortHelp=tooltip)
+        tb.AddTool(wx.ID_FIND, "", bitmap=bmp, shortHelp=tooltip)
         tb.Realize()
 
         self.Bind(wx.EVT_ACTIVATE, self._OnActivate, self)
@@ -273,7 +272,7 @@ class EntryDialog(wx.Dialog):
 
 
 
-class NoteButton(wx.PyPanel, wx.Button):
+class NoteButton(wx.Panel, wx.Button):
     """
     A large button with a custom icon, main label, and additional note.
     Inspired by wx.CommandLinkButton, which does not support custom icons
@@ -289,7 +288,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         """
         @param   
         """
-        wx.PyPanel.__init__(self, parent, id, pos, size,
+        wx.Panel.__init__(self, parent, id, pos, size,
                             style | wx.FULL_REPAINT_ON_RESIZE, name)
         self._label = label
         self._note = note
@@ -297,7 +296,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         self._bmp_disabled = bmp
         if bmp is not None and bmp.IsOk():
             img = bmp.ConvertToImage().ConvertToGreyscale()
-            self._bmp_disabled = wx.BitmapFromImage(img) if img.IsOk() else bmp
+            self._bmp_disabled = wx.Bitmap(img) if img.IsOk() else bmp
         self._hover = False # Whether button is being mouse hovered
         self._press = False # Whether button is being mouse pressed
         self._align = style & (wx.ALIGN_RIGHT | wx.ALIGN_CENTER)
@@ -311,8 +310,8 @@ class NoteButton(wx.PyPanel, wx.Button):
         self._extent_label = None
         self._extent_note = None
 
-        self._cursor_hover   = wx.StockCursor(wx.CURSOR_HAND)
-        self._cursor_default = wx.StockCursor(wx.CURSOR_DEFAULT)
+        self._cursor_hover   = wx.Cursor(wx.CURSOR_HAND)
+        self._cursor_default = wx.Cursor(wx.CURSOR_DEFAULT)
 
         self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
@@ -363,7 +362,7 @@ class NoteButton(wx.PyPanel, wx.Button):
             x = 10 + (width - self.DoGetBestSize().width) / 2
 
         dc.Font = self.Font
-        dc.Brush = BRUSH(self.BackgroundColour, wx.SOLID)
+        dc.Brush = BRUSH(self.BackgroundColour)
         if self.IsThisEnabled():
             dc.TextForeground = self.ForegroundColour
         else:
@@ -382,7 +381,7 @@ class NoteButton(wx.PyPanel, wx.Button):
             # Button is focused: draw focus marquee.
             if is_focused:
                 if not NoteButton.BMP_MARQUEE:
-                    NoteButton.BMP_MARQUEE = wx.EmptyBitmap(2, 2)
+                    NoteButton.BMP_MARQUEE = wx.Bitmap(2, 2)
                     dc_bmp = wx.MemoryDC()
                     dc_bmp.SelectObject(NoteButton.BMP_MARQUEE)
                     dc_bmp.Background = wx.Brush(self.BackgroundColour)
@@ -390,11 +389,11 @@ class NoteButton(wx.PyPanel, wx.Button):
                     dc_bmp.Pen = wx.Pen(self.ForegroundColour)
                     dc_bmp.DrawPointList([(0, 1), (1, 0)])
                     dc_bmp.SelectObject(wx.NullBitmap)
-                if hasattr(wx.Pen, "Stipple"):
-                    pen = PEN(dc.TextForeground, 1, wx.STIPPLE)
+                try:
+                    pen = PEN(dc.TextForeground, 1, wx.PENSTYLE_STIPPLE)
                     pen.Stipple, dc.Pen = NoteButton.BMP_MARQUEE, pen
                     dc.DrawRectangle(4, 4, width - 8, height - 8)
-                else:
+                except wx.wxAssertionError: # Gtk does not support stippled pens
                     brush = BRUSH(dc.TextForeground)
                     brush.SetStipple(NoteButton.BMP_MARQUEE)
                     dc.Brush = brush
@@ -435,10 +434,10 @@ class NoteButton(wx.PyPanel, wx.Button):
 
         # Draw label and accelerator key underlines
         dc.Font = wx.Font(dc.Font.PointSize, dc.Font.Family, dc.Font.Style,
-                          wx.FONTWEIGHT_BOLD, face=dc.Font.FaceName)
+                          wx.FONTWEIGHT_BOLD, faceName=dc.Font.FaceName)
         text_label = self._text_label
         if "&" in self._label:
-            text_label, h, lines = "", y - 1, []
+            text_label, h = "", y - 1
             for line in self._text_label.split("\n"):
                 i, chars = 0, ""
                 while i < len(line):
@@ -454,12 +453,12 @@ class NoteButton(wx.PyPanel, wx.Button):
                     if i < len(line):
                         chars += line[i]
                     i += 1
-                h += self._extent_label[2]
+                h += self._extent_label[1]
                 text_label += chars + "\n"
         dc.DrawText(text_label, x, y)
 
         # Draw note
-        _, label_h, _ = dc.GetMultiLineTextExtent(self._text_label)
+        _, label_h = dc.GetMultiLineTextExtent(self._text_label)
         y += label_h + 10
         dc.Font = self.Font
         dc.DrawText(self._text_note, x, y)
@@ -471,17 +470,21 @@ class NoteButton(wx.PyPanel, wx.Button):
         label = self._label
         self._text_label = label
         self._text_note = self._note
-        WORDWRAP = wx.lib.wordwrap.wordwrap
+
+        def WORDWRAP(text, width, dc):
+            try: return wx.lib.wordwrap.wordwrap(text, width, dc)
+            except Exception: return text
+
         if width > 20 and height > 20:
             dc = wx.ClientDC(self)
         else: # Not properly sized yet: assume a reasonably fitting size
             dc, width, height = wx.MemoryDC(), 500, 100
-            dc.SelectObject(wx.EmptyBitmap(500, 100))
+            dc.SelectObject(wx.Bitmap(500, 100))
         dc.Font = self.Font
         x = 10 + self._bmp.Size.width + 10
         self._text_note = WORDWRAP(self._text_note, width - 10 - x, dc)
         dc.Font = wx.Font(dc.Font.PointSize, dc.Font.Family, dc.Font.Style,
-                          wx.FONTWEIGHT_BOLD, face=dc.Font.FaceName)
+                          wx.FONTWEIGHT_BOLD, faceName=dc.Font.FaceName)
         self._text_label = WORDWRAP(self._text_label, width - 10 - x, dc)
         self._extent_label = dc.GetMultiLineTextExtent(self._text_label)
         self._extent_note = dc.GetMultiLineTextExtent(self._text_note)
@@ -585,7 +588,7 @@ class NoteButton(wx.PyPanel, wx.Button):
         control state was changed.
         """
         self._enabled = enable
-        result = wx.PyPanel.Enable(self, enable)
+        result = wx.Panel.Enable(self, enable)
         if result:
             self.Refresh()
         return result
@@ -593,8 +596,8 @@ class NoteButton(wx.PyPanel, wx.Button):
 
     def IsThisEnabled(self):
         """Returns the internal enabled state, independent of parent state."""
-        if hasattr(wx.PyPanel, "IsThisEnabled"):
-            result = wx.PyPanel.IsThisEnabled(self)
+        if hasattr(wx.Panel, "IsThisEnabled"):
+            result = wx.Panel.IsThisEnabled(self)
         else:
             result = self._enabled
         return result
@@ -682,7 +685,7 @@ class PropertyDialog(wx.Dialog):
         tip = wx.StaticText(self.panel, label=help)
 
         ctrl.Value = self._GetValueForCtrl(value, typeclass)
-        ctrl.ToolTipString = label.ToolTipString = "Value of type %s%s." % (
+        ctrl.ToolTip = label.ToolTip = "Value of type %s%s." % (
             typeclass.__name__,
             "" if default is None else ", default %s" % repr(default))
         tip.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
@@ -832,7 +835,7 @@ class ProgressWindow(wx.Dialog):
 
 
 
-class RangeSlider(wx.PyPanel):
+class RangeSlider(wx.Panel):
     """
     A horizontal slider with two markers for selecting a value range. Supports
     numeric and date/time values. Fires a wx.EVT_SLIDER event on value change.
@@ -886,7 +889,7 @@ class RangeSlider(wx.PyPanel):
         @param   fmt   format string or function used for formatting label
                        values, see LabelFormat
         """
-        wx.PyPanel.__init__(self, parent, id, pos, size,
+        wx.Panel.__init__(self, parent, id, pos, size,
                             style | wx.FULL_REPAINT_ON_RESIZE, name)
         if not RangeSlider.BACKGROUND_COLOUR:
             bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
@@ -920,8 +923,8 @@ class RangeSlider(wx.PyPanel):
         self._dragging_scrollbar = False # Whether scrollbar is under drag
         self._marker_xs = [None, None] # [left x, right x]
         self._active_marker = None # Index of the currently hovered marker
-        self._cursor_marker_hover    = wx.StockCursor(wx.CURSOR_SIZEWE)
-        self._cursor_default         = wx.StockCursor(wx.CURSOR_DEFAULT)
+        self._cursor_marker_hover    = wx.Cursor(wx.CURSOR_SIZEWE)
+        self._cursor_default         = wx.Cursor(wx.CURSOR_DEFAULT)
         self._grip_area = None # Current scrollbar grip area
         self._bar_arrow_areas = None # Scrollbar arrow areas
         self._box_area = None # Current range area
@@ -1140,7 +1143,7 @@ class RangeSlider(wx.PyPanel):
                        else self.RANGE_DISABLED_COLOUR
 
         # Fill background
-        dc.SetBrush(BRUSH(self.BACKGROUND_COLOUR, wx.SOLID))
+        dc.SetBrush(BRUSH(self.BACKGROUND_COLOUR))
         dc.SetPen(PEN(self.BACKGROUND_COLOUR))
         dc.DrawRectangle(0, 0, width, height)
         dc.SetPen(PEN(self.BOX_COLOUR))
@@ -1165,7 +1168,7 @@ class RangeSlider(wx.PyPanel):
                 x = self._box_area.x \
                     + self._box_area.width * marker_delta / range_delta_local
                 value_rect[2 if i else 0] = (x - value_rect[0]) if i else x
-            dc.SetBrush(BRUSH(range_colour, wx.SOLID))
+            dc.SetBrush(BRUSH(range_colour))
             dc.SetPen(PEN(range_colour))
             dc.DrawRectangle(*value_rect)
             # Draw scrollbar arrow buttons
@@ -1183,11 +1186,11 @@ class RangeSlider(wx.PyPanel):
                 #   self.BAR_COLOUR1, self.BAR_COLOUR2, wx.WEST
                 #)
                 button_colour = self.BAR_ARROW_BG_COLOUR
-                if self._bar_arrow_areas[i].Contains(self._mousepos):
+                if self._mousepos and self._bar_arrow_areas[i].Contains(self._mousepos):
                     button_colour = self.BAR_HL_COLOUR
-                dc.SetBrush(BRUSH(button_colour, wx.SOLID))
+                dc.SetBrush(BRUSH(button_colour))
                 dc.DrawRectangle(*self._bar_arrow_areas[i])
-            dc.SetBrush(BRUSH(self.BAR_ARROW_FG_COLOUR, wx.SOLID))
+            dc.SetBrush(BRUSH(self.BAR_ARROW_FG_COLOUR))
             dc.SetPen(PEN(self.BAR_ARROW_FG_COLOUR))
             dc.DrawPolygon(((self.BAR_BUTTON_WIDTH / 2 + 1,
                 height - self.BAR_HEIGHT / 2 - 3), (
@@ -1214,7 +1217,7 @@ class RangeSlider(wx.PyPanel):
             )
             dc.GradientFillLinear(bar_rect, self.BAR_COLOUR1,
                 self.BAR_HL_COLOUR if (
-                    self._grip_area.Contains(self._mousepos)
+                    self._mousepos and self._grip_area.Contains(self._mousepos)
                 ) else self.BAR_COLOUR2, wx.SOUTH
             )
             # Draw a few vertical dashes in the scrollbar center
@@ -1301,7 +1304,7 @@ class RangeSlider(wx.PyPanel):
             label_area = wx.Rect(x - label_extent[0] / 2, 0, 
                 label_extent[0] + 2, sum(label_extent[1:2])
             )
-            if not self.ClientRect.ContainsRect(label_area):
+            if not self.ClientRect.Contains(label_area):
                 # Rest label against the edge if going out of control area
                 label_area.x = 1 if (label_area.x < 1) \
                     else (width - label_area.width)
@@ -1325,7 +1328,7 @@ class RangeSlider(wx.PyPanel):
                     brush_colour = wx.WHITE # self.BAR_HL_COLOUR
                 else:
                     brush_colour = self.MARKER_BUTTON_BG_COLOUR
-                dc.SetBrush(BRUSH(brush_colour, wx.SOLID))
+                dc.SetBrush(BRUSH(brush_colour))
                 dc.SetPen(PEN(self.MARKER_BUTTON_COLOUR))
                 dc.DrawRoundedRectangle(*button_area, radius=button_radius)
                 button_lines = [
@@ -1376,7 +1379,7 @@ class RangeSlider(wx.PyPanel):
             # Switch marker to right if two are overlapping and approaching
             # from the right.
             active_marker = active_markers[-1]
-        self.SetToolTipString("")
+        self.SetToolTip("")
 
         if event.Entering():
             refresh = True
@@ -1409,7 +1412,7 @@ class RangeSlider(wx.PyPanel):
                 x_delta = abs(event.Position.x - self._box_area.x + 1)
                 range_delta = self._rng[1] - self._rng[0]
                 x_step = range_delta * x_delta / self._box_area.width
-                self.SetToolTipString(self.FormatLabel(self._rng[0] + x_step))
+                self.SetToolTip(self.FormatLabel(self._rng[0] + x_step))
         elif event.LeftDClick():
             if active_marker is not None:
                 # Maximize/restore marker value on double-clicking a marker
@@ -1530,7 +1533,7 @@ class RangeSlider(wx.PyPanel):
                     if isinstance(self._rng[0], datetime.date) and step.days < 1:
                         # Enforce a minimum step of 1 day for date values
                         step = datetime.timedelta(days=1)
-                    in_area = self._grip_area.ContainsXY(
+                    in_area = self._grip_area.Contains(
                         event.Position.x, self._grip_area.Top
                     )
                     enlarging = (x_direction > 0) if i else (x_direction < 0)
@@ -1562,7 +1565,7 @@ class RangeSlider(wx.PyPanel):
                     range_delta = self._rng[1] - self._rng[0]
                     range_width = self.GetClientSize().width
                     step = range_delta * x_delta / range_width
-                    in_area = self._grip_area.ContainsXY(
+                    in_area = self._grip_area.Contains(
                         event.Position.x, self._grip_area.Top
                     )
                     closest_i, x_i_delta = 0, sys.maxsize
@@ -1643,7 +1646,7 @@ class RangeSlider(wx.PyPanel):
         return True
 
     def GetDefaultAttributes(self):
-        return wx.PyPanel.GetClassDefaultAttributes()
+        return wx.Panel.GetClassDefaultAttributes()
 
     def DoGetBestSize(self):
         best = wx.Size(200, 40)
@@ -1757,6 +1760,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
         self.Bind(wx.EVT_MENU, self.OnSelectAll, id=id_selectall)
+        self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
 
 
     def SetColumnFormatters(self, formatters):
@@ -1779,7 +1783,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         """
         self._col_widths.clear()
         self._row_colours.clear()
-        self._id_rows = [(wx.NewId(), r) for r in rows]
+        self._id_rows = [(self.counter(), r) for r in rows]
         self.RefreshRows()
 
 
@@ -1789,15 +1793,15 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
         @param   data     item data dictionary
         """
-        item_id = wx.NewId()
+        item_id = self.counter()
         if self._RowMatchesFilter(data):
             columns = [c[0] for c in self._columns]
             index = self.ItemCount
             col_value = self._formatters[columns[0]](data, columns[0])
-            self.InsertStringItem(index, col_value)
+            self.InsertItem(index, col_value)
             for i, col_name in [(i, x) for i, x in enumerate(columns) if i]:
                 col_value = self._formatters[col_name](data, col_name)
-                self.SetStringItem(index, i, col_value)
+                self.SetItem(index, i, col_value)
                 col_width = self.GetTextExtent(col_value)[0] + self.COL_PADDING
                 if col_width > self._col_widths.get(i, 0):
                     self._col_widths[i] = col_width
@@ -1872,7 +1876,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             col_value = self._formatters[col_name](row, col_name)
             col_lengths[col_name] = max(col_lengths[col_name],
                                         self.GetTextExtent(col_value)[0] + self.COL_PADDING)
-            self.InsertStringItem(index, col_value)
+            self.InsertItem(index, col_value)
             self.SetItemData(index, item_id)
             self.SetItemImage(index, -1)
             self.SetItemColumnImage(index, 0, -1)
@@ -1883,7 +1887,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 col_value = self._formatters[col_name](row, col_name)
                 col_width = self.GetTextExtent(col_value)[0] + self.COL_PADDING
                 col_lengths[col_name] = max(col_lengths[col_name], col_width)
-                self.SetStringItem(index, col_index, col_value)
+                self.SetItem(index, col_index, col_value)
                 item_data_map[item_id][col_index] = row.get(col_name)
                 col_index += 1
             index += 1
@@ -2292,7 +2296,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
 
 
 
-class SearchableStyledTextCtrl(wx.PyPanel):
+class SearchableStyledTextCtrl(wx.Panel):
     """
     A StyledTextCtrl with a search bar that appears on demand, top or bottom.
     Search bar has a text box, next-previous buttons, search options and a
@@ -2332,10 +2336,10 @@ class SearchableStyledTextCtrl(wx.PyPanel):
     SEARCH_WIDTH = 150
 
     """Background colour for the search edit box if no match found."""
-    SEARCH_NOMATCH_BGCOLOUR = wx.NamedColour("#FF6666")
+    SEARCH_NOMATCH_BGCOLOUR = wx.Colour(255, 102, 102) # "#FF6666"
 
     """Foreground colour for the search edit box if no match found."""
-    SEARCH_NOMATCH_FGCOLOUR = wx.NamedColour("#FFFFFF")
+    SEARCH_NOMATCH_FGCOLOUR = wx.Colour(255, 255, 255) # "#FFFFFF"
 
     """Font colour of descriptive text in the search box."""
     SEARCH_DESCRIPTIVE_COLOUR = None # Postpone to after wx.App creation
@@ -2344,19 +2348,19 @@ class SearchableStyledTextCtrl(wx.PyPanel):
     SEARCH_DESCRIPTIVE_TEXT = "Search for.."
 
     """Background colour for selected matched text in the control."""
-    MATCH_SELECTED_BGCOLOUR = wx.NamedColour("#0A246A")
+    MATCH_SELECTED_BGCOLOUR = wx.Colour(10, 36, 106) # "#0A246A"
 
     """Foreground colour for search buttons."""
-    BUTTON_FGCOLOUR = wx.NamedColour("#475358")
+    BUTTON_FGCOLOUR = wx.Colour(71, 83, 88) # "#475358"
 
     """Top background colour for search button gradient."""
-    BUTTON_BGCOLOUR_TOP = wx.NamedColour("#FEFEFE")
+    BUTTON_BGCOLOUR_TOP = wx.Colour(254, 254, 254) # "#FEFEFE"
 
     """Middle background colour for search button gradient."""
-    BUTTON_BGCOLOUR_MIDDLE = wx.NamedColour("#ECECEC")
+    BUTTON_BGCOLOUR_MIDDLE = wx.Colour(236, 236, 236) # "#ECECEC"
 
     """Bottom background colour for search button gradient."""
-    BUTTON_BGCOLOUR_BOTTOM = wx.NamedColour("#DFDFDF")
+    BUTTON_BGCOLOUR_BOTTOM = wx.Colour(223, 223, 223) # "#DFDFDF"
 
     """Image for the close button."""
     IMG_CLOSE = wx.lib.embeddedimage.PyEmbeddedImage(
@@ -2421,7 +2425,7 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         @param   searchDirection  initial search direction,
                                   wx.DOWN (default) or wx.UP
         """
-        wx.PyPanel.__init__(self, parent=parent, pos=pos,
+        wx.Panel.__init__(self, parent=parent, pos=pos,
             size=size, style=style | wx.TAB_TRAVERSAL
         )
         if not SearchableStyledTextCtrl.SEARCH_DESCRIPTIVE_COLOUR:
@@ -2457,7 +2461,7 @@ class SearchableStyledTextCtrl(wx.PyPanel):
                 buttonsize, style = wx.NO_BORDER)
             bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
             self._button_toggle.BackgroundColour = bgcolour
-        self._button_toggle.SetToolTipString("Show search bar (Ctrl-F)")
+        self._button_toggle.SetToolTip("Show search bar (Ctrl-F)")
 
         panel = self._panel_bar = wx.Panel(parent=self)
         sizer_bar = panel.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -2497,7 +2501,7 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         except Exception:
             self._button_close = wx.BitmapButton(panel, wx.ID_ANY,
                 self.IMG_CLOSE.GetBitmap(), (20, 20), style = wx.NO_BORDER)
-        self._button_close.SetToolTipString("Hide search bar.")
+        self._button_close.SetToolTip("Hide search bar.")
         sizer_bar.Add(self._label_search, border=5,
             flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         sizer_bar.Add(self._edit, border=5,
@@ -2507,9 +2511,8 @@ class SearchableStyledTextCtrl(wx.PyPanel):
         sizer_bar.AddStretchSpacer()
         for i in [self._cb_case, self._cb_wholeword, self._cb_regex]:
             sizer_bar.Add(i, border=5,
-                flag=wx.RIGHT | wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
-        sizer_bar.Add(self._button_close,
-            flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL)
+                flag=wx.RIGHT | wx.ALIGN_CENTER_VERTICAL)
+        sizer_bar.Add(self._button_close, flag=wx.ALIGN_CENTER_VERTICAL)
 
         # AddMany item tuple structure: (item, proportion=0, flag=0, border=0).
         items = [(self._stc, 1, wx.EXPAND), (panel, 0, wx.EXPAND | wx.ALL, 5)]
@@ -2836,15 +2839,15 @@ class SearchableStyledTextCtrl(wx.PyPanel):
 
 TabLeftDClickEvent, EVT_TAB_LEFT_DCLICK = wx.lib.newevent.NewEvent()
 
-class TabbedHtmlWindow(wx.PyPanel):
+class TabbedHtmlWindow(wx.Panel):
     """
     HtmlWindow with tabs for different content pages.
     """
 
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=wx.html.HW_DEFAULT_STYLE,
-                 name=wx.html.HtmlWindowNameStr):
-        wx.PyPanel.__init__(self, parent, pos=pos, size=size, style=style)
+                 name=""):
+        wx.Panel.__init__(self, parent, pos=pos, size=size, style=style)
         # [{"title", "content", "id", "info", "scrollpos", "scrollrange"}]
         self._tabs = []
         self._default_page = ""      # Content shown on the blank page
@@ -3153,8 +3156,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self.SetChoices(choices or [])
             self._cursor = None
             # For changing cursor when hovering over final "Clear" item.
-            self._cursor_action_hover = wx.StockCursor(wx.CURSOR_HAND)
-            self._cursor_default      = wx.StockCursor(wx.CURSOR_DEFAULT)
+            self._cursor_action_hover = wx.Cursor(wx.CURSOR_HAND)
+            self._cursor_default      = wx.Cursor(wx.CURSOR_DEFAULT)
 
             gp = self
             while gp is not None:
@@ -3378,7 +3381,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             choices = self._choices[:]
             choices += ["", self.DROPDOWN_CLEAR_TEXT] if choices else []
             for i, text in enumerate(choices):
-                self._listbox.InsertStringItem(i, text)
+                self._listbox.InsertItem(i, text)
             if choices: # Colour "Clear" item
                 self._listbox.SetItemTextColour(i, self.DROPDOWN_CLEAR_COLOUR)
 
@@ -3407,7 +3410,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         if show and self.IsShownOnScreen() and self._choices and self._listwindow:
             size = self._listwindow.GetSize()
             width, height = self.Size.width - 3, self.Size.height
-            x, y = self.ClientToScreenXY(0, height - 2)
+            x, y = self.ClientToScreen(0, height - 2)
             if size.GetWidth() <> width:
                 size.SetWidth(width)
                 self._listwindow.SetSize(size)
@@ -3458,10 +3461,10 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     bgcolour, border = "white", 1
     rect_step = barsize[0] + (1 if barsize[0] < 10 else 2)
     w, h = len(data) * rect_step + border + 1, barsize[1] + 2 * border
-    bmp = wx.EmptyBitmap(w, h)
+    bmp = wx.Bitmap(w, h)
     dc = wx.MemoryDC()
     dc.SelectObject(bmp)
-    dc.Brush = BRUSH(bgcolour, wx.SOLID)
+    dc.Brush = BRUSH(bgcolour)
     dc.Pen = PEN(colour)
     dc.Clear()
     dc.DrawRectangle(0, 0, w, h)
@@ -3471,12 +3474,11 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     maxval = maxval if maxval is not None else max(zip(*data)[1])
     for i, (interval, val) in enumerate(data):
         h = barsize[1] * safediv(val, maxval) + 1
-        if val and h < 1.5:
-            h = 1.5 # Very low values produce no visual bar
+        if val and h < 1.5: h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
         y = bmp.Height - h
         bars.append((x, y, barsize[0], h))
-    dc.Brush = BRUSH(colour, wx.SOLID)
+    dc.Brush = BRUSH(colour)
     dc.DrawRectangleList(bars)
 
     dc.SelectObject(wx.NullBitmap)
