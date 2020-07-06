@@ -40,22 +40,19 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="http://erki.lap.ee/downloads/Skyperious/skyperious_3.5-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
         <h2>Frequently Asked Questions</h2>
 
         <ul>
+          <li><a href="#obsolete">Does Skyperious work with modern Skype?</a></li>
           <li><a href="#merge-different">Can I merge chat history from another operating system?</a></li>
-          <li><a href="#sync-computers">How do I synchronize chat history between different computers?</a></li>
           <li><a href="#osx">Can I use Skyperious on OS X?</a></li>
-          <li><a href="#autosync">Is there any way to keep chat history in sync automatically on all my devices?</a></li>
-          <li><a href="#dbb">Can I restore messages from *.dbb files that I have from an older computer?</a></li>
           <li><a href="#logs-other">Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</a></li>
-          <li><a href="#xyz">Do you plan to add support for doing X/Y/Z?</a></li>
           <li><a href="#csv-nonenglish">Why are non-English letters like &Aring; not visible in CSV export?</a></li>
           <li><a href="#sqlite-size">Why does the database file size remain the same after deleting something?</a></li>
         </ul>
@@ -63,30 +60,20 @@
         <hr />
 
 
-        <h3><a name="merge-different"></a>Can I merge chat history from another operating system?</h3>
+        <h3><a name="obsolete"></a>Does Skyperious work with modern Skype?</h3>
         <p>
-          Yes, the .db files are the same on all platforms: Windows, OS X, Linux,
-          Android and iOS.
+          No, Skype chat history is no longer available locally, and thus Skyperious has become
+          <strong><em>obsolete</em></strong>. 
+          It can still be used to work with older main.db files, but this will not affect the current
+          Skype account in any way.
         </p>
         <br />
 
 
-        <h3><a name="sync-computers"></a>How do I synchronize chat history between different computers?</h3>
+        <h3><a name="merge-different"></a>Can I merge chat history from another operating system?</h3>
         <p>
-          You will need to get their Skype files onto one computer, merge them
-          there, and copy the resulting file back.<br />
-          Select one database on Skyperious main screen, click "Compare and merge" and
-          choose the second database. In the comparison tab, you can click "Scan and report"
-          to scan for new messages in the first database and overview changes before merging,
-          or you can click "Merge to the right" to scan and merge immediately. Either process
-          will take some time, as every message in the first database has to be processed.<br />
-          Afterwards, copy the updated file back to its Skype folder.<br />
-          This can be automated with the <a href="help.html#commandline">command line interface</a>.<br />
-          <br />
-          <b>!</b> The databases should belong to the same Skype account.<br />
-          <br />
-          <b>!</b> Shut down Skype before starting, if one of the files is
-          currently used by Skype.
+          Yes, the .db files are the same on all platforms: Windows, OS X, Linux,
+          Android and iOS.
         </p>
         <br />
 
@@ -98,51 +85,13 @@
         <br />
 
 
-        <h3><a name="autosync"></a>Is there any way to keep chat history in sync automatically on all my devices?</h3>
-        <p>
-          Not quite. If one of the devices is logged in all the time, it
-          will keep the others in sync - mostly, but not always.<br />
-          <br />
-          Merging the databases from time to time seems the simplest option.<br />
-          As Skyperious can be used from the <a href="help.html#commandline">command line</a>, that part can be automated.
-        </p>
-        <br />
-
-
-        <h3><a name="dbb"></a>Can I restore messages from *.dbb files that I have from an older computer?</h3>
-        <p>
-          Not directly, Skyperious does not work with *.dbb files. It is an old proprietary format
-          that was in use prior to 2008. However, Skype can automatically convert them 
-          to the current format. Try the following:<br />
-          <ul>
-          <li>shut down Skype</li>
-          <li>move your current Skype account folder elsewhere (for example, on Windows 7,
-              it is C:\Users\username\AppData\Roaming\Skype\skypename)</li>
-          <li>copy the older Skype account folder contents to the current Skype folder</li>
-          <li>launch Skype and log in to your account - this should convert the .dbb
-              files to a main.db file</li>
-          <li>shut down Skype</li>
-          <li>copy the new main.db elsewhere and restore the original Skype folder</li>
-          </ul>
-        </p>
-        <br />
-
-
         <h3><a name="logs-other"></a>Does Skyperious open logs from other programs like AIM/ICQ/Miranda/..?</h3>
         <p>
-          No, it only works with Skype.<br />
+          No, it only worked with Skype.<br />
           <br />
           If the file is an SQLite database, for example a WhatsApp message store,
           Skyperious will still open it. You can't browse chats or export messages,
           but you can access, search, and export database tables.
-        </p>
-        <br />
-
-
-        <h3><a name="xyz"></a>Do you plan to add support for doing X/Y/Z?</h3>
-        <p>
-          I might add the support, if the requested functionality seems useful, 
-          and more people contact me to ask for it.
         </p>
         <br />
 
