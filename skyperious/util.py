@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import ctypes
@@ -46,7 +46,7 @@ def safedivf(a, b):
 
 def safe_filename(filename):
     """Returns the filename with characters like \:*?"<>| removed."""
-    return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "", filename)
+    return re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
 
 
 def format_bytes(size, precision=2, max_units=True):
