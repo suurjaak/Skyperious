@@ -24,7 +24,9 @@ You can open Skype SQLite databases and look at their contents:
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
+
 and
+
 - synchronize messages in two Skype databases: keep chat history up-to-date on
   different computers, or restore missing messages from older files into the
   current one
