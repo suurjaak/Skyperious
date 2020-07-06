@@ -6,7 +6,9 @@
 ; /DSUFFIX64=<"_x64" for 64-bit installer>
 ;
 ; @created   13.01.2013
-; @modified  01.03.2014
+; @modified  06.07.2020
+
+Unicode True
 
 ; HM NIS Edit Wizard helper defines
 !define PRODUCT_NAME "Skyperious"
