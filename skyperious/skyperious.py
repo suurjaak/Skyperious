@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.07.2020
+@modified    06.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3777,7 +3777,7 @@ class DatabasePage(wx.Panel):
                         self.grid_table.Table.IsChanged())
                 item = self.tree_tables.GetNextSibling(item)
             # Refresh cell colours; without CallAfter wx 2.8 can crash
-            wx.CallLater(0, self.grid_table.ForceRefresh)
+            wx.CallLater(1, self.grid_table.ForceRefresh)
 
 
     def on_rollback_table(self, event):
@@ -3785,7 +3785,7 @@ class DatabasePage(wx.Panel):
         self.grid_table.Table.UndoChanges()
         self.on_change_table(None)
         # Refresh scrollbars and colours; without CallAfter wx 2.8 can crash
-        wx.CallLater(0, lambda: (self.grid_table.ContainingSizer.Layout(),
+        wx.CallLater(1, lambda: (self.grid_table.ContainingSizer.Layout(),
                                  self.grid_table.ForceRefresh()))
 
 
@@ -4235,7 +4235,7 @@ class DatabasePage(wx.Panel):
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(),
                                         l.SortListItems(4, 0))
-            wx.CallLater(0, sortfunc, self.list_chats)
+            wx.CallLater(1, sortfunc, self.list_chats)
             wx.CallAfter(self.update_tabheader)
 
 

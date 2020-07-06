@@ -220,7 +220,7 @@ def status_flash(text, *args):
         def clear_status():
             if window.StatusBar and window.StatusBar.StatusText == msg:
                 window.SetStatusText("")
-        wx.CallLater(conf.StatusFlashLength, clear_status)
+        wx.CallLater(max(1, conf.StatusFlashLength), clear_status)
     else:
         deferred_status[:] = [msg]
 
