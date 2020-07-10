@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    06.07.2020
+@modified    10.07.2020
 ------------------------------------------------------------------------------
 """
 import ctypes
@@ -269,7 +269,7 @@ def img_wx_to_raw(img, format="PNG"):
     stream = io.BytesIO()
     img = img if isinstance(img, wx.Image) else img.ConvertToImage()
     fmttype = getattr(wx, "BITMAP_TYPE_" + format.upper(), wx.BITMAP_TYPE_PNG)
-    img.SaveStream(stream, fmttype)
+    img.SaveFile(stream, fmttype)
     result = stream.getvalue()
     return result
 
@@ -292,8 +292,10 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
                 size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
                 align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
             if size1[0] > size[0] or size1[1] > size[1]:
-                result = result.ResampleBox(*size2)
+                if result is not img: result = result.Copy()
+                result.Rescale(*size2)
             if align_pos:
+                if result is not img: result = result.Copy()
                 result.Resize(size, align_pos, *bg)
     return result
 
