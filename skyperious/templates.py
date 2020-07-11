@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    06.07.2020
+@modified    10.07.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -697,7 +697,10 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
   <div id="participants">
-%for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
+<%
+filterer = lambda p: not stats["counts"] or p["identity"] == db.id or p["identity"] in stats["counts"]
+%>
+%for p in filter(filterer, sorted(participants, key=lambda p: p["name"].lower())):
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
