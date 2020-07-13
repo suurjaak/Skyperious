@@ -2147,6 +2147,7 @@ class DatabasePage(wx.Panel):
         grid = self.grid_table = wx.grid.Grid(parent=panel2)
         grid.SetToolTip("Double click on column header to sort, "
                               "right click to filter.")
+        grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK, self.on_sort_grid_column)
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
@@ -2218,6 +2219,7 @@ class DatabasePage(wx.Panel):
         sizer_buttons.Add(button_reset, border=5, flag=wx.RIGHT)
         sizer_buttons.Add(button_export)
         grid = self.grid_sql = wx.grid.Grid(parent=panel2)
+        grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK,
                   self.on_sort_grid_column)
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
