@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.07.2020
+@modified    13.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3141,8 +3141,7 @@ class DatabasePage(wx.Panel):
                         grid.Table.ClearFilter()
                     # Search for matching row and scroll to it.
                     table["columns"] = self.db.get_table_columns(table_name)
-                    id_fields = [c["name"] for c in table["columns"]
-                                 if c.get("pk_id")]
+                    id_fields = [c["name"] for c in table["columns"] if c.get("pk")]
                     if not id_fields: # No primary key fields: take all
                         id_fields = [c["name"] for c in table["columns"]]
                     row_id = [row[c] for c in id_fields]
