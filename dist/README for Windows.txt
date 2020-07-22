@@ -1,5 +1,6 @@
-Skyperious 3.6
+Skyperious 4.0
 ==============
+
 
 Obsolescence Notice
 -------------------
@@ -17,10 +18,11 @@ active Skype account.
 
 Skyperious is a Skype database viewer and merger, written in Python.
 
-You can open Skype SQLite databases and look at their contents:
+You can open Skype SQLite databases and work with their contents:
 
 - search across all messages and contacts
 - browse chat history and export as HTML or spreadsheet, see chat statistics
+- synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -84,8 +86,10 @@ Attribution
 Skyperious has been built using the following open-source software:
 - Python 2.7.18 (http://www.python.org)
 - wxPython 4.1.0 (http://www.wxpython.org)
+- beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
 - Pillow 6.2.2 (https://pypi.python.org/pypi/Pillow)
 - pyparsing 2.4.7 (http://pyparsing.wikispaces.com/)
+- SkPy (https://pypi.python.org/pypi/SkPy)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
 - XlsxWriter 1.2.9 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.8.1, (http://pypi.python.org/pypi/python-dateutil)

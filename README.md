@@ -1,4 +1,4 @@
-Skyperious 3.6
+Skyperious 4.0
 ==============
 
 
@@ -18,10 +18,11 @@ active Skype account.
 
 Skyperious is a Skype database viewer and merger, written in Python.
 
-You can open Skype SQLite databases and look at their contents:
+You can open Skype SQLite databases and work with their contents:
 
 - search across all messages and contacts
 - browse chat history and export as HTML or spreadsheet, see chat statistics
+- synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -151,9 +152,9 @@ Several icons from:
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Binaries compiled with PyInstaller 3.5, http://www.pyinstaller.org
+Binaries compiled with PyInstaller, http://www.pyinstaller.org
 
-Installers created with Nullsoft Scriptable Install System 3.0b1,
+Installers created with Nullsoft Scriptable Install System,
 http://nsis.sourceforge.net/
 
 
