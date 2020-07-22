@@ -8,15 +8,18 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    10.07.2020
+@modified    14.07.2020
 ------------------------------------------------------------------------------
 """
+import calendar
 import ctypes
+import datetime
 import io
 import locale
 import math
 import os
 import re
+import string
 import subprocess
 import sys
 import time
@@ -120,6 +123,35 @@ def plural(word, items=None, with_items=True):
     result = word + ("" if 1 == count else "s")
     if with_items and items is not None:
         result = "%s %s" % (count, result)
+    return result
+
+
+def xor(text, key):
+    """Returns the given string XORed with given key."""
+    while len(key) < len(text): key += key
+    key = key[:len(text)]
+    return "".join(chr(ord(a) ^ ord(b)) for (a, b) in zip(text, key))
+
+
+def obfuscate(text, key=string.punctuation):
+    """Returns text obfuscated with key."""
+    if not isinstance(key, basestring): key = str(key)
+    return xor(text, key).encode("base64").strip()
+
+
+def deobfuscate(text, key=string.punctuation):
+    """Returns deobfuscated text obfuscated with key ."""
+    if not isinstance(key, basestring): key = str(key)
+    try: return xor(text.decode("base64"), key)
+    except Exception: return ""
+
+
+def datetime_to_epoch(dt):
+    """Returns datetime.datetime as UNIX timestamp, or None if dt is None."""
+    result = None
+    if isinstance(dt, datetime.datetime):
+        x = calendar.timegm(dt.timetuple()) + dt.microsecond / 1e6
+        if x >= 0: result = x if x % 1 else int(x)
     return result
 
 

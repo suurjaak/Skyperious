@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    06.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -42,8 +42,8 @@ class WorkerThread(threading.Thread):
         """
         threading.Thread.__init__(self)
         self._callback = callback
-        self._is_running = False
-        self._stop_work = False   # Flag to stop the current work
+        self._is_running   = False # Flag whether thread is running
+        self._is_working   = False # Flag whether thread is currently working
         self._drop_results = False # Flag to not post back obtained results
         self._queue = Queue.Queue()
 
@@ -55,16 +55,15 @@ class WorkerThread(threading.Thread):
 
         @param   data  a dict with work data
         """
-        self._stop_work = True
         self._queue.put(data)
         if not self._is_running: self.start()
 
 
     def stop(self):
         """Stops the worker thread."""
-        self._is_running = False
+        self._is_running   = False
+        self._is_working   = False
         self._drop_results = True
-        self._stop_work = True
         self._queue.put(None) # To wake up thread waiting on queue
 
 
@@ -73,13 +72,18 @@ class WorkerThread(threading.Thread):
         Signals to stop the currently ongoing work, if any. Obtained results
         will be posted back, unless drop_results is True.
         """
-        self._stop_work = True
+        self._is_working = False
         self._drop_results = drop_results
+
+
+    def is_working(self):
+        """Returns whether the thread is currently doing work."""
+        return self._is_working
 
 
     def postback(self, data):
         # Check whether callback is still bound to a valid object instance
-        if getattr(self._callback, "__self__", True):
+        if callable(self._callback) and getattr(self._callback, "__self__", True):
             self._callback(data)
 
 
@@ -115,6 +119,7 @@ class SearchThread(WorkerThread):
                 if not search:
                     continue # continue while self._is_running
 
+                self._is_working, self._drop_results = True, False
                 is_html = ("text" != search.get("output"))
                 wrap_html = None # MessageParser wrap function, for HTML output
                 if is_html:
@@ -144,8 +149,6 @@ class SearchThread(WorkerThread):
                     output = {"format": "text"}
                 FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
                 guibase.log('Searching "%(text)s" in %(table)s (%(db)s).' % search)
-                self._stop_work = False
-                self._drop_results = False
 
                 parser = skypedata.MessageParser(search["db"],
                                                  wrapper=wrap_html)
@@ -205,7 +208,7 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
-                    if self._stop_work:
+                    if not self._is_working:
                         break # break for chat in chats
                 if result["output"] and not self._drop_results:
                     result["count"] = result_count
@@ -214,7 +217,7 @@ class SearchThread(WorkerThread):
                               "count": 0}
 
                 # Find contacts with a matching name
-                if not self._stop_work and "contacts" == search["table"] \
+                if self._is_working and "contacts" == search["table"] \
                 and match_words:
                     count = 0
                     contacts = search["db"].get_contacts()
@@ -253,7 +256,7 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
-                        if self._stop_work:
+                        if not self._is_working:
                             break # break for contact in contacts
                 if result["output"] and not self._drop_results:
                     result["count"] = result_count
@@ -262,7 +265,7 @@ class SearchThread(WorkerThread):
                               "search": search, "count": 0}
 
                 # Find messages with a matching body
-                if not self._stop_work and "messages" == search["table"]:
+                if self._is_working and "messages" == search["table"]:
                     template_message = FACTORY("message")
                     count, result_type = 0, "messages"
                     chat_messages = {} # {chat id: [message, ]}
@@ -292,12 +295,12 @@ class SearchThread(WorkerThread):
                             self.postback(result)
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
-                        if self._stop_work or (is_html
+                        if not self._is_working or (is_html
                         and count >= conf.MaxSearchMessages):
                             break # break for m in messages
 
                 infotext = search["table"]
-                if not self._stop_work and "all tables" == search["table"]:
+                if self._is_working and "all tables" == search["table"]:
                     infotext, result_type = "", "table row"
                     # Search over all fields of all tables.
                     template_table = FACTORY("table")
@@ -340,7 +343,7 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
-                            if self._stop_work or (is_html
+                            if not self._is_working or (is_html
                             and result_count >= conf.MaxSearchTableRows):
                                 break # break while row
                             row = rows.fetchone()
@@ -353,7 +356,7 @@ class SearchThread(WorkerThread):
                                       "search": search, "count": 0}
                         infotext += " (%s%s%s)" % (countpre, 
                                     util.plural("result", count), countsuf)
-                        if self._stop_work or (is_html
+                        if not self._is_working or (is_html
                         and result_count >= conf.MaxSearchTableRows):
                             break # break for table in search["db"]..
                     single_table = ("," not in infotext)
@@ -368,7 +371,7 @@ class SearchThread(WorkerThread):
                 if result_count:
                     final_text = "Finished searching %s." % infotext
 
-                if self._stop_work:
+                if not self._is_working:
                     final_text += " Stopped by user."
                 elif "messages" == result_type and is_html \
                 and count >= conf.MaxSearchMessages:
@@ -391,7 +394,8 @@ class SearchThread(WorkerThread):
                 result["done"], result["error"] = True, traceback.format_exc()
                 result["error_short"] = repr(e)
                 self.postback(result)
-
+            finally:
+                self._is_working = False
 
 
 class MergeThread(WorkerThread):
@@ -416,14 +420,18 @@ class MergeThread(WorkerThread):
         self._is_running = True
         while self._is_running:
             params = self._queue.get()
-            self._stop_work = False
-            self._drop_results = False
-            if params and "diff_left" == params.get("type"):
-                self.work_diff_left(params)
-            elif params and "diff_merge_left" == params.get("type"):
-                self.work_diff_merge_left(params)
-            elif params and "merge_left" == params.get("type"):
-                self.work_merge_left(params)
+            if not params: continue # while self._is_running
+                
+            self._is_working, self._drop_results = True, False
+            try:
+                if "diff_left" == params.get("type"):
+                    self.work_diff_left(params)
+                elif "diff_merge_left" == params.get("type"):
+                    self.work_diff_merge_left(params)
+                elif "merge_left" == params.get("type"):
+                    self.work_merge_left(params)
+            finally:
+                self._is_working = False
 
 
     def work_diff_left(self, params):
@@ -463,7 +471,7 @@ class MergeThread(WorkerThread):
             postback = dict((k, v) for k, v in result.items()
                             if k not in ["output", "chats", "params"])
             diff = self.get_chat_diff_left(chat, db1, db2, postback)
-            if self._stop_work:
+            if not self._is_working:
                 break # break for index, chat in enumerate(compared)
             if diff["messages"] \
             or (chat["message_count"] and diff["participants"]):
@@ -533,7 +541,7 @@ class MergeThread(WorkerThread):
                 postback = dict((k, v) for k, v in result.items()
                                 if k not in ["output", "chats", "params"])
                 diff = self.get_chat_diff_left(chat, db1, db2, postback)
-                if self._stop_work:
+                if not self._is_working:
                     break # break for index, chat in enumerate(compared)
                 if diff["messages"] \
                 or (chat["message_count"] and diff["participants"]):
@@ -543,7 +551,7 @@ class MergeThread(WorkerThread):
                     if new_chat:
                         chat2 = chat1.copy()
                         chat["c2"] = chat2
-                        chat2["id"] = db2.insert_chat(chat2, db1)
+                        chat2["id"] = db2.insert_conversation(chat2, db1)
                     if diff["participants"]:
                         db2.insert_participants(chat2, diff["participants"],
                                                 db1)
@@ -610,7 +618,7 @@ class MergeThread(WorkerThread):
                   "params": params}
         try:
             for index, chat_data in enumerate(chats):
-                if self._stop_work:
+                if not self._is_working:
                     break # break for i, chat_data in enumerate(chats)
                 chat1 = chat_data["chat"]["c1"]
                 chat2 = chat_data["chat"]["c2"]
@@ -628,7 +636,7 @@ class MergeThread(WorkerThread):
                 if not chat2:
                     chat2 = chat1.copy()
                     chat_data["chat"]["c2"] = chat2
-                    chat2["id"] = db2.insert_chat(chat2, db1)
+                    chat2["id"] = db2.insert_conversation(chat2, db1)
                 if participants:
                     db2.insert_participants(chat2, participants, db1)
                     count_participants += len(participants)
@@ -791,17 +799,56 @@ class DetectDatabaseThread(WorkerThread):
         self._is_running = True
         while self._is_running:
             search = self._queue.get()
-            self._stop_work = self._drop_results = False
-            if search:
-                all_filenames = set() # To handle potential duplicates
-                for filenames in skypedata.detect_databases():
-                    filenames = all_filenames.symmetric_difference(filenames)
-                    if not self._drop_results:
-                        result = {"filenames": filenames}
-                        self.postback(result)
-                    all_filenames.update(filenames)
-                    if self._stop_work:
-                        break # break for filename in skypedata.detect_data...
+            if not search: continue # while self._is_running
 
-                result = {"done": True, "count": len(all_filenames)}
-                self.postback(result)
+            self._is_working, self._drop_results = True, False
+            all_filenames = set() # To handle potential duplicates
+            for filenames in skypedata.detect_databases():
+                filenames = all_filenames.symmetric_difference(filenames)
+                if not self._drop_results:
+                    result = {"filenames": filenames}
+                    self.postback(result)
+                all_filenames.update(filenames)
+                if not self._is_working:
+                    break # break for filename in skypedata.detect_data...
+
+            result = {"done": True, "count": len(all_filenames)}
+            self.postback(result)
+            self._is_working = False
+
+
+class LiveThread(WorkerThread):
+    """
+    Skype online service background thread, carries out login and retrieval.
+    """
+
+
+    def __init__(self, callback, skype):
+        """
+        @param   callback  function to call with request progress
+        @param   skype     live.SkypeLogin instance
+        """
+        super(LiveThread, self).__init__(callback)
+        self._skype = skype
+
+
+    def run(self):
+        self._is_running = True
+        while self._is_running:
+            action = self._queue.get()
+            if not action: continue # while self._is_running
+
+            self._is_working, self._drop_results = True, False
+            result = {"action": action["action"], "opts": action, "done": True}
+            try:
+                if "login" == action["action"]:
+                    self._skype.login(password=action["password"])
+                elif "populate" == action["action"]:
+                    self._skype.populate()
+            except Exception as e:
+                result["error"] = traceback.format_exc()
+                result["error_short"] = util.format_exc(e)
+            if not self._is_working: result["stop"] = True
+
+            if not self._drop_results: self.postback(result)
+            self._is_working = False

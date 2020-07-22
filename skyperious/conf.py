@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -22,8 +22,8 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.dev3"
-VersionDate = "13.07.2020"
+Version = "4.0.dev4"
+VersionDate = "22.07.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -33,12 +33,15 @@ else:
     ApplicationDirectory = os.path.abspath(os.path.dirname(__file__))
     ResourceDirectory = os.path.join(ApplicationDirectory, "res")
 
+"""Directory for variable content like login tokens."""
+VarDirectory = os.path.join(ApplicationDirectory, "var")
+
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
-    "LastActivePage", "LastSearchResults", "LastSelectedFiles",
+    "LastActivePage", "LastSearchResults", "LastSelectedFiles", "Login",
     "RecentFiles", "SearchHistory", "SearchInChatInfo",
     "SearchInContacts", "SearchInMessages", "SearchUseNewTab",
     "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
@@ -81,6 +84,9 @@ LastSearchResults = {}
 
 """Files selected in the database lists on last run."""
 LastSelectedFiles = ["", ""]
+
+"""Skype login settings, {db path: {"store", "auto", "password"}}."""
+Login = {}
 
 """Contents of Recent Files menu."""
 RecentFiles = []

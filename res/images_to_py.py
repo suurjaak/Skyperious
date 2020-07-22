@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  06.07.2020
+@modified  20.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -43,8 +43,12 @@ IMAGES = {
         "Small icon for export button on start page.",
     "ButtonHome.png":
         "Large icon for home on start page.",
+    "ButtonImport.png":
+        "Large icon for live import on start page.",
     "ButtonListDatabase.png":
         "Button for databases in database list.",
+    "ButtonLogin.png":
+        "Small icon for login button on online page.",
     "ButtonMergeLeft.png":
         "Small icon for left merge button on merger page.",
     "ButtonMergeLeftMulti.png":
@@ -63,6 +67,8 @@ IMAGES = {
         "Small icon for save as button on start page.",
     "ButtonScanDiff.png":
         "Small icon for scan button on merge page.",
+    "ButtonStop.png":
+        "Small icon for stop button on online page.",
     "ExportClock.png":
         "Clock image icon for new days in exported chat HTML.",
     "ExportEdited.png":
@@ -93,6 +99,8 @@ IMAGES = {
         "Icon for the Merge All page in a merger tab.",
     "PageMergeChats.png":
         "Icon for the Merge Chats page in a merger tab.",
+    "PageOnline.png":
+        "Icon for the Online page in a database tab.",
     "PageSearch.png":
         "Icon for the Search page in a database tab.",
     "PageSQL.png":

@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    06.07.2020
+@modified    20.07.2020
 ------------------------------------------------------------------------------
 """
 try:
@@ -664,6 +664,31 @@ ButtonHome = PyEmbeddedImage(
 )
 
 
+"""Large icon for live import on start page."""
+ButtonImport = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAD+0lEQVRYw8WXO2wcVRSGvztz"
+    "57UPxzgQCpOCCFkhkZwQoLCQoUEu4rSWKNykQkJIJg0NshBNCioXtqxUpnHlxlIQHa0RJkZi"
+    "S1wAQqKwhPfBzszOzu5cit2ZnZ3MOuuXMqOrO3Pncf57zrn/fy685EPkDS4tLb0H3LtgW7/u"
+    "7Ow8yw7KvDe73e69tbW1x6VS6Wr2mVIK3+/gum08L6TbBU0TaJqOrutIaWAYEsMwkFIipaTV"
+    "8o4fPXr4FTAeAAAp5dWjoyM8z8N1XYIgQCmFUtBqtWk0Any/g1ICKQ1M08SyLBzHoVBwcBwH"
+    "27axbYtyuTw1yo52fs+q1EmqDd9fPAABCIXq90kbMvliCNp5Zp7rCaHIO0eG+iQT+/v7NJtN"
+    "rl17ncnJKyMgpE30ZysUEJ3fA7VajYWFBY6P/x3tBxFHPMqZd5T0ZwLQ6XQAmJ+f548//8rJ"
+    "AzUAIUgBiXqhGPLECSHQNO0T4Ho8ODc39+329vbQi3fv3OWXg99468b1DIWpofhn83/cHHjz"
+    "8PDwcd4LURQRBAG12jEFW+Pw8Hdc1024AUDXdQxjwAW99T9olUrlhzwSSgAIIUYmo67rTExM"
+    "UCiWePW1aaZeKeK3Qlw3wPPbdLoRQhNouo6UMRAD0zAwTAMpDeY+/Pj+558+fHoSE/49MzPz"
+    "TTy4urr6dXy9vLxMGIY0mx4//fyMmzM3ekzY9PFaIR0VoUsNwzSS2RcKDo5t49gOtmVRLpdP"
+    "DkG32/0uPVipVP5ZX19/srm5mYzt7e1x69ZNlBoQkSJLPtnYR0k70yqIot6Hu7u73L799ggt"
+    "zSw7ERuMMgR9BgBTU1NsbW0xPf3GCCZMsZ+IcljwxR44kQkXFxeH1DC7/tNeyHV7Xx/UpWhB"
+    "LEI5WhiT0ADMGbVgPCAZFhTP0zJnCMHBxsbG97Ozsw9836fdbqP66d/pdC6eiHKOd1dWVh4E"
+    "QUAYhoRhmOiCUgq/1eY/18dttQijEARoUkMaeo+ELBPLMrFME9M0uPPB+/e//OyLp6cqyeKZ"
+    "5pZkQUDD82i2AjqEoAsMQ8e0TGzbxHEcnNDGsW3sro3U9csoSOK4k0m8fEm+vCRMlSUxEDKq"
+    "eGoAURTp4+8qVKYyUinyGayCUf/MDYHv+6XxtjN944LnagCSSqh37/t+cWwP1Ot18/TF6TAh"
+    "9YRqAGzUP3M9UK1W7VOnYooZSVXHMZhqtWqN7YFarebU6/VGqVSaME2TYrE4zANBm5Lr4bY8"
+    "gqiNEgoh6fOA7BOSiWUaGKaJW/cbtVqtMM7mdBK44jjOR8A7URShlEpkOec70a+oEKKXkfF1"
+    "/z7pgQPP834EmkBjFAA71S5g2zbMbYAPtIFEWv8HpI6FnfEHR9MAAAAASUVORK5CYII="
+)
+
+
 """Button for databases in database list."""
 ButtonListDatabase = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAB3RJTUUH3QgQDRcfgk6jPwAA"
@@ -684,6 +709,28 @@ ButtonListDatabase = PyEmbeddedImage(
     "gMFg4KFiH1/NHnG49Hq9KgeSFPoBLs84hISmIhnBJy04YEogcQ7wQ4kNwTTyb25uuhgFvIrZ"
     "1N+OUeEAu8e4jt9i/0ydhFRxNlQBkf8H0l6mrpXdmu2nWGM/sZ/hM/02Adx6FWt4bas0bmGE"
     "kWLOwoa/OzOLOIBt5xoAAAAASUVORK5CYII="
+)
+
+
+"""Small icon for login button on online page."""
+ButtonLogin = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+    "ZSBJbWFnZVJlYWR5ccllPAAAAzFJREFUeNpMU21IU1EYfrZ75+Y2a+l06piWkjNXVCBFqMj6"
+    "ggSVMiHE9UFRFFZC9iOKqN8VFkjRn6CC9kNjSkQ/CrLvNClT/NoctqBys7m5TXZvu9t6zy3K"
+    "A899ue85z/O+5304isbGRigUCiiVSjkScglrAJgIy/BnRQj+dDo9QZgjIJVKgUUe/5easKm4"
+    "uLiqubm5paSkZJ0kSfIGz/Pwer2j3d3dD3w+3xtKDRJEtseVl5ezqoy8s76+vtXhcJwZmoLJ"
+    "9TyMO48iePQqBo9vEXyGztSyt3Y7dcq53W5G9hGSnNVqZa1UNzQ0tNrt9v0Xbvkx+V0LTVYB"
+    "8vNNMBqNEFI6fCLOiw9BHNhtXc9xnEQic0xEmUwmTUVFRTXbtm11nL/pB6c1wWAwYGbmB64c"
+    "1+HqCR3C4bicS6mMuHg7iNraWofZbK5hXCZga2ras+/xywCEdBYNB5idDYLyGBiZk2dw/7IZ"
+    "gcC8vBcRM/FsIIS6ul37GJcJFFosFtuwOw69XiuT4/E4BEHAsUsf0f/+K+VmceN0JgYHPyIS"
+    "ieCzR0RBQYGNcXn6GKLRGMZnJKwsSaGvcw38fj9isRhZmwWVKgFRTMtOvL5XhbqTY3Q2TUUE"
+    "1qWBJ6tYF5CkJCIxAdPT03/8JYJKpZLjUkhpgiSTwbhMIMpxPMosNNLwLzSd+4ml61q7GZW2"
+    "bJlcdegTVGqtfBZQMoEoq/7d45meXFuqRjQShj7bgoysQvDaXFw/u/ofufrImJxPJuKwrcog"
+    "l75MMi4TGHE6na4dm43IyYxBEhaoip7uz2FjmUYm1xz1QLN8JZJiFGZDHPbKFejrc7kYl8vL"
+    "y4uFQvMqQJHZfthe8eyVG7OBMHWQDefLDNx7mkQqTfYFPMjXBdHZYUNvb8/DgYG3LprVMPf3"
+    "YXybmBhTks/KC6caypdrRCwGZzA6/AEL/klsKBLQZM9Fx8EKOJ13e3t6HrjI6iehUEhSyNMA"
+    "NGq1Oluv19ut1opNbW1nd1VWbildOsyhoXferq4rT6amxgfJ4n5RFIOUFpgARzAQcgh6ss5A"
+    "9y6lR5O79DlTl3M0dW8ikQjT/yKB2RX+LcAAp/aU9ivfuRgAAAAASUVORK5CYII="
 )
 
 
@@ -848,6 +895,19 @@ ButtonScanDiff = PyEmbeddedImage(
     "WN/jCWk+1QdCKJpWE5VGxS7X10hUq4jRgU450uHF5IlTOyZjGfLXZ4qPTugEJCcRmhW4+0wU"
     "pGA7YtZZObNNeOPNaFdCeuSh4aAqQUx9eebO34D/SnxveBzAyVAo2Ix1hrsXiiX8L+BPZD+A"
     "aQBdAFb/ADonfMWfJE59AAAAAElFTkSuQmCC"
+)
+
+
+"""Small icon for stop button on online page."""
+ButtonStop = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+    "ZSBJbWFnZVJlYWR5ccllPAAAAT1JREFUeNrEUztSwzAQfUIGjBNomAwFPRWdSwpKzpAWCg7A"
+    "OThACug5AxUFJSUFVFAwJGRgxrHxR5Il1nZw0GCHzKRAM/qs9PbpaXfFjDFYpq1gyeYUw+Hl"
+    "CIyxAS39BXzuSPXpzfHOjCBXqpj8/tGuL6X9pJ8vdByGq+uX3wpklpVGHOcIAtV6dbfLa6xF"
+    "INK0NNJUYTIR9aGUElkmoJSE1hq9XqfGWgRZkpSGEJpIJKIoQhiG5JzBzpKosTZBHJdGlKR4"
+    "eh1C0M1VjrgFTvQM26jg+VNg6Li06zYHga/NVzDiHsad1dYginU+X8Gb4+HDba9MQdyyScF3"
+    "agzn2PQAbaYd1Wym9SBZhdXjB9rplz6siDJVIecHZxfY3tv/sw7fH+/z2/MT8lMWAa23qG8s"
+    "UMqF3MAi+Nff+CXAADjrrYLxZ/nIAAAAAElFTkSuQmCC"
 )
 
 
@@ -1868,6 +1928,49 @@ PageMergeChats = PyEmbeddedImage(
     "D8N798MlCQUw4erVO6RbFpGtd8fuq1yXACZbx9LCIk23jG9+4TF87akPdS6nrfHL16b8+dfn"
     "cHV+mfARUBc378YFaUtcBhIBycK7cC8ogjP0lMZ3enNfyBf2Il7LJsYSPHf0MJ7/9OE23/8B"
     "F8pelXv5qYcAAAAASUVORK5CYII="
+)
+
+
+"""Icon for the Online page in a database tab."""
+PageOnline = PyEmbeddedImage(
+    "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"
 )
 
 

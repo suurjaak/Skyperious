@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -76,8 +76,19 @@ MESSAGE_TYPE_SHARE_PHOTO  = 201 # Photo sharing
 MESSAGE_TYPES_BASE = (2, 4, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_STATS = (2, 4, 10, 12, 13, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
-TRANSFER_TYPE_OUTBOUND     =   1 # Transfer sent by partner_handle
-TRANSFER_TYPE_INBOUND      =   2 # Transfer sent to partner_handle
+CHATMSG_TYPE_PARTICIPANTS  =  1 # Added participants to chat (type 10)
+CHATMSG_TYPE_PARTICIPANTS2 =  2 # Added participants to chat; or file transfer notice (type 10, 100)
+CHATMSG_TYPE_MESSAGE       =  3 # Ordinary message (type 61)
+CHATMSG_TYPE_LEAVE         =  4 # Contact left the chat (type 13)
+CHATMSG_TYPE_TOPIC         =  5 # Changed chat topic (type 2)
+CHATMSG_TYPE_ACCEPT        =  6 # Accepted file transfer (type 100)
+CHATMSG_TYPE_SPECIAL       =  7 # File transfer, SMS, "/me laughs" or others (type 60, 64, 68, 201)
+CHATMSG_TYPE_CONTACTS      =  8 # Sent contacts (type 63)
+CHATMSG_TYPE_REMOVE        = 11 # Removed participants from chat (type 12)
+CHATMSG_TYPE_PICTURE       = 15 # Changed chat picture (type 2)
+CHATMSG_TYPE_SPECIAL2      = 18 # Calls/contacts/transfers (type 30, 39, 51, 68)
+TRANSFER_TYPE_OUTBOUND     =  1 # Transfer sent by partner_handle
+TRANSFER_TYPE_INBOUND      =  2 # Transfer sent to partner_handle
 CONTACT_FIELD_TITLES = {
     "displayname" : "Display name",
     "skypename"   : "Skype Name",
@@ -175,7 +186,9 @@ class SkypeDatabase(object):
                                       filename, traceback.format_exc())
             self.close()
             raise
+        from . import live # Avoid circular import
         self.update_accountinfo(log_error)
+        self.live = live.SkypeLogin(self)
 
 
     def __str__(self):
@@ -295,6 +308,11 @@ class SkypeDatabase(object):
             if hasattr(self, attr):
                 delattr(self, attr)
                 setattr(self, attr, None if ("tables_list" == attr) else {})
+
+        # Remove live login tokenfile if not storing password
+        if not conf.Login.get(self.filename, {}).get("store"):
+            try: os.unlink(self.live.tokenpath)
+            except Exception: pass
 
 
     def execute(self, sql, params=[], log=True):
@@ -527,7 +545,8 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_conversations(self, chatnames=None, authornames=None):
+    def get_conversations(self, chatnames=None, authornames=None, chatidentities=None,
+                          reload=False, log=True):
         """
         Returns chats as
         [{"id": integer, "title": "chat title", "created_datetime": datetime,
@@ -536,107 +555,131 @@ class SkypeDatabase(object):
         Combines migrated chats into a single one under {"__link": {oldchat}}.
         Uses already retrieved cached values if possible.
 
-        @param   chatnames    return chats with names containing given values
-        @param   authornames  return chats with authors containing given values
+        @param   chatnames       return chats with names containing given values
+        @param   authornames     return chats with authors containing given values
+        @param   chatidentities  return chats with given identities
+        @param   reload          ignore cache, retrieve everything again
         """
-        conversations = []
-        if self.is_open() and "conversations" in self.tables:
-            if "conversations" not in self.table_rows:
-                participants = {}
-                if "contacts" in self.tables and "participants" in self.tables:
-                    guibase.log("Conversations and participants: "
-                                "retrieving all (%s).", self.filename)
-                    self.get_contacts()
-                    self.get_table_rows("participants")
-                    for p in self.table_objects["participants"].values():
-                        if p["convo_id"] not in participants:
-                            participants[p["convo_id"]] = []
-                        if p["identity"] == self.id:
-                            p["contact"] = self.account
-                        else:
-                            # Fake a dummy contact object if no contact row
-                            p["contact"] = self.table_objects["contacts"].get(
-                                p["identity"], {"skypename":   p["identity"],
-                                                "identity":    p["identity"],
-                                                "name":        p["identity"],
-                                                "fullname":    p["identity"],
-                                                "displayname": p["identity"]}
-                            )
-                        participants[p["convo_id"]].append(p)
-                [p.sort(key=lambda x: (x["contact"].get("name") or "").lower())
-                 for p in participants.values()]
-                where, args = "WHERE displayname IS NOT NULL ", {}
-                for i, item in enumerate(chatnames or []):
-                    safe = item.replace("%", "\\%").replace("_", "\\_")
-                    where += (" OR " if i else "AND (") + (
-                             "title LIKE :name%s" % i +
-                             (" ESCAPE '\\'" if safe != item else "") +
-                             (")" if i == len(chatnames) - 1 else ""))
-                    args["name%s" % i] = "%" + safe + "%"
-                rows = self.execute(
-                    "SELECT *, "
-                    "COALESCE(displayname, meta_topic, identity) AS title, "
-                    "NULL AS created_datetime, NULL AS last_activity_datetime "
-                    "FROM conversations %s"
-                    "ORDER BY last_activity_timestamp DESC" % where, args
-                ).fetchall()
-                conversations = []
-                # Chats can refer to older entries, prior to system from Skype 7.
-                # Collate such chats automatically, with merged statistics.
-                idmap = dict((x["identity"], x) for x in rows)
-                for c in rows:
-                    if c.get("alt_identity") in idmap: # Pointing to new ID
-                        idmap[c["alt_identity"]]["__link"] = c
-                    if "thread.skype" not in c["identity"]: continue
-                    # Can contain old chat ID base64-encoded into new identity:
-                    # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
-                    pattern = r"(\d+:)([^@]+)(.*)"
-                    repl = lambda x: x.group(2).decode("base64")
-                    try:
-                        oldid = re.sub(pattern, repl, str(c["identity"]))
-                        if oldid in idmap:
-                            c["__link"] = idmap[oldid]
-                    except Exception: pass
-                oldset = set(x["__link"]["identity"] for x in rows
-                             if x.get("__link"))
-                for chat in rows:
-                    chat["participants"] = participants.get(chat["id"], [])
-                    if authornames:
-                        fs = "fullname displayname skypename pstnnumber".split()
-                        vals = [p["contact"].get(field, None) for field in fs
-                                for p in chat["participants"]]
-                        match = any(re.search(name, value, re.I | re.U)
-                                    for name in map(re.escape, authornames)
-                                    for value in vals if value)
-                        if not vals or not match: continue # for chat in rows
-                    chat["title_long"] = ("Chat with %s"
-                        if CHATS_TYPE_SINGLE == chat["type"]
-                        else "Group chat \"%s\"") % chat["title"]
-                    chat["title_long_lc"] = \
-                        chat["title_long"][0].lower() + chat["title_long"][1:]
-                    for k, v in [("creation_timestamp", "created_datetime"),
-                    ("last_activity_timestamp", "last_activity_datetime")]:
-                        if chat[k]:
-                            chat[v] = self.stamp_to_date(chat[k])
-                        
-                    chat["type_name"] = CHATS_TYPENAMES.get(chat["type"],
-                        "Unknown (%d)" % chat["type"])
-                    # Set stats attributes presence
-                    chat["message_count"] = None
-                    chat["first_message_datetime"] = None
-                    chat["last_message_datetime"] = None
-                    if chat["identity"] not in oldset: # Available in link
-                        conversations.append(chat)
-                guibase.log("Conversations and participants retrieved "
-                    "(%s chats, %s contacts, %s).",
-                    len(conversations), len(self.table_rows["contacts"]),
-                    self.filename
-                )
-                self.table_rows["conversations"] = conversations
-            else:
-                conversations = self.table_rows["conversations"]
+        result = []
+        if not self.is_open() or "conversations" not in self.tables:
+            return result
 
-        return conversations
+        if reload or "conversations" not in self.table_rows:
+            participants = {}
+            sortkey_participants = lambda x: (x["contact"].get("name") or "").lower()
+            if "contacts" in self.tables and "participants" in self.tables:
+                if log: guibase.log("Conversations and participants: "
+                            "retrieving all (%s).", self.filename)
+                self.get_contacts(reload=reload)
+                self.get_table_rows("participants", reload=reload)
+                for p in self.table_objects["participants"].values():
+                    if p["convo_id"] not in participants:
+                        participants[p["convo_id"]] = []
+                    if p["identity"] == self.id:
+                        p["contact"] = self.account
+                    else:
+                        # Fake a dummy contact object if no contact row
+                        p["contact"] = self.table_objects["contacts"].get(
+                            p["identity"], {"skypename":   p["identity"],
+                                            "identity":    p["identity"],
+                                            "name":        p["identity"],
+                                            "fullname":    p["identity"],
+                                            "displayname": p["identity"]}
+                        )
+                    participants[p["convo_id"]].append(p)
+            [p.sort(key=sortkey_participants) for p in participants.values()]
+            where, args = "WHERE displayname IS NOT NULL ", {}
+            for i, item in enumerate(chatnames or []):
+                safe = item.replace("%", "\\%").replace("_", "\\_")
+                where += (" OR " if i else "AND (") + (
+                         "title LIKE :name%s" % i +
+                         (" ESCAPE '\\'" if safe != item else "") +
+                         (")" if i == len(chatnames) - 1 else ""))
+                args["name%s" % i] = "%" + safe + "%"
+            for i, identity in enumerate(chatidentities or []):
+                where += (" OR " if i else "AND (") + (
+                          "identity = :identity%s" % i + 
+                         (")" if i == len(chatidentities) - 1 else ""))
+                args["identity%s" % i] = identity
+            rows = self.execute(
+                "SELECT *, "
+                "COALESCE(displayname, meta_topic, identity) AS title, "
+                "NULL AS created_datetime, NULL AS last_activity_datetime "
+                "FROM conversations %s"
+                "ORDER BY last_activity_timestamp DESC" % where, args
+            ).fetchall()
+
+            # Chats can refer to older entries, prior to system from Skype 7.
+            # Collate such chats automatically, with merged statistics.
+            idmap = dict((x["identity"], x) for x in rows)
+            for c in rows:
+                if c.get("alt_identity") in idmap: # Pointing to new ID
+                    idmap[c["alt_identity"]]["__link"] = c
+                if "thread.skype" not in c["identity"]: continue
+                # Can contain old chat ID base64-encoded into new identity:
+                # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
+                pattern = r"(\d+:)([^@]+)(.*)"
+                repl = lambda x: x.group(2).decode("base64")
+                try:
+                    oldid = re.sub(pattern, repl, str(c["identity"]))
+                    if oldid in idmap:
+                        c["__link"] = idmap[oldid]
+                except Exception: pass
+            oldset = set(x["__link"]["identity"] for x in rows
+                         if x.get("__link"))
+            for chat in rows:
+                chat["participants"] = participants.get(chat["id"], [])
+                if authornames:
+                    fs = "fullname displayname skypename pstnnumber".split()
+                    vals = [p["contact"].get(field, None) for field in fs
+                            for p in chat["participants"]]
+                    match = any(re.search(name, value, re.I | re.U)
+                                for name in map(re.escape, authornames)
+                                for value in vals if value)
+                    if not vals or not match: continue # for chat
+
+                chat["title_long"] = ("Chat with %s"
+                    if CHATS_TYPE_SINGLE == chat["type"]
+                    else "Group chat \"%s\"") % chat["title"]
+                chat["title_long_lc"] = \
+                    chat["title_long"][0].lower() + chat["title_long"][1:]
+                for k, v in [("creation_timestamp", "created_datetime"),
+                ("last_activity_timestamp", "last_activity_datetime")]:
+                    if chat[k]:
+                        chat[v] = self.stamp_to_date(chat[k])
+
+                chat["type_name"] = CHATS_TYPENAMES.get(chat["type"],
+                    "Unknown (%d)" % chat["type"])
+                # Set stats attributes presence
+                chat["message_count"] = None
+                chat["first_message_datetime"] = None
+                chat["last_message_datetime"] = None
+                if chat["identity"] not in oldset: # Available in link
+                    result.append(chat)
+
+            for chat in result:
+                # Second pass: combine participants from linked chats, populate people
+                if chat.get("__link") and chat["__link"].get("participants"):
+                    pmap = dict((p["identity"], p) for c in (chat, chat["__link"])
+                                for p in c["participants"])
+                    chat["participants"] = sorted(pmap.values(), key=sortkey_participants)
+
+                people = sorted([p["identity"] for p in chat["participants"]])
+                if CHATS_TYPE_SINGLE != chat["type"]:
+                    chat["people"] = "%s (%s)" % (len(people), ", ".join(people))
+                else:
+                    chat["people"] = ", ".join(p for p in people if p != self.id)
+
+            if log: guibase.log("Conversations and participants retrieved "
+                "(%s chats, %s contacts, %s).",
+                len(result), len(self.table_rows["contacts"]),
+                self.filename
+            )
+            self.table_rows["conversations"] = result
+        else:
+            result = self.table_rows["conversations"]
+
+        return result
 
 
     def get_conversations_stats(self, chats, log=True):
@@ -678,15 +721,10 @@ class SkypeDatabase(object):
                         dt = self.stamp_to_date(data[n + "_timestamp"])
                         data[n + "_datetime"] = dt
 
-            def merge_participants(datas):
-                pmap = dict((p["identity"], p) for pp in datas for p in pp)
-                sortkey = lambda x: (x["contact"].get("name") or "").lower()
-                return sorted(pmap.values(), key=sortkey)
             for n, f in zip(["first_message_datetime", "last_message_datetime",
                 "created_datetime", "creation_timestamp", "message_count",
-                "last_activity_datetime", "last_activity_timestamp",
-                "participants"],
-                [min, max, min, min, sum, max, max, merge_participants]
+                "last_activity_datetime", "last_activity_timestamp"],
+                [min, max, min, min, sum, max, max]
             ): # Combine 
                 values = [d.get(n, c.get(n)) for c, d in zip(cc, datas)]
                 values = [x for x in values if x is not None]
@@ -718,31 +756,35 @@ class SkypeDatabase(object):
         return groups
 
 
-    def get_contacts(self):
+    def get_contacts(self, reload=False):
         """
         Returns all the contacts in the database, as
         [{"identity": skypename or pstnnumber,
           "name": displayname or fullname, },]
         Uses already retrieved cached values if possible.
-        """
-        contacts = []
-        if self.is_open() and "contacts" in self.tables:
-            if "contacts" not in self.table_rows:
-                rows = self.execute(
-                    "SELECT *, COALESCE(skypename, pstnnumber, '') "
-                        "AS identity, "
-                    "COALESCE(fullname, displayname, skypename, pstnnumber, '') "
-                    "AS name FROM contacts ORDER BY name COLLATE NOCASE"
-                ).fetchall()
-                self.table_objects["contacts"] = {}
-                for c in rows:
-                    contacts.append(c)
-                    self.table_objects["contacts"][c["identity"]] = c
-                self.table_rows["contacts"] = contacts
-            else:
-                contacts = self.table_rows["contacts"]
 
-        return contacts
+        @param   reload  ignore cache, retrieve everything again
+        """
+        result = []
+        if not self.is_open() or "contacts" not in self.tables:
+            return result
+
+        if reload or "contacts" not in self.table_rows:
+            rows = self.execute(
+                "SELECT *, COALESCE(skypename, pstnnumber, '') "
+                    "AS identity, "
+                "COALESCE(fullname, displayname, skypename, pstnnumber, '') "
+                "AS name FROM contacts ORDER BY name COLLATE NOCASE"
+            ).fetchall()
+            self.table_objects["contacts"] = {}
+            for c in rows:
+                result.append(c)
+                self.table_objects["contacts"][c["identity"]] = c
+            self.table_rows["contacts"] = result
+        else:
+            result = self.table_rows["contacts"]
+
+        return result
 
 
     def get_contact_name(self, identity):
@@ -762,27 +804,29 @@ class SkypeDatabase(object):
         return name
 
 
-    def get_table_rows(self, table):
+    def get_table_rows(self, table, reload=False):
         """
         Returns all the rows of the specified table.
         Uses already retrieved cached values if possible.
+
+        @param   reload  ignore cache, retrieve everything again
         """
-        rows = []
+        result = []
         table = table.lower()
         if table in self.tables:
-            if table not in self.table_rows:
+            if reload or table not in self.table_rows:
                 col_data = self.get_table_columns(table)
                 pks = [c["name"] for c in col_data if c["pk"]]
                 pk = pks[0] if len(pks) == 1 else None
-                rows = self.execute("SELECT * FROM %s" % table).fetchall()
-                self.table_rows[table] = rows
+                result = self.execute("SELECT * FROM %s" % table).fetchall()
+                self.table_rows[table] = result
                 self.table_objects[table] = {}
                 if pk:
-                    for row in rows:
+                    for row in result:
                         self.table_objects[table][row[pk]] = row
             else:
-                rows = self.table_rows[table]
-        return rows
+                result = self.table_rows[table]
+        return result
 
 
     def get_smses(self):
@@ -990,10 +1034,8 @@ class SkypeDatabase(object):
             self.tables[table] = row
 
 
-    def insert_chat(self, chat, source_db):
-        """Inserts the specified chat into the database and returns its ID."""
-        # @todo insert_chat v�iks renameda insert_conversation, kuna k�ik
-        #       teised meetodid on convo-nime peal
+    def insert_conversation(self, chat, source_db):
+        """Inserts the specified conversation into the database and returns its ID."""
         if self.is_open() and not self.account and source_db.account:
             self.insert_account(source_db.account)
         if self.is_open() and "conversations" not in self.tables:
@@ -1290,7 +1332,7 @@ class SkypeDatabase(object):
                     yield m
 
 
-    def update_row(self, table, row, original_row, rowid=None):
+    def update_row(self, table, row, original_row, rowid=None, log=True):
         """
         Updates the table row in the database, identified by its primary key
         in its original values, or the given rowid if table has no primary key.
@@ -1298,10 +1340,10 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table, where = table.lower(), ""
-        guibase.log("Updating 1 row in table %s, %s.",
-                    self.tables[table]["name"], self.filename)
+        if log: guibase.log("Updating 1 row in table %s, %s.",
+                            self.tables[table]["name"], self.filename)
         self.ensure_backup()
-        col_data = self.get_table_columns(table)
+        col_data = [x for x in self.get_table_columns(table) if x["name"] in row]
         values, where = row.copy(), ""
         setsql = ", ".join("%(name)s = :%(name)s" % x for x in col_data)
         if rowid is not None:
@@ -1315,12 +1357,12 @@ class SkypeDatabase(object):
         if not where:
             return False # Sanity check: no primary key and no rowid
         self.execute("UPDATE %s SET %s WHERE %s" % (table, setsql, where),
-                     values)
+                     values, log=log)
         self.connection.commit()
         self.last_modified = datetime.datetime.now()
 
 
-    def insert_row(self, table, row):
+    def insert_row(self, table, row, log=True):
         """
         Inserts the new table row in the database.
 
@@ -1329,22 +1371,22 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table = table.lower()
-        guibase.log("Inserting 1 row into table %s, %s.",
-                    self.tables[table]["name"], self.filename)
+        if log: guibase.log("Inserting 1 row into table %s, %s.",
+                            self.tables[table]["name"], self.filename)
         self.ensure_backup()
         col_data = self.get_table_columns(table)
-        fields = [col["name"] for col in col_data]
+        fields = [col["name"] for col in col_data if col["name"] in row]
         str_cols = ", ".join(fields)
         str_vals = ":" + ", :".join(fields)
         row = self.blobs_to_binary(row, fields, col_data)
         cursor = self.execute("INSERT INTO %s (%s) VALUES (%s)" %
-                              (table, str_cols, str_vals), row)
+                              (table, str_cols, str_vals), row, log=log)
         self.connection.commit()
         self.last_modified = datetime.datetime.now()
         return cursor.lastrowid
 
 
-    def delete_row(self, table, row, rowid=None):
+    def delete_row(self, table, row, rowid=None, log=True):
         """
         Deletes the table row from the database. Row is identified by its
         primary key, or by rowid if no primary key.
@@ -1354,8 +1396,8 @@ class SkypeDatabase(object):
         if not self.is_open():
             return
         table, where = table.lower(), ""
-        guibase.log("Deleting 1 row from table %s, %s.",
-                    self.tables[table]["name"], self.filename)
+        if log: guibase.log("Deleting 1 row from table %s, %s.",
+                            self.tables[table]["name"], self.filename)
         self.ensure_backup()
         col_data = self.get_table_columns(table)
         values, where = row.copy(), ""
@@ -1369,7 +1411,7 @@ class SkypeDatabase(object):
                 where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
         if not where:
             return False # Sanity check: no primary key and no rowid
-        self.execute("DELETE FROM %s WHERE %s" % (table, where), values)
+        self.execute("DELETE FROM %s WHERE %s" % (table, where), values, log=log)
         self.connection.commit()
         self.last_modified = datetime.datetime.now()
         return True
@@ -1630,6 +1672,17 @@ class MessageParser(object):
                 a = ElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
                 a.tail = "" if i < len(files) - 1 else "."
+        elif MESSAGE_TYPE_INFO == message["type"] \
+        and "<location" in message["body_xml"]:
+            href, text = None, None
+            for link in dom.getiterator("a"):
+                href, text = link.get("href"), link.text
+                break # for link
+            if href and text:
+                dom.clear()
+                dom.text = "has shared a location: "
+                a = ElementTree.SubElement(dom, "a", {"href": href})
+                a.text = text
         elif MESSAGE_TYPE_CONTACTS == message["type"]:
             self.db.get_contacts()
             contacts = sorted(get_contact_name(i.get("f") or i.get("s"))
@@ -1650,22 +1703,27 @@ class MessageParser(object):
                     dom.text += "."
             else:
                 dom.text = "Changed the conversation picture."
-        elif MESSAGE_TYPE_CALL == message["type"]:
-            for elem in dom.getiterator("part"):
+        elif message["type"] in (MESSAGE_TYPE_CALL, MESSAGE_TYPE_CALL_END):
+            # Durations can either be in both start and end message,
+            # or only in end message if it's like '<partlist type="ended" ..'
+            do_durations = MESSAGE_TYPE_CALL == message["type"] or \
+                           "ended" == (dom.find("partlist") or {}).get("type")
+            for elem in dom.getiterator("part") if do_durations else ():
                 identity = elem.get("identity")
                 duration = elem.findtext("duration")
                 if identity and duration:
+                    identity = re.sub(r"^\d+\:", "", identity)
                     calldurations = message.get("__calldurations", {})
                     try:
-                        calldurations[identity] = int(duration)
+                        calldurations[identity] = float(duration)
                         message["__calldurations"] = calldurations
                     except (TypeError, ValueError):
                         pass
+            text = " Call" if MESSAGE_TYPE_CALL == message["type"] else " Call ended"
+            if "missed" == (dom.find("partlist") or {}).get("type"):
+                text = " Call missed" # <partlist type="missed" ..
             dom.clear()
-            ElementTree.SubElement(dom, "msgstatus").text = " Call"
-        elif MESSAGE_TYPE_CALL_END == message["type"]:
-            dom.clear()
-            ElementTree.SubElement(dom, "msgstatus").text = " Call ended"
+            ElementTree.SubElement(dom, "msgstatus").text = text
         elif MESSAGE_TYPE_LEAVE == message["type"]:
             dom.clear()
             b = ElementTree.SubElement(dom, "b")
@@ -2014,7 +2072,7 @@ class MessageParser(object):
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
         if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
-        MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
+        MESSAGE_TYPE_CALL_END, MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
         and author not in self.stats["counts"]):
             self.stats["counts"][author] = author_stats.copy()
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
@@ -2039,9 +2097,10 @@ class MessageParser(object):
             self.stats["smses"] += 1
             self.stats["counts"][author]["smses"] += 1
             self.stats["counts"][author]["smschars"] += len_msg
-        elif MESSAGE_TYPE_CALL == message["type"]:
-            self.stats["calls"] += 1
-            self.stats["counts"][author]["calls"] += 1
+        elif message["type"] in (MESSAGE_TYPE_CALL, MESSAGE_TYPE_CALL_END):
+            if MESSAGE_TYPE_CALL == message["type"]:
+                self.stats["calls"] += 1
+                self.stats["counts"][author]["calls"] += 1
             calldurations = message.get("__calldurations", {})
             for identity, duration in calldurations.items():
                 if identity not in self.stats["counts"]:
@@ -2055,7 +2114,7 @@ class MessageParser(object):
                 transfers = self.db.get_transfers()
                 filedict = dict((f["chatmsg_index"], f) for f in transfers
                                 if f["chatmsg_guid"] == message["guid"])
-                files = [f for i, f in sorted(filedict.items)]
+                files = [f for i, f in sorted(filedict.items())]
                 message["__files"] = files
             for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
@@ -2546,7 +2605,7 @@ Messages:
                         if transfer, Messages.guid == Transfers.chatmsg_guid
                   8:    sent contacts (body_xml has contacts XML) (type 63)
                   11:   "%name removed %name from this conversation." (type 12)
-                  15:   "%name% has changed the conversation picture" (type 2)
+                  15:   "%name has changed the conversation picture" (type 2)
                   18:   different call/contact things (type 30, 39, 51, 68)
 
   type            2:    set topic or picture (chatmsg_type 5, 15)

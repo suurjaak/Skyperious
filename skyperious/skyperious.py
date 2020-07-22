@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -57,10 +57,12 @@ from . import emoticons
 from . import export
 from . import guibase
 from . import images
+from . import live
 from . import skypedata
 from . import templates
 from . import util
 from . import workers
+from . import wx_accel
 
 
 """Custom application events for worker results."""
@@ -500,6 +502,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             ("folder", "&Import from folder.", images.ButtonFolder,
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
+            ("live", "Create database from &Skype online.", images.ButtonImport,
+             "Log in to Skype online service and download chat history "),
             ("missing", "Remove missing", images.ButtonRemoveMissing,
              "Remove non-existing files from the database list."),
             ("type", "Remove by type", images.ButtonRemoveType,
@@ -571,6 +575,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         button_opena.Bind(wx.EVT_BUTTON,         self.on_open_database)
         button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
         button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
+        button_live.Bind(wx.EVT_BUTTON,          self.on_live_login)
         button_missing.Bind(wx.EVT_BUTTON,       self.on_remove_missing)
         button_type.Bind(wx.EVT_BUTTON,          self.on_remove_type_menu)
         button_clear.Bind(wx.EVT_BUTTON,         self.on_clear_databases)
@@ -585,6 +590,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(button_opena, flag=wx.GROW)
         panel_main.Sizer.Add(button_detect, flag=wx.GROW)
         panel_main.Sizer.Add(button_folder, flag=wx.GROW)
+        panel_main.Sizer.Add(button_live, flag=wx.GROW)
         panel_main.Sizer.AddStretchSpacer()
         panel_main.Sizer.Add(button_missing, flag=wx.GROW)
         panel_main.Sizer.Add(button_type, flag=wx.GROW)
@@ -1208,6 +1214,57 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.MinSize = conf.MinWindowSize
 
 
+    def on_live_login(self, event):
+        """
+        Handler for create database from live button, asks for username and
+        password, opens database page and starts syncing data.
+        """
+        self.button_live.Disable()
+        dlg = LoginDialog(self, title="Log in to Skype online")
+        dlgresult = dlg.ShowModal()
+        self.button_live.Enable()
+        self.button_live.SetFocus()
+        if wx.ID_OK != dlgresult: return
+        user, pw = dlg.Username, dlg.Password
+        if not user or not pw: return
+
+        skype, db, page0 = None, None, None
+        filename = live.SkypeLogin.make_db_path(user)
+        if filename in self.dbs:
+            db = self.dbs[filename]
+            page0 = next((k for k, v in self.db_pages.items() if db is v), None)
+
+        skype = db.live if db else live.SkypeLogin()
+        busy = controls.BusyPanel(self, "Logging in as '%s'." % user)
+        self.Refresh()
+        try:
+            try:
+                if not skype.is_logged_in(): skype.login(user, pw, token=False)
+            except Exception as e:
+                busy.Close()
+                return wx.MessageBox("Failed to log in as '%s':\n\n%s" % 
+                                     (user, util.format_exc(e)),
+                                     conf.Title, wx.OK | wx.ICON_ERROR)
+
+            conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
+            skype.save("accounts", skype.skype.user)
+            skype.db.update_accountinfo()
+        finally: busy.Close()
+
+        self.load_database(filename, skype.db)
+        self.update_database_list(filename)
+        page = page0 or self.load_database_page(filename)
+        if not page: return
+
+        page.update_liveinfo()
+        page.notebook.Selection = page.pageorder[page.page_live]        
+        if not page0 and conf.Login[filename].get("auto") \
+        or page.worker_live.is_working():
+            return # Sync launched automatically on page open
+
+        page.on_live_result(action="login", opts={"auto": True})
+
+
     def on_open_database(self, event):
         """
         Handler for open database menu or button, displays a file dialog and
@@ -1409,6 +1466,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 elif page.db.filename in conf.LastActivePage:
                     del conf.LastActivePage[page.db.filename]
                 page.save_page_conf()
+                page.worker_live.stop()
                 for worker in page.workers_search.values(): worker.stop()
             for page in self.merger_pages: page.worker_merge.stop()
             self.worker_detection.stop()
@@ -1477,6 +1535,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del conf.LastActivePage[page.db.filename]
 
             for worker in page.workers_search.values(): worker.stop()
+            page.worker_live.stop()
             page.save_page_conf()
 
             if page in self.db_pages:
@@ -1563,51 +1622,50 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         return unique
 
 
-    def load_database(self, filename):
+    def load_database(self, filename, db=None):
         """
         Tries to load the specified database, if not already open, and returns
         it.
         """
-        db = self.dbs.get(filename)
-        if not db:
-            db = None
-            if os.path.exists(filename):
+        db0 = self.dbs.get(filename)
+        if db0: db = db0
+        elif not os.path.exists(filename):
+            wx.MessageBox("Nonexistent file: %s." % filename,
+                          conf.Title, wx.OK | wx.ICON_WARNING)
+        else:
+            try:
+                db = db or skypedata.SkypeDatabase(filename)
+            except Exception:
+                is_accessible = False
                 try:
-                    db = skypedata.SkypeDatabase(filename)
+                    with open(filename, "rb"):
+                        is_accessible = True
                 except Exception:
-                    is_accessible = False
-                    try:
-                        with open(filename, "rb"):
-                            is_accessible = True
-                    except Exception:
-                        pass
-                    if not is_accessible:
-                        wx.MessageBox(
-                            "Could not open %s.\n\n"
-                            "Some other process may be using the file."
-                            % filename, conf.Title, wx.OK | wx.ICON_WARNING)
-                    else:
-                        wx.MessageBox(
-                            "Could not open %s.\n\n"
-                            "Not a valid SQLITE database?" % filename,
-                            conf.Title, wx.OK | wx.ICON_WARNING)
-                if db:
-                    guibase.log("Opened %s (%s).", db, util.format_bytes(
-                                db.filesize))
-                    guibase.status_flash("Reading database file %s.", db)
-                    self.dbs[filename] = db
-                    # Add filename to Recent Files menu and conf, if needed
-                    if filename in conf.RecentFiles: # Remove earlier position
-                        idx = conf.RecentFiles.index(filename)
-                        try: self.history_file.RemoveFileFromHistory(idx)
-                        except Exception: pass
-                    self.history_file.AddFileToHistory(filename)
-                    util.add_unique(conf.RecentFiles, filename, -1,
-                                    conf.MaxRecentFiles)
-                    conf.save()
-            else:
-                wx.MessageBox("Nonexistent file: %s." % filename,
-                              conf.Title, wx.OK | wx.ICON_WARNING)
+                    pass
+                if not is_accessible:
+                    wx.MessageBox(
+                        "Could not open %s.\n\n"
+                        "Some other process may be using the file."
+                        % filename, conf.Title, wx.OK | wx.ICON_WARNING)
+                else:
+                    wx.MessageBox(
+                        "Could not open %s.\n\n"
+                        "Not a valid SQLITE database?" % filename,
+                        conf.Title, wx.OK | wx.ICON_WARNING)
+            if db:
+                guibase.log("Opened %s (%s).", db, util.format_bytes(
+                            db.filesize))
+                guibase.status_flash("Reading database file %s.", db)
+                self.dbs[filename] = db
+                # Add filename to Recent Files menu and conf, if needed
+                if filename in conf.RecentFiles: # Remove earlier position
+                    idx = conf.RecentFiles.index(filename)
+                    try: self.history_file.RemoveFileFromHistory(idx)
+                    except Exception: pass
+                self.history_file.AddFileToHistory(filename)
+                util.add_unique(conf.RecentFiles, filename, -1,
+                                conf.MaxRecentFiles)
+                conf.save()
         return db
 
 
@@ -1687,6 +1745,8 @@ class DatabasePage(wx.Panel):
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
         self.workers_search = {} # {search ID: workers.SearchThread, }
+        self.db.live.progress = self.on_live_result
+        self.worker_live = workers.LiveThread(self.on_live_result, self.db.live)
 
         sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -1732,6 +1792,7 @@ class DatabasePage(wx.Panel):
         idx3 = il.Add(images.PageInfo.Bitmap)
         idx4 = il.Add(images.PageTables.Bitmap)
         idx5 = il.Add(images.PageSQL.Bitmap)
+        idx6 = il.Add(images.PageOnline.Bitmap)
         notebook.AssignImageList(il)
 
         self.create_page_search(notebook)
@@ -1739,12 +1800,14 @@ class DatabasePage(wx.Panel):
         self.create_page_info(notebook)
         self.create_page_tables(notebook)
         self.create_page_sql(notebook)
+        self.create_page_live(notebook)
 
         notebook.SetPageImage(0, idx1)
         notebook.SetPageImage(1, idx2)
         notebook.SetPageImage(2, idx3)
         notebook.SetPageImage(3, idx4)
         notebook.SetPageImage(4, idx5)
+        notebook.SetPageImage(5, idx6)
 
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
@@ -2332,6 +2395,336 @@ class DatabasePage(wx.Panel):
         page.SetupScrolling()
 
 
+    def create_page_live(self, notebook):
+        """Creates a page for handling communication with Skype online login."""
+        page = self.page_live = wx.Panel(notebook)
+        self.pageorder[page] = len(self.pageorder)
+        notebook.AddPage(page, "Online")
+
+        splitter = self.splitter_live = wx.SplitterWindow(
+            parent=page, style=wx.BORDER_NONE
+        )
+        splitter.SetMinimumPaneSize(300)
+        panel1 = self.panel_login = wx.Panel(splitter)
+        panel2 = self.panel_sync  = wx.Panel(splitter)
+        splitter_sync = self.splitter_sync = wx.SplitterWindow(
+            parent=panel2, style=wx.BORDER_NONE
+        )
+        splitter_sync.SetMinimumPaneSize(100)
+        panel_sync1 = wx.Panel(splitter_sync)
+        panel_sync2 = wx.Panel(splitter_sync)
+
+        label_login = wx.StaticText(panel1, label="Log in to Skype online account")
+        label_user = wx.StaticText(panel1, label="Username:")
+        edit_user  = self.edit_user = wx.TextCtrl(panel1)
+        label_pw = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
+        edit_pw  = self.edit_pw = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
+        check_store  = self.check_login_store = wx.CheckBox(panel1, label="&Remember password")
+        check_auto   = self.check_login_auto  = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
+        edit_status  = self.edit_login_status = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
+        button_login = self.button_login      = controls.NoteButton(panel1, label="&Log in as '%s'" % self.db.id, bmp=images.ButtonLogin.Bitmap)
+
+        label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
+        list_chats = self.list_chats_sync = controls.SortableListView(
+            parent=panel_sync1, style=wx.LC_REPORT)
+        gauge = self.gauge_sync = wx.Gauge(panel_sync2, size=(300, 15),
+                                           style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
+        label_progress   = self.label_sync_progress = wx.StaticText(panel_sync2)
+        edit_sync_status = self.edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
+        button_sync      = self.button_sync      = controls.NoteButton(panel_sync2, label="S&ynchronize history in local database", bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync_stop = self.button_sync_stop = controls.NoteButton(panel_sync2, label="Stop synchronizing", bmp=images.ButtonStop.Bitmap)
+
+        panel1.BackgroundColour = panel2.BackgroundColour = conf.BgColour
+        label_user.Disable()
+        edit_user.Disable()
+        label_login.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
+            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        check_store.ToolTip = "Store password for this database locally"
+        check_auto.ToolTip  = "Update database from Skype online service automatically on opening this database next time"
+        check_auto.Disable()
+        edit_status.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+        edit_status.BackgroundColour = panel1.BackgroundColour
+        edit_status.SetEditable(False)
+        button_login.BackgroundColour = conf.BgColour
+        button_login.Note = "After login, local database can be updated from Skype online service.\n" \
+                            "Additionally, HTML export can download and include shared images."
+
+        label_sync.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
+                                  wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        columns = [("title", "Chat"), ("message_count", "Updates"),
+                   ("first_message_datetime", "From"),
+                   ("last_message_datetime", "Until") ]
+        frmt = lambda r, c: r[c].strftime("%Y-%m-%d") if r.get(c) else ""
+        formatters = {"first_message_datetime": frmt,
+                      "last_message_datetime": frmt, }
+        list_chats.SetColumns(columns)
+        list_chats.SetColumnFormatters(formatters)
+        list_chats.SetColumnsMaxWidth(300)
+        edit_sync_status.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+        edit_sync_status.BackgroundColour = panel2.BackgroundColour
+        edit_sync_status.SetEditable(False)
+        button_sync.BackgroundColour = conf.BgColour
+        button_sync_stop.BackgroundColour = conf.BgColour
+        button_sync.Note = "Query Skype online services for new messages and save them in local database."
+        button_sync_stop.Note = "Cease querying the online service."
+        for c in controls.get_controls(panel2): c.Disable()
+        if not live.skpy:
+            edit_status.Value = "Login unavailable: SkPy module not installed"
+            button_login.Disable()
+            page.Disable()
+
+        self.Bind(wx.EVT_TEXT,     self.on_change_ctrl_login, edit_pw)
+        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_store)
+        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_auto)
+        self.Bind(wx.EVT_BUTTON,   self.on_live_login,        button_login)
+        self.Bind(wx.EVT_BUTTON,   self.on_live_sync,         button_sync)
+        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
+
+        sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_login = wx.FlexGridSizer(cols=2, vgap=0, hgap=10)
+        sizer_login.AddGrowableCol(1, 1)
+        sizer_sync1 = panel_sync1.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_sync2 = panel_sync2.Sizer = wx.BoxSizer(wx.VERTICAL)
+
+        sizer_login.Add(label_user,  border=5, flag=wx.ALL)
+        sizer_login.Add(edit_user,   border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.Add(label_pw,    border=5, flag=wx.ALL)
+        sizer_login.Add(edit_pw,     border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.AddSpacer(5)
+        sizer_login.Add(check_store, border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.AddSpacer(5)
+        sizer_login.Add(check_auto,  border=5, flag=wx.ALL | wx.GROW)
+
+        sizer1.Add(label_login,  border=5,  flag=wx.ALL)
+        sizer1.Add(sizer_login,  border=20, flag=wx.TOP | wx.GROW)
+        sizer1.Add(edit_status,  border=10, flag=wx.TOP | wx.LEFT | wx.RIGHT | wx.GROW)
+        sizer1.Add(button_login, border=5,  flag=wx.ALL | wx.GROW)
+
+        sizer2.Add(label_sync, border=5, flag=wx.ALL | wx.GROW)
+
+        sizer_sync1.Add(list_chats, proportion=1, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(gauge, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
+        sizer_sync2.Add(label_progress, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
+        sizer_sync2.Add(edit_sync_status, proportion=1, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
+
+        sizer2.Add(splitter_sync, proportion=1, flag=wx.GROW)
+
+        sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
+        splitter.SplitVertically(panel1, panel2)
+        splitter_sync.SplitHorizontally(panel_sync1, panel_sync2)
+
+
+    def update_liveinfo(self):
+        """Refreshes controls in login-page."""
+        opts = conf.Login.get(self.db.filename, {})
+        self.edit_user.Value = self.db.id if self.db.id else ""
+        try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
+        except Exception as e: guibase.log("Error decoding stored password: %s", util.format_exc(e))
+        self.check_login_store.Value = opts.get("store", False)
+        self.check_login_auto.Value  = opts.get("auto",  False)
+        self.check_login_auto.Enable(self.check_login_store.Value)
+
+
+    def on_change_ctrl_login(self, event):
+        """Handler for changing a login control like password or checkboxes, updates conf."""
+        ctrl, value = event.EventObject, event.EventObject.Value
+        if ctrl is self.edit_pw:
+            name, value = "password", util.obfuscate(value)
+        elif ctrl is self.check_login_store: name = "store"
+        elif ctrl is self.check_login_auto:  name = "auto"
+        self.check_login_auto.Enable(self.check_login_store.Value)
+        conf.Login.setdefault(self.db.filename, {})[name] = value
+        if not self.check_login_store.Value:
+            self.check_login_auto.Value = False
+            conf.Login[self.db.filename].pop("store",    None)
+            conf.Login[self.db.filename].pop("auto",     None)
+            conf.Login[self.db.filename].pop("password", None)
+        if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
+        conf.save()
+
+
+    def on_change_list_chats_sync(self, event):
+        """
+        Handler for selecting an item in the synced chats list, loads the
+        messages in chats-page.
+        """
+        c = self.list_chats_sync.GetItemMappedData(event.Index)
+        chat = next((x for x in self.chats if x["identity"] == c["identity"]), None)
+        if chat:
+            self.notebook.Selection = self.pageorder[self.page_chats]
+            self.load_chat(chat)
+
+
+    def on_live_login(self, event=None, auto=False):
+        """
+        Attempts to login to Skype online service.
+
+        @param   auto  whether sync should start automatically after login
+        """
+        if not self or not self.edit_pw.Value or not live.skpy: return
+        self.edit_login_status.Value = "Logging in to Skype.."
+        for c in self.panel_login.Children:
+            if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
+        self.button_login.Disable() 
+        self.panel_login.Refresh()
+        action = {"action": "login", "password": self.edit_pw.Value, "auto": auto}
+        self.worker_live.work(action)
+
+
+    def on_live_sync(self, event=None):
+        """Starts synchronizing local database from Skype online service."""
+        self.label_sync_progress.Label = "Updating local database from Skype online service.."
+        self.list_chats_sync.DeleteAllItems()
+        self.gauge_sync.Pulse()
+        self.button_sync.Disable()
+        self.button_sync_stop.Enable()
+        self.gauge_sync.ContainingSizer.Layout()
+        self.worker_live.work({"action": "populate"})
+
+
+    def on_live_sync_stop(self, event=None):
+        """Stops synchronizing local database from Skype online service."""
+        if wx.OK != wx.MessageBox("Are you sure you want to stop synchronization?",
+            conf.Title, wx.ICON_QUESTION | wx.OK | wx.CANCEL
+        ) or not self.worker_live.is_working(): return
+        self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
+        self.button_sync.Enable()
+        self.button_sync_stop.Disable()
+        self.gauge_sync.ContainingSizer.Layout()
+        self.worker_live.stop_work()
+
+
+    def on_live_result(self, result=None, **kwargs):
+        """Callback for workers.LiveThread results."""
+
+        def after(result):
+            if not self: return
+
+            if "populate" == result["action"]:
+                plabel, slabel = None, None
+                if "error" in result:
+                    err = "Error syncing from Skype online service:\n\n%s" % result["error"]
+                    guibase.log(err)
+                    plabel = "Error syncing from Skype online service."
+                    slabel = err
+                    self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
+                    self.button_sync.Enable()
+                    self.button_sync_stop.Disable()
+                    wx.Bell()
+                    self.update_info_page()
+                elif result.get("done"):
+                    self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
+                    if result.get("stop"):
+                        plabel = slabel = "Stopped by user."
+                    else:
+                        plabel = slabel = "Synchronization complete."
+                        self.gauge_sync.Value = 100
+                    self.button_sync.Enable()
+                    self.button_sync_stop.Disable()
+                    wx.Bell()
+                    self.update_info_page()
+                else:
+                    plabel = u"Synchronizing %s" % result["table"]
+                    if "messages" == result["table"] and result.get("chat"):
+                        chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
+                        if not chat:
+                            cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
+                            self.chats.extend(cc)
+                            chat = cc[0]
+
+                        title = chat["title_long_lc"] if chat else result["chat"]
+                        if len(title) > 35:
+                            title = title[:35] + ".."
+                            if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
+                        plabel += " in %s" % title
+
+                    if result.get("count"):
+                        clabel = ", %s processed" % result["count"]
+                        if "total" in result:
+                            clabel = ", %s of %s processed" % (result["count"], result["total"])
+                            percent = min(100, math.ceil(100 * util.safedivf(result["count"], result["total"])))
+                            self.gauge_sync.Value = percent
+                        for k in "new", "updated":
+                            if result.get(k): clabel += ", %s %s" % (result[k], k)
+                        plabel += clabel + "."
+                    elif "count" not in result and "total" not in result and self.worker_live.is_working():
+                        plabel = slabel = "Synchronizing %s.." % result["table"]
+
+                    if result.get("end"):
+                        slabel = "Synchronized %s" % result["table"]
+                        if self.worker_live.is_working(): self.gauge_sync.Pulse()
+                        if "chats" == result["table"]:
+                            slabel = "Synchronized %s%s: %s in total%s." % (
+                                util.plural("chat", result["count"]) if result["count"] else "chats",
+                                " (%s new)" % result["new"] if result["new"] else "",
+                                util.plural("new message", result["message_count_new"]),
+                                ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
+                            )
+                            self.chats = self.db.get_conversations(reload=True, log=False)
+                            def after2():
+                                if self: self.db.get_conversations_stats(self.chats)
+                                if self: self.list_chats.Populate(self.chats)
+                            wx.CallAfter(after2)
+
+                        if "messages" == result["table"]:
+                            slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
+
+                            if chat and (result.get("new") or result.get("updated")):
+                                row = dict(title=chat["title"], identity=chat["identity"],
+                                           first_message_datetime=result["first"],
+                                           last_message_datetime=result["last"],
+                                           message_count=result["new"] + result["updated"])
+                                self.list_chats_sync.AppendRow(row)
+                                self.list_chats_sync.ResetColumnWidths()
+                                chat["message_count" ] = (chat["message_count"] or 0) + result["new"]
+                                chat["first_message_datetime"]  = min(chat["first_message_datetime"] or result["first"], result["first"])
+                                chat["last_message_datetime"]   = max(chat["last_message_datetime"]  or result["first"], result["last"])
+                                chat["last_activity_datetime"]  = max(chat["last_activity_datetime"] or result["last"],  result["last"])
+                                for k in "first_message", "last_message", "last_activity":
+                                    chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
+                                self.list_chats.Populate(self.chats)
+
+                            if not any(result[k] for k in ("new", "updated")):
+                                slabel = None
+                            else:
+                                slabel += ": %s new" % result["new"]
+                                if result["updated"]: slabel += ", %s updated" % result["updated"]
+                                slabel += "."
+
+                        if "contacts" == result["table"]:
+                            t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
+                            slabel += (": %s" % t if t else "") + "."
+
+                if plabel:
+                    self.label_sync_progress.Label = plabel
+                if slabel:
+                    self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
+                    self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+                self.gauge_sync.ContainingSizer.Layout()
+            elif "login"  == result["action"]:
+                for c in self.panel_login.Children:
+                    if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Enable()
+                if "error" in result:
+                    guibase.log('Error logging in to Skype as "%s":\n\n%s', self.db.id, result["error"])
+                    self.edit_login_status.Value = result.get("error_short", result["error"])
+                    self.button_login.Enable() 
+                else:
+                    self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.id
+                    self.button_login.Disable() 
+                    for c in controls.get_controls(self.panel_sync): c.Enable()
+                    self.button_sync_stop.Disable()
+                    if result.get("opts", {}).get("auto"): wx.CallAfter(self.on_live_sync)
+                self.update_liveinfo()
+
+        if self: wx.CallAfter(after, result or kwargs)
+        return bool(self and self.worker_live.is_working())
+
+
     def on_check_integrity(self, event):
         """
         Handler for checking database integrity, offers to save a fixed
@@ -2523,16 +2916,16 @@ class DatabasePage(wx.Panel):
         text = ""
         if "lastmessage_dt" in stats:
             text = "%(lastmessage_dt)s %(lastmessage_from)s" % stats
-        if stats and (stats.get("lastmessage_skypename") == self.db.id
-        or skypedata.CHATS_TYPE_SINGLE != stats.get("lastmessage_chattype")):
-            text += " in %(lastmessage_chat)s" % stats
+            if stats.get("lastmessage_skypename") == self.db.id \
+            or skypedata.CHATS_TYPE_SINGLE != stats.get("lastmessage_chattype"):
+                text += " in %(lastmessage_chat)s" % stats
         self.edit_info_lastmessage.Value = text
         text = ""
         if "firstmessage_dt" in stats:
             text = "%(firstmessage_dt)s %(firstmessage_from)s" % stats
-        if stats and (stats.get("firstmessage_skypename") == self.db.id
-        or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype")):
-            text += " in %(firstmessage_chat)s" % stats
+            if stats.get("firstmessage_skypename") == self.db.id \
+            or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype"):
+                text += " in %(firstmessage_chat)s" % stats
         self.edit_info_firstmessage.Value = text
 
         self.edit_info_size.Value = "%s (%s)" % \
@@ -4198,8 +4591,6 @@ class DatabasePage(wx.Panel):
 
             # Populate the chats list
             self.chats = self.db.get_conversations()
-            for c in self.chats:
-                c["people"] = "" # Set empty data, stats will come later
             self.list_chats.Populate(self.chats)
 
             wx.CallLater(100, self.load_later_data)
@@ -4210,6 +4601,9 @@ class DatabasePage(wx.Panel):
             guibase.logstatus_flash(errormsg)
         wx.CallLater(500, self.update_info_page, False)
         wx.CallLater(200, self.load_tables_data)
+        self.update_liveinfo()
+        if conf.Login.get(self.db.filename, {}).get("auto"):
+            wx.CallLater(1000, self.on_live_login, auto=True)
 
 
     def load_later_data(self):
@@ -4221,14 +4615,6 @@ class DatabasePage(wx.Panel):
         try:
             # Load chat statistics and update the chat list
             self.db.get_conversations_stats(self.chats)
-            for c in self.chats:
-                people = sorted([p["identity"] for p in c["participants"]])
-                if skypedata.CHATS_TYPE_SINGLE != c["type"]:
-                    c["people"] = "%s (%s)" % (len(people), ", ".join(people))
-                else:
-                    people = [p for p in people if p != self.db.id]
-                    c["people"] = ", ".join(people)
-
             if self.chat:
                 # If the user already opened a chat while later data
                 # was loading, update the date range control values.
@@ -5269,7 +5655,7 @@ class MergerPage(wx.Panel):
                     if not chat2:
                         chat2 = chat.copy()
                         self.chat["c2"] = chat2
-                        chat2["id"] = db2.insert_chat(chat2, db1)
+                        chat2["id"] = db2.insert_conversation(chat2, db1)
                     if participants:
                         if contacts2:
                             db2.insert_contacts(contacts2, db1)
@@ -5557,6 +5943,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._center_message_id =    -1
         # Index of the centered message in _messages
         self._center_message_index = -1
+        self._urllinks  = {} # {link start position: url}
         self._filelinks = {} # {link start position: file path}
         self._datelinks = {} # {link start position: two dates, }
         self._datelink_last = None # Title of clicked date link, if any
@@ -5670,6 +6057,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     url = url[3:] # Strip redundant filelink slashes
                 if not isinstance(url, unicode):
                     url = unicode(url, "utf-8", errors="replace")
+            elif urlrange[0] in self._urllinks:
+                url = self._urllinks[urlrange[0]]
             item_link = wx.MenuItem(menu, -1, "C&opy %s location" % urltype)
             menu.Append(item_link)
             menu.Bind(wx.EVT_MENU, on_copyurl, id=item_link.GetId())
@@ -5727,6 +6116,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         busy.Close()
                 function = filter_range
                 params = [url, self._datelinks[url_range[0]]]
+            elif url_range[0] in self._urllinks:
+                url = self._urllinks[url_range[0]]
+                function, params = webbrowser.open, [url]
             elif url:
                 function, params = webbrowser.open, [url]
             if function:
@@ -5818,6 +6210,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             previous_day = None
             count = 0
             focus_message_id = None
+            self._urllinks.clear()
             self._filelinks.clear()
             self._datelinks.clear()
             # For accumulating various statistics
@@ -5980,12 +6373,13 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 text = text.decode("utf-8")
             if type(tail) is str:
                 tail = tail.decode("utf-8")
-            href = None
             if "a" == e.tag:
                 href = e.get("href")
                 if href.startswith("file:"):
                     pathname = urllib.url2pathname(e.get("href")[5:])
                     self._filelinks[self.STC.Length] = pathname
+                elif re.match("^[a-z]+%s" % re.escape("://"), href):
+                    self._urllinks[self.STC.Length] = href
                 linefeed_final = "\n\n"
             elif "ss" == e.tag:
                 text = e.text
@@ -6834,6 +7228,46 @@ class AboutDialog(wx.Dialog):
         self.Layout()
         self.Size = (self.Size[0], html.VirtualSize[1] + 60)
         self.CenterOnParent()
+
+
+
+class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
+    """Dialog that asks for username and password."""
+ 
+    def __init__(self, parent, title="Log in"):
+        wx.Dialog.__init__(self, parent, title=title,
+                           style=wx.CAPTION | wx.CLOSE_BOX)
+
+        label_name = wx.StaticText(self, label="&Username:", name="label_user")
+        edit_name  = self.edit_name = wx.TextCtrl(self, size=(200, -1), name="user")
+        label_pass = wx.StaticText(self, label="&Password:", name="label_pass")
+        edit_pass  = self.edit_pass = wx.TextCtrl(self, size=(200, -1), style=wx.TE_PASSWORD, name="pass")
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_ctrls = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
+        sizer_buttons = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        sizer_ctrls.Add(label_name)
+        sizer_ctrls.Add(edit_name, flag=wx.GROW)
+        sizer_ctrls.Add(label_pass)
+        sizer_ctrls.Add(edit_pass, flag=wx.GROW)
+        self.Sizer.Add(sizer_ctrls, border=8, proportion=1, flag=wx.ALL | wx.GROW)
+        self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.ALL)
+        self.Layout()
+        self.Fit()
+        self.CenterOnParent()
+        self.UpdateAccelerators()
+        edit_name.SetFocus()
+
+
+    def GetUsername(self):
+        return self.edit_name.Value.strip()
+    Username = property(GetUsername)
+
+
+    def GetPassword(self):
+        return self.edit_pass.Value.strip()
+    Password = property(GetPassword)
+
 
 
 

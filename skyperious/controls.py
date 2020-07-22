@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.07.2020
+@modified    20.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3484,3 +3484,14 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     dc.SelectObject(wx.NullBitmap)
     rects = [(x, border, x+w, bmp.Height - 2*border) for x, y, w, h in bars]
     return bmp, rects
+
+
+
+def get_controls(window):
+    """Returns a list of all nested controls of given window."""
+    result, cc = [], list(window.Children)
+    while cc:
+        c = cc.pop(0)
+        if isinstance(c, wx.Control): result.append(c)
+        cc.extend(c.Children)
+    return result
