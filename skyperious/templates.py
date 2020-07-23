@@ -424,6 +424,20 @@ from skyperious.third_party import step
       display: block;
       font-size: 1.1em;
     }
+    span.shared_image {
+      background: black;
+      border-radius: 5px;
+      display: inline-block;
+      max-width: 305px;
+      max-height: 210px;
+    }
+    span.shared_image img {
+      border-radius: 5px;
+      cursor: pointer;
+      max-width: 305px;
+      max-height: 210px;
+      opacity: 0.5;
+    }
     #chat_picture {
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
       display: none;
@@ -456,6 +470,9 @@ from skyperious.third_party import step
                   center center no-repeat;
     }
 %endfor
+%if any(x["success"] for x in stats["shared_images"].values()):
+    {{!templates.LIGHTBOX_CSS}}
+%endif
   </style>
   <script>
     var HIGHLIGHT_STYLES = 10;
@@ -634,6 +651,9 @@ from skyperious.third_party import step
       return false;
     };
 
+%if any(x["success"] for x in stats["shared_images"].values()):
+    {{!templates.LIGHTBOX_JS}}
+%endif
   </script>
 </head>
 <body>
@@ -1011,6 +1031,9 @@ for chunk in message_buffer:
   </table>
 </td></tr></table>
 <div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
+%if any(x["success"] for x in stats["shared_images"].values()):
+<script> new Lightbox().load({carousel: false}); </script>
+%endif
 </body>
 </html>
 """
@@ -1072,6 +1095,16 @@ previous_author = m["author"]
 %>
 %endfor
 """
+
+"""HTML chat history export template for shared image message body."""
+CHAT_MESSAGE_IMAGE = """<%
+import base64, imghdr
+filetype = imghdr.what("", image)
+caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message_id, datetime.strftime("%Y-%m-%d %H:%M")]))
+%>
+<span class="shared_image"><img src="data:image/{{filetype}};base64,{{!base64.b64encode(image)}}" title="Click to enlarge." alt="Click to enlarge." data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" /></span>
+"""
+
 
 """TXT chat history export template."""
 CHAT_TXT = """<%
@@ -1838,6 +1871,8 @@ under the MIT License.
           github.com/jmcnamara/XlsxWriter</font></a></li>
   <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
       <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
+  <li>jsOnlyLightbox{{" 0.5.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
+      <font color="{{conf.LinkColour}}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
 %if getattr(sys, 'frozen', False):
   <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
   <li>PyInstaller, <a href="http://www.pyinstaller.org">
@@ -2257,4 +2292,15 @@ else:
   </g>
 %endfor
 </svg>
+"""
+
+
+"""CSS rules for chat HTML export shared images lightbox."""
+LIGHTBOX_CSS = """
+    .jslghtbx-ie8.jslghtbx{background-image:url(../img/trans-bck.png);display:none}.jslghtbx-ie8.jslghtbx.jslghtbx-active{display:block}.jslghtbx-ie8.jslghtbx .jslghtbx-contentwrapper>img{-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";display:block}.jslghtbx-ie8.jslghtbx .jslghtbx-contentwrapper.jslghtbx-wrapper-active>img{-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=100)"}.jslghtbx{font-family:sans-serif;overflow:auto;visibility:hidden;position:fixed;z-index:2;left:0;top:0;width:100%;height:100%;background-color:transparent}.jslghtbx.jslghtbx-active{visibility:visible;background-color:rgba(0,0,0,.85)}.jslghtbx-loading-animation{margin-top:-60px;margin-left:-60px;width:120px;height:120px;top:50%;left:50%;display:none;position:absolute;z-index:-1}.jslghtbx-loading-animation>span{display:inline-block;width:20px;height:20px;border-radius:20px;margin:5px;background-color:#fff;-webkit-transition:all .3s ease-in-out;-moz-transition:all .3s ease-in-out;-o-transition:all .3s ease-in-out;-ms-transition:all .3s ease-in-out}.jslghtbx-loading-animation>span.jslghtbx-active{margin-bottom:60px}.jslghtbx.jslghtbx-loading .jslghtbx-loading-animation{display:block}.jslghtbx-nooverflow{overflow:hidden!important}.jslghtbx-contentwrapper{margin:auto;visibility:hidden}.jslghtbx-contentwrapper>img{background:#fff;padding:.5em;display:none;height:auto;margin-left:auto;margin-right:auto;opacity:0}.jslghtbx-contentwrapper.jslghtbx-wrapper-active{visibility:visible}.jslghtbx-contentwrapper.jslghtbx-wrapper-active>img{display:block;opacity:1}.jslghtbx-caption{display:none;margin:5px auto;max-width:450px;color:#fff;text-align:center;font-size:.9em}.jslghtbx-active .jslghtbx-caption{display:block}.jslghtbx-contentwrapper.jslghtbx-animate>img{opacity:0}.jslghtbx-contentwrapper>img.jslghtbx-animate-transition{-webkit-transition:opacity .2s ease-in-out;-moz-transition:opacity .2s ease-in-out;-o-transition:opacity .2s ease-in-out;-ms-transition:opacity .2s ease-in-out}.jslghtbx-contentwrapper>img.jslghtbx-animate-init,.jslghtbx-contentwrapper>img.jslghtbx-animating-next,.jslghtbx-contentwrapper>img.jslghtbx-animating-prev{opacity:1;-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=100)"}.jslghtbx-contentwrapper>img.jslghtbx-animate-transition{cursor:pointer}.jslghtbx-close{position:fixed;right:23px;top:23px;margin-top:-4px;font-size:2em;color:#FFF;cursor:pointer;-webkit-transition:all .3s ease-in-out;-moz-transition:all .3s ease-in-out;-o-transition:all .3s ease-in-out;-ms-transition:all .3s ease-in-out}.jslghtbx-close:hover{text-shadow:0 0 10px #fff}@media screen and (max-width:1060px){.jslghtbx-close{font-size:1.5em}}.jslghtbx-next,.jslghtbx-prev{display:none;position:fixed;top:50%;max-width:6%;max-height:250px;cursor:pointer;-webkit-transition:all .2s ease-in-out;-moz-transition:all .2s ease-in-out;-o-transition:all .2s ease-in-out;-ms-transition:all .2s ease-in-out}.jslghtbx-next.jslghtbx-active,.jslghtbx-prev.jslghtbx-active{display:block}.jslghtbx-next>img,.jslghtbx-prev>img{width:100%}.jslghtbx-next{right:.6em}.jslghtbx-next.jslghtbx-no-img:hover{border-left-color:#787878}@media screen and (min-width:451px){.jslghtbx-next{right:.6em}.jslghtbx-next.jslghtbx-no-img{border-top:110px solid transparent;border-bottom:110px solid transparent;border-left:40px solid #FFF}}@media screen and (max-width:600px){.jslghtbx-next.jslghtbx-no-img{right:5px;padding-left:0;border-top:60px solid transparent;border-bottom:60px solid transparent;border-left:15px solid #FFF}}@media screen and (max-width:450px){.jslghtbx-next{right:.2em;padding-left:20px}}.jslghtbx-prev{left:.6em}.jslghtbx-prev.jslghtbx-no-img:hover{border-right-color:#787878}@media screen and (min-width:451px){.jslghtbx-prev{left:.6em}.jslghtbx-prev.jslghtbx-no-img{border-top:110px solid transparent;border-bottom:110px solid transparent;border-right:40px solid #FFF}}@media screen and (max-width:600px){.jslghtbx-prev.jslghtbx-no-img{left:5px;padding-right:0;border-top:60px solid transparent;border-bottom:60px solid transparent;border-right:15px solid #FFF}}@media screen and (max-width:450px){.jslghtbx-prev{left:.2em;padding-right:20px}}.jslghtbx-thmb{padding:2px;max-width:100%;max-height:140px;cursor:pointer;box-shadow:0 0 3px 0 #000;-webkit-transition:all .3s ease-in-out;-moz-transition:all .3s ease-in-out;-o-transition:all .3s ease-in-out;-ms-transition:all .3s ease-in-out}@media screen and (min-width:451px){.jslghtbx-thmb{margin:1em}}@media screen and (max-width:450px){.jslghtbx-thmb{margin:1em 0}}.jslghtbx-thmb:hover{box-shadow:0 0 14px 0 #000}
+"""
+
+"""JavaScript for chat HTML export shared images lightbox."""
+LIGHTBOX_JS = """
+    function Lightbox(){function z(){return window.innerHeight||document.documentElement.offsetHeight}function A(){return window.innerWidth||document.documentElement.offsetWidth}function B(a,b,c,d){a.addEventListener?a.addEventListener(b,c,d||!1):a.attachEvent&&a.attachEvent("on"+b,c)}function C(a,b){return a&&b?new RegExp("(^|\\\\s)"+b+"(\\\\s|$)").test(a.className):void 0}function D(a,b){return a&&b?(a.className=a.className.replace(new RegExp("(?:^|\\\\s)"+b+"(?!\\\\S)"),""),a):void 0}function E(a,b){return a&&b?(C(a,b)||(a.className+=" "+b),a):void 0}function F(a){return"undefined"!=typeof a?!0:!1}function G(a,b){if(!a||!F(a))return!1;var c;return a.getAttribute?c=a.getAttribute(b):a.getAttributeNode&&(c=a.getAttributeNode(b).value),F(c)&&""!=c?c:!1}function H(a,b){if(!a||!F(a))return!1;var c;return a.getAttribute?c=a.getAttribute(b):a.getAttributeNode&&(c=a.getAttributeNode(b).value),"string"==typeof c?!0:!1}function I(a){B(a,"click",function(){h=G(a,"data-jslghtbx-group")||!1,i=a,S(a,!1,!1,!1)},!1)}function J(a){a.stopPropagation?a.stopPropagation():a.returnValue=!1}function K(b){for(var c=[],d=0;d<a.thumbnails.length;d++)G(a.thumbnails[d],"data-jslghtbx-group")===b&&c.push(a.thumbnails[d]);return c}function L(a,b){for(var c=K(b),d=0;d<c.length;d++)if(G(a,"src")===G(c[d],"src")&&G(a,"data-jslghtbx")===G(c[d],"data-jslghtbx"))return d}function M(){if(h){var a=new Image,b=new Image,c=L(i,h);c===k.length-1?(a.src=k[k.length-1].src,b.src=k[0].src):0===c?(a.src=k[k.length-1].src,b.src=k[1].src):(a.src=k[c-1].src,b.src=k[c+1].src)}}function N(){if(!b){O();var d=function(){if(E(a.box,"jslghtbx-loading"),!c&&"number"==typeof a.opt.loadingAnimation){var b=0;o=setInterval(function(){E(p[b],"jslghtbx-active"),setTimeout(function(){D(p[b],"jslghtbx-active")},a.opt.loadingAnimation),b=b>=p.length?0:b+=1},a.opt.loadingAnimation)}};q=setTimeout(d,500)}}function O(){if(!b&&(D(a.box,"jslghtbx-loading"),!c&&"string"!=typeof a.opt.loadingAnimation&&a.opt.loadingAnimation)){clearInterval(o);for(var d=0;d<p.length;d++)D(p[d],"jslghtbx-active")}}function P(){if(!r){if(r=document.createElement("span"),E(r,"jslghtbx-next"),a.opt.nextImg){var b=document.createElement("img");b.setAttribute("src",a.opt.nextImg),r.appendChild(b)}else E(r,"jslghtbx-no-img");B(r,"click",function(b){J(b),a.next()},!1),a.box.appendChild(r)}if(E(r,"jslghtbx-active"),!s){if(s=document.createElement("span"),E(s,"jslghtbx-prev"),a.opt.prevImg){var c=document.createElement("img");c.setAttribute("src",a.opt.prevImg),s.appendChild(c)}else E(s,"jslghtbx-no-img");B(s,"click",function(b){J(b),a.prev()},!1),a.box.appendChild(s)}E(s,"jslghtbx-active")}function Q(){if(a.opt.responsive&&r&&s){var b=z()/2-r.offsetHeight/2;r.style.top=b+"px",s.style.top=b+"px"}}function R(c){function f(a){return"boolean"==typeof a?a:!0}if(c||(c={}),a.opt={boxId:c.boxId||!1,controls:f(c.controls),dimensions:f(c.dimensions),captions:f(c.captions),prevImg:"string"==typeof c.prevImg?c.prevImg:!1,nextImg:"string"==typeof c.nextImg?c.nextImg:!1,hideCloseBtn:c.hideCloseBtn||!1,closeOnClick:"boolean"==typeof c.closeOnClick?c.closeOnClick:!0,loadingAnimation:void 0===c.loadingAnimation?!0:c.loadingAnimation,animElCount:c.animElCount||4,preload:f(c.preload),carousel:f(c.carousel),animation:c.animation||400,nextOnClick:f(c.nextOnClick),responsive:f(c.responsive),maxImgSize:c.maxImgSize||.8,keyControls:f(c.keyControls),onopen:c.onopen||!1,onclose:c.onclose||!1,onload:c.onload||!1,onresize:c.onresize||!1,onloaderror:c.onloaderror||!1},a.opt.boxId)a.box=document.getElementById(a.opt.boxId);else if(!a.box&&!document.getElementById("jslghtbx")){var g=document.createElement("div");g.setAttribute("id","jslghtbx"),g.setAttribute("class","jslghtbx"),a.box=g,d.appendChild(a.box)}if(a.box.innerHTML=e,b&&E(a.box,"jslghtbx-ie8"),a.wrapper=document.getElementById("jslghtbx-contentwrapper"),!a.opt.hideCloseBtn){var h=document.createElement("span");h.setAttribute("id","jslghtbx-close"),h.setAttribute("class","jslghtbx-close"),h.innerHTML="X",a.box.appendChild(h),B(h,"click",function(b){J(b),a.close()},!1)}if(!b&&a.opt.closeOnClick&&B(a.box,"click",function(){a.close()},!1),"string"==typeof a.opt.loadingAnimation)n=document.createElement("img"),n.setAttribute("src",a.opt.loadingAnimation),E(n,"jslghtbx-loading-animation"),a.box.appendChild(n);else if(a.opt.loadingAnimation){a.opt.loadingAnimation="number"==typeof a.opt.loadingAnimation?a.opt.loadingAnimation:200,n=document.createElement("div"),E(n,"jslghtbx-loading-animation");for(var i=0;i<a.opt.animElCount;)p.push(n.appendChild(document.createElement("span"))),i++;a.box.appendChild(n)}a.opt.responsive?(B(window,"resize",function(){a.resize()},!1),E(a.box,"jslghtbx-nooverflow")):D(a.box,"jslghtbx-nooverflow"),a.opt.keyControls&&(B(document,"keydown",function(b){J(b),l&&39==b.keyCode&&a.next()},!1),B(document,"keydown",function(b){J(b),l&&37==b.keyCode&&a.prev()},!1),B(document,"keydown",function(b){J(b),l&&27==b.keyCode&&a.close()},!1))}function S(e,f,m,n){if(!e&&!f)return!1;h=f||h||G(e,"data-jslghtbx-group"),h&&(k=K(h),"boolean"!=typeof e||e||(e=k[0])),j.img=new Image,i=e;var o;o="string"==typeof e?e:G(e,"data-jslghtbx")?G(e,"data-jslghtbx"):G(e,"src"),g=!1,l||("number"==typeof a.opt.animation&&E(j.img,"jslghtbx-animate-transition jslghtbx-animate-init"),l=!0,a.opt.onopen&&a.opt.onopen()),a.opt&&F(a.opt.hideOverflow)&&!a.opt.hideOverflow||d.setAttribute("style","overflow: hidden"),a.box.setAttribute("style","padding-top: 0"),a.wrapper.innerHTML="",a.wrapper.appendChild(j.img),a.opt.animation&&E(a.wrapper,"jslghtbx-animate");var p=G(e,"data-jslghtbx-caption");if(p&&a.opt.captions){var r=document.createElement("p");r.setAttribute("class","jslghtbx-caption"),r.innerHTML=p,a.wrapper.appendChild(r)}E(a.box,"jslghtbx-active"),b&&E(a.wrapper,"jslghtbx-active"),a.opt.controls&&k.length>1&&(P(),Q()),j.img.onerror=function(){a.opt.onloaderror&&a.opt.onloaderror(n)},j.img.onload=function(){if(j.originalWidth=this.naturalWidth||this.width,j.originalHeight=this.naturalHeight||this.height,b||c){var d=new Image;d.setAttribute("src",o),j.originalWidth=d.width,j.originalHeight=d.height}var e=setInterval(function(){C(a.box,"jslghtbx-active")&&(E(a.wrapper,"jslghtbx-wrapper-active"),"number"==typeof a.opt.animation&&E(j.img,"jslghtbx-animate-transition"),m&&m(),O(),clearTimeout(q),a.opt.preload&&M(),a.opt.nextOnClick&&(E(j.img,"jslghtbx-next-on-click"),B(j.img,"click",function(b){J(b),a.next()},!1)),a.opt.onload&&a.opt.onload(n),clearInterval(e),a.resize())},10)},j.img.setAttribute("src",o),N()}var n,o,q,t,u,x,y,a=this,b=!1,c=!1,d=document.getElementsByTagName("body")[0],e='<div class="jslghtbx-contentwrapper" id="jslghtbx-contentwrapper" ></div>',g=!1,h=!1,i=!1,j={},k=[],l=!1,p=[],r=!1,s=!1;a.opt={},a.box=!1,a.wrapper=!1,a.thumbnails=[],a.load=function(d){navigator.appVersion.indexOf("MSIE 8")>0&&(b=!0),navigator.appVersion.indexOf("MSIE 9")>0&&(c=!0),R(d);for(var e=document.getElementsByTagName("img"),f=0;f<e.length;f++)H(e[f],"data-jslghtbx")&&(a.thumbnails.push(e[f]),I(e[f]))},a.open=function(a,b){a&&b&&(b=!1),S(a,b,!1,!1)},a.resize=function(){if(j.img){t=A(),u=z();var b=a.box.offsetWidth,c=a.box.offsetHeight;!g&&j.img&&j.img.offsetWidth&&j.img.offsetHeight&&(g=j.img.offsetWidth/j.img.offsetHeight),Math.floor(b/g)>c?(x=c*g,y=c):(x=b,y=b/g),x=Math.floor(x*a.opt.maxImgSize),y=Math.floor(y*a.opt.maxImgSize),(a.opt.dimensions&&y>j.originalHeight||a.opt.dimensions&&x>j.originalWidth)&&(y=j.originalHeight,x=j.originalWidth),j.img.setAttribute("width",x),j.img.setAttribute("height",y),j.img.setAttribute("style","margin-top:"+(z()-y)/2+"px"),setTimeout(Q,200),a.opt.onresize&&a.opt.onresize()}},a.next=function(){if(h){var b=L(i,h)+1;if(k[b])i=k[b];else{if(!a.opt.carousel)return;i=k[0]}"number"==typeof a.opt.animation?(D(j.img,"jslghtbx-animating-next"),setTimeout(function(){var b=function(){setTimeout(function(){E(j.img,"jslghtbx-animating-next")},a.opt.animation/2)};S(i,!1,b,"next")},a.opt.animation/2)):S(i,!1,!1,"next")}},a.prev=function(){if(h){var b=L(i,h)-1;if(k[b])i=k[b];else{if(!a.opt.carousel)return;i=k[k.length-1]}"number"==typeof a.opt.animation?(D(j.img,"jslghtbx-animating-prev"),setTimeout(function(){var b=function(){setTimeout(function(){E(j.img,"jslghtbx-animating-next")},a.opt.animation/2)};S(i,!1,b,"prev")},a.opt.animation/2)):S(i,!1,!1,"prev")}},a.close=function(){h=!1,i=!1,j={},k=[],l=!1,D(a.box,"jslghtbx-active"),D(a.wrapper,"jslghtbx-wrapper-active"),D(r,"jslghtbx-active"),D(s,"jslghtbx-active"),a.box.setAttribute("style","padding-top: 0px"),O(),b&&a.box.setAttribute("style","display: none"),a.opt&&F(a.opt.hideOverflow)&&!a.opt.hideOverflow||d.setAttribute("style","overflow: auto"),a.opt.onclose&&a.opt.onclose()}}
 """

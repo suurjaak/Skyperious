@@ -5,13 +5,18 @@ Skyperious 4.0
 Obsolescence Notice
 -------------------
 
-This program no longer works with modern Skype, as Skype has started to store
-its message history on its own servers, and nothing is kept locally any more
-that can easily be accessed with an external program. 
+Around 2017, starting from Skype version 8, Skype moved away from its famous
+peer-to-peer architecture to a client-server system, and started to store 
+its message history on its own servers only.
 
-The program can still be used to work with older Skype `main.db` files, but more
-recent message history is unavailable, and nothing can be merged back to an
-active Skype account.
+Formerly, it used a local SQLite `main.db` database to retain all history,
+which is what Skyperious was created to work with - merging chat histories from
+different computers into one.
+
+Skyperious still works with existing `main.db` files, and can also download
+newer messages from Skype online service. But any changes done to the database
+no longer affect what is visible in official Skype releases.
+
 
 ---
 
@@ -21,7 +26,8 @@ Skyperious is a Skype database viewer and merger, written in Python.
 You can open Skype SQLite databases and work with their contents:
 
 - search across all messages and contacts
-- browse chat history and export as HTML or spreadsheet, see chat statistics
+- browse chat history in full, see chat statistics
+- export chats as HTML, text or spreadsheet
 - synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
@@ -29,9 +35,8 @@ You can open Skype SQLite databases and work with their contents:
 
 and
 
-- synchronize messages in two Skype databases: keep chat history up-to-date on
-  different computers, or restore missing messages from older files into the
-  current one
+- synchronize messages in two Skype databases, merging their differences
+
 
 Additionally, it doubles as a useful database tool for any SQLite file.
 Also, a [command line interface](http://suurjaak.github.io/Skyperious/help.html#commandline)
@@ -58,6 +63,14 @@ You can use keywords to search among specific authors or chats only
 (`from:john`, `chat:links`), or from certain dates only 
 (`date:2012`, `date:2010..2013-06`). Search supports 
 wildcards, exact phrases, grouping, excluding, and either-or queries.
+
+Skyperious can create a new `main.db` database from scratch,
+by logging into Skype online service and downloading available history.
+
+HTML export can download shared photos and embed them in the resulting HTML,
+if password for the Skype account has been entered in online-page.
+This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
+Image download is also supported in the command-line interface.
 
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
@@ -137,6 +150,9 @@ Attribution
 
 Skyperious includes step, Simple Template Engine for Python,
 (c) 2012, Daniele Mazzocchio (https://github.com/dotpy/step).
+
+Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
+(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the [Skype Component License 1.0](res/emoticons/Skype Component License.txt).

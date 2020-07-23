@@ -71,7 +71,7 @@ class SkypeLogin(object):
 
     def is_logged_in(self):
         """Returns whether there is active login."""
-        return bool(self.skype and self.skype.connected)
+        return bool(self.skype and self.skype.conn.connected)
 
 
     def login(self, username=None, password=None, token=True):
@@ -337,7 +337,7 @@ class SkypeLogin(object):
 
             if item.avatar and "?" in item.avatar:
                 # https://avatar.skype.com/v1/avatars/username/public?auth_key=1455825688
-                raw = self.get_image(item.avatar)
+                raw = self.download_image(item.avatar)
                 # main.db has NULL-byte in front of image binary
                 if raw: result.update(avatar_image="\0" + raw)
 
@@ -369,19 +369,9 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    url = item.picture
-                    if not url.endswith("/views/avatar_fullsize"):
-                        url += "/views/avatar_fullsize"
-                    urls = [url]
-                    if not url.startswith("https://experimental-api.asm"):
-                        url0 = re.sub("https\:\/\/.+\.asm", "https://experimental-api.asm", url)
-                        urls.insert(0, url0)
-                    for url in urls:
-                        raw = self.get_image(url)
-                        if not raw: continue # for url
-                        # main.db has NULL-byte in front of image binary
-                        result.update(meta_picture="\0" + raw)
-                        break # for url
+                    raw = self.get_api_image(item.picture, category="avatar")
+                    # main.db has NULL-byte in front of image binary
+                    if raw: result.update(meta_picture="\0" + raw)
             else: result = None
 
         elif "contacts" == table:
@@ -509,7 +499,7 @@ class SkypeLogin(object):
                 # SkypeMsg(id='1594466637922', type='RichText/Media_Video', time=datetime.datetime(2020, 7, 11, 11, 23, 10, 45000), clientId='7459423203289210001', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef../views/thumbnail" type="Video.1/Message.1" doc_id="0-weu-d8-abcdef.." width="640" height="480">To view this video message, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..</a><OriginalName v="937029c3-6a12-4202-bdaf-aac9e341c63d.mp4"></OriginalName><FileSize v="103470"></FileSize></URIObject>')
                 # For audio: type="Audio.1/Message.1", "To hear this voice message, go to: ", ../views/audio
 
-                result.update(type=skypedata.MESSAGE_TYPE_SHARE_VIDEO)
+                result.update(type=skypedata.MESSAGE_TYPE_SHARE_VIDEO2)
 
             else: # SkypeCardMsg, SkypeChangeMemberMsg, ..
                 result = None
@@ -635,8 +625,29 @@ class SkypeLogin(object):
         )
 
 
-    def get_image(self, url):
-        """Returns image raw binary from Skype URL, or None."""
+    def get_api_image(self, url, category=None):
+        """
+        Returns image raw binary from Skype API URL via login, or None.
+
+        @param   category  type of image, e.g. "avatar"
+        """
+        if "avatar" == category and not url.endswith("/views/avatar_fullsize"):
+            url += "/views/avatar_fullsize"
+        elif "/views/" not in url:
+            url += "/views/imgpsh_fullsize"
+
+        urls = [url]
+        # Some images appear to be available on one domain, some on another
+        if not url.startswith("https://experimental-api.asm"):
+            url0 = re.sub("https\:\/\/.+\.asm", "https://experimental-api.asm", url)
+            urls.insert(0, url0)
+        for url in urls:
+            raw = self.download_image(url)
+            if raw: return raw
+
+
+    def download_image(self, url):
+        """Downloads and returns image raw binary from Skype URL via login, or None."""
         try:
             r = self.request(self.skype.conn, "GET", url,
                              auth=skpy.SkypeConnection.Auth.Authorize,

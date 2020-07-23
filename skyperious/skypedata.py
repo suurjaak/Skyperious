@@ -73,6 +73,7 @@ MESSAGE_TYPE_FILE         =  68 # File transfer
 MESSAGE_TYPE_SHARE_VIDEO  =  70 # Video sharing
 MESSAGE_TYPE_BIRTHDAY     = 110 # Birthday notification
 MESSAGE_TYPE_SHARE_PHOTO  = 201 # Photo sharing
+MESSAGE_TYPE_SHARE_VIDEO2 = 253 # Video sharing
 MESSAGE_TYPES_BASE = (2, 4, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
 MESSAGE_TYPES_STATS = (2, 4, 10, 12, 13, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
@@ -1766,7 +1767,7 @@ class MessageParser(object):
                 else:
                     dom.text = "Removed  from this conversation."
         elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE,
-        MESSAGE_TYPE_SHARE_PHOTO, MESSAGE_TYPE_SHARE_VIDEO] \
+        MESSAGE_TYPE_SHARE_PHOTO, MESSAGE_TYPE_SHARE_VIDEO, MESSAGE_TYPE_SHARE_VIDEO2] \
         and message["edited_timestamp"] and not message["body_xml"]:
             elm_sub = ElementTree.SubElement(dom, "bodystatus")
             elm_sub.text = MESSAGE_REMOVED_TEXT
@@ -1797,12 +1798,13 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        # Photo/video sharing: sanitize XML tags like Title|Text|Description|..
+        # Photo/video sharing: take image link, if any
         if any(dom.getiterator("URIObject")):
-            link, url = next(dom.getiterator("a"), None), None
-            if link:
+            url = dom.find("URIObject").get("uri")
+            link = next(dom.getiterator("a"), None)
+            if not url and link:
                 url = link.get("href")
-            else: # Parse link from message contents
+            elif not url: # Parse link from message contents
                 text = ElementTree.tostring(dom, "utf-8", "text")
                 match = re.search("(https?://[^\s<]+)", text)
                 if match: # Make link clickable
@@ -1810,12 +1812,11 @@ class MessageParser(object):
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
                     text2 = text.replace(url, a.encode("utf-8"))
                     dom = self.make_xml(text2, message) or dom
-                else:
-                    url = dom.find("URIObject").get("uri")
             if url and self.stats:
                 self.stats["shared_images"][message["id"]] = dict(url=url,
                     author_name=get_author_name(message), author=message["author"],
-                    datetime=message["datetime"])
+                    success=False, datetime=message["datetime"])
+            # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
         # Process Skype message quotation tags, assembling a simple
@@ -1904,6 +1905,15 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
+        shared_image = self.stats.get("shared_images", {}).get(message["id"])
+        if shared_image and output.get("export") \
+        and conf.SharedImageAutoDownload and self.db.live.is_logged_in():
+            raw = self.db.live.get_api_image(shared_image["url"])
+            if raw:
+                shared_image["success"] = True
+                ns = dict(shared_image, image=raw, message_id=message["id"])
+                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns)
+
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):

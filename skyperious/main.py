@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -352,8 +352,8 @@ def run_gui(filenames):
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
-    window.run_console("from skyperious import conf, controls, emoticons, export, guibase, "
-                       "images, main, searchparser, skypedata, skyperious, "
+    window.run_console("from . import conf, controls, emoticons, export, guibase, "
+                       "images, live, main, searchparser, skypedata, skyperious, "
                        "templates, util, wordcloud, workers, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")

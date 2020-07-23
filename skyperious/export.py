@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.07.2020
+@modified    22.07.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -106,6 +106,14 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
         export_func = (export_chats_xlsx if format.lower().endswith("xlsx")
                        else export_chat_csv if format.lower().endswith("csv")
                        else export_chat_template)
+
+        if format.lower().endswith("html") and conf.SharedImageAutoDownload \
+        and not db.live.is_logged_in() \
+        and conf.Login.get(db.filename or {}).get("password"):
+            # Log in to Skype online service to download shared images
+            try: db.live.login(db.id, conf.Login[db.filename]["password"])
+            except Exception: pass
+
         message_count = 0
         for chat in chats:
             if skip and not messages and not chat["message_count"]:

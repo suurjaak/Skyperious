@@ -5,13 +5,17 @@ Skyperious 4.0
 Obsolescence Notice
 -------------------
 
-This program no longer works with modern Skype, as Skype has started to store
-its message history on its own servers, and nothing is kept locally any more
-that can easily be accessed with an external program. 
+Around 2017, starting from Skype version 8, Skype moved away from its famous
+peer-to-peer architecture to a client-server system, and started to store 
+its message history on its own servers only.
 
-The program can still be used to work with older Skype `main.db` files, but more
-recent message history is unavailable, and nothing can be merged back to an
-active Skype account.
+Formerly, it used a local SQLite main.db database to retain all history,
+which is what Skyperious was created to work with - merging chat histories from
+different computers into one.
+
+Skyperious still works with existing main.db files, and can also download
+newer messages from Skype online service. But any changes done to the database
+no longer affect what is visible in official Skype releases.
 
 ---
 
@@ -56,6 +60,14 @@ You can use keywords to search among specific authors or chats only
 Search supports wildcards, exact phrases, grouping, excluding,
 and either-or queries.
 
+Skyperious can create a new main.db database from scratch,
+by logging into Skype online service and downloading available history.
+
+HTML export can download shared photos and embed them in the resulting HTML,
+if password for the Skype account has been entered in online-page.
+This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
+Image download is also supported in the command-line interface.
+
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 browse and copy specific chats and contacts.
@@ -93,6 +105,10 @@ Skyperious has been built using the following open-source software:
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
 - XlsxWriter 1.2.9 (https://github.com/jmcnamara/XlsxWriter)
 - dateutil 2.8.1, (http://pypi.python.org/pypi/python-dateutil)
+
+
+Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
+(c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
 released under the Skype Component License 1.0.

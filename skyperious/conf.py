@@ -22,7 +22,7 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.dev4"
+Version = "4.0.dev5"
 VersionDate = "22.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -53,9 +53,9 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
     "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
     "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchResultsChunk",  "StatisticsPlotWidth", "StatusFlashLength",
-    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
-    "WordCloudWordsAuthorMax"
+    "SearchResultsChunk", "SharedImageAutoDownload", "StatisticsPlotWidth",
+    "StatusFlashLength", "WordCloudLengthMin", "WordCloudCountMin",
+    "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
 OptionalFileDirectiveDefaults = {}
 
@@ -306,6 +306,11 @@ StatisticsPlotWidth = 150
 
 """Width of the chat emoticons plots, in pixels."""
 EmoticonsPlotWidth = 200
+
+"""
+Ask for Skype password and download shared images from Skype web for HTML export.
+"""
+SharedImageAutoDownload = True
 
 """Duration of "flashed" status message on StatusBar, in milliseconds."""
 StatusFlashLength = 30000
