@@ -40,7 +40,7 @@ and
 
 Additionally, it doubles as a useful database tool for any SQLite file.
 Also, a [command line interface](http://suurjaak.github.io/Skyperious/help.html#commandline)
-is available with key functions like exporting, searching, and merging.
+is available with key functions like exporting, searching, syncing, and merging.
 The graphical version includes a Python console window.
 
 Downloads, help texts, and more screenshots at

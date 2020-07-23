@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.07.2020
+@modified    23.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -19,6 +19,7 @@ import codecs
 import collections
 import datetime
 import errno
+import getpass
 import glob
 import locale
 import io
@@ -30,6 +31,7 @@ import sys
 import threading
 import time
 import traceback
+import warnings
 
 try:
     import wx
@@ -102,6 +104,26 @@ ARGUMENTS = {
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file(s) to search", },
+             {"args": ["--verbose"], "action": "store_true",
+              "help": "print detailed progress messages to stderr"}, ],
+        }, 
+        {"name": "sync",
+         "help": "synchronize database from Skype online service",
+         "description": "Synchronize Skype database via login to Skype online service.",
+         "arguments": [
+             {"args": ["-u", "--username"], "dest": "username",
+              "help": "username for Skype account, used only if the Skype database "
+                      "does not contain account information yet"},
+             {"args": ["-p", "--password"], "dest": "password",
+              "help": "password for Skype account, if not using stored or prompted"},
+             {"args": ["--store-password"], "dest": "store_password",
+              "action": "store_true", "required": False,
+              "help": "store entered password in configuration"},
+             {"args": ["--ask-password"], "dest": "ask_password",
+              "action": "store_true", "required": False,
+              "help": "ask for Skype account password if not stored"},
+             {"args": ["FILE"], "nargs": "+",
+              "help": "Skype database file to sync", },
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -237,6 +259,148 @@ def run_search(filenames, query):
         worker and (worker.stop(), worker.join())
 
 
+def run_sync(filenames, username=None, password=None, ask_password=False, store_password=False):
+    """Synchronizes history in specified database from Skype online service."""
+
+    ns = {"bar": None, "chat_title": None, "filename": None}
+    enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
+    def progress(result=None, **kwargs):
+        result = result or kwargs
+
+        if "error" in result:
+            if ns["bar"]: ns["bar"].stop()
+            output("\nError syncing chat history: %(error)s" % result)
+
+        elif "contacts" == result.get("table"):
+            if result.get("start"):
+                ns["bar"] = ProgressBar(afterword=" Synchronizing contacts..")
+                ns["bar"].start()
+            elif result.get("end"):
+                t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
+                ns["bar"].afterword = " Synchronized contacts%s." % (": %s" % t if t else "")
+                ns["bar"].update(result["total"])
+                ns["bar"] = ns["bar"].stop()
+            else:
+                ns["bar"].max = result["total"]
+                if "count" in result:
+                    t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
+                    ns["bar"].afterword = " Synchronizing contacts, %s processed%s." % (result["count"], ", %s" % t if t else "")
+                    ns["bar"].update(result["count"])
+
+        elif "chats" == result.get("table"):
+            if result.get("start"):
+                output("\nSynchronizing chats..")
+            elif result.get("end"):
+                ns["bar"] = ns["bar"].stop()
+                output("\n\nSynchronized %s%s in %s: %s in total%s." % (
+                    util.plural("chat", result["count"]) if result["count"] else "chats",
+                    " (%s new)" % result["new"] if result["new"] else "",
+                    ns["filename"],
+                    util.plural("new message", result["message_count_new"]),
+                    ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
+                ))
+
+        elif "messages" == result.get("table"):
+            if result.get("start"):
+                cc = db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
+                chat = cc[0] if cc else None
+
+                title = chat["title_long_lc"] if chat else result["chat"]
+                if isinstance(title, unicode): title = title.encode(enc, errors="xmlcharrefreplace")
+                if len(title) > 25:
+                    title = title[:25] + ".."
+                    if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
+                ns["chat_title"] = title
+                if ns["bar"]:
+                    ns["bar"].pulse_pos = 0
+                    ns["bar"].pause = False
+                    ns["bar"].afterword = " Synchronizing %s" % title
+                else:
+                    ns["bar"] = ProgressBar(pulse=True, interval=0.05,
+                                            afterword=" Synchronizing %s" % title)
+                    ns["bar"].start()
+
+            elif result.get("end"):
+                t = ""
+                if any(result[k] for k in ("new", "updated")):
+                    t += ": %s new" % result["new"]
+                    if result["updated"]: t += ", %s updated" % result["updated"]
+
+                ns["bar"].afterword = " Synchronized %s%s." % (ns["chat_title"], t)
+                ns["bar"].pulse_pos = None
+                ns["bar"].pause = True
+                ns["bar"].update()
+                if t: output() # Force new line if chat got updated
+
+            else:
+                t = ""
+                for k in "new", "updated":
+                    if result.get(k): t += ", %s %s" % (result[k], k)
+                if t: t += "."
+                ns["bar"].afterword = " Synchronizing %s%s" % (ns["chat_title"], t)
+
+        return True
+
+
+    username0, password0, passwords = username, password, {}
+    for filename in filenames:
+        filename1 = os.path.realpath(filename)
+        file_exists = os.path.exists(filename1)
+
+        output("\nSynchronizing %s from live." % filename)
+
+        if not file_exists and not username0:
+            output("%s does not exist and no username given, cannot login." % filename)
+            continue # for filename
+
+        if not file_exists:
+            with open(filename1, "w"): pass
+        db = skypedata.SkypeDatabase(filename1)
+        username = db.id or username0
+        password = password0 or passwords.get(username)
+
+        if not username:
+            output("%s has no Skype account information and no username given, cannot login." % filename)
+            continue # for filename
+
+        if not password and conf.Login.get(filename1, {}).get("password"):
+            password = util.deobfuscate(conf.Login[filename1]["password"])
+
+        if not password and ask_password:
+            prompt = "Enter Skype password for '%s': " % username
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore") # possible GetPassWarning
+                while not password:
+                    output(prompt, end="") # getpass output can raise errors
+                    password = getpass.getpass("", io.BytesIO()).strip()
+                    if not password: continue # while
+
+        if not password:
+            output("No password for '%s', cannot login." % username)
+            continue # for filename
+        else:
+            passwords[username] = password
+
+        output("Logging in to Skype as '%s'.." % username, end="")
+        try: db.live.login(username, password)
+        except Exception as e:
+            output("\nError logging in as '%s': %s\n\n%s" % 
+                  (username, util.format_exc(e), traceback.format_exc()))
+            continue # for filename
+        else: output(" success!")
+
+        if password0 and store_password:
+            conf.Login.setdefault(filename, {})
+            conf.Login[filename].update(store=True, password=util.obfuscate(password0))
+            conf.save()
+
+        output()
+        db.live.progress = progress
+        ns["filename"] = filename
+        try: db.live.populate()
+        except Exception as e: progress(error=util.format_exc(e))
+    
+
 def run_export(filenames, format, chatnames, authornames):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
@@ -345,7 +509,7 @@ def run_gui(filenames):
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
-    locale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
+    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
     window = skyperious.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 
@@ -396,7 +560,7 @@ def run(nogui=False):
     if argv[0] in ("-h", "--help") and len(argv) > 1:
         argv[:2] = argv[:2][::-1] # Swap "-h option" to "option -h"
 
-    arguments = argparser.parse_args(argv)
+    arguments, _ = argparser.parse_known_args(argv)
 
     if hasattr(arguments, "FILE1") and hasattr(arguments, "FILE2"):
         arguments.FILE1 = [util.to_unicode(f) for f in arguments.FILE1]
@@ -430,6 +594,9 @@ def run(nogui=False):
         run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
+    elif "sync" == arguments.command:
+        run_sync(arguments.FILE, arguments.username, arguments.password,
+                 arguments.ask_password, arguments.store_password)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
 
@@ -517,10 +684,12 @@ class ProgressBar(threading.Thread):
     """
     A simple ASCII progress bar with a ticker thread, drawn like
     '[---------\   36%            ] Progressing text..'.
+    or for pulse mode
+    '[    ----                    ] Progressing text..'.
     """
 
     def __init__(self, max=100, value=0, min=0, width=30, forechar="-",
-                 backchar=" ", foreword="", afterword="", interval=1):
+                 backchar=" ", foreword="", afterword="", interval=1, pulse=False):
         """
         Creates a new progress bar, without drawing it yet.
 
@@ -533,38 +702,64 @@ class ProgressBar(threading.Thread):
         @param   foreword   text in front of progress bar
         @param   afterword  text after progress bar
         @param   interval   ticker thread interval, in seconds
+        @param   pulse      ignore value-min-max, use constant pulse instead
         """
         threading.Thread.__init__(self)
         for k, v in locals().items(): setattr(self, k, v) if "self" != k else 0
         self.daemon = True # Daemon threads do not keep application running
         self.percent = None        # Current progress ratio in per cent
         self.value = None          # Current progress bar value
-        self.bar = "%s[-%s]%s" % (foreword, " " * (self.width - 3), afterword)
-        self.printbar = self.bar   # Printable text, includes padding to clear
+        self.pause = False         # Whether drawing is currently paused
+        self.pulse_pos = 0         # Current pulse position
+        self.bar = "%s[%s%s]%s" % (foreword,
+                                   backchar if pulse else forechar,
+                                   backchar * (width - 3),
+                                   afterword)
+        self.printbar = self.bar   # Printable text, with padding to clear previous
         self.progresschar = itertools.cycle("-\\|/")
         self.is_running = False
-        self.update(value, draw=False)
+        if not pulse: self.update(value, draw=False)
 
 
-    def update(self, value, draw=True):
+    def update(self, value=None, draw=True):
         """Updates the progress bar value, and refreshes by default."""
-        self.value = min(self.max, max(self.min, value))
-        new_percent = int(round(100.0 * self.value / (self.max or 1)))
+        if value is not None: self.value = min(self.max, max(self.min, value))
         w_full = self.width - 2
-        w_done = max(1, int(round((new_percent / 100.0) * w_full)))
-        # Build bar outline, animate by cycling last char from progress chars
-        char_last = self.forechar
-        if draw and w_done < w_full: char_last = next(self.progresschar)
-        bartext = "%s[%s%s%s]%s" % (
-                   self.foreword, self.forechar * (w_done - 1), char_last,
-                   self.backchar * (w_full - w_done), self.afterword)
-        # Write percentage into the middle of the bar
-        centertxt = " %2d%% " % new_percent
-        pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
-        bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
+        if self.pulse:
+            if self.pulse_pos is None:
+                bartext = "%s[%s]%s" % (self.foreword,
+                                        self.forechar * (self.width - 2),
+                                        self.afterword)
+            else:
+                dash = self.forechar * max(1, (self.width - 2) / 7)
+                pos = self.pulse_pos
+                if pos < len(dash):
+                    dash = dash[:pos]
+                elif pos >= self.width - 1:
+                    dash = dash[:-(pos - self.width - 2)]
+
+                bar = "[%s]" % (self.backchar * w_full)
+                # Write pulse dash into the middle of the bar
+                pos1 = min(self.width - 1, pos + 1)
+                bar = bar[:pos1 - len(dash)] + dash + bar[pos1:]
+                bartext = "%s%s%s" % (self.foreword, bar, self.afterword)
+                self.pulse_pos = (self.pulse_pos + 1) % (self.width + 2)
+        else:
+            new_percent = int(round(100.0 * self.value / (self.max or 1)))
+            w_done = max(1, int(round((new_percent / 100.0) * w_full)))
+            # Build bar outline, animate by cycling last char from progress chars
+            char_last = self.forechar
+            if draw and w_done < w_full: char_last = next(self.progresschar)
+            bartext = "%s[%s%s%s]%s" % (
+                       self.foreword, self.forechar * (w_done - 1), char_last,
+                       self.backchar * (w_full - w_done), self.afterword)
+            # Write percentage into the middle of the bar
+            centertxt = " %2d%% " % new_percent
+            pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
+            bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
+            self.percent = new_percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
         self.bar = bartext
-        self.percent = new_percent
         if draw: self.draw()
 
 
@@ -575,8 +770,9 @@ class ProgressBar(threading.Thread):
 
     def run(self):
         self.is_running = True
-        while self.is_running and time:
-            self.update(self.value), time.sleep(self.interval)
+        while self.is_running:
+            if not self.pause: self.update(self.value)
+            time.sleep(self.interval)
 
 
     def stop(self):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.07.2020
+@modified    23.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2652,7 +2652,7 @@ class DatabasePage(wx.Panel):
                         for k in "new", "updated":
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
-                    elif "count" not in result and "total" not in result and self.worker_live.is_working():
+                    elif result.get("start") and "messages" != result["table"] and self.worker_live.is_working():
                         plabel = slabel = "Synchronizing %s.." % result["table"]
 
                     if result.get("end"):

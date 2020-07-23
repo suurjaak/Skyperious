@@ -4,7 +4,7 @@ CHANGELOG
 4.0, 2020-07-22
 ---------------
 - restored shared image download functionality;
-- added support for syncing database from Skype online service.
+- added support for syncing chat history from Skype online service.
 
 
 3.6, 2020-07-06

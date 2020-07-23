@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    22.07.2020
+@modified    23.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -81,7 +81,7 @@ class SkypeLogin(object):
 
         @param   token   whether to use existing tokenfile instead of password
         """
-        if username and not self.db: self.username = username
+        if username and (not self.db or not self.db.id): self.username = username
         path = util.safe_filename(self.username)
         if path != self.username: path += "_%x" % hash(self.username)
         path = self.tokenpath = os.path.join(conf.VarDirectory, "%s.token" % path)
@@ -92,7 +92,7 @@ class SkypeLogin(object):
         if token and os.path.isfile(path) and os.path.getsize(path):
             kwargslist.insert(0, {"tokenFile": path}) # Try with existing token
         else:
-            with open(path, "w") as f: pass
+            with open(path, "w"): pass
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
@@ -313,6 +313,10 @@ class SkypeLogin(object):
         """
         result, table = {}, table.lower()
 
+        with open(os.path.join(conf.VarDirectory, "fafafa_new.txt"), "ab") as f:
+            f.write("\n\n%r\n" % item) # @todo remove
+
+
         if table in ("accounts", "contacts"):
             # SkypeContact(id='username', name=Name(first='first', last='last'), location=Location(country='EE'), language='ET', avatar='https://avatar.skype.com/v1/avatars/username/public', birthday=datetime.date(1984, 5, 9))
 
@@ -524,11 +528,12 @@ class SkypeLogin(object):
 
     def populate_history(self):
         """Retrieves all conversations and their messages."""
-        if self.progress and not self.progress(action="populate", table="messages", start=True):
+        if self.progress and not self.progress(action="populate", table="chats", start=True):
             return
         if not self.cache: self.build_cache()
 
         updateds, new, mtotalnew, mtotalupdated, run = set(), 0, 0, 0, True
+        msgids = set()
         while run:
             chats = self.request(self.skype.chats.recent)
             if not chats: break # while True
@@ -536,12 +541,14 @@ class SkypeLogin(object):
                 if chat.id.startswith("48:"): # Skip specials like "48:calllogs"
                     continue # for chat
                 cidentity = self.id_to_identity(chat.id)
+
+                if cidentity in updateds: continue # for chat
                 action = self.save("chats", chat)
                 if self.SAVE.INSERT == action: new += 1
                 if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                     updateds.add(cidentity)
                 if self.progress and not self.progress(
-                    action="populate", table="messages", chat=cidentity, count=0
+                    action="populate", table="messages", chat=cidentity, start=True
                 ):
                     run = False
                     break # for chat
@@ -563,9 +570,10 @@ class SkypeLogin(object):
                         ):
                             msgs, mrun = [], False
                             break # for msg
-                        if self.SAVE.NOCHANGE == action:
+                        if self.SAVE.NOCHANGE == action and msg.id not in msgids:
                             msgs = [] # Stop on reaching already retrieved messages
                             break # for msg
+                        msgids.add(msg.id)
                     if not msgs:
                         break # while mrun
                 mtotalnew, mtotalupdated = mtotalnew + mnew, mtotalupdated + mupdated
@@ -599,7 +607,7 @@ class SkypeLogin(object):
 
     def populate_contacts(self):
         """Retrieves the list of contacts."""
-        if self.progress and not self.progress(action="populate", table="contacts"):
+        if self.progress and not self.progress(action="populate", table="contacts", start=True):
             return
         if not self.cache: self.build_cache()
 
