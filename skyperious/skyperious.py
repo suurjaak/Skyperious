@@ -31,7 +31,6 @@ import webbrowser
 
 import wx
 import wx.adv
-import wx.gizmos
 import wx.grid
 import wx.html
 import wx.lib
@@ -41,6 +40,7 @@ import wx.lib.agw.labelbook
 import wx.lib.agw.flatmenu
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.ultimatelistctrl
+import wx.lib.gizmos
 import wx.lib.newevent
 import wx.lib.scrolledpanel
 import wx.stc
@@ -2139,7 +2139,7 @@ class DatabasePage(wx.Panel):
             wx.Button(panel1, label="Refresh")
         sizer_topleft.AddStretchSpacer()
         sizer_topleft.Add(button_refresh)
-        tree = self.tree_tables = wx.gizmos.TreeListCtrl(
+        tree = self.tree_tables = wx.lib.gizmos.TreeListCtrl(
             parent=panel1,
             style=wx.TR_DEFAULT_STYLE
             #| wx.TR_HAS_BUTTONS
@@ -2989,7 +2989,7 @@ class DatabasePage(wx.Panel):
                         break # break while table and item and itek.IsOk()
                     item = self.tree_tables.GetNextSibling(item)
                 if tableitem:
-                    # Only way to create state change in wx.gizmos.TreeListCtrl
+                    # Only way to create state change in wx.lib.gizmos.TreeListCtrl
                     class HackEvent(object):
                         def __init__(self, item): self._item = item
                         def GetItem(self):        return self._item
@@ -3523,7 +3523,7 @@ class DatabasePage(wx.Panel):
                 if tableitem:
                     self.notebook.SetSelection(self.pageorder[self.page_tables])
                     wx.YieldIfNeeded()
-                    # Only way to create state change in wx.gizmos.TreeListCtrl
+                    # Only way to create state change in wx.lib.gizmos.TreeListCtrl
                     class HackEvent(object):
                         def __init__(self, item): self._item = item
                         def GetItem(self):        return self._item

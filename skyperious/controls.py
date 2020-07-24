@@ -83,10 +83,12 @@ import wx
 import wx.html
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.gradientbutton
+import wx.lib.agw.labelbook
 try: # ShapedButton requires PIL, might not be installed
     import wx.lib.agw.shapedbutton
 except Exception: pass 
 import wx.lib.embeddedimage
+import wx.lib.gizmos
 import wx.lib.mixins.listctrl
 import wx.lib.newevent
 import wx.lib.wordwrap
@@ -94,8 +96,36 @@ import wx.stc
 
 
 # Convenience methods for creating a wx.Brush and wx.Pen or returning cached.
-BRUSH = lambda c, s=wx.SOLID: wx.TheBrushList.FindOrCreateBrush(c, s)
-PEN = lambda c, w=1, s=wx.SOLID: wx.ThePenList.FindOrCreatePen(c, w, s)
+BRUSH = lambda c,      s=wx.BRUSHSTYLE_SOLID: wx.TheBrushList.FindOrCreateBrush(c,    s)
+PEN   = lambda c, w=1, s=wx.PENSTYLE_SOLID:   wx.ThePenList  .FindOrCreatePen  (c, w, s)
+
+
+
+class KEYS(object):
+    """Keycode groupings, includes numpad keys."""
+    UP         = wx.WXK_UP,       wx.WXK_NUMPAD_UP
+    DOWN       = wx.WXK_DOWN,     wx.WXK_NUMPAD_DOWN
+    LEFT       = wx.WXK_LEFT,     wx.WXK_NUMPAD_LEFT
+    RIGHT      = wx.WXK_RIGHT,    wx.WXK_NUMPAD_RIGHT
+    PAGEUP     = wx.WXK_PAGEUP,   wx.WXK_NUMPAD_PAGEUP
+    PAGEDOWN   = wx.WXK_PAGEDOWN, wx.WXK_NUMPAD_PAGEDOWN
+    ENTER      = wx.WXK_RETURN,   wx.WXK_NUMPAD_ENTER
+    INSERT     = wx.WXK_INSERT,   wx.WXK_NUMPAD_INSERT
+    DELETE     = wx.WXK_DELETE,   wx.WXK_NUMPAD_DELETE
+    HOME       = wx.WXK_HOME,     wx.WXK_NUMPAD_HOME
+    END        = wx.WXK_END,      wx.WXK_NUMPAD_END
+    SPACE      = wx.WXK_SPACE,    wx.WXK_NUMPAD_SPACE
+    BACKSPACE  = wx.WXK_BACK,
+    TAB        = wx.WXK_TAB,      wx.WXK_NUMPAD_TAB
+    ESCAPE     = wx.WXK_ESCAPE,
+
+    ARROW      = UP + DOWN + LEFT + RIGHT
+    PAGING     = PAGEUP + PAGEDOWN
+    NAVIGATION = ARROW + PAGING + HOME + END + TAB
+    COMMAND    = ENTER + INSERT + DELETE + SPACE + BACKSPACE + ESCAPE
+
+    NAME_CTRL  = "Cmd" if "darwin" == sys.platform else "Ctrl"
+
 
 
 class BusyPanel(wx.Window):
@@ -146,6 +176,163 @@ class BusyPanel(wx.Window):
     def Close(self):
         try: self.Destroy(); self.Parent.Refresh()
         except Exception: pass
+
+
+
+class ColourManager(object):
+    """
+    Updates managed component colours on Windows system colour change.
+    """
+    colourcontainer   = None
+    colourmap         = {} # {colour name in container: wx.SYS_COLOUR_XYZ}
+    darkcolourmap     = {} # {colour name in container: wx.SYS_COLOUR_XYZ}
+    darkoriginals     = {} # {colour name in container: original value}
+    # {ctrl: (prop name: colour name in container)}
+    ctrls             = collections.defaultdict(dict)
+
+
+    @classmethod
+    def Init(cls, window, colourcontainer, colourmap, darkcolourmap):
+        """
+        Hooks WM_SYSCOLORCHANGE on Windows, updates colours in container
+        according to map.
+
+        @param   window           application main window
+        @param   colourcontainer  object with colour attributes
+        @param   colourmap        {"attribute": wx.SYS_COLOUR_XYZ}
+        @param   darkcolourmap    colours changed if dark background,
+                                  {"attribute": wx.SYS_COLOUR_XYZ or wx.Colour}
+        """
+        cls.colourcontainer = colourcontainer
+        cls.colourmap.update(colourmap)
+        cls.darkcolourmap.update(darkcolourmap)
+        for name in darkcolourmap:
+            if not hasattr(colourcontainer, name): continue # for name
+            cls.darkoriginals[name] = getattr(colourcontainer, name)
+
+        cls.UpdateContainer()
+
+        # Hack: monkey-patch FlatImageBook with non-hardcoded background
+        class HackContainer(wx.lib.agw.labelbook.ImageContainer):
+            WHITE_BRUSH = wx.WHITE_BRUSH
+            def OnPaint(self, event):
+                bgcolour = cls.ColourHex(wx.SYS_COLOUR_WINDOW)
+                if "#FFFFFF" != bgcolour: wx.WHITE_BRUSH = BRUSH(bgcolour)
+                try: result = HackContainer.__base__.OnPaint(self, event)
+                finally: wx.WHITE_BRUSH = HackContainer.WHITE_BRUSH
+                return result
+        wx.lib.agw.labelbook.ImageContainer = HackContainer
+
+        # Hack: monkey-patch TreeListCtrl with working Colour properties
+        wx.lib.gizmos.TreeListCtrl.BackgroundColour = property(
+            wx.lib.gizmos.TreeListCtrl.GetBackgroundColour,
+            wx.lib.gizmos.TreeListCtrl.SetBackgroundColour
+        )
+        wx.lib.gizmos.TreeListCtrl.ForegroundColour = property(
+            wx.lib.gizmos.TreeListCtrl.GetForegroundColour,
+            wx.lib.gizmos.TreeListCtrl.SetForegroundColour
+        )
+
+        window.Bind(wx.EVT_SYS_COLOUR_CHANGED, cls.OnSysColourChange)
+
+
+    @classmethod
+    def Manage(cls, ctrl, prop, colour):
+        """
+        Starts managing a control colour property.
+
+        @param   ctrl    wx component
+        @param   prop    property name like "BackgroundColour",
+                         tries using ("Set" + prop)() if no such property
+        @param   colour  colour name in colour container like "BgColour",
+                         or system colour ID like wx.SYS_COLOUR_WINDOW
+        """
+        if not ctrl: return
+        cls.ctrls[ctrl][prop] = colour
+        cls.UpdateControlColour(ctrl, prop, colour)
+
+
+    @classmethod
+    def OnSysColourChange(cls, event):
+        """
+        Handler for system colour change, refreshes configured colours
+        and updates managed controls.
+        """
+        event.Skip()
+        cls.UpdateContainer()
+        cls.UpdateControls()
+
+
+    @classmethod
+    def ColourHex(cls, idx):
+        """Returns wx.Colour or system colour as HTML colour hex string."""
+        colour = idx if isinstance(idx, wx.Colour) \
+                 else wx.SystemSettings.GetColour(idx)
+        return colour.GetAsString(wx.C2S_HTML_SYNTAX)
+
+
+    @classmethod
+    def GetColour(cls, colour):
+        if isinstance(colour, wx.Colour): return colour
+        return wx.Colour(getattr(cls.colourcontainer, colour)) \
+               if isinstance(colour, basestring) \
+               else wx.SystemSettings.GetColour(colour)
+
+
+    @classmethod
+    def Adjust(cls, colour1, colour2, ratio=0.5):
+        """
+        Returns first colour adjusted towards second.
+        Arguments can be wx.Colour, RGB tuple, colour hex string,
+        or wx.SystemSettings colour index.
+
+        @param   ratio    RGB channel adjustment ratio towards second colour
+        """
+        colour1 = wx.SystemSettings.GetColour(colour1) \
+                  if isinstance(colour1, (int, long)) else wx.Colour(colour1)
+        colour2 = wx.SystemSettings.GetColour(colour2) \
+                  if isinstance(colour2, (int, long)) else wx.Colour(colour2)
+        rgb1, rgb2 = tuple(colour1)[:3], tuple(colour2)[:3]
+        delta  = tuple(a - b for a, b in zip(rgb1, rgb2))
+        result = tuple(a - (d * ratio) for a, d in zip(rgb1, delta))
+        result = tuple(min(255, max(0, x)) for x in result)
+        return wx.Colour(result)
+
+
+    @classmethod
+    def UpdateContainer(cls):
+        """Updates configuration colours with current system theme values."""
+        for name, colourid in cls.colourmap.items():
+            setattr(cls.colourcontainer, name, cls.ColourHex(colourid))
+
+        if "#FFFFFF" != cls.ColourHex(wx.SYS_COLOUR_WINDOW):
+            for name, colourid in cls.darkcolourmap.items():
+                setattr(cls.colourcontainer, name, cls.ColourHex(colourid))
+        else:
+            for name, value in cls.darkoriginals.items():
+                setattr(cls.colourcontainer, name, value)
+
+
+    @classmethod
+    def UpdateControls(cls):
+        """Updates all managed controls."""
+        for ctrl, props in cls.ctrls.items():
+            if not ctrl: # Component destroyed
+                cls.ctrls.pop(ctrl)
+                continue # for ctrl, props
+
+            for prop, colour in props.items():
+                cls.UpdateControlColour(ctrl, prop, colour)
+
+
+    @classmethod
+    def UpdateControlColour(cls, ctrl, prop, colour):
+        """Sets control property or invokes "Set" + prop."""
+        mycolour = cls.GetColour(colour)
+        if hasattr(ctrl, prop):
+            setattr(ctrl, prop, mycolour)
+        elif hasattr(ctrl, "Set" + prop):
+            getattr(ctrl, "Set" + prop)(mycolour)
 
 
 
