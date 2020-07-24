@@ -22,7 +22,7 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.dev10"
+Version = "4.0.dev11"
 VersionDate = "24.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -57,7 +57,7 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "StatusFlashLength", "WordCloudLengthMin", "WordCloudCountMin",
     "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
-OptionalFileDirectiveDefaults = {}
+Defaults = {}
 
 """---------------------------- FileDirectives: ----------------------------"""
 
@@ -337,8 +337,13 @@ WordCloudWordsAuthorMax = 50
 
 def load():
     """Loads FileDirectives from ConfigFile into this module's attributes."""
+    global Defaults
     section = "*"
     module = sys.modules[__name__]
+    VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))
+    Defaults = {k: v for k, v in vars(module).items() if not k.startswith("_")
+                and isinstance(v, VARTYPES)}
+
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
@@ -358,7 +363,6 @@ def load():
         for name in FileDirectives:
             [setattr(module, name, v) for v, s in [parse_value(name)] if s]
         for name in OptionalFileDirectives:
-            OptionalFileDirectiveDefaults[name] = getattr(module, name, None)
             [setattr(module, name, v) for v, s in [parse_value(name)] if s]
     except Exception:
         pass # Fail silently
@@ -372,6 +376,8 @@ def save():
     parser.optionxform = str # Force case-sensitivity on names
     parser.add_section(section)
     try:
+        try: os.makedirs(os.path.split(ConfigFile)[0])
+        except Exception: pass
         f = open(ConfigFile, "wb")
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -381,7 +387,7 @@ def save():
         for name in OptionalFileDirectives:
             try:
                 value = getattr(module, name, None)
-                if OptionalFileDirectiveDefaults.get(name) != value:
+                if Defaults.get(name) != value:
                     parser.set(section, name, json.dumps(value))
             except Exception: pass
         parser.write(f)

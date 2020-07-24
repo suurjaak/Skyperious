@@ -9,7 +9,7 @@ GUI frame template:
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    06.07.2020
+@modified    24.07.2020
 """
 import datetime
 import os
@@ -23,6 +23,7 @@ try:
 except ImportError: wx = None
 
 
+from . controls import ColourManager, KEYS
 from . import conf
 from . import wx_accel
 
@@ -186,6 +187,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         """Creates and returns the log output panel."""
         panel = wx.Panel(parent)
         sizer = panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        ColourManager.Manage(panel, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
 
         button_clear = wx.Button(parent=panel, label="C&lear log",
                                  size=(100, -1))
@@ -193,9 +195,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         edit_log = self.log = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
         edit_log.SetEditable(False)
         # Read-only controls tend to be made grey by default
-        getcolour = wx.SystemSettings.GetColour
-        edit_log.BackgroundColour = getcolour(wx.SYS_COLOUR_WINDOW)
-        edit_log.ForegroundColour = getcolour(wx.SYS_COLOUR_GRAYTEXT)
+        ColourManager.Manage(edit_log, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(edit_log, "ForegroundColour", wx.SYS_COLOUR_GRAYTEXT)
 
         sizer.Add(button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP | 
                   wx.RIGHT)
@@ -244,7 +245,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
     def on_keydown_console(self, event):
         """Handler for keydown in console, saves entered command in history."""
         event.Skip()
-        if (wx.WXK_RETURN == event.KeyCode and not event.ShiftDown()
+        if (event.KeyCode in KEYS.ENTER and not event.ShiftDown()
         and self.console.history):
             # Defer saving until command is inserted into console history
             wx.CallAfter(self.save_last_command)

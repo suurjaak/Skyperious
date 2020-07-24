@@ -6,6 +6,9 @@ Stand-alone GUI components for wx:
   Primitive hover panel with a message that stays in the center of parent
   window.
 
+- ColourManager(object):
+  Updates managed component colours on Windows system colour change.
+
 - EntryDialog(wx.Dialog):
   Non-modal text entry dialog with auto-complete dropdown, appears in lower
   right corner.
@@ -490,11 +493,8 @@ class NoteButton(wx.Panel, wx.Button):
     def __init__(self, parent, label=wx.EmptyString, note=wx.EmptyString,
                  bmp=wx.NullBitmap, id=-1, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=0, name=wx.PanelNameStr):
-        """
-        @param   
-        """
         wx.Panel.__init__(self, parent, id, pos, size,
-                            style | wx.FULL_REPAINT_ON_RESIZE, name)
+                          style | wx.FULL_REPAINT_ON_RESIZE, name)
         self._label = label
         self._note = note
         self._bmp = bmp
@@ -518,20 +518,19 @@ class NoteButton(wx.Panel, wx.Button):
         self._cursor_hover   = wx.Cursor(wx.CURSOR_HAND)
         self._cursor_default = wx.Cursor(wx.CURSOR_DEFAULT)
 
-        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouseEvent)
+        self.Bind(wx.EVT_MOUSE_EVENTS,       self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.Bind(wx.EVT_SIZE, self.OnSize)
-        self.Bind(wx.EVT_SET_FOCUS, self.OnFocus)
-        self.Bind(wx.EVT_KILL_FOCUS, self.OnFocus)
-        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
-        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
-        self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
+        self.Bind(wx.EVT_PAINT,              self.OnPaint)
+        self.Bind(wx.EVT_SIZE,               self.OnSize)
+        self.Bind(wx.EVT_SET_FOCUS,          self.OnFocus)
+        self.Bind(wx.EVT_KILL_FOCUS,         self.OnFocus)
+        self.Bind(wx.EVT_ERASE_BACKGROUND,   self.OnEraseBackground)
+        self.Bind(wx.EVT_KEY_DOWN,           self.OnKeyDown)
+        self.Bind(wx.EVT_CHAR_HOOK,          self.OnChar)
 
         self.SetCursor(self._cursor_hover)
-        fgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT)
-        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
-        self.ForegroundColour, self.BackgroundColour = fgcolour, bgcolour
+        ColourManager.Manage(self, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
         self.WrapTexts()
 
 
@@ -540,15 +539,16 @@ class NoteButton(wx.Panel, wx.Button):
 
 
     def DoGetBestSize(self):
-        w = 100 if self.Size.width < 100 else self.Size.width
+        w = 40 if self.Size.width  < 40 else self.Size.width
         h = 40 if self.Size.height < 40 else self.Size.height
-        if self._extent_label:    
+        if self._bmp:
+            w = max(w, self._bmp.Size.width  + 20)
+            h = max(h, self._bmp.Size.height + 20)
+        if self._extent_label:
             h1 = 10 + self._bmp.Size.height + 10
             h2 = 10 + self._extent_label[1] + 10 + self._extent_note[1] + 10
             h  = max(h1, h2)
-        size = wx.Size(w, h)
-
-        return size
+        return wx.Size(w, h)
 
 
     def Draw(self, dc):
@@ -576,46 +576,47 @@ class NoteButton(wx.Panel, wx.Button):
         dc.Pen = PEN(dc.TextForeground)
         dc.Clear()
 
-        is_focused = (self.FindFocus() == self)
+        is_focused = (self.FindFocus() is self)
 
-        if is_focused or not self.IsThisEnabled():
+        if is_focused:
             # Draw simple border around button
             dc.Brush = wx.TRANSPARENT_BRUSH
             dc.DrawRectangle(0, 0, width, height)
 
-            # Button is focused: draw focus marquee.
-            if is_focused:
-                if not NoteButton.BMP_MARQUEE:
-                    NoteButton.BMP_MARQUEE = wx.Bitmap(2, 2)
-                    dc_bmp = wx.MemoryDC()
-                    dc_bmp.SelectObject(NoteButton.BMP_MARQUEE)
-                    dc_bmp.Background = wx.Brush(self.BackgroundColour)
-                    dc_bmp.Clear()
-                    dc_bmp.Pen = wx.Pen(self.ForegroundColour)
-                    dc_bmp.DrawPointList([(0, 1), (1, 0)])
-                    dc_bmp.SelectObject(wx.NullBitmap)
-                try:
-                    pen = PEN(dc.TextForeground, 1, wx.PENSTYLE_STIPPLE)
-                    pen.Stipple, dc.Pen = NoteButton.BMP_MARQUEE, pen
-                    dc.DrawRectangle(4, 4, width - 8, height - 8)
-                except wx.wxAssertionError: # Gtk does not support stippled pens
-                    brush = BRUSH(dc.TextForeground)
-                    brush.SetStipple(NoteButton.BMP_MARQUEE)
-                    dc.Brush = brush
-                    dc.Pen = wx.TRANSPARENT_PEN
-                    dc.DrawRectangle(4, 4, width - 8, height - 8)
-                    dc.Brush = BRUSH(self.BackgroundColour)
-                    dc.DrawRectangle(5, 5, width - 10, height - 10)
-                dc.Pen = PEN(dc.TextForeground)
+            # Create cached focus marquee
+            if not NoteButton.BMP_MARQUEE:
+                NoteButton.BMP_MARQUEE = wx.Bitmap(2, 2)
+                dc_bmp = wx.MemoryDC()
+                dc_bmp.SelectObject(NoteButton.BMP_MARQUEE)
+                dc_bmp.Background = wx.Brush(self.BackgroundColour)
+                dc_bmp.Clear()
+                dc_bmp.Pen = wx.Pen(self.ForegroundColour)
+                dc_bmp.DrawPointList([(0, 1), (1, 0)])
+                dc_bmp.SelectObject(wx.NullBitmap)
 
-        if self._press or (is_focused and wx.GetKeyState(wx.WXK_SPACE)):
-            # Button is being clicked with mouse: create sunken effect.
+            # Draw focus marquee
+            try:
+                pen = PEN(dc.TextForeground, 1, wx.PENSTYLE_STIPPLE)
+                pen.Stipple, dc.Pen = NoteButton.BMP_MARQUEE, pen
+                dc.DrawRectangle(4, 4, width - 8, height - 8)
+            except wx.wxAssertionError: # Gtk does not support stippled pens
+                brush = BRUSH(dc.TextForeground)
+                brush.SetStipple(NoteButton.BMP_MARQUEE)
+                dc.Brush = brush
+                dc.Pen = wx.TRANSPARENT_PEN
+                dc.DrawRectangle(4, 4, width - 8, height - 8)
+                dc.Brush = BRUSH(self.BackgroundColour)
+                dc.DrawRectangle(5, 5, width - 10, height - 10)
+            dc.Pen = PEN(dc.TextForeground)
+
+        if self._press or (is_focused and any(wx.GetKeyState(x) for x in KEYS.SPACE)):
+            # Button is being clicked with mouse: create sunken effect
             colours = [(128, 128, 128)] * 2
             lines   = [(1, 1, width - 2, 1), (1, 1, 1, height - 2)]
             dc.DrawLineList(lines, [PEN(wx.Colour(*c)) for c in colours])
             x += 1; y += 1
         elif self._hover and self.IsThisEnabled():
-            # Button is being hovered with mouse: create raised effect.
+            # Button is being hovered with mouse: create raised effect
             colours  = [(255, 255, 255)] * 2
             if wx.WHITE == self.BackgroundColour:
                 colours =  [(158, 158, 158)] * 2
@@ -643,6 +644,7 @@ class NoteButton(wx.Panel, wx.Button):
         text_label = self._text_label
         if "&" in self._label:
             text_label, h = "", y - 1
+            dc.Pen = wx.Pen(dc.TextForeground)
             for line in self._text_label.split("\n"):
                 i, chars = 0, ""
                 while i < len(line):
@@ -654,7 +656,7 @@ class NoteButton(wx.Panel, wx.Button):
                             x1, y1 = x + extent_all[0], h + extent[1]
                             dc.DrawLine(x1, y1, x1 + extent[0], y1)
                         elif i < len(line):
-                            chars += line[i] # Double ampersand: add as one.
+                            chars += line[i] # Double ampersand: add as one
                     if i < len(line):
                         chars += line[i]
                     i += 1
@@ -671,15 +673,14 @@ class NoteButton(wx.Panel, wx.Button):
 
     def WrapTexts(self):
         """Wraps button texts to current control size."""
+        self._text_label, self._text_note = self._label, self._note
+
+        if not self._label and not self._note:
+            self._extent_label = self._extent_note = (0, 0)
+            return
+
+        WORDWRAP = wx.lib.wordwrap.wordwrap
         width, height = self.Size
-        label = self._label
-        self._text_label = label
-        self._text_note = self._note
-
-        def WORDWRAP(text, width, dc):
-            try: return wx.lib.wordwrap.wordwrap(text, width, dc)
-            except Exception: return text
-
         if width > 20 and height > 20:
             dc = wx.ClientDC(self)
         else: # Not properly sized yet: assume a reasonably fitting size
@@ -696,25 +697,25 @@ class NoteButton(wx.Panel, wx.Button):
 
 
     def OnPaint(self, event):
-        """Handler for paint event, calls """
+        """Handler for paint event, calls Draw()."""
         dc = wx.BufferedPaintDC(self)
         self.Draw(dc)
 
 
     def OnSize(self, event):
         """Handler for size event, resizes texts and repaints control."""
+        event.Skip()
         if event.Size != self._size:
             self._size = event.Size
             wx.CallAfter(lambda: self and (self.WrapTexts(), self.Refresh(),
                          self.InvalidateBestSize(), self.Parent.Layout()))
-        event.Skip()
 
 
     def OnFocus(self, event):
         """Handler for receiving/losing focus, repaints control."""
         if self: # Might get called when control already destroyed
             self.Refresh()
-            
+
 
     def OnEraseBackground(self, event):
         """Handles the wx.EVT_ERASE_BACKGROUND event."""
@@ -722,24 +723,23 @@ class NoteButton(wx.Panel, wx.Button):
 
 
     def OnKeyDown(self, event):
-        """Refreshes display if pressing space."""
-        if not event.AltDown() and event.UnicodeKey in [wx.WXK_SPACE]:
+        """Refreshes display if pressing space (showing sunken state)."""
+        if not event.AltDown() and event.UnicodeKey in KEYS.SPACE:
             self.Refresh()
+        else: event.Skip()
 
 
-    def OnKeyUp(self, event):
-        """Fires button event on releasing space or enter."""
+    def OnChar(self, event):
+        """Queues firing button event on pressing space or enter."""
         skip = True
-        if not event.AltDown():
-            key = event.UnicodeKey
-            if key in [wx.WXK_SPACE, wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
-                button_event = wx.PyCommandEvent(wx.EVT_BUTTON.typeId, self.Id)
-                button_event.EventObject = self
-                wx.PostEvent(self, button_event)
-                skip = False
-                self.Refresh()
-        if skip:
-            event.Skip()
+        if not event.AltDown() \
+        and event.UnicodeKey in KEYS.SPACE + KEYS.ENTER:
+            button_event = wx.PyCommandEvent(wx.EVT_BUTTON.typeId, self.Id)
+            button_event.EventObject = self
+            wx.CallLater(1, wx.PostEvent, self, button_event)
+            skip = False
+            self.Refresh()
+        if skip: event.Skip()
 
 
     def OnMouseEvent(self, event):
@@ -747,6 +747,7 @@ class NoteButton(wx.Panel, wx.Button):
         Mouse handler, creates hover/press border effects and fires button
         event on click.
         """
+        event.Skip()
         refresh = False
         if event.Entering():
             refresh = True
@@ -771,7 +772,6 @@ class NoteButton(wx.Panel, wx.Button):
                     wx.PostEvent(self, btnevent)
         if refresh:
             self.Refresh()
-        event.Skip()
 
 
     def OnMouseCaptureLostEvent(self, event):
@@ -787,16 +787,24 @@ class NoteButton(wx.Panel, wx.Button):
         return True
 
 
+    def Disable(self):
+        return self.Enable(False)
+
+
     def Enable(self, enable=True):
         """
         Enable or disable this control for user input, returns True if the
         control state was changed.
         """
+        result = (self._enabled != enable)
+        if not result: return result
+
         self._enabled = enable
-        result = wx.Panel.Enable(self, enable)
-        if result:
-            self.Refresh()
+        wx.Panel.Enable(self, enable)
+        self.Refresh()
         return result
+    def IsEnabled(self): return wx.Panel.IsEnabled(self)
+    Enabled = property(IsEnabled, Enable)
 
 
     def IsThisEnabled(self):
@@ -837,42 +845,42 @@ class PropertyDialog(wx.Dialog):
     integers, booleans, and wx classes like wx.Size interpreted as tuples.
     """
 
+
     COLOUR_ERROR = wx.RED
 
     def __init__(self, parent, title):
-        wx.Dialog.__init__(self, parent=parent, title=title,
+        wx.Dialog.__init__(self, parent, title=title,
                           style=wx.CAPTION | wx.CLOSE_BOX | wx.RESIZE_BORDER)
         self.properties = [] # [(name, type, orig_val, default, label, ctrl), ]
 
         panelwrap = wx.Panel(self)
-        panel = self.panel = wx.lib.scrolledpanel.ScrolledPanel(panelwrap)
+        panel = self.panel = wx.ScrolledWindow(panelwrap)
 
-        button_save = wx.Button(panelwrap, label="Save")
-        button_reset = wx.Button(panelwrap, label="Restore defaults")
-        button_cancel = wx.Button(panelwrap, label="Cancel", id=wx.CANCEL)
-
-        self.Bind(wx.EVT_BUTTON, self._OnSave, button_save)
-        self.Bind(wx.EVT_BUTTON, self._OnReset, button_reset)
-        self.Bind(wx.EVT_BUTTON, self._OnCancel, button_cancel)
-
-        button_save.SetDefault()
-        self.SetEscapeId(wx.CANCEL)
-
-        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        self.Sizer      = wx.BoxSizer(wx.VERTICAL)
         panelwrap.Sizer = wx.BoxSizer(wx.VERTICAL)
-        panel.Sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
+        panel.Sizer     = wx.BoxSizer(wx.VERTICAL)
         sizer_items = self.sizer_items = wx.GridBagSizer(hgap=5, vgap=1)
+
+        sizer_buttons = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        button_ok     = next((x.Window for x in sizer_buttons.Children
+                              if x.Window and wx.ID_OK == x.Window.Id), None)
+        button_reset  = wx.Button(self, label="Restore defaults")
+        if button_ok:
+            button_ok.Label = "Save"
+            button_reset.MoveAfterInTabOrder(button_ok)
 
         panel.Sizer.Add(sizer_items, proportion=1, border=5, flag=wx.GROW | wx.RIGHT)
         panelwrap.Sizer.Add(panel, proportion=1, border=10, flag=wx.GROW | wx.ALL)
-        for b in (button_save, button_reset, button_cancel):
-            sizer_buttons.Add(b, border=10, flag=wx.LEFT)
-        panelwrap.Sizer.Add(sizer_buttons, border=10, flag=wx.ALL | wx.ALIGN_RIGHT)
         self.Sizer.Add(panelwrap, proportion=1, flag=wx.GROW)
+        sizer_buttons.Insert(min(2, sizer_buttons.ItemCount), button_reset)
+        self.Sizer.Add(sizer_buttons, border=10, flag=wx.ALL | wx.ALIGN_RIGHT)
+
+        self.Bind(wx.EVT_BUTTON, self._OnSave,   id=wx.ID_OK)
+        self.Bind(wx.EVT_BUTTON, self._OnReset,  button_reset)
+        self.Bind(wx.EVT_BUTTON, self._OnReset,  id=wx.ID_APPLY)
 
         self.MinSize, self.Size = (320, 180), (420, 420)
-        self.BackgroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
 
     def AddProperty(self, name, value, help="", default=None, typeclass=unicode):
@@ -893,9 +901,10 @@ class PropertyDialog(wx.Dialog):
         ctrl.ToolTip = label.ToolTip = "Value of type %s%s." % (
             typeclass.__name__,
             "" if default is None else ", default %s" % repr(default))
-        tip.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+        ColourManager.Manage(tip, "ForegroundColour", wx.SYS_COLOUR_GRAYTEXT)
         tipfont, tipfont.PixelSize = tip.Font, (0, 9)
         tip.Font = tipfont
+        tip.Wrap(self.panel.Size[0] - 30)
         for x in (label, tip): x.Bind(wx.EVT_LEFT_UP, label_handler)
 
         self.sizer_items.Add(label, pos=(row, 0), flag=wx.ALIGN_CENTER_VERTICAL)
@@ -907,7 +916,7 @@ class PropertyDialog(wx.Dialog):
 
     def Realize(self):
         """Lays out the properties, to be called when adding is completed."""
-        self.panel.SetupScrolling(scroll_x=False)
+        self.panel.SetScrollRate(0, 20)
         self.sizer_items.AddGrowableCol(1) # Grow ctrl column
 
 
@@ -925,7 +934,7 @@ class PropertyDialog(wx.Dialog):
 
     def _OnSave(self, event):
         """
-        Handler for clicking save, checks values and hides the dialog if all 
+        Handler for clicking save, checks values and hides the dialog if all
         ok, highlights errors otherwise.
         """
         all_ok = True
@@ -933,13 +942,9 @@ class PropertyDialog(wx.Dialog):
             if self._GetValueForType(ctrl.Value, typeclass) is None:
                 all_ok = False
                 label.ForegroundColour = ctrl.ForegroundColour = self.COLOUR_ERROR
-            else:                
+            else:
                 label.ForegroundColour = ctrl.ForegroundColour = self.ForegroundColour
-        if all_ok:
-            self.Hide()
-            self.IsModal() and self.EndModal(wx.ID_OK)
-        else:
-            self.Refresh()
+        event.Skip() if all_ok else self.Refresh()
 
 
     def _OnReset(self, event):
@@ -952,19 +957,14 @@ class PropertyDialog(wx.Dialog):
         self.Refresh()
 
 
-    def _OnCancel(self, event):
-        """Handler for clicking cancel, hides the dialog."""
-        self.Hide()
-        self.IsModal() and self.EndModal(wx.ID_CANCEL)
-
-
     def _GetValueForType(self, value, typeclass):
         """Returns value in type expected, or None on failure."""
         try:
-            result = typeclass(value) if "wx" not in typeclass.__module__ \
-                     else tuple(typeclass(*ast.literal_eval(value)))
+            result = typeclass(value)
+            if isinstance(result, (int, long)) and result < 0:
+                raise ValueError() # Reject negative numbers
             isinstance(result, basestring) and result.strip()[0] # Reject empty
-            return result 
+            return result
         except Exception:
             return None
 
@@ -972,8 +972,10 @@ class PropertyDialog(wx.Dialog):
     def _GetValueForCtrl(self, value, typeclass):
         """Returns the value in type suitable for appropriate wx control."""
         value = tuple(value) if isinstance(value, list) else value
-        return str(value) if typeclass in [int, long]  or "wx" in typeclass.__module__ \
-               else "" if value is None else value
+        if isinstance(value, tuple):
+            value = tuple(str(x) if isinstance(x, unicode) else x for x in value)
+        return "" if value is None else value \
+               if isinstance(value, (basestring, bool)) else unicode(value)
 
 
 
@@ -1046,7 +1048,6 @@ class RangeSlider(wx.Panel):
     numeric and date/time values. Fires a wx.EVT_SLIDER event on value change.
     Disabling MARKER_LABEL_SHOW will skip drawing marker label area.
     """
-    BACKGROUND_COLOUR       = None
     BAR_ARROW_BG_COLOUR     = wx.Colour(212, 208, 200)
     BAR_ARROW_FG_COLOUR     = wx.Colour(0,     0,   0)
     BAR_COLOUR1             = wx.Colour(255, 255, 255) # Scrollbar buttons background
@@ -1096,9 +1097,7 @@ class RangeSlider(wx.Panel):
         """
         wx.Panel.__init__(self, parent, id, pos, size,
                             style | wx.FULL_REPAINT_ON_RESIZE, name)
-        if not RangeSlider.BACKGROUND_COLOUR:
-            bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-            RangeSlider.BACKGROUND_COLOUR = bgcolour
+        ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
         # Fill unassigned range and values with other givens, or assign
         # a default date range.
@@ -1348,8 +1347,8 @@ class RangeSlider(wx.Panel):
                        else self.RANGE_DISABLED_COLOUR
 
         # Fill background
-        dc.SetBrush(BRUSH(self.BACKGROUND_COLOUR))
-        dc.SetPen(PEN(self.BACKGROUND_COLOUR))
+        dc.SetBrush(BRUSH(self.BackgroundColour))
+        dc.SetPen(PEN(self.BackgroundColour))
         dc.DrawRectangle(0, 0, width, height)
         dc.SetPen(PEN(self.BOX_COLOUR))
         dc.DrawLine(0, box_top, width, box_top) # Top line
@@ -2305,36 +2304,45 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
     """A StyledTextCtrl configured for SQLite syntax highlighting."""
 
     """SQLite reserved keywords."""
-    KEYWORDS = [
-        u"ABORT", u"ACTION", u"ADD", u"AFTER", u"ALL", u"ALTER", u"ANALYZE",
-        u"AND", u"AS", u"ASC", u"ATTACH", u"AUTOINCREMENT", u"BEFORE",
-        u"BEGIN", u"BETWEEN", u"BY", u"CASCADE", u"CASE", u"CAST", u"CHECK",
-        u"COLLATE", u"COLUMN", u"COMMIT", u"CONFLICT", u"CONSTRAINT",
-        u"CREATE", u"CROSS", u"CURRENT_DATE", u"CURRENT_TIME",
-        u"CURRENT_TIMESTAMP", u"DATABASE", u"DEFAULT", u"DEFERRABLE",
-        u"DEFERRED", u"DELETE", u"DESC", u"DETACH", u"DISTINCT", u"DROP",
-        u"EACH", u"ELSE", u"END", u"ESCAPE", u"EXCEPT", u"EXCLUSIVE",
-        u"EXISTS", u"EXPLAIN", u"FAIL", u"FOR", u"FOREIGN", u"FROM", u"FULL",
-        u"GLOB", u"GROUP", u"HAVING", u"IF", u"IGNORE", u"IMMEDIATE", u"IN",
-        u"INDEX", u"INDEXED", u"INITIALLY", u"INNER", u"INSERT", u"INSTEAD",
-        u"INTERSECT", u"INTO", u"IS", u"ISNULL", u"JOIN", u"KEY", u"LEFT",
-        u"LIKE", u"LIMIT", u"MATCH", u"NATURAL", u"NO", u"NOT", u"NOTNULL",
-        u"NULL", u"OF", u"OFFSET", u"ON", u"OR", u"ORDER", u"OUTER", u"PLAN",
-        u"PRAGMA", u"PRIMARY", u"QUERY", u"RAISE", u"REFERENCES", u"REGEXP",
-        u"REINDEX", u"RELEASE", u"RENAME", u"REPLACE", u"RESTRICT", u"RIGHT",
-        u"ROLLBACK", u"ROW", u"SAVEPOINT", u"SELECT", u"SET", u"TABLE",
-        u"TEMP", u"TEMPORARY", u"THEN", u"TO", u"TRANSACTION", u"TRIGGER",
-        u"UNION", u"UNIQUE", u"UPDATE", u"USING", u"VACUUM", u"VALUES", u"VIEW",
-        u"VIRTUAL", u"WHEN", u"WHERE"
-    ]
+    KEYWORDS = map(unicode, sorted([
+        "ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ANALYZE",
+        "AND", "AS", "ASC", "ATTACH", "AUTOINCREMENT", "BEFORE",
+        "BEGIN", "BETWEEN", "BINARY", "BY", "CASCADE", "CASE", "CAST",
+        "CHECK", "COLLATE", "COLUMN", "COMMIT", "CONFLICT", "CONSTRAINT",
+        "CREATE", "CROSS", "CURRENT_DATE", "CURRENT_TIME",
+        "CURRENT_TIMESTAMP", "DATABASE", "DEFAULT", "DEFERRABLE",
+        "DEFERRED", "DELETE", "DESC", "DETACH", "DISTINCT", "DROP",
+        "EACH", "ELSE", "END", "ESCAPE", "EXCEPT", "EXCLUSIVE",
+        "EXISTS", "EXPLAIN", "FAIL", "FOR", "FOREIGN", "FROM", "FULL",
+        "GLOB", "GROUP", "HAVING", "IF", "IGNORE", "IMMEDIATE", "IN",
+        "INDEX", "INDEXED", "INITIALLY", "INNER", "INSERT", "INSTEAD",
+        "INTERSECT", "INTO", "IS", "ISNULL", "JOIN", "KEY", "LEFT", "LIKE",
+        "LIMIT", "MATCH", "NATURAL", "NO", "NOCASE", "NOT", "NOTNULL",
+        "NULL", "OF", "OFFSET", "ON", "OR", "ORDER", "OUTER", "PLAN",
+        "PRAGMA", "PRIMARY", "QUERY", "RAISE", "REFERENCES", "REGEXP",
+        "REINDEX", "RELEASE", "RENAME", "REPLACE", "RESTRICT", "RIGHT",
+        "ROLLBACK", "ROW", "ROWID", "RTRIM", "SAVEPOINT", "SELECT", "SET",
+        "TABLE", "TEMP", "TEMPORARY", "THEN", "TO", "TRANSACTION", "TRIGGER",
+        "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM", "VALUES", "VIEW",
+        "VIRTUAL", "WHEN", "WHERE", "WITHOUT",
+    ]))
+    """SQLite data types."""
+    TYPEWORDS = map(unicode, sorted([
+        "BLOB",
+        "INTEGER", "BIGINT", "INT", "INT2", "INT8", "MEDIUMINT", "SMALLINT",
+                   "TINYINT", "UNSIGNED",
+        "NUMERIC", "BOOLEAN", "DATE", "DATETIME", "DECIMAL",
+        "TEXT", "CHARACTER", "CLOB", "NCHAR", "NVARCHAR", "VARCHAR", "VARYING",
+        "REAL", "DOUBLE", "FLOAT", "PRECISION",
+    ]))
     AUTOCOMP_STOPS = " .,;:([)]}'\"\\<>%^&+-=*/|`"
-    FONT_FACE = "Courier New" if os.name == "nt" else "Courier"
     """String length from which autocomplete starts."""
     AUTOCOMP_LEN = 2
+    FONT_FACE = "Courier New" if os.name == "nt" else "Courier"
 
     def __init__(self, *args, **kwargs):
         wx.stc.StyledTextCtrl.__init__(self, *args, **kwargs)
-        self.autocomps_added = set()
+        self.autocomps_added = set(["sqlite_master"])
         # All autocomps: added + KEYWORDS
         self.autocomps_total = self.KEYWORDS
         # {word.upper(): set(words filled in after word+dot), }
@@ -2344,50 +2352,18 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         self.SetMarginWidth(1, 0) # Get rid of left margin
         self.SetTabWidth(4)
         # Keywords must be lowercase, required by StyledTextCtrl
-        self.SetKeyWords(0, u" ".join(self.KEYWORDS).lower())
+        self.SetKeyWords(0, u" ".join(self.KEYWORDS + self.TYPEWORDS).lower())
         self.AutoCompStops(self.AUTOCOMP_STOPS)
         self.SetWrapMode(wx.stc.STC_WRAP_WORD)
-        self.SetCaretLineBackground("#00FFFF")
         self.SetCaretLineBackAlpha(20)
         self.SetCaretLineVisible(True)
         self.AutoCompSetIgnoreCase(True)
-        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
-        self.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
+        self.Bind(wx.EVT_KEY_DOWN,           self.OnKeyDown)
+        self.Bind(wx.EVT_KILL_FOCUS,         self.OnKillFocus)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
+        self.Bind(wx.stc.EVT_STC_ZOOM,       self.OnZoom)
 
-        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, 
-                          "face:%s,back:%s" % (self.FONT_FACE,
-                          bgcolour.GetAsString(wx.C2S_HTML_SYNTAX)))
-        self.StyleClearAll() # Apply the new default style to all styles
-        self.StyleSetSpec(wx.stc.STC_SQL_DEFAULT, "face:%s" % self.FONT_FACE)
-        self.StyleSetSpec(wx.stc.STC_SQL_STRING, "fore:#FF007F") # "
-        self.StyleSetSpec(wx.stc.STC_SQL_CHARACTER, "fore:#FF007F") # "
-        self.StyleSetSpec(wx.stc.STC_SQL_QUOTEDIDENTIFIER, "fore:#0000FF")
-        self.StyleSetSpec(wx.stc.STC_SQL_WORD, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_WORD2, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_USER1, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_USER2, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_USER3, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_USER4, "fore:#0000FF,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS, "fore:#ff0000,bold")
-        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS_COMMENT, "back:#ffff00")
-        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS_PROMPT, "back:#00ff00")
-        # 01234567890.+-e
-        self.StyleSetSpec(wx.stc.STC_SQL_NUMBER, "fore:#FF00FF")
-        # + - * / % = ! ^ & . , ; <> () [] {}
-        self.StyleSetSpec(wx.stc.STC_SQL_OPERATOR, "fore:#0000FF")
-        # --...
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINE, "fore:#008000")
-        # #...
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINEDOC, "fore:#008000")
-        # /*...*/
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENT, "fore:#008000")
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOC, "fore:#008000")
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORD, "back:#AAFFAA")
-        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORDERROR, "back:#AAFFAA")
-
-        self.StyleSetSpec(wx.stc.STC_STYLE_BRACELIGHT, "fore:#0000FF")
-        self.StyleSetSpec(wx.stc.STC_STYLE_BRACEBAD, "fore:#FF0000")
+        self.SetStyleSpecs()
 
         """
         This is how a non-sorted case-insensitive list can be used.
@@ -2406,14 +2382,60 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         """
 
 
+    def SetStyleSpecs(self):
+        """Sets STC style colours."""
+        fgcolour, bgcolour, highcolour = (
+            wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
+            for x in (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW
+                      if self.Enabled else wx.SYS_COLOUR_BTNFACE,
+                      wx.SYS_COLOUR_HOTLIGHT)
+        )
+
+
+        self.SetCaretForeground(fgcolour)
+        self.SetCaretLineBackground("#00FFFF")
+        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,
+                          "face:%s,back:%s,fore:%s" % (self.FONT_FACE, bgcolour, fgcolour))
+        self.StyleClearAll() # Apply the new default style to all styles
+        self.StyleSetSpec(wx.stc.STC_SQL_DEFAULT,   "face:%s" % self.FONT_FACE)
+        self.StyleSetSpec(wx.stc.STC_SQL_STRING,    "fore:#FF007F") # "
+        self.StyleSetSpec(wx.stc.STC_SQL_CHARACTER, "fore:#FF007F") # "
+        self.StyleSetSpec(wx.stc.STC_SQL_QUOTEDIDENTIFIER, "fore:%s" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_WORD,  "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_WORD2, "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_USER1, "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_USER2, "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_USER3, "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_USER4, "fore:%s,bold" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS, "fore:#ff0000,bold")
+        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS_COMMENT, "back:#ffff00")
+        self.StyleSetSpec(wx.stc.STC_SQL_SQLPLUS_PROMPT,  "back:#00ff00")
+        # 01234567890.+-e
+        self.StyleSetSpec(wx.stc.STC_SQL_NUMBER, "fore:#FF00FF")
+        # + - * / % = ! ^ & . , ; <> () [] {}
+        self.StyleSetSpec(wx.stc.STC_SQL_OPERATOR, "fore:%s" % highcolour)
+        # --...
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINE, "fore:#008000")
+        # #...
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTLINEDOC, "fore:#008000")
+        # /*...*/
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENT, "fore:#008000")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOC, "fore:#008000")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORD, "back:#AAFFAA")
+        self.StyleSetSpec(wx.stc.STC_SQL_COMMENTDOCKEYWORDERROR, "back:#AAFFAA")
+
+        self.StyleSetSpec(wx.stc.STC_STYLE_BRACELIGHT, "fore:%s" % highcolour)
+        self.StyleSetSpec(wx.stc.STC_STYLE_BRACEBAD, "fore:#FF0000")
+
+
     def AutoCompAddWords(self, words):
         """Adds more words used in autocompletion."""
         self.autocomps_added.update(words)
         # A case-insensitive autocomp has to be sorted, will not work
         # properly otherwise. UserList would support arbitrarily sorting.
-        self.autocomps_total = sorted(
-            list(self.autocomps_added) + self.KEYWORDS, cmp=self.stricmp
-        )
+        self.autocomps_total = sorted(list(self.autocomps_added) +
+                                      map(unicode, self.KEYWORDS),
+                                      cmp=self.stricmp)
 
 
     def AutoCompAddSubWords(self, word, subwords):
@@ -2421,18 +2443,29 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         Adds more subwords used in autocompletion, will be shown after the word
         and a dot.
         """
+        word, subwords = unicode(word), map(unicode, subwords)
         if word not in self.autocomps_added:
             self.AutoCompAddWords([word])
         if subwords:
             word_key = word.upper()
-            if word_key not in self.autocomps_subwords:
-                self.autocomps_subwords[word_key] = set()
+            self.autocomps_subwords.setdefault(word_key, set())
             self.autocomps_subwords[word_key].update(subwords)
 
 
     def OnKillFocus(self, event):
         """Handler for control losing focus, hides autocomplete."""
         self.AutoCompCancel()
+
+
+    def OnSysColourChange(self, event):
+        """Handler for system colour change, updates STC styling."""
+        event.Skip()
+        self.SetStyleSpecs()
+
+
+    def OnZoom(self, event):
+        """Disables zoom."""
+        if self.Zoom: self.Zoom = 0
 
 
     def OnKeyDown(self, event):
@@ -3057,9 +3090,7 @@ class TabbedHtmlWindow(wx.Panel):
         self._tabs = []
         self._default_page = ""      # Content shown on the blank page
         self._delete_callback = None # Function called after deleting a tab
-        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        tabcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
-        self.BackgroundColour = bgcolour
+        ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
@@ -3082,8 +3113,8 @@ class TabbedHtmlWindow(wx.Panel):
                       self._OnDropTab)
         self._html.Bind(wx.EVT_SCROLLWIN, self._OnScroll)
 
-        notebook.SetActiveTabColour(bgcolour)
-        notebook.SetTabAreaColour(tabcolour)
+        ColourManager.Manage(notebook, "ActiveTabColour", wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(notebook, "TabAreaColour",   wx.SYS_COLOUR_BTNFACE)
         try: notebook._pages.GetSingleLineBorderColour = notebook.GetActiveTabColour
         except Exception: pass # Hack to get uniform background colour
 
@@ -3199,8 +3230,7 @@ class TabbedHtmlWindow(wx.Panel):
     def _SetPage(self, content):
         """Sets current HTML page content."""
         self._html.SetPage(content)
-        bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        self._html.SetBackgroundColour(bgcolour)
+        ColourManager.Manage(self._html, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
 
     def SetDeleteCallback(self, callback):
@@ -3312,9 +3342,6 @@ class TextCtrlAutoComplete(wx.TextCtrl):
     """
     DROPDOWN_COUNT_PER_PAGE = 8
     DROPDOWN_CLEAR_TEXT = "Clear search history"
-    DROPDOWN_CLEAR_COLOUR = "blue"
-    DROPDOWN_TEXT_COLOUR = None # Postpone to after wx.App creation
-    DESCRIPTION_COLOUR = None # Postpone to after wx.App creation
 
 
     def __init__(self, parent, choices=None, description="",
@@ -3328,12 +3355,10 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         else:
             kwargs["style"] = wx.TE_PROCESS_ENTER
         wx.TextCtrl.__init__(self, parent, **kwargs)
-        self._text_colour = self.GetForegroundColour()
-
-        if not TextCtrlAutoComplete.DROPDOWN_TEXT_COLOUR:
-            graycolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
-            TextCtrlAutoComplete.DROPDOWN_TEXT_COLOUR = graycolour
-            TextCtrlAutoComplete.DESCRIPTION_COLOUR = graycolour
+        self._text_colour = self._desc_colour = self._clear_colour = None
+        ColourManager.Manage(self, "_text_colour",  wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(self, "_desc_colour",  wx.SYS_COLOUR_GRAYTEXT)
+        ColourManager.Manage(self, "_clear_colour", wx.SYS_COLOUR_HOTLIGHT)
 
         self._choices = [] # Ordered case-insensitively
         self._choices_lower = [] # Cached lower-case choices
@@ -3345,7 +3370,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         self._description_on = False # Is textbox filled with description?
         if not self.Value:
             self.Value = self._description
-            self.SetForegroundColour(self.DESCRIPTION_COLOUR)
+            self.SetForegroundColour(self._desc_colour)
             self._description_on = True
         try:
             self._listwindow = wx.PopupWindow(self)
@@ -3357,7 +3382,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self._listbox = self._listwindow = None
 
         if self._listbox:
-            self._listbox.TextColour = self.DROPDOWN_TEXT_COLOUR
+            ColourManager.Manage(self._listbox, "TextColour", wx.SYS_COLOUR_GRAYTEXT)
             self.SetChoices(choices or [])
             self._cursor = None
             # For changing cursor when hovering over final "Clear" item.
@@ -3381,6 +3406,17 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                                   self._listbox)
         self.Bind(wx.EVT_SET_FOCUS,                 self.OnFocus, self)
         self.Bind(wx.EVT_KILL_FOCUS,                self.OnFocus, self)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED,        self.OnSysColourChange)
+
+
+    def OnSysColourChange(self, event):
+        """
+        Handler for system colour change, updates text colours.
+        """
+        event.Skip()
+        colour = self._desc_colour if self._description_on else self._text_colour
+        self.SetForegroundColour(colour)
+        self.SetChoices(self._choices)
 
 
     def OnListClick(self, event):
@@ -3408,9 +3444,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         """
         Handler for moving or sizing the control or any parent, hides dropdown.
         """
-        if self:
-            self.ShowDropDown(False)
         event.Skip()
+        if self: self.ShowDropDown(False)
 
 
     def OnClickDown(self, event):
@@ -3418,8 +3453,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         Handler for clicking and holding left mouse button, remembers click
         position.
         """
-        self._lastinsertionpoint = self.GetInsertionPoint()
         event.Skip()
+        self._lastinsertionpoint = self.GetInsertionPoint()
 
 
     def OnClickUp(self, event):
@@ -3427,9 +3462,9 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         Handler for releasing left mouse button, toggles dropdown list
         visibility on/off if clicking same spot in textbox.
         """
+        event.Skip()
         if (self.GetInsertionPoint() == self._lastinsertionpoint):
             self.ShowDropDown(not self._listwindow.Shown)
-        event.Skip()
 
 
     def OnListItemSelected(self, event):
@@ -3437,15 +3472,16 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         Handler for selecting an item in the dropdown list, sets its value to
         textbox.
         """
-        self.SetValueFromSelected()
         event.Skip()
+        self.SetValueFromSelected()
 
 
     def OnFocus(self, event):
         """
         Handler for focusing/unfocusing the control, shows/hides description.
         """
-        if self and self.FindFocus() == self:
+        event.Skip() # Allow to propagate to parent, to show having focus
+        if self and self.FindFocus() is self:
             if self._description_on:
                 self.Value = ""
             self._value_last = self.Value
@@ -3454,11 +3490,10 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             if self._description and not self.Value:
                 # Control has been unfocused, set and colour description
                 self.Value = self._description
-                self.SetForegroundColour(self.DESCRIPTION_COLOUR)
+                self.SetForegroundColour(self._desc_colour)
                 self._description_on = True
             if self._listbox:
                 self.ShowDropDown(False)
-        event.Skip() # Allow to propagate to parent, to show having focus
 
 
     def OnMouse(self, event):
@@ -3466,6 +3501,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         Handler for mouse events, changes cursor to pointer if hovering over
         action item like "Clear history".
         """
+        event.Skip()
         index, flag = self._listbox.HitTest(event.GetPosition())
         if index == self._listbox.ItemCount - 1:
             if self._cursor != self._cursor_action_hover:
@@ -3474,21 +3510,19 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         elif self._cursor == self._cursor_action_hover:
             self._cursor = self._cursor_default
             self._listbox.SetCursor(self._cursor_default)
-        event.Skip()
 
 
     def OnKeyDown(self, event):
         """Handler for any keypress, changes dropdown items."""
-        if not self._choices:
-            return event.Skip()
+        if not self._choices: return event.Skip()
 
         skip = True
         visible = self._listwindow.Shown
         selected = self._listbox.GetFirstSelected()
         selected_new = None
-        if event.KeyCode in [wx.WXK_DOWN, wx.WXK_UP]:
+        if event.KeyCode in KEYS.UP + KEYS.DOWN:
             if visible:
-                step = 1 if (wx.WXK_UP != event.KeyCode) else -1
+                step = 1 if event.KeyCode in KEYS.DOWN else -1
                 itemcount = len(self._choices)
                 selected_new = min(itemcount - 1, max(0, selected + step))
                 self._listbox.Select(selected_new)
@@ -3497,9 +3531,9 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                 self._listbox.EnsureVisible(ensured)
             self.ShowDropDown()
             skip = False
-        elif event.KeyCode in [wx.WXK_PAGEDOWN, wx.WXK_PAGEUP]:
+        elif event.KeyCode in KEYS.PAGING:
             if visible:
-                step = 1 if (wx.WXK_PAGEUP != event.KeyCode) else -1
+                step = 1 if event.KeyCode in KEYS.PAGEDOWN else -1
                 self._listbox.ScrollPages(step)
                 itemcount = len(self._choices)
                 countperpage = self._listbox.CountPerPage
@@ -3511,15 +3545,16 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                 self._listbox.Select(selected_new)
             self.ShowDropDown()
             skip = False
-        elif event.KeyCode in [wx.WXK_BACK, wx.WXK_DELETE]:
+        elif event.KeyCode in KEYS.DELETE + (wx.WXK_BACK, ):
             self._skip_autocomplete = True
             self.ShowDropDown()
+
         if visible:
             if selected_new is not None: # Replace textbox value with new text
                 self._ignore_textchange = True
                 self.Value = self._listbox.GetItemText(selected_new)
                 self.SetInsertionPointEnd()
-            if wx.WXK_RETURN == event.KeyCode:
+            if event.KeyCode in KEYS.ENTER:
                 self.ShowDropDown(False)
             if wx.WXK_ESCAPE == event.KeyCode:
                 self.ShowDropDown(False)
@@ -3529,8 +3564,10 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                 if self._value_last != self.Value:
                     self.Value = self._value_last
                     self.SelectAll()
-        if skip:
-            event.Skip()
+            elif event.CmdDown() and event.KeyCode in map(ord, "AH"):
+                # Avoid opening dropdown on Ctrl-A (select all) or Ctrl-H (backspace)
+                self._ignore_textchange = True
+        if skip: event.Skip()
 
 
     def OnText(self, event):
@@ -3538,9 +3575,9 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         Handler for changing textbox value, auto-completes the text and selects
         matching item in dropdown list, if any.
         """
+        event.Skip()
         if self._ignore_textchange:
             self._ignore_textchange = self._skip_autocomplete = False
-            event.Skip()
             return
         text = self.Value
         if text and not self._description_on:
@@ -3556,19 +3593,18 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                     if not self._skip_autocomplete:
                         # Use a callback function to change value - changing
                         # value inside handler causes multiple events in Linux.
-                        def autocomplete_callback():
+                        def autocomplete_callback(choice):
                             if self and self.Value == text: # Can have changed
                                 self._ignore_textchange = True # To skip OnText
                                 self.Value = choice # Auto-complete text
                                 self.SetSelection(len(text), -1) # Select added
-                        wx.CallAfter(autocomplete_callback)
+                        wx.CallAfter(autocomplete_callback, choice)
                     break
             if not found: # Deselect currently selected item
                 self._listbox.Select(self._listbox.GetFirstSelected(), False)
         else:
             self.ShowDropDown(False)
         self._skip_autocomplete = False
-        event.Skip()
 
 
     def SetChoices(self, choices):
@@ -3588,7 +3624,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             for i, text in enumerate(choices):
                 self._listbox.InsertItem(i, text)
             if choices: # Colour "Clear" item
-                self._listbox.SetItemTextColour(i, self.DROPDOWN_CLEAR_COLOUR)
+                self._listbox.SetItemTextColour(i, self._clear_colour)
 
             itemheight = self._listbox.GetItemRect(0)[-1] if choices else 0
             itemcount = min(len(choices), self.DROPDOWN_COUNT_PER_PAGE)

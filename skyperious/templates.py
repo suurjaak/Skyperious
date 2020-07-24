@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    10.07.2020
+@modified    24.07.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1898,7 +1898,7 @@ Includes fonts Carlito Regular and Carlito bold,
 <a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{conf.LinkColour}}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
 %if getattr(sys, 'frozen', False):
 <br /><br />
-Installer created with Nullsoft Scriptable Install System 3.0b1,
+Installer created with Nullsoft Scriptable Install System,
 <a href="http://nsis.sourceforge.net/"><font color="{{conf.LinkColour}}">nsis.sourceforge.net</font></a>
 %endif
 

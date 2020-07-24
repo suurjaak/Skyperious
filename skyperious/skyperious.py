@@ -49,6 +49,7 @@ import wx.stc
 try: from dateutil.relativedelta import relativedelta
 except ImportError: relativedelta = None
 
+from . controls import ColourManager
 from . third_party import step
 
 from . import conf
@@ -81,7 +82,24 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         wx.Frame.__init__(self, parent=None, title=conf.Title, size=conf.WindowSize)
         guibase.TemplateFrameMixIn.__init__(self)
 
-        self.init_colours()
+        ColourManager.Init(self, conf, colourmap={
+            "FgColour":                  wx.SYS_COLOUR_BTNTEXT,
+            "BgColour":                  wx.SYS_COLOUR_WINDOW,
+            "DisabledColour":            wx.SYS_COLOUR_GRAYTEXT,
+            "MainBgColour":              wx.SYS_COLOUR_WINDOW,
+            "WidgetColour":              wx.SYS_COLOUR_BTNFACE,
+        }, darkcolourmap={               
+            "DBListForegroundColour":    wx.SYS_COLOUR_BTNTEXT,
+            "DBListBackgroundColour":    wx.SYS_COLOUR_WINDOW,
+            "LinkColour":                wx.SYS_COLOUR_HOTLIGHT,
+            "SkypeLinkColour":           wx.SYS_COLOUR_HOTLIGHT,
+            "MessageTextColour":         wx.SYS_COLOUR_BTNTEXT,
+            "MainBgColour":              wx.SYS_COLOUR_BTNFACE,
+            "HelpCodeColour":            wx.SYS_COLOUR_HIGHLIGHT,
+            "HelpBorderColour":          wx.SYS_COLOUR_ACTIVEBORDER,
+            "MergeHtmlBackgroundColour": wx.SYS_COLOUR_WINDOW,
+        })
+
         self.db_filename = None # Current selected file in main list
         self.db_filenames = {}  # added DBs {filename: {size, last_modified,
                                 #            account, chats, messages, error},}
@@ -110,6 +128,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                      wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
                      wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
                      wx.lib.agw.flatnotebook.FNB_FF2)
+        ColourManager.Manage(notebook, "ActiveTabColour",        wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(notebook, "ActiveTabTextColour",    wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(notebook, "NonActiveTabTextColour", wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(notebook, "TabAreaColour",          wx.SYS_COLOUR_BTNFACE)
+        ColourManager.Manage(notebook, "GradientColourBorder",   wx.SYS_COLOUR_BTNSHADOW)
+        ColourManager.Manage(notebook, "GradientColourTo",       wx.SYS_COLOUR_ACTIVECAPTION)
+        ColourManager.Manage(notebook, "ForegroundColour",       wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(notebook, "BackgroundColour",       wx.SYS_COLOUR_WINDOW)
 
         self.create_page_main(notebook)
         self.page_log = self.create_log_panel(notebook)
@@ -143,27 +169,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # Memory file system for showing images in wx.HtmlWindow
         self.memoryfs = {"files": {}, "handler": wx.MemoryFSHandler()}
         wx.FileSystem.AddHandler(self.memoryfs["handler"])
-        abouticon = "skyperious.png" # Program icon shown in About window
-        img = images.Icon48x48_32bit
-        self.memoryfs["handler"].AddFile(abouticon, img.Image, wx.BITMAP_TYPE_PNG)
-        self.memoryfs["files"][abouticon] = 1
-        # Screenshots look better with colouring if system has off-white colour
-        tint_colour = wx.Colour(conf.BgColour)
-        tint_factor = [((4 * x) % 256) / 255. for x in tint_colour]
-        # Images shown on the default search content page
-        for name in ["Search", "Chats", "Info", "Tables", "SQL"]:
-            bmp = getattr(images, "Help" + name, None)
-            if not bmp: continue # Continue for name in [..]
-            bmp = bmp.Image.AdjustChannels(*tint_factor)
-            filename = "Help%s.png" % name
-            self.memoryfs["handler"].AddFile(filename, bmp, wx.BITMAP_TYPE_PNG)
-            self.memoryfs["files"][filename] = 1
+        self.load_fs_images()
+        self.adapt_colours()
 
         self.worker_detection = \
             workers.DetectDatabaseThread(self.on_detect_databases_callback)
         self.Bind(EVT_DETECTION_WORKER, self.on_detect_databases_result)
         self.Bind(EVT_OPEN_DATABASE, self.on_open_database_event)
 
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_MOVE, self.on_move)
@@ -227,36 +241,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(self.on_toggle_iconize)
         else:
             self.Show(True)
-
-
-    def init_colours(self):
-        """Update configuration colours with current system theme values."""
-        colourhex = lambda index: (wx.SystemSettings.GetColour(index)
-                                   .GetAsString(wx.C2S_HTML_SYNTAX))
-        conf.FgColour = colourhex(wx.SYS_COLOUR_BTNTEXT)
-        conf.BgColour = colourhex(wx.SYS_COLOUR_WINDOW)
-        conf.DisabledColour = colourhex(wx.SYS_COLOUR_GRAYTEXT)
-        conf.WidgetColour = colourhex(wx.SYS_COLOUR_BTNFACE)
-        if "#FFFFFF" != conf.BgColour: # Potential default colour mismatch
-            conf.DBListForegroundColour = conf.FgColour
-            conf.DBListBackgroundColour = conf.BgColour
-            conf.LinkColour = colourhex(wx.SYS_COLOUR_HOTLIGHT)
-            conf.SkypeLinkColour = colourhex(wx.SYS_COLOUR_HOTLIGHT)
-            conf.MainBgColour = conf.WidgetColour
-            conf.MessageTextColour = conf.FgColour
-            conf.HelpCodeColour = colourhex(wx.SYS_COLOUR_HIGHLIGHT)
-            conf.HelpBorderColour = colourhex(wx.SYS_COLOUR_ACTIVEBORDER)
-            conf.MergeHtmlBackgroundColour = conf.BgColour
-
-            # Hack: monkey-patch FlatImageBook with non-hardcoded background
-            class HackContainer(wx.lib.agw.labelbook.ImageContainer):
-                BRUSH1, BRUSH2 = wx.WHITE_BRUSH, wx.Brush(conf.BgColour)
-                def OnPaint(self, event):
-                    wx.WHITE_BRUSH = HackContainer.BRUSH2
-                    try: result = HackContainer.__base__.OnPaint(self, event)
-                    finally: wx.WHITE_BRUSH = HackContainer.BRUSH1
-                    return result
-            wx.lib.agw.labelbook.ImageContainer = HackContainer
 
 
     def on_tray_search(self, event):
@@ -393,6 +377,59 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         event.Skip()
 
 
+    def on_sys_colour_change(self, event):
+        """Handler for system colour change, updates filesystem images."""
+        event.Skip()
+        self.adapt_colours()
+        def after():
+            self.load_fs_images()
+            for i in range(self.list_db.GetItemCount()):
+                self.list_db.SetItemTextColour(i,       self.list_db.ForegroundColour)
+                self.list_db.SetItemBackgroundColour(i, self.list_db.BackgroundColour)
+        wx.CallAfter(after) # Postpone to allow conf update
+
+
+    def adapt_colours(self):
+        """Adapts configuration colours to better fit current theme."""
+        COLOURS = ["GridRowInsertedColour", "GridRowChangedColour",
+                   "GridCellChangedColour"]
+        frgb = tuple(ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT))[:3]
+        brgb = tuple(ColourManager.GetColour(wx.SYS_COLOUR_WINDOW ))[:3]
+        for n in COLOURS:
+            rgb = tuple(wx.Colour(conf.Defaults.get(n)))[:3]
+            delta = tuple(255 - x for x in rgb)
+            direction = 1 if (sum(frgb) > sum(brgb)) else -1
+            rgb2 = tuple(a + int(b * direction) for a, b in zip(brgb, delta))
+            rgb2 = tuple(min(255, max(0, x)) for x in rgb2)
+            setattr(conf, n, wx.Colour(rgb2).GetAsString(wx.C2S_HTML_SYNTAX))
+
+
+    def load_fs_images(self):
+        """Loads content to MemoryFS."""
+        if not self: return
+        abouticon = "%s.png" % conf.Title.lower() # Program icon shown in About window
+        img = images.Icon48x48_32bit
+        if abouticon in self.memoryfs["files"]:
+            self.memoryfs["handler"].RemoveFile(abouticon)
+        self.memoryfs["handler"].AddFile(abouticon, img.Image, wx.BITMAP_TYPE_PNG)
+        self.memoryfs["files"][abouticon] = 1
+
+        # Screenshots look better with colouring if system has off-white colour
+        tint_colour = wx.Colour(conf.BgColour)
+        tint_factor = [((4 * x) % 256) / 255. for x in tint_colour]
+        # Images shown on the default search content page
+        for name in ["HelpSearch", "HelpChats", "HelpInfo", "HelpTables",
+                     "HelpSQL"]:
+            embedded = getattr(images, name, None)
+            if not embedded: continue # for name
+            img = embedded.Image.AdjustChannels(*tint_factor)
+            filename = "%s.png" % name
+            if filename in self.memoryfs["files"]:
+                self.memoryfs["handler"].RemoveFile(filename)
+            self.memoryfs["handler"].AddFile(filename, img, wx.BITMAP_TYPE_PNG)
+            self.memoryfs["files"][filename] = 1
+
+
     def update_notebook_header(self):
         """
         Removes or adds X to notebook tab style, depending on whether current
@@ -425,10 +462,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.list_db.DeleteItem(start)
             idx = stop if start > stop else stop - 1
             self.list_db.InsertImageStringItem(idx, filename, [1])
-            fgcolour = wx.Colour(conf.DBListForegroundColour)
-            bgcolour = wx.Colour(conf.DBListBackgroundColour)
-            self.list_db.SetItemBackgroundColour(idx, bgcolour)
-            self.list_db.SetItemTextColour(idx, fgcolour)
             self.list_db.Select(idx)
         self.db_drag_start = None
 
@@ -455,7 +488,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def create_page_main(self, notebook):
         """Creates the main page with database list and buttons."""
         page = self.page_main = wx.Panel(notebook)
-        page.BackgroundColour = conf.MainBgColour
+        ColourManager.Manage(page, "BackgroundColour", "MainBgColour")
         notebook.AddPage(page, "Databases")
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -472,10 +505,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         il.Add(images.ButtonListDatabase.Bitmap)
         list_db.AssignImageList(il, wx.IMAGE_LIST_SMALL)
         list_db.InsertImageStringItem(0, "Home", [0])
-        list_db.TextColour = wx.Colour(conf.DBListForegroundColour)
-        list_bgcolour = wx.Colour(conf.DBListBackgroundColour)
-        list_db.BackgroundColour = list_bgcolour
-        list_db.SetItemBackgroundColour(0, list_bgcolour)
+        ColourManager.Manage(list_db, "ForegroundColour", "DBListForegroundColour")
+        ColourManager.Manage(list_db, "BackgroundColour", "DBListBackgroundColour")
+        try:
+            ColourManager.Manage(list_db._headerWin, "ForegroundColour", "DBListForegroundColour")
+            ColourManager.Manage(list_db._mainWin,   "BackgroundColour", "DBListBackgroundColour")
+        except Exception: pass
         if hasattr(list_db, "SetUserLineHeight"):
             h = images.ButtonListDatabase.Bitmap.Size[1]
             list_db.SetUserLineHeight(int(h * 1.5))
@@ -492,7 +527,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # Create main page label and buttons
         label_main = wx.StaticText(panel_main,
                                    label="Welcome to %s" % conf.Title)
-        label_main.SetForegroundColour(conf.SkypeLinkColour)
+        ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
         label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
         BUTTONS_MAIN = [
@@ -522,7 +557,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
         label_db.Font = wx.Font(12, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        label_db.BackgroundColour = panel_detail.BackgroundColour
+        ColourManager.Manage(label_db, "BackgroundColour", "WidgetColour")
         label_db.SetEditable(False)
 
         sizer_labels = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
@@ -533,9 +568,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             lbltext = wx.StaticText(parent=panel_detail, label="%s:" % title)
             valtext = wx.TextCtrl(parent=panel_detail, value="",
                                   size=(300, -1), style=wx.NO_BORDER)
-            valtext.BackgroundColour = panel_detail.BackgroundColour
+            ColourManager.Manage(valtext, "BackgroundColour", "WidgetColour")
+            ColourManager.Manage(valtext, "ForegroundColour", wx.SYS_COLOUR_WINDOWTEXT)
             valtext.SetEditable(False)
-            lbltext.ForegroundColour = conf.DisabledColour
+            ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
             sizer_labels.Add(lbltext, border=5, flag=wx.LEFT)
             sizer_labels.Add(valtext, proportion=1, flag=wx.GROW)
             setattr(self, "label_" + field, valtext)
@@ -560,7 +596,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         children = list(panel_main.Children) + list(panel_detail.Children)
         for c in [panel_main, panel_detail] + children:
-            c.BackgroundColour = page.BackgroundColour 
+            ColourManager.Manage(c, "BackgroundColour", "MainBgColour")
         panel_right.SetupScrolling(scroll_x=False)
         panel_detail.Hide()
 
@@ -700,8 +736,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         Handler for clicking "About Skyperious" menu, opens a small info frame.
         """
-        text = step.Template(templates.ABOUT_TEXT).expand()
-        AboutDialog(self, text).ShowModal()
+        maketext = lambda: step.Template(templates.ABOUT_TEXT).expand()
+        AboutDialog(self, maketext).ShowModal()
 
 
     def on_detect_databases(self, event):
@@ -768,10 +804,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     self.db_filenames[filename] = data
                     idx = self.list_db.GetItemCount()
                     self.list_db.InsertImageStringItem(idx, filename, [1])
-                    fgcolour = wx.Colour(conf.DBListForegroundColour)
-                    bgcolour = wx.Colour(conf.DBListBackgroundColour)
-                    self.list_db.SetItemBackgroundColour(idx, bgcolour)
-                    self.list_db.SetItemTextColour(idx, fgcolour)
                     # self is not shown: form creation time, reselect last file
                     if not self.Shown and filename in conf.LastSelectedFiles:
                         self.list_db.Select(idx)
@@ -1730,6 +1762,8 @@ class DatabasePage(wx.Panel):
         parent_notebook.InsertPage(1, self, title)
         busy = controls.BusyPanel(self, "Loading \"%s\"." % db.filename)
         self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
+        ColourManager.Manage(self, "BackgroundColour", "WidgetColour")
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
 
         self.chat = None # Currently viewed chat
         self.chats = []  # All chats in database
@@ -1986,10 +2020,15 @@ class DatabasePage(wx.Panel):
         list_participants = self.list_participants = \
             wx.lib.agw.ultimatelistctrl.UltimateListCtrl(parent=panel_stc2,
                                                          agwStyle=agw_style)
+        ColourManager.Manage(list_participants, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
+        ColourManager.Manage(list_participants, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
+        try:
+            ColourManager.Manage(list_participants._headerWin, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
+            ColourManager.Manage(list_participants._mainWin,   "BackgroundColour", wx.SYS_COLOUR_WINDOW)
+        except Exception: pass
         list_participants.InsertColumn(0, "")
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_select_participant,
                   list_participants)
-        list_participants.EnableSelectionGradient()
         if hasattr(list_participants, "SetUserLineHeight"):
             list_participants.SetUserLineHeight(conf.AvatarImageSize[1] + 2)
         sizer_dates = wx.BoxSizer(wx.HORIZONTAL)
@@ -2095,6 +2134,7 @@ class DatabasePage(wx.Panel):
             self.label_search.Label = "&Search in all tables:"
 
         html = self.html_searchall = controls.TabbedHtmlWindow(parent=page)
+        ColourManager.Manage(html, "TabAreaColour", "WidgetColour")
         default = step.Template(templates.SEARCH_WELCOME_HTML).expand()
         html.SetDefaultPage(default)
         html.SetDeleteCallback(self.on_delete_tab_callback)
@@ -2105,10 +2145,9 @@ class DatabasePage(wx.Panel):
         html._html.Bind(wx.EVT_RIGHT_UP, self.on_rightclick_searchall)
         html.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_change_searchall_tab)
         html.Bind(controls.EVT_TAB_LEFT_DCLICK, self.on_dclick_searchall_tab)
-        html.SetTabAreaColour(tb.BackgroundColour)
         html.Font.PixelSize = (0, 8)
 
-        label_html.BackgroundColour = tb.BackgroundColour
+        ColourManager.Manage(label_html, "BackgroundColour", "WidgetColour")
         
         sizer_top.Add(label_html, proportion=1, flag=wx.GROW)
         sizer_top.Add(tb, border=5, flag=wx.TOP | wx.RIGHT |
@@ -2139,18 +2178,11 @@ class DatabasePage(wx.Panel):
             wx.Button(panel1, label="Refresh")
         sizer_topleft.AddStretchSpacer()
         sizer_topleft.Add(button_refresh)
-        tree = self.tree_tables = wx.lib.gizmos.TreeListCtrl(
-            parent=panel1,
-            style=wx.TR_DEFAULT_STYLE
-            #| wx.TR_HAS_BUTTONS
-            #| wx.TR_TWIST_BUTTONS
-            #| wx.TR_ROW_LINES
-            #| wx.TR_COLUMN_LINES
-            #| wx.TR_NO_LINES
-            | wx.TR_FULL_ROW_HIGHLIGHT
+        tree = self.tree_tables = wx.lib.gizmos.TreeListCtrl(panel1,
+            agwStyle=wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT
         )
-        tree.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
-        tree.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT))
+        ColourManager.Manage(tree, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(tree, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
         tree.AddColumn("Table")
         tree.AddColumn("Info")
         tree.AddRoot("Loading data..")
@@ -2211,6 +2243,10 @@ class DatabasePage(wx.Panel):
         grid = self.grid_table = wx.grid.Grid(parent=panel2)
         grid.SetToolTip("Double click on column header to sort, "
                               "right click to filter.")
+        ColourManager.Manage(grid, "DefaultCellBackgroundColour", wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
+        ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)
+        ColourManager.Manage(grid, "LabelTextColour",             wx.SYS_COLOUR_WINDOWTEXT)
         grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK, self.on_sort_grid_column)
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
@@ -2219,7 +2255,7 @@ class DatabasePage(wx.Panel):
         grid.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_change_table)
         label_help = wx.StaticText(panel2, label="Double-click on column "
                                    "header to sort, right click to filter.")
-        label_help.ForegroundColour = "grey"
+        ColourManager.Manage(label_help, "ForegroundColour", "DisabledColour")
         sizer2.Add(sizer_tb, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
         sizer2.Add(grid, border=5, proportion=2,
                    flag=wx.GROW | wx.LEFT | wx.RIGHT)
@@ -2255,7 +2291,7 @@ class DatabasePage(wx.Panel):
         label_help = wx.StaticText(panel2, label=
             "Alt-Enter runs the query contained in currently selected text or "
             "on the current line. Ctrl-Space shows autocompletion list.")
-        label_help.ForegroundColour = "grey"
+        ColourManager.Manage(label_help, "ForegroundColour", "DisabledColour")
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         button_sql = self.button_sql = wx.Button(panel2, label="Execute S&QL")
         button_script = self.button_script = wx.Button(panel2, 
@@ -2283,6 +2319,10 @@ class DatabasePage(wx.Panel):
         sizer_buttons.Add(button_reset, border=5, flag=wx.RIGHT)
         sizer_buttons.Add(button_export)
         grid = self.grid_sql = wx.grid.Grid(parent=panel2)
+        ColourManager.Manage(grid, "DefaultCellBackgroundColour", wx.SYS_COLOUR_WINDOW)
+        ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
+        ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)
+        ColourManager.Manage(grid, "LabelTextColour",             wx.SYS_COLOUR_WINDOWTEXT)
         grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK,
                   self.on_sort_grid_column)
@@ -2295,7 +2335,7 @@ class DatabasePage(wx.Panel):
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
         label_help_grid = wx.StaticText(panel2, label="Double-click on column "
                                         "header to sort, right click to filter.")
-        label_help_grid.ForegroundColour = "grey"
+        ColourManager.Manage(label_help_grid, "ForegroundColour", "DisabledColour")
 
         sizer2.Add(label_help, border=5, flag=wx.GROW | wx.LEFT | wx.BOTTOM)
         sizer2.Add(sizer_buttons, border=5, flag=wx.GROW | wx.ALL)
@@ -2317,7 +2357,8 @@ class DatabasePage(wx.Panel):
 
         panel1 = self.panel_accountinfo = wx.Panel(parent=page)
         panel2 = wx.Panel(parent=page)
-        panel1.BackgroundColour = panel2.BackgroundColour = conf.BgColour
+        ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
+        ColourManager.Manage(panel2, "BackgroundColour", "BgColour")
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_account = wx.BoxSizer(wx.HORIZONTAL)
         label_account = wx.StaticText(parent=panel1,
@@ -2361,11 +2402,11 @@ class DatabasePage(wx.Panel):
                 sizer_file.AddSpacer(20), sizer_file.AddSpacer(20)
                 continue # continue for i, (name, label) in enumerate(..
             labeltext = wx.StaticText(parent=panel2, label="%s:" % label)
-            labeltext.ForegroundColour = wx.Colour(102, 102, 102)
+            ColourManager.Manage(labeltext, "ForegroundColour", "DisabledColour")
             valuetext = wx.TextCtrl(parent=panel2, value="Analyzing..",
                 style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
             valuetext.MinSize = (-1, 35)
-            valuetext.BackgroundColour = panel2.BackgroundColour
+            ColourManager.Manage(valuetext, "BackgroundColour", "BgColour")
             valuetext.SetEditable(False)
             sizer_file.Add(labeltext, border=5, flag=wx.LEFT)
             sizer_file.Add(valuetext, proportion=1, flag=wx.GROW)
@@ -2435,7 +2476,8 @@ class DatabasePage(wx.Panel):
         button_sync      = self.button_sync      = controls.NoteButton(panel_sync2, label="S&ynchronize history in local database", bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = self.button_sync_stop = controls.NoteButton(panel_sync2, label="Stop synchronizing", bmp=images.ButtonStop.Bitmap)
 
-        panel1.BackgroundColour = panel2.BackgroundColour = conf.BgColour
+        ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
+        ColourManager.Manage(panel2, "BackgroundColour", "BgColour")
         label_user.Disable()
         edit_user.Disable()
         label_login.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
@@ -2443,10 +2485,10 @@ class DatabasePage(wx.Panel):
         check_store.ToolTip = "Store password for this database locally"
         check_auto.ToolTip  = "Update database from Skype online service automatically on opening this database next time"
         check_auto.Disable()
-        edit_status.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
-        edit_status.BackgroundColour = panel1.BackgroundColour
+        ColourManager.Manage(edit_status, "ForegroundColour", "DisabledColour")
+        ColourManager.Manage(edit_status, "BackgroundColour", "BgColour")
         edit_status.SetEditable(False)
-        button_login.BackgroundColour = conf.BgColour
+        ColourManager.Manage(button_login, "BackgroundColour", "BgColour")
         button_login.Note = "After login, local database can be updated from Skype online service.\n" \
                             "Additionally, HTML export can download and include shared images."
 
@@ -2461,11 +2503,11 @@ class DatabasePage(wx.Panel):
         list_chats.SetColumns(columns)
         list_chats.SetColumnFormatters(formatters)
         list_chats.SetColumnsMaxWidth(300)
-        edit_sync_status.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
-        edit_sync_status.BackgroundColour = panel2.BackgroundColour
+        ColourManager.Manage(edit_sync_status, "ForegroundColour", "DisabledColour")
+        ColourManager.Manage(edit_sync_status, "BackgroundColour", "BgColour")
         edit_sync_status.SetEditable(False)
-        button_sync.BackgroundColour = conf.BgColour
-        button_sync_stop.BackgroundColour = conf.BgColour
+        ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
         button_sync.Note = "Query Skype online services for new messages and save them in local database."
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
@@ -2518,6 +2560,30 @@ class DatabasePage(wx.Panel):
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
         splitter_sync.SplitHorizontally(panel_sync1, panel_sync2)
+
+
+    def on_sys_colour_change(self, event):
+        """Handler for system colour change, refreshes content."""
+        event.Skip()
+        def dorefresh():
+            if not self: return
+
+            self.label_html.SetPage(step.Template(templates.SEARCH_HELP_SHORT).expand())
+            self.label_html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_BTNFACE)
+            self.label_html.ForegroundColour = ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT)
+            default = step.Template(templates.SEARCH_WELCOME_HTML).expand()
+            self.html_searchall.SetDefaultPage(default)
+            self.load_tables_data()
+            self.populate_chat_statistics()
+            util.try_until(lambda: self.grid_table.Table.ClearAttrs())
+            util.try_until(lambda: self.grid_sql.Table.ClearAttrs())
+
+            for lst in (self.list_chats, self.list_chats_sync, self.list_participants):
+                for i in range(lst.GetItemCount()):
+                    lst.SetItemTextColour(i,       lst.ForegroundColour)
+                    lst.SetItemBackgroundColour(i, lst.BackgroundColour)
+
+        wx.CallAfter(dorefresh) # Postpone to allow conf update
 
 
     def update_liveinfo(self):
@@ -2825,10 +2891,10 @@ class DatabasePage(wx.Panel):
                 lbltext = wx.StaticText(parent=panel, label="%s:" % title)
                 valtext = wx.TextCtrl(parent=panel, value=value,
                     style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
-                valtext.BackgroundColour = panel.BackgroundColour
+                ColourManager.Manage(valtext, "BackgroundColour", "BgColour")
                 valtext.MinSize = (-1, 35)
                 valtext.SetEditable(False)
-                lbltext.ForegroundColour = wx.Colour(102, 102, 102)
+                ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
                 sizer.Add(lbltext, border=5, flag=wx.LEFT)
                 sizer.Add(valtext, proportion=1, flag=wx.GROW)
         panel.Layout()
@@ -4144,6 +4210,7 @@ class DatabasePage(wx.Panel):
             if list_table:
                 if list_table.lower() == grid_data.table.lower():
                     self.tree_tables.SetItemTextColour(item, colour)
+
                     break # break while item and item.IsOk()
             item = self.tree_tables.GetNextSibling(item)
 
@@ -4286,134 +4353,138 @@ class DatabasePage(wx.Panel):
 
     def load_chat(self, chat, center_message_id=None):
         """Loads history of the specified chat (as returned from db)."""
-        if chat and (chat != self.chat or center_message_id):
-            busy = None
+        if not chat or (chat == self.chat and not center_message_id):
+            return
+
+        busy, clist, plist = None, self.list_chats, self.list_participants
+        if chat != self.chat:
+            # Update chat list colours and scroll to the opened chat
+            guibase.log("Opening %s.", chat["title_long_lc"])
+            self.list_chats.Freeze()
+            scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
+            index_selected = -1
+            for i in range(clist.ItemCount):
+                if clist.GetItemMappedData(i) == self.chat:
+                    clist.SetItemFont(i, clist.Font)
+                elif clist.GetItemMappedData(i) == chat:
+                    index_selected = i
+                    f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                    clist.SetItemFont(i, f)
+            if index_selected >= 0:
+                delta = index_selected - scrollpos
+                if delta < 0 or abs(delta) >= clist.CountPerPage:
+                    nudge = -clist.CountPerPage / 2
+                    clist.ScrollLines(delta + nudge)
+            clist.Thaw()
+            wx.YieldIfNeeded() # Allow display to refresh
+            # Add shortcut key flag to chat label
+            self.label_chat.Label = chat["title_long"].replace(
+                "chat", "&chat"
+            ).replace("Chat", "&Chat") + ":"
+            self.label_chat.Parent.Layout()
+
+        dates_range  = [None, None] # total available date range
+        dates_values = [None, None] # currently filtered date range
+        if chat != self.chat or (center_message_id
+        and not self.stc_history.IsMessageShown(center_message_id)):
+            busy = controls.BusyPanel(self, 
+                "Loading history for %s." % chat["title_long_lc"])
+            try:
+                # Refresh last messages, in case database has updated
+                self.db.get_conversations_stats([chat], log=False)
+            except Exception:
+                guibase.logstatus_flash("Notice: failed to refresh %s.\n\n%s",
+                    chat["title_long_lc"], traceback.format_exc())
+            self.edit_filtertext.Value = self.chat_filter["text"] = ""
+            dts = "first_message_datetime", "last_message_datetime"
+            date_range = [chat[n].date() if chat[n] else None for n in dts]
+            self.chat_filter["daterange"] = date_range
+            self.chat_filter["startdaterange"] = date_range
+            dates_range = dates_values = date_range
+            avatar_default = images.AvatarDefault.Bitmap
             if chat != self.chat:
-                # Update chat list colours and scroll to the opened chat
-                guibase.log("Opening %s.", chat["title_long_lc"])
-                self.list_chats.Freeze()
-                scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
-                index_selected = -1
-                for i in range(self.list_chats.ItemCount):
-                    if self.list_chats.GetItemMappedData(i) == self.chat:
-                        self.list_chats.SetItemFont(i, self.list_chats.Font)
-                    elif self.list_chats.GetItemMappedData(i) == chat:
-                        index_selected = i
-                        f = self.list_chats.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
-                        self.list_chats.SetItemFont(i, f)
-                if index_selected >= 0:
-                    delta = index_selected - scrollpos
-                    if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
-                        nudge = -self.list_chats.CountPerPage / 2
-                        self.list_chats.ScrollLines(delta + nudge)
-                self.list_chats.Thaw()
-                wx.YieldIfNeeded() # Allow display to refresh
-                # Add shortcut key flag to chat label
-                self.label_chat.Label = chat["title_long"].replace(
-                    "chat", "&chat"
-                ).replace("Chat", "&Chat") + ":"
-                self.label_chat.Parent.Layout()
+                # If chat has changed, load avatar images for the contacts
+                plist.ClearAll()
+                plist.InsertColumn(0, "")
+                sz_avatar = conf.AvatarImageSize
+                il = wx.ImageList(*sz_avatar)
+                il.Add(avatar_default)
+                plist.AssignImageList( il, wx.IMAGE_LIST_SMALL)
+                index = 0
+                # wx will otherwise open a warning dialog on image error
 
-            dates_range  = [None, None] # total available date range
-            dates_values = [None, None] # currently filtered date range
-            if chat != self.chat or (center_message_id
-            and not self.stc_history.IsMessageShown(center_message_id)):
-                busy = controls.BusyPanel(self, 
-                    "Loading history for %s." % chat["title_long_lc"])
-                try:
-                    # Refresh last messages, in case database has updated
-                    self.db.get_conversations_stats([chat], log=False)
-                except Exception:
-                    guibase.logstatus_flash("Notice: failed to refresh %s.\n\n%s",
-                        chat["title_long_lc"], traceback.format_exc())
-                self.edit_filtertext.Value = self.chat_filter["text"] = ""
-                dts = "first_message_datetime", "last_message_datetime"
-                date_range = [chat[n].date() if chat[n] else None for n in dts]
-                self.chat_filter["daterange"] = date_range
-                self.chat_filter["startdaterange"] = date_range
-                dates_range = dates_values = date_range
-                avatar_default = images.AvatarDefault.Bitmap
-                if chat != self.chat:
-                    # If chat has changed, load avatar images for the contacts
-                    self.list_participants.ClearAll()
-                    self.list_participants.InsertColumn(0, "")
-                    sz_avatar = conf.AvatarImageSize
-                    il = wx.ImageList(*sz_avatar)
-                    il.Add(avatar_default)
-                    self.list_participants.AssignImageList(
-                        il, wx.IMAGE_LIST_SMALL)
-                    index = 0
-                    # wx will otherwise open a warning dialog on image error
-                    nolog = wx.LogNull()
-                    for p in chat["participants"]:
-                        b = 0
-                        if not p["contact"].get("avatar_bitmap"):
-                            bmp = skypedata.get_avatar(p["contact"], sz_avatar)
-                            if bmp:
-                                p["contact"]["avatar_bitmap"] = bmp
-                        if "avatar_bitmap" in p["contact"]:
-                            b = il.Add(p["contact"]["avatar_bitmap"])
-                        self.list_participants.InsertImageStringItem(index,
-                            "%s (%s)" % (p["contact"]["name"], p["identity"]),
-                            b, it_kind=1)
-                        c = self.list_participants.GetItem(index)
-                        c.Check(True)
-                        self.list_participants.SetItem(c)
-                        self.list_participants.SetItemData(index, p)
-                        index += 1
-                    del nolog # Restore default wx message logger
-                    self.list_participants.SetColumnWidth(0, wx.LIST_AUTOSIZE)
-                self.chat_filter["participants"] = [
-                    p["identity"] for p in chat["participants"]]
+                nolog = wx.LogNull()
+                for p in chat["participants"]:
+                    b = 0
+                    if not p["contact"].get("avatar_bitmap"):
+                        bmp = skypedata.get_avatar(p["contact"], sz_avatar)
+                        if bmp:
+                            p["contact"]["avatar_bitmap"] = bmp
+                    if "avatar_bitmap" in p["contact"]:
+                        b = il.Add(p["contact"]["avatar_bitmap"])
+                    plist.InsertImageStringItem(index,
+                        "%s (%s)" % (p["contact"]["name"], p["identity"]),
+                        b, it_kind=1)
+                    plist.SetItemTextColour(index,       plist.ForegroundColour)
+                    plist.SetItemBackgroundColour(index, plist.BackgroundColour)
+                    c = plist.GetItem(index)
+                    c.Check(True)
+                    plist.SetItem(c)
+                    plist.SetItemData(index, p)
+                    index += 1
+                del nolog # Restore default wx message logger
+                plist.SetColumnWidth(0, wx.LIST_AUTOSIZE)
+            self.chat_filter["participants"] = [
+                p["identity"] for p in chat["participants"]]
 
-            if center_message_id and self.chat == chat:
-                if not self.stc_history.IsMessageShown(center_message_id):
-                    for i in range(self.list_participants.GetItemCount()):
-                        c = self.list_participants.GetItem(i)
-                        c.Check(True)
-                        self.list_participants.SetItem(c)
-                    self.list_participants.Refresh()
-                    self.stc_history.SetFilter(self.chat_filter)
-                    self.stc_history.RefreshMessages(center_message_id)
-                else:
-                    self.stc_history.FocusMessage(center_message_id)
-            else:
+        if center_message_id and self.chat == chat:
+            if not self.stc_history.IsMessageShown(center_message_id):
+                for i in range(plist.GetItemCount()):
+                    c = plist.GetItem(i)
+                    c.Check(True)
+                    plist.SetItem(c)
+                plist.Refresh()
                 self.stc_history.SetFilter(self.chat_filter)
-                try:
-                    self.stc_history.Populate(chat, self.db,
-                        center_message_id=center_message_id)
-                except Exception:
-                    errormsg = "Error loading %s:\n\n%s" % \
-                               (chat["title_long_lc"], traceback.format_exc())
-                    guibase.logstatus_flash(errormsg)
-                    wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+                self.stc_history.RefreshMessages(center_message_id)
+            else:
+                self.stc_history.FocusMessage(center_message_id)
+        else:
+            self.stc_history.SetFilter(self.chat_filter)
+            try:
+                self.stc_history.Populate(chat, self.db,
+                    center_message_id=center_message_id)
+            except Exception:
+                errormsg = "Error loading %s:\n\n%s" % \
+                           (chat["title_long_lc"], traceback.format_exc())
+                guibase.logstatus_flash(errormsg)
+                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
-            if self.stc_history.GetMessage(0):
-                values = [self.stc_history.GetMessage(0)["datetime"],
-                          self.stc_history.GetMessage(-1)["datetime"]]
-                dates_values = tuple(i.date() for i in values)
-                if not any(filter(None, dates_range)):
-                    dts = "first_message_datetime", "last_message_datetime"
-                    dates_range = [chat[n].date() if chat[n] else None for n in dts]
-                if not any(filter(None, dates_range)):
-                    dates_range = dates_values
-                self.chat_filter["daterange"] = dates_range
-                self.chat_filter["startdaterange"] = dates_values
-            self.range_date.SetRange(*dates_range)
-            self.range_date.SetValues(*dates_values)
-            has_messages = bool(self.stc_history.GetMessage(0))
-            self.tb_chat.EnableTool(wx.ID_MORE, has_messages)
-            if not self.chat:
-                # Very first load, toggle filter tool button on
-                self.tb_chat.ToggleTool(wx.ID_MORE, self.splitter_stc.IsSplit())
-            if self.chat != chat:
-                self.chat = chat
-            if busy:
-                busy.Close()
-            self.panel_chats2.Enabled = True
-            self.populate_chat_statistics()
-            if self.html_stats.Shown:
-                self.show_stats(True) # To restore scroll position
+        if self.stc_history.GetMessage(0):
+            values = [self.stc_history.GetMessage(0)["datetime"],
+                      self.stc_history.GetMessage(-1)["datetime"]]
+            dates_values = tuple(i.date() for i in values)
+            if not any(filter(None, dates_range)):
+                dts = "first_message_datetime", "last_message_datetime"
+                dates_range = [chat[n].date() if chat[n] else None for n in dts]
+            if not any(filter(None, dates_range)):
+                dates_range = dates_values
+            self.chat_filter["daterange"] = dates_range
+            self.chat_filter["startdaterange"] = dates_values
+        self.range_date.SetRange(*dates_range)
+        self.range_date.SetValues(*dates_values)
+        has_messages = bool(self.stc_history.GetMessage(0))
+        self.tb_chat.EnableTool(wx.ID_MORE, has_messages)
+        if not self.chat:
+            # Very first load, toggle filter tool button on
+            self.tb_chat.ToggleTool(wx.ID_MORE, self.splitter_stc.IsSplit())
+        if self.chat != chat:
+            self.chat = chat
+        if busy:
+            busy.Close()
+        self.panel_chats2.Enabled = True
+        self.populate_chat_statistics()
+        if self.html_stats.Shown:
+            self.show_stats(True) # To restore scroll position
 
 
     def populate_chat_statistics(self):
@@ -4514,7 +4585,7 @@ class DatabasePage(wx.Panel):
         previous_scrollpos = getattr(self.html_stats, "_last_scroll_pos", None)
         self.html_stats.Freeze()
         self.html_stats.SetPage(html)
-        self.html_stats.BackgroundColour = conf.BgColour
+        self.html_stats.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
         if previous_scrollpos:
             self.html_stats.Scroll(*previous_scrollpos)
         elif previous_anchor:
@@ -4652,10 +4723,12 @@ class DatabasePage(wx.Panel):
                     table["rows"], "s" if table["rows"] != 1 else " "
                 ), 1)
                 self.tree_tables.SetItemPyData(child, table["name"])
+                self.tree_tables.SetItemTextColour(child, self.tree_tables.ForegroundColour)
 
                 for col in self.db.get_table_columns(table["name"]):
                     subchild = self.tree_tables.AppendItem(child, col["name"])
                     self.tree_tables.SetItemText(subchild, col["type"], 1)
+                    self.tree_tables.SetItemTextColour(subchild, self.tree_tables.ForegroundColour)
             self.tree_tables.Expand(root)
             if child:
                 # Nudge columns to fit and fill the header exactly.
@@ -4829,13 +4902,13 @@ class MergerPage(wx.Panel):
             controls.ScrollingHtmlWindow(panel, style=wx.BORDER_SUNKEN)
 
         for c in [panel, button_scan, button_merge, panel_gauge]:
-            c.BackgroundColour = conf.BgColour
+            ColourManager.Manage(c, "BackgroundColour", "BgColour")
         gauge.ForegroundColour = conf.GaugeColour
         button_scan.Enabled = button_merge.Enabled = False
         button_scan.MinSize = button_merge.MinSize = (400, -1)
         html.SetFonts(normal_face=self.Font.FaceName,
                       fixed_face=self.Font.FaceName, sizes=[8] * 7)
-        html.BackgroundColour = conf.MergeHtmlBackgroundColour
+        ColourManager.Manage(html, "BackgroundColour", "MergeHtmlBackgroundColour")
         html.Hide()
         panel_gauge.Hide()
 
@@ -4919,7 +4992,7 @@ class MergerPage(wx.Panel):
         splitter_diff.SetMinimumPaneSize(350)
         panel_stc1 = self.panel_stc1 = wx.Panel(parent=splitter_diff)
         panel_stc2 = self.panel_stc2 = wx.lib.scrolledpanel.ScrolledPanel(splitter_diff)
-        panel_stc2.BackgroundColour = conf.BgColour
+        ColourManager.Manage(panel_stc2, "BackgroundColour", "BgColour")
         sizer_stc1 = panel_stc1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_stc2 = panel_stc2.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -4937,8 +5010,8 @@ class MergerPage(wx.Panel):
             bmp=images.ButtonExport.Bitmap)
         button_merge.Bind(wx.EVT_BUTTON, self.on_merge_chat)
         button_export.Bind(wx.EVT_BUTTON, self.on_export_chat)
-        button_merge.BackgroundColour = conf.BgColour
-        button_export.BackgroundColour = conf.BgColour
+        ColourManager.Manage(button_merge,  "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_export, "BackgroundColour", "BgColour")
         button_merge.Enabled = button_export.Enabled = False
 
         sizer_stc1.Add(stc1, proportion=1, flag=wx.GROW)
@@ -4972,7 +5045,7 @@ class MergerPage(wx.Panel):
         splitter.SetMinimumPaneSize(350)
         panel1 = wx.Panel(parent=splitter)
         panel2 = wx.lib.scrolledpanel.ScrolledPanel(splitter)
-        panel2.BackgroundColour = conf.BgColour
+        ColourManager.Manage(panel2, "BackgroundColour", "BgColour")
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -5008,7 +5081,8 @@ class MergerPage(wx.Panel):
             panel2, label="Merge &all to the right",
             note="Copy all contacts to the database on the right.",
             bmp=images.ButtonMergeLeftMulti.Bitmap)
-        button1.BackgroundColour = button_all1.BackgroundColour = conf.BgColour
+        ColourManager.Manage(button1,     "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_all1, "BackgroundColour", "BgColour")
         button1.Bind(wx.EVT_BUTTON, self.on_merge_contacts)
         button_all1.Bind(wx.EVT_BUTTON, self.on_merge_contacts)
         button1.Enabled = button_all1.Enabled = False
@@ -5962,6 +6036,21 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             "boldspecial": 20, "remoteweak": 21, "localweak": 22,
             "italic": 23, "strike": 24
         }
+        self.SetWrapMode(True)
+        self.SetMarginLeft(10)
+        self.SetReadOnly(True)
+        self.SetStyleSpecs()
+
+        self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
+        self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
+        self._stc.Bind(wx.EVT_CONTEXT_MENU, lambda e: None)
+        self._stc.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
+        # Hide caret
+        self.SetCaretForeground(conf.BgColour), self.SetCaretWidth(0)
+
+
+    def SetStyleSpecs(self):
+        """Sets STC style colours."""
         stylespecs = {
             "default":      "face:%s,size:%d,fore:%s,back:%s" %
                             (conf.HistoryFontName, conf.HistoryFontSize,
@@ -5987,14 +6076,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             self.StyleSetSpec(self._styles[style], spec)
         self.StyleSetHotSpot(self._styles["link"], True)
         self.StyleSetHotSpot(self._styles["boldlink"], True)
-        self.SetWrapMode(True)
-        self.SetMarginLeft(10)
-        self.SetReadOnly(True)
-        self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
-        self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
-        self._stc.Bind(wx.EVT_CONTEXT_MENU, lambda e: None)
-        # Hide caret
-        self.SetCaretForeground(conf.BgColour), self.SetCaretWidth(0)
 
 
     def SetDatabasePage(self, page):
@@ -6012,6 +6093,12 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         url_range[1] += 1
         startstop = url_range[-1], url_range[1]
         return self._stc.GetTextRange(*startstop), startstop
+
+
+    def OnSysColourChange(self, event):
+        """Handler for system colour change, updates STC styling."""
+        event.Skip()
+        self.SetStyleSpecs()
 
 
     def OnMenu(self, event):
@@ -7025,6 +7112,15 @@ class SqliteGridBase(wx.grid.GridTableBase):
                 self.View.ForceRefresh()
 
 
+    def ClearAttrs(self):
+        """Clears all current row attributes and refreshes grid."""
+        self.attrs.clear()
+        if not self.View: return
+        for row in range(len(self.rows_current)):
+            for col in range(len(self.columns)): self.View.RefreshAttr(row, col)
+        self.View.Refresh()
+
+
     def Filter(self):
         """
         Filters the grid table with the currently added filters.
@@ -7216,9 +7312,10 @@ class AboutDialog(wx.Dialog):
         wx.Dialog.__init__(self, parent, title="About %s" % conf.Title,
                            style=wx.CAPTION | wx.CLOSE_BOX)
         html = self.html = wx.html.HtmlWindow(self)
+        self.content = content
 
-        html.SetPage(content)
-        html.BackgroundColour = conf.BgColour
+        html.SetPage(content() if callable(content) else content)
+        html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
 
@@ -7226,9 +7323,22 @@ class AboutDialog(wx.Dialog):
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
         sizer_buttons = self.CreateButtonSizer(wx.OK)
         self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.ALL)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
+
         self.Layout()
-        self.Size = (self.Size[0], html.VirtualSize[1] + 60)
+        self.Size = (self.Size[0], html.VirtualSize[1] + 70)
         self.CenterOnParent()
+
+
+    def OnSysColourChange(self, event):
+        """Handler for system colour change, refreshes content."""
+        event.Skip()
+        def dorefresh():
+            if not self: return
+            self.html.SetPage(self.content() if callable(self.content) else self.content)
+            self.html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
+            self.html.ForegroundColour = ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT)
+        wx.CallAfter(dorefresh) # Postpone to allow conf to update
 
 
 
