@@ -161,7 +161,7 @@ class SkypeDatabase(object):
         @param   log_error  if False, exceptions on opening the database
                             are not written to log (written by default)
         """
-        self.filename = filename
+        self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
         self.backup_created = False
         self.consumers = set() # Registered objects using this database

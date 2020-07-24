@@ -432,11 +432,16 @@ def run_export(filenames, format, chatnames, authornames, ask_password, store_pa
                     while not password:
                         output(prompt, end="") # getpass output can raise errors
                         password = getpass.getpass("", io.BytesIO()).strip()
-                        prompt = "Enter Skype password for '%s': " % username
+                        prompt = "Enter Skype password for '%s': " % db.id
 
                 try: db.live.login(db.id, password)
                 except Exception as e:
                     prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
+
+            if store_password:
+                conf.Login.setdefault(db.filename, {})
+                conf.Login[db.filename].update(store=True, password=util.obfuscate(password))
+                conf.save()
 
         formatargs = collections.defaultdict(str)
         formatargs["skypename"] = os.path.basename(db.filename)
