@@ -13,10 +13,8 @@ Released under the MIT License.
 """
 import cgi
 import collections
-import cookielib
 import copy
 import cStringIO
-import csv
 import datetime
 import math
 import os
@@ -2395,84 +2393,6 @@ def find_databases(folder):
     for root, dirs, files in os.walk(folder):
         for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)
-
-
-def import_contacts_file(filename):
-    """
-    Returns contacts found in the CSV file, as [{"name", "e-mail", "phone"}].
-    """
-    result, uniques = [], {}
-    contents = open(filename, "rb").read()
-    if not contents: return result
-
-    if contents.startswith("\xFF\xFE"): # Unicode little endian header
-        try:
-            contents = contents.decode("utf-16") # GMail CSVs can be in UTF-16
-        except UnicodeDecodeError:
-            contents = contents[2:].replace("\x00", "")
-        else: # CSV has trouble with Unicode: turn back to string
-            contents = contents.encode("latin1", errors="xmlcharrefreplace")
-    lines = contents.splitlines()
-    csvfile = csv.reader(lines, csv.Sniffer().sniff(lines[0], ",;\t"))
-    rows = [x for x in csvfile if x]
-    header, items = rows[0] if rows else [], rows[1:]
-    titlemap = dict((title.lower(), i) for i, title in enumerate(header))
-
-    # Look through header row and see what fields we recognize.
-    # By default, assume MSN/Outlook type of values.
-    FIRST, MIDDLE, LAST = "first name", "middle name", "last name"
-    PHONE_FIELDS, EMAIL_FIELDS = ["mobile phone"], ["e-mail address"]
-    if "given name" in titlemap: # Looks like GMail type of values
-        FIRST, MIDDLE, LAST = "given name", "additional name", "family name"
-        PHONE_FIELDS = [("phone %s - value" % i) for i in range(1, 5)]
-        EMAIL_FIELDS = [("e-mail %s - value" % i) for i in range(1, 3)]
-    # Try other possible headers if not MSN/GMail export
-    if not any(x in titlemap for x in [FIRST, MIDDLE, LAST]):
-        FIRST = "name" if "name" in titlemap else "skypename"
-    if not any(x in titlemap for x in PHONE_FIELDS):
-        PHONE_FIELDS = ["phone"] if "phone" in titlemap else ["mobile"]
-    if not any(x in titlemap for x in EMAIL_FIELDS):
-        EMAIL_FIELDS = ["e-mail"] if "e-mail" in titlemap else ["email"]
-    # Looks like no header: try to auto-detect fields from first values
-    ALL_FIELDS = [FIRST, MIDDLE, LAST] + PHONE_FIELDS + EMAIL_FIELDS
-    if not any(x in titlemap for x in ALL_FIELDS):
-        titlemap.clear()
-        for i, title in ((i, t) for i, t in enumerate(header) if t):
-            if "@" in title:
-                titlemap[EMAIL_FIELDS[0]] = i
-            elif re.search("\\d{3,}", title):
-                titlemap[PHONE_FIELDS[0]] = i
-            elif FIRST not in titlemap:
-                titlemap[FIRST] = i
-        items = [header] + items
-
-    for row in items:
-        row = [x.strip().decode("latin1") for x in row]
-        values = dict((t, row[i]) for t, i in titlemap.items() if i < len(row))
-
-        # Assemble full name from partial fields
-        contact = {"name": values.get(FIRST, ""), "phone": "", "e-mail": ""}
-        for title in (x for x in [MIDDLE, LAST] if values.get(x, "")):
-            contact["name"] += (" " if contact["name"] else "") + values[title]
-
-        # Phone data can contain arbitrary whitespace: remove it
-        for title in (x for x in PHONE_FIELDS if values.get(x, "")):
-            values[title] = re.sub(r"\s+", "", values[title])
-
-        # Gather phone and e-mail information
-        for t, fields in [("phone", PHONE_FIELDS), ("e-mail", EMAIL_FIELDS)]:
-            for title in (x for x in fields if values.get(x, "")):
-                if contact[t]: # Value already filled: make new record
-                    result.append(contact)
-                    contact = contact.copy()
-                contact[t] = values[title]
-
-        if any(contact.values()):
-            key = tuple(contact.items())
-            if key not in uniques: result.append(contact)
-            uniques[key] = contact
-
-    return result
 
 
 def get_avatar(datadict, size=None, aspect_ratio=True):
