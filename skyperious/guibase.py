@@ -18,6 +18,7 @@ Released under the MIT License.
 import datetime
 import logging
 import os
+import re
 import sys
 import traceback
 
@@ -99,8 +100,6 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
 
         conf.load()
 
-        self.Bind(EVT_LOG,      self.on_log_message)
-        self.Bind(EVT_STATUS,   self.on_set_status)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
         self.console_commands = set() # Commands from run_console()
@@ -213,18 +212,26 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         self.SetStatusText(event.text)
 
 
-    def on_log_message(self, event):
-        """Event handler for adding a message to the log control."""
-        if hasattr(self, "log") and getattr(conf, "LogEnabled", False):
-            text = event.text
-            try:
-                self.log.AppendText(text + "\n")
-            except Exception:
-                try:
-                    self.log.AppendText(text.decode("utf-8", "replace") + "\n")
-                except Exception as e:
-                    print("Exception %s: %s in on_log_message" %
-                          (e.__class__.__name__, e))
+    def set_status(self, text, timeout=False):
+        """Sets main window status bar text, optionally clears after timeout."""
+        self.SetStatusText(text)
+        if not timeout or not text: return
+
+        if timeout is True: timeout = conf.StatusFlashLength
+        clear = lambda sb: sb and sb.StatusText == text and self.SetStatusText("")
+        wx.CallLater(timeout, clear, self.StatusBar)
+
+
+    def log_message(self, text):
+        """Adds a message to the log control."""
+        if not hasattr(self, "log") \
+        or hasattr(conf, "LogEnabled") and not conf.LogEnabled: return
+
+        try:
+            self.log.AppendText(text + "\n")
+        except Exception:
+            try: self.log.AppendText(text.decode("utf-8", "replace") + "\n")
+            except Exception: pass
 
 
     def on_showhide_console(self, event=None):

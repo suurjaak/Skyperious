@@ -1236,7 +1236,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         for name in sorted(conf.OptionalFileDirectives):
             value, help = getattr(conf, name, None), get_field_doc(name)
-            default = conf.OptionalFileDirectiveDefaults.get(name)
+            default = conf.Defaults.get(name)
             if value is None and default is None:
                 continue # continue for name
             kind = wx.Size if isinstance(value, (tuple, list)) else type(value)

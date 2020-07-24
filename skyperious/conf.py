@@ -308,11 +308,11 @@ StatisticsPlotWidth = 150
 EmoticonsPlotWidth = 200
 
 """
-Ask for Skype password and download shared images from Skype web for HTML export.
+Download shared images from Skype online service for HTML export.
 """
 SharedImageAutoDownload = True
 
-"""Duration of "flashed" status message on StatusBar, in milliseconds."""
+"""Duration of status message on program statusbar, in milliseconds."""
 StatusFlashLength = 30000
 
 """How many items in the Recent Files menu."""
