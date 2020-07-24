@@ -668,45 +668,48 @@ class ConsoleWriter(object):
         global window
         if not window and win32console:
             if not ConsoleWriter.is_loaded and not ConsoleWriter.handle:
-                try:
-                    win32console.AttachConsole(-1) # pythonw.exe from console
-                    atexit.register(lambda: ConsoleWriter.realwrite("\n"))
-                except Exception:
-                    pass # Okay if fails: can be python.exe from console
-                try:
-                    handle = win32console.GetStdHandle(
-                                          win32console.STD_OUTPUT_HANDLE)
-                    handle.WriteConsole("\n" + text)
-                    ConsoleWriter.handle = handle
-                    ConsoleWriter.realwrite = handle.WriteConsole
-                except Exception: # Fails if GUI program: make new console
-                    try: win32console.FreeConsole()
-                    except Exception: pass
-                    try:
-                        win32console.AllocConsole()
-                        handle = open("CONOUT$", "w")
-                        argv = [util.longpath(sys.argv[0])] + sys.argv[1:]
-                        handle.write(" ".join(argv) + "\n\n" + text)
-                        handle.flush()
-                        ConsoleWriter.handle = handle
-                        ConsoleWriter.realwrite = handle.write
-                        sys.stdin = open("CONIN$", "r")
-                        exitfunc = lambda s: (handle.write(s), handle.flush(),
-                                              raw_input())
-                        atexit.register(exitfunc, "\nPress ENTER to exit.")
-                    except Exception:
-                        try: win32console.FreeConsole()
-                        except Exception: pass
-                        ConsoleWriter.realwrite = self.stream.write
-                ConsoleWriter.is_loaded = True
-            else:
-                try:
-                    self.realwrite(text)
-                    self.flush()
-                except Exception:
-                    self.stream.write(text)
+                self.init_console()
+
+            try: self.realwrite(text), self.flush()
+            except Exception: self.stream.write(text)
         else:
             self.stream.write(text)
+
+
+    def init_console(self):
+        """Sets up connection to console."""
+        try:
+            win32console.AttachConsole(-1) # pythonw.exe from console
+            atexit.register(lambda: ConsoleWriter.realwrite("\n"))
+        except Exception:
+            pass # Okay if fails: can be python.exe from console
+        try:
+            handle = win32console.GetStdHandle(
+                                  win32console.STD_OUTPUT_HANDLE)
+            handle.WriteConsole("\n")
+            ConsoleWriter.handle = handle
+            ConsoleWriter.realwrite = handle.WriteConsole
+        except Exception: # Fails if GUI program: make new console
+            try: win32console.FreeConsole()
+            except Exception: pass
+            try:
+                win32console.AllocConsole()
+                handle = open("CONOUT$", "w")
+                argv = [util.longpath(sys.argv[0])] + sys.argv[1:]
+                handle.write(" ".join(argv) + "\n\n")
+                handle.flush()
+                ConsoleWriter.handle = handle
+                ConsoleWriter.realwrite = handle.write
+                sys.stdin = open("CONIN$", "r")
+                exitfunc = lambda s: (handle.write(s), handle.flush(),
+                                      raw_input())
+                atexit.register(exitfunc, "\nPress ENTER to exit.")
+            except Exception:
+                try: win32console.FreeConsole()
+                except Exception: pass
+                ConsoleWriter.realwrite = self.stream.write
+        ConsoleWriter.is_loaded = True
+
 
 
 class ProgressBar(threading.Thread):
