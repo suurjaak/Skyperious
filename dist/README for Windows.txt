@@ -43,7 +43,7 @@ exporting, searching, syncing, and merging.
 The graphical version includes a Python console window.
 
 Downloads, help texts, and more screenshots at
-http://suurjaak.github.io/Skyperious.
+https://suurjaak.github.io/Skyperious.
 
 
 Using The Program
@@ -98,13 +98,13 @@ Attribution
 Skyperious has been built using the following open-source software:
 - Python 2.7.18 (http://www.python.org)
 - wxPython 4.1.0 (http://www.wxpython.org)
-- beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
-- Pillow 6.2.2 (https://pypi.python.org/pypi/Pillow)
-- pyparsing 2.4.7 (http://pyparsing.wikispaces.com/)
-- SkPy (https://pypi.python.org/pypi/SkPy)
-- step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 1.2.9 (https://github.com/jmcnamara/XlsxWriter)
+- beautifulsoup4 4.9.1 (https://pypi.org/project/beautifulsoup4)
 - dateutil 2.8.1, (http://pypi.python.org/pypi/python-dateutil)
+- Pillow 6.2.2 (https://pypi.org/project/Pillow)
+- pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
+- SkPy 0.9.1 (https://pypi.org/project/SkPy)
+- step, Simple Template Engine for Python (https://github.com/dotpy/step)
+- XlsxWriter 1.2.9 (https://pypi.org/project/XlsxWriter)
 
 
 Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
@@ -115,19 +115,19 @@ released under the Skype Component License 1.0.
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
-  http://brandonmathis.com/projects/fancy-avatars/
+  https://github.com/imathis/fancy-avatars
 
 Several icons from:
   Fugue Icons, (c) 2010 Yusuke Kamiyamane,
-  http://p.yusukekamiyamane.com/
+  https://p.yusukekamiyamane.com/
 
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Binaries compiled with PyInstaller, http://www.pyinstaller.org
+Binaries compiled with PyInstaller, https://www.pyinstaller.org
 
 Installer created with Nullsoft Scriptable Install System,
-http://nsis.sourceforge.net/
+https://nsis.sourceforge.io/
 
 
 License

@@ -142,9 +142,9 @@ LogEnabled = True
 LogSQL = False
 
 """URLs for download list, changelog, and homepage."""
-DownloadURL  = "http://erki.lap.ee/downloads/Skyperious/"
-ChangelogURL = "http://suurjaak.github.com/Skyperious/changelog.html"
-HomeUrl = "http://suurjaak.github.com/Skyperious/"
+DownloadURL  = "https://erki.lap.ee/downloads/Skyperious/"
+ChangelogURL = "https://suurjaak.github.com/Skyperious/changelog.html"
+HomeUrl = "https://suurjaak.github.io/Skyperious/"
 
 """Maximum number of error reports sent per day."""
 ErrorReportsPerDay = 5

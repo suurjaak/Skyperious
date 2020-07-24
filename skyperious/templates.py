@@ -1852,7 +1852,7 @@ under the MIT License.
 
 
 &copy; 2011, Erki Suurjaak.
-<a href="{{conf.HomeUrl}}"><font color="{{conf.LinkColour}}">suurjaak.github.com/Skyperious</font></a><br /><br /><br />
+<a href="{{conf.HomeUrl}}"><font color="{{conf.LinkColour}}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
 
 
 
@@ -1860,22 +1860,26 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 4.1.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
+  <li>beautifulsoup4{{" 4.9.1" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.org/project/beautifulsoup4"><font color="{{conf.LinkColour}}">pypi.org/project/beautifulsoup4</font></a></li>
+  <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/python-dateutil">
+      <font color="{{conf.LinkColour}}">pypi.org/project/python-dateutil</font></a></li>
   <li>Pillow{{" 6.2.2" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.python.org/pypi/Pillow/"><font color="{{conf.LinkColour}}">pypi.python.org/pypi/Pillow</font></a></li>
+      <a href="https://pypi.org/project/Pillow"><font color="{{conf.LinkColour}}">pypi.org/project/Pillow</font></a></li>
+  <li>pyparsing{{" 2.4.7" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.org/project/pyparsing"><font color="{{conf.LinkColour}}">pypi.org/project/pyparsing</font></a></li>
+  <li>SkPy{{" 0.9.1" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.org/project/SkPy"><font color="{{conf.LinkColour}}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
-      <li>pyparsing{{" 2.4.7" if getattr(sys, 'frozen', False) else ""}}, 
-      <a href="http://pyparsing.wikispaces.com/"><font color="{{conf.LinkColour}}">pyparsing.wikispaces.com</font></a></li>
   <li>XlsxWriter{{" 1.2.9" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://github.com/jmcnamara/XlsxWriter"><font color="{{conf.LinkColour}}">
-          github.com/jmcnamara/XlsxWriter</font></a></li>
-  <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.python.org/pypi/python-dateutil">
-      <font color="{{conf.LinkColour}}">pypi.python.org/pypi/python-dateutil</font></a></li>
+      <a href="https://pypi.org/project/XlsxWriter"><font color="{{conf.LinkColour}}">
+          pypi.org/project/XlsxWriter</font></a></li>
   <li>jsOnlyLightbox{{" 0.5.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
       <font color="{{conf.LinkColour}}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
 %if getattr(sys, 'frozen', False):
   <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
-  <li>PyInstaller, <a href="http://www.pyinstaller.org">
+  <li>PyInstaller, <a href="https://www.pyinstaller.org">
       <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br />
@@ -1887,19 +1891,19 @@ released under the Skype Component License 1.0.<br /><br />
 
 
 Default avatar icon from Fancy Avatars, &copy; 2009 Brandon Mathis<br />
-<a href="http://brandonmathis.com/projects/fancy-avatars/">
-<font color="{{conf.LinkColour}}">brandonmathis.com/projects/fancy-avatars</font></a><br /><br />
+<a href="https://github.com/imathis/fancy-avatars">
+<font color="{{conf.LinkColour}}">github.com/imathis/fancy-avatars</font></a><br /><br />
 
 
 Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
-<a href="http://p.yusukekamiyamane.com/"><font color="{{conf.LinkColour}}">p.yusukekamiyamane.com</font></a>
+<a href="https://p.yusukekamiyamane.com/"><font color="{{conf.LinkColour}}">p.yusukekamiyamane.com</font></a>
 <br /><br />
 Includes fonts Carlito Regular and Carlito bold,
 <a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{conf.LinkColour}}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
 %if getattr(sys, 'frozen', False):
 <br /><br />
 Installer created with Nullsoft Scriptable Install System,
-<a href="http://nsis.sourceforge.net/"><font color="{{conf.LinkColour}}">nsis.sourceforge.net</font></a>
+<a href="https://nsis.sourceforge.io"><font color="{{conf.LinkColour}}">nsis.sourceforge.io</font></a>
 %endif
 
 </font>

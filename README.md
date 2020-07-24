@@ -39,12 +39,12 @@ and
 
 
 Additionally, it doubles as a useful database tool for any SQLite file.
-Also, a [command line interface](http://suurjaak.github.io/Skyperious/help.html#commandline)
+Also, a [command line interface](https://suurjaak.github.io/Skyperious/help.html#commandline)
 is available with key functions like exporting, searching, syncing, and merging.
 The graphical version includes a Python console window.
 
 Downloads, help texts, and more screenshots at
-http://suurjaak.github.io/Skyperious.
+https://suurjaak.github.io/Skyperious.
 
 [![Screenshots](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/th_collage.png)](https://raw.github.com/suurjaak/Skyperious/gh-pages/img/collage.png)
 
@@ -58,7 +58,7 @@ Once added to the database list, a file can be opened for browsing, searching
 and exporting, or compared with another database for merging.
 
 Searching an opened database supports a simple Google-like
-[query syntax](http://suurjaak.github.io/Skyperious/help.html).
+[query syntax](https://suurjaak.github.io/Skyperious/help.html).
 You can use keywords to search among specific authors or chats only
 (`from:john`, `chat:links`), or from certain dates only 
 (`date:2012`, `date:2010..2013-06`). Search supports 
@@ -77,7 +77,7 @@ the other, and merge all detected messages to the other database. Or you can
 browse and copy specific chats and contacts.
 
 Skyperious offers a number of options from the
-[command line](http://suurjaak.github.io/Skyperious/help.html#commandline):
+[command line](https://suurjaak.github.io/Skyperious/help.html#commandline):
 ```
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
@@ -110,7 +110,7 @@ Installation
 ------------
 
 Windows: download and launch the latest setup from
-http://suurjaak.github.io/Skyperious/downloads.html.
+https://suurjaak.github.io/Skyperious/downloads.html.
 
 Mac/Linux/other: install Python, wxPython, pip, and run
 `pip install skyperious`
@@ -130,11 +130,11 @@ and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
 The following are also listed in `requirements.txt` for pip:
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
-* dateutil (https://pypi.python.org/pypi/python-dateutil)
-* Pillow (https://pypi.python.org/pypi/Pillow)
-* pyparsing (https://pyparsing.wikispaces.com/)
-* SkPy (https://pypi.python.org/pypi/SkPy)
-* XlsxWriter (https://pypi.python.org/pypi/XlsxWriter)
+* dateutil (https://pypi.org/project/python-dateutil)
+* Pillow (https://pypi.org/project/Pillow)
+* pyparsing (https://pypi.org/project/pyparsing)
+* SkPy (https://pypi.org/project/SkPy)
+* XlsxWriter (https://pypi.org/project/XlsxWriter)
 
 If wxPython is not available, the command line interface will function
 regardless.
@@ -159,19 +159,19 @@ released under the [Skype Component License 1.0](res/emoticons/Skype Component L
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
-  http://brandonmathis.com/projects/fancy-avatars/
+  https://github.com/imathis/fancy-avatars
 
 Several icons from:
   Fugue Icons, (c) 2010 Yusuke Kamiyamane,
-  http://p.yusukekamiyamane.com/
+  https://p.yusukekamiyamane.com
 
 Includes fonts Carlito Regular and Carlito bold,
 https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts
 
-Binaries compiled with PyInstaller, http://www.pyinstaller.org
+Binaries compiled with PyInstaller, https://www.pyinstaller.org
 
 Installers created with Nullsoft Scriptable Install System,
-http://nsis.sourceforge.net/
+https://nsis.sourceforge.io
 
 
 License
