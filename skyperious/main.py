@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.07.2020
+@modified    24.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -237,6 +237,7 @@ def run_merge(filenames, output_filename=None):
                   (util.plural("message", counts[db1]["msgs"]),
                    util.plural("chat", counts[db1]["chats"]), db1))
         output("Merge into %s complete." % db2)
+        db2.close()
 
 
 def run_search(filenames, query):
@@ -409,6 +410,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
         ns["filename"] = filename
         try: db.live.populate()
         except Exception as e: progress(error=util.format_exc(e))
+        db.close()
     
 
 def run_export(filenames, format, chatnames, authornames, ask_password, store_password):
