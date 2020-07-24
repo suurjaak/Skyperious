@@ -490,14 +490,17 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         page = self.page_main = wx.Panel(notebook)
         ColourManager.Manage(page, "BackgroundColour", "MainBgColour")
         notebook.AddPage(page, "Databases")
-        sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
+
+        splitter = self.splitter = wx.SplitterWindow(page, style=wx.BORDER_NONE)
+        splitter.SetMinimumPaneSize(300)
 
         agw_style = (wx.LC_REPORT | wx.LC_NO_HEADER |
                      wx.LC_SINGLE_SEL | wx.BORDER_NONE)
         if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_USER_ROW_HEIGHT"):
             agw_style |= wx.lib.agw.ultimatelistctrl.ULC_USER_ROW_HEIGHT
         list_db = self.list_db = wx.lib.agw.ultimatelistctrl. \
-            UltimateListCtrl(parent=page, agwStyle=agw_style)
+            UltimateListCtrl(parent=splitter, agwStyle=agw_style)
         list_db.MinSize = 400, -1 # Maximize-restore would resize width to 100
         list_db.InsertColumn(0, "")
         il = wx.ImageList(*images.ButtonHome.Bitmap.Size)
@@ -516,7 +519,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             list_db.SetUserLineHeight(int(h * 1.5))
         list_db.Select(0)
 
-        panel_right = wx.lib.scrolledpanel.ScrolledPanel(page)
+        panel_right = wx.lib.scrolledpanel.ScrolledPanel(splitter)
         panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         panel_main = self.panel_db_main = wx.Panel(panel_right)
@@ -641,10 +644,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_detail.Sizer.AddStretchSpacer()
         panel_detail.Sizer.Add(button_saveas, flag=wx.GROW)
         panel_detail.Sizer.Add(button_remove, flag=wx.GROW)
-        panel_right.Sizer.Add(panel_main, proportion=1, flag=wx.GROW)
-        panel_right.Sizer.Add(panel_detail, proportion=1, flag=wx.GROW)
-        sizer.Add(list_db, border=10, proportion=6, flag=wx.ALL | wx.GROW)
-        sizer.Add(panel_right, border=10, proportion=4, flag=wx.ALL | wx.GROW)
+        panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
+        panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
+        sizer.Add(splitter, border=10, proportion=1, flag=wx.ALL | wx.GROW)
+        splitter.SplitVertically(list_db, panel_right, sashPosition=self.Size[0]*4/7)
         for filename in conf.DBFiles:
             self.update_database_list(filename)
 
