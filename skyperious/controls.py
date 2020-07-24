@@ -67,7 +67,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    20.07.2020
+@modified    24.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -105,30 +105,48 @@ class BusyPanel(wx.Window):
     """
     FOREGROUND_COLOUR = wx.WHITE
     BACKGROUND_COLOUR = wx.Colour(110, 110, 110, 255)
+    REFRESH_INTERVAL  = 500
 
     def __init__(self, parent, label):
         wx.Window.__init__(self, parent)
-        self.Hide()
-        sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
-        label = self._label = wx.StaticText(parent=self, label=label)
-        self.BackgroundColour = self.BACKGROUND_COLOUR
+        self.Hide() # Avoid initial flicker
+
+        timer = self._timer = wx.Timer(self)
+
+        label = wx.StaticText(self, label=label, style=wx.ST_ELLIPSIZE_END)
+
+        self.BackgroundColour  = self.BACKGROUND_COLOUR
         label.ForegroundColour = self.FOREGROUND_COLOUR
-        sizer.Add(label, border=15, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
+
+        self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        self.Sizer.Add(label, border=15, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         self.Fit()
+
+        maxsize = [self.Parent.Size.width / 2, self.Parent.Size.height * 2 / 3]
+        self.Size = tuple(min(a, b) for a, b in zip(self.Size, maxsize))
+
+        self.Bind(wx.EVT_PAINT, lambda e: (e.Skip(), self.Refresh()))
+        self.Bind(wx.EVT_TIMER, lambda e: (e.Skip(), self.Refresh()))
+        self.Bind(wx.EVT_WINDOW_DESTROY, self._OnDestroy)
+
         self.Layout()
         self.CenterOnParent()
         self.Show()
         parent.Refresh()
-        wx.YieldIfNeeded()
+        wx.Yield()
+        timer.Start(self.REFRESH_INTERVAL)
+
+
+    def _OnDestroy(self, event):
+        event.Skip()
+        try: self._timer.Stop()
+        except Exception: pass
 
 
     def Close(self):
-        try:
-            self.Hide()
-            self.Parent.Refresh()
-            self.Destroy()
+        try: self.Destroy(); self.Parent.Refresh()
         except Exception: pass
-        
+
 
 
 class NonModalOKDialog(wx.Dialog):
