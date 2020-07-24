@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.07.2020
+@modified    24.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -188,6 +188,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             def OnDropFiles(self, x, y, filenames):
                 # CallAfter to allow UI to clear up the dragged icons
                 wx.CallAfter(self.ProcessFiles, filenames)
+                return True
 
             def ProcessFiles(self, filenames):
                 for filename in filenames:
