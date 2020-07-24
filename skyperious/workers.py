@@ -9,10 +9,11 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.07.2020
+@modified    24.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
+import logging
 import Queue
 import re
 import threading
@@ -26,11 +27,12 @@ except ImportError:
 from . third_party import step
 
 from . import conf
-from . import guibase
 from . import searchparser
 from . import skypedata
 from . import templates
 from . import util
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerThread(threading.Thread):
@@ -148,7 +150,7 @@ class SearchThread(WorkerThread):
                     wrap_b = lambda x: "**%s**" % x.group(0)
                     output = {"format": "text"}
                 FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
-                guibase.log('Searching "%(text)s" in %(table)s (%(db)s).' % search)
+                logger.info('Searching "%(text)s" in %(table)s (%(db)s).' % search)
 
                 parser = skypedata.MessageParser(search["db"],
                                                  wrapper=wrap_html)
@@ -195,8 +197,8 @@ class SearchThread(WorkerThread):
                             result_count += 1
                             try: result["output"] += template_chat.expand(locals())
                             except Exception:
-                                guibase.log("Error formatting search result for chat %s in %s.\n\n%s",
-                                            chat, search["db"], traceback.format_exc())
+                                logger.exception("Error formatting search result for chat %s in %s.",
+                                                 chat, search["db"])
                                 count -= 1
                                 result_count -= 1
                                 continue # for chat
@@ -245,8 +247,8 @@ class SearchThread(WorkerThread):
                             result_count += 1
                             try: result["output"] += template_contact.expand(locals())
                             except Exception:
-                                guibase.log("Error formatting search result for contact %s in %s.\n\n%s",
-                                            contact, search["db"], traceback.format_exc())
+                                logger.exception("Error formatting search result for contact %s in %s.",
+                                                 contact, search["db"])
                                 count -= 1
                                 result_count -= 1
                                 continue # for contact
@@ -281,8 +283,8 @@ class SearchThread(WorkerThread):
                         result_count += 1
                         try: result["output"] += template_message.expand(locals())
                         except Exception:
-                            guibase.log("Error formatting search result for message %s in %s.\n\n%s",
-                                        m, search["db"], traceback.format_exc())
+                            logger.exception("Error formatting search result for message %s in %s.",
+                                             m, search["db"])
                             count -= 1
                             result_count -= 1
                             continue # for m
@@ -329,8 +331,8 @@ class SearchThread(WorkerThread):
                             result_count += 1
                             try: result["output"] += template_row.expand(locals())
                             except Exception:
-                                guibase.log("Error formatting search result for row %s in %s.\n\n%s",
-                                            row, search["db"], traceback.format_exc())
+                                logger.exception("Error formatting search result for row %s in %s.\n\n%s",
+                                                 row, search["db"])
                                 count -= 1
                                 result_count -= 1
                                 continue # for contact
@@ -387,7 +389,7 @@ class SearchThread(WorkerThread):
                 result["done"] = True
                 result["count"] = result_count
                 self.postback(result)
-                guibase.log("Search found %(count)s results." % result)
+                logger.info("Search found %(count)s results." % result)
             except Exception as e:
                 if not result:
                     result = {}

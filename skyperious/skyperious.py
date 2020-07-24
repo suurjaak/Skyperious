@@ -18,6 +18,7 @@ import copy
 import datetime
 import hashlib
 import inspect
+import logging
 import math
 import os
 import re
@@ -70,6 +71,8 @@ from . import wx_accel
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
 DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
@@ -750,7 +753,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         if self.button_detect.FindFocus() == self.button_detect:
             self.list_db.SetFocus()
-        guibase.logstatus("Searching local computer for databases..")
+        guibase.status("Searching local computer for databases..", log=True)
         self.button_detect.Enabled = False
         self.worker_detection.work(True)
 
@@ -770,11 +773,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if "filenames" in result:
             for f in result["filenames"]:
                 if self.update_database_list(f):
-                    guibase.log("Detected database %s.", f)
+                    logger.info("Detected database %s.", f)
         if "count" in result:
             name = ("" if result["count"] else "additional ") + "database"
-            guibase.logstatus_flash("Detected %s.", 
-                                    util.plural(name, result["count"]))
+            guibase.status("Detected %s.", util.plural(name, result["count"]), log=True)
         if result.get("done", False):
             self.button_detect.Enabled = True
             wx.Bell()
@@ -868,14 +870,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 shutil.copyfile(original, newpath)
                 success = True
             except Exception as e:
-                guibase.log("%r when trying to copy %s to %s.",
-                            e, original, newpath)
+                logger.error("%r when trying to copy %s to %s.",
+                             e, original, newpath)
                 wx.MessageBox("Failed to copy \"%s\" to \"%s\"." %
                               (original, newpath), conf.Title,
                               wx.OK | wx.ICON_WARNING)
             if success:
-                guibase.logstatus_flash("Saved a copy of %s as %s.",
-                                        original, newpath)
+                guibase.status("Saved a copy of %s as %s.", original, newpath,
+                               log=True)
                 self.update_database_list(newpath)
 
 
@@ -1093,11 +1095,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     error = True
                 busy.Close()
             if not error:
-                guibase.logstatus_flash("Exported %s from %s as %s "
-                    "under %s.", util.plural("chat", count), db.filename,
-                    extname.upper(), export_dir)
+                guibase.status("Exported %s from %s as %s "
+                               "under %s.", util.plural("chat", count), db.filename,
+                               extname.upper(), export_dir, log=True)
             elif errormsg:
-                guibase.logstatus_flash(errormsg)
+                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             if db and not db.has_consumers():
                 del self.dbs[db.filename]
@@ -1146,7 +1148,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             page = next((x for x in self.merger_pages
                          if x and set([x.db1, x.db2]) == dbset), None)
             if not page:
-                guibase.log("Merge page for %s and %s.", db1, db2)
+                logger.info("Merge page for %s and %s.", db1, db2)
                 page = MergerPage(self.notebook, db1, db2,
                        self.get_unique_tab_title("Database comparison"))
                 self.merger_pages[page] = (db1, db2)
@@ -1156,7 +1158,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             # Close DB with no owner
             for db in filter(None, [db1, db2]):
                 if not db.has_consumers():
-                    guibase.log("Closed database %s." % db.filename)
+                    logger.info("Closed database %s." % db.filename)
                     del self.dbs[db.filename]
                     db.close()
         if page:
@@ -1345,17 +1347,17 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.list_db.SetFocus()
             self.button_folder.Enabled = False
             folder = self.dialog_selectfolder.GetPath()
-            guibase.logstatus("Detecting databases under %s.", folder)
+            guibase.status("Detecting databases under %s.", folder, log=True)
             wx.YieldIfNeeded()
             count = 0
             for filename in skypedata.find_databases(folder):
                 if filename not in self.db_filenames:
-                    guibase.log("Detected database %s.", filename)
+                    logger.info("Detected database %s.", filename)
                     self.update_database_list(filename)
                     count += 1
             self.button_folder.Enabled = True
-            guibase.logstatus_flash("Detected %s under %s.",
-                util.plural("new database", count), folder)
+            guibase.status("Detected %s under %s.",
+                           util.plural("new database", count), folder, log=True)
 
 
     def on_open_current_database(self, event):
@@ -1380,8 +1382,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.label_messages.Value = "Error text: %s" % util.format_exc(e)
             self.label_account.ForegroundColour = conf.LabelErrorColour 
             self.label_chats.ForegroundColour = conf.LabelErrorColour
-            guibase.log("Error opening %s.\n\n%s", filename,
-                     traceback.format_exc())
+            logger.exception("Error opening %s.", filename)
             return
         try:
             stats = db.get_general_statistics(full=False)
@@ -1405,8 +1406,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.label_account.ForegroundColour = conf.LabelErrorColour
             self.label_chats.Value = "Error text: %s" % util.format_exc(e)
             self.label_chats.ForegroundColour = conf.LabelErrorColour
-            guibase.log("Error loading data from %s.\n\n%s", filename,
-                        traceback.format_exc())
+            logger.exception("Error loading data from %s.", filename)
         if db and not db.has_consumers():
             db.close()
             if filename in self.dbs:
@@ -1577,7 +1577,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if page in self.db_pages:
                 del self.db_pages[page]
             page_dbs = [page.db]
-            guibase.log("Closed database tab for %s." % page.db)
+            logger.info("Closed database tab for %s.", page.db)
             conf.save()
         else:
             if page.is_merging:
@@ -1592,7 +1592,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
             page.worker_merge.stop()
-            guibase.log("Closed comparison tab for %s and %s.",
+            logger.info("Closed comparison tab for %s and %s.",
                         page.db1, page.db2)
 
         # Close databases, if not used in any other page
@@ -1602,7 +1602,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if db.filename in self.dbs:
                     del self.dbs[db.filename]
                 db.close()
-                guibase.log("Closed database %s." % db)
+                logger.info("Closed database %s." % db)
         # Remove any dangling references
         if self.page_merge_latest == page:
             self.page_merge_latest = None
@@ -1689,9 +1689,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         "Not a valid SQLITE database?" % filename,
                         conf.Title, wx.OK | wx.ICON_WARNING)
             if db:
-                guibase.log("Opened %s (%s).", db, util.format_bytes(
+                logger.info("Opened %s (%s).", db, util.format_bytes(
                             db.filesize))
-                guibase.status_flash("Reading database file %s.", db)
+                guibase.status("Reading database file %s.", db)
                 self.dbs[filename] = db
                 # Add filename to Recent Files menu and conf, if needed
                 if filename in conf.RecentFiles: # Remove earlier position
@@ -1722,7 +1722,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not db:
                 db = self.load_database(filename)
             if db:
-                guibase.status_flash("Opening database file %s." % db)
+                guibase.status("Opening database file %s." % db)
                 tab_title = self.get_unique_tab_title(db.filename)
                 page = DatabasePage(self.notebook, tab_title, db, self.memoryfs)
                 self.db_pages[page] = db
@@ -2594,7 +2594,7 @@ class DatabasePage(wx.Panel):
         opts = conf.Login.get(self.db.filename, {})
         self.edit_user.Value = self.db.id if self.db.id else ""
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
-        except Exception as e: guibase.log("Error decoding stored password: %s", util.format_exc(e))
+        except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
         self.check_login_auto.Value  = opts.get("auto",  False)
         self.check_login_auto.Enable(self.check_login_store.Value)
@@ -2679,7 +2679,7 @@ class DatabasePage(wx.Panel):
                 plabel, slabel = None, None
                 if "error" in result:
                     err = "Error syncing from Skype online service:\n\n%s" % result["error"]
-                    guibase.log(err)
+                    logger.error(err)
                     plabel = "Error syncing from Skype online service."
                     slabel = err
                     self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
@@ -2780,7 +2780,7 @@ class DatabasePage(wx.Panel):
                 for c in self.panel_login.Children:
                     if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Enable()
                 if "error" in result:
-                    guibase.log('Error logging in to Skype as "%s":\n\n%s', self.db.id, result["error"])
+                    logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.id, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
                     self.button_login.Enable() 
                 else:
@@ -2801,7 +2801,7 @@ class DatabasePage(wx.Panel):
         database if corruption detected.
         """
         msg = "Checking integrity of %s." % self.db.filename
-        guibase.logstatus_flash(msg)
+        guibase.status(msg)
         busy = controls.BusyPanel(self, msg)
         wx.YieldIfNeeded()
         try:
@@ -2809,13 +2809,13 @@ class DatabasePage(wx.Panel):
         except Exception as e:
             errors = e.args[:]
         busy.Close()
-        guibase.status_flash("")
+        guibase.status()
         if not errors:
             wx.MessageBox("No database errors detected.",
                           conf.Title, wx.ICON_INFORMATION)
         else:
             err = "\n- ".join(errors)
-            guibase.log("Errors found in %s: %s", self.db, err)
+            logger.info("Errors found in %s: %s", self.db, err)
             err = err[:500] + ".." if len(err) > 500 else err
             msg = "A number of errors were found in %s:\n\n- %s\n\n" \
                   "Recover as much as possible to a new database?" % \
@@ -2833,8 +2833,8 @@ class DatabasePage(wx.Panel):
                     newfile = self.dialog_savefile.GetPath()
                     if not newfile.lower().endswith(".db"): newfile += ".db"
                     if newfile != self.db.filename:
-                        guibase.status_flash("Recovering data from %s to %s.",
-                                             self.db.filename, newfile)
+                        guibase.status("Recovering data from %s to %s.",
+                                       self.db.filename, newfile)
                         m = "Recovering data from %s\nto %s."
                         busy = controls.BusyPanel(self, m % (self.db, newfile))
                         wx.YieldIfNeeded()
@@ -2846,7 +2846,7 @@ class DatabasePage(wx.Panel):
                               "more details in log window:\n\n- "
                               + "\n- ".join(copyerrors)) if copyerrors else ""
                         err = err[:500] + ".." if len(err) > 500 else err
-                        guibase.status_flash("Recovery to %s complete." % newfile)
+                        guibase.status("Recovery to %s complete." % newfile)
                         wx.MessageBox("Recovery to %s complete.%s" %
                                       (newfile, err), conf.Title,
                                       wx.ICON_INFORMATION)
@@ -3141,21 +3141,21 @@ class DatabasePage(wx.Panel):
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
-            guibase.status_flash("Exporting to %s.", filepath)
+            guibase.status("Exporting to %s.", filepath)
             try:
                 messages = self.stc_history.GetMessages()
                 progressfunc = lambda *args: wx.SafeYield()
                 export.export_chats([self.chat], dirname, filename, self.db,
                     messages=messages, skip=False, progress=progressfunc)
-                guibase.status_flash("Exported %s.", filepath)
+                guibase.status("Exported %s.", filepath)
                 try: util.start_file(filepath)
                 except Exception:
-                    guibase.log("Error starting %s:\n\n%s.", filepath,
-                                traceback.format_exc())
+                    logger.exception("Error starting %s.", filepath)
             except Exception:
+                logger.exception("Error saving %s.", filepath)
+                guibase.status("Error saving %s.", filepath)
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 wx.CallAfter(util.try_until, lambda: os.unlink(filepath))
             finally:
@@ -3251,7 +3251,7 @@ class DatabasePage(wx.Panel):
                 (util.plural("chat", chats), self.db.filename,
                  extname.upper(), dirname)
             busy = controls.BusyPanel(self, msg)
-            guibase.logstatus(msg)
+            guibase.status(msg, log=True)
             files, count, errormsg = [], 0, None
             try:
                 progressfunc = lambda *args: wx.SafeYield()
@@ -3262,12 +3262,12 @@ class DatabasePage(wx.Panel):
                            traceback.format_exc()
             busy.Close()
             if not errormsg:
-                guibase.logstatus_flash("Exported %s from %s as %s under %s.",
-                                        util.plural("chat", count), self.db,
-                                        extname.upper(), dirname)
+                guibase.status("Exported %s from %s as %s under %s.",
+                               util.plural("chat", count), self.db,
+                               extname.upper(), dirname, log=True)
                 util.start_file(dirname if len(files) > 1 else files[0])
             else:
-                guibase.logstatus_flash(errormsg)
+                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -3303,11 +3303,11 @@ class DatabasePage(wx.Panel):
                             if not self.stc_history.IsMessageFilteredOut(m)]
                 self.stc_history.SetFilter(filter_backup)
                 if messages:
-                    guibase.logstatus("Filtering and exporting to %s.", filepath)
+                    guibase.status("Filtering and exporting to %s.", filepath, log=True)
                     progressfunc = lambda *args: wx.SafeYield()
                     export.export_chats([self.chat], dirname, filename, self.db,
                         messages=messages, progress=progressfunc)
-                    guibase.logstatus_flash("Exported %s.", filepath)
+                    guibase.status("Exported %s.", filepath, log=True)
                     util.start_file(filepath)
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
@@ -3315,7 +3315,7 @@ class DatabasePage(wx.Panel):
             except Exception:
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
+                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
@@ -3735,16 +3735,15 @@ class DatabasePage(wx.Panel):
             self.html_searchall.SetTabDataByID(search_id, title, html,
                                                tab_data["info"])
         if search_done:
-            guibase.status_flash("Finished searching for \"%s\" in %s.",
-                result["search"]["text"], self.db.filename
-            )
+            guibase.status("Finished searching for \"%s\" in %s.",
+                           result["search"]["text"], self.db.filename)
             self.tb_search_settings.SetToolNormalBitmap(
                 wx.ID_STOP, images.ToolbarStopped.Bitmap)
             if search_id in self.workers_search:
                 self.workers_search[search_id].stop()
                 del self.workers_search[search_id]
         if "error" in result:
-            guibase.log("Error searching %s:\n\n%s", self.db, result["error"])
+            logger.error("Error searching %s:\n\n%s", self.db, result["error"])
             errormsg = "Error searching %s:\n\n%s" % \
                        (self.db, result.get("error_short", result["error"]))
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
@@ -3762,8 +3761,7 @@ class DatabasePage(wx.Panel):
         """
         text = self.edit_searchall.Value
         if text.strip():
-            guibase.status_flash("Searching for \"%s\" in %s.",
-                                 text, self.db.filename)
+            guibase.status("Searching for \"%s\" in %s.", text, self.db.filename)
             html = self.html_searchall
             data = {"id": self.counter(), "db": self.db, "text": text, "map": {},
                     "width": html.Size.width * 5/9, "table": "",
@@ -4072,12 +4070,12 @@ class DatabasePage(wx.Panel):
                 try:
                     export.export_grid(grid_source, filename, title,
                                        self.db, sql, table)
-                    guibase.logstatus_flash("Exported %s.", filename)
+                    guibase.status("Exported %s.", filename, log=True)
                     util.start_file(filename)
                 except Exception:
                     msg = "Error saving %s:\n\n%s" % \
                           (filename, traceback.format_exc())
-                    guibase.logstatus_flash(msg)
+                    guibase.status(msg, log=True)
                     wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
                 finally:
                     busy.Close()
@@ -4115,7 +4113,7 @@ class DatabasePage(wx.Panel):
         sql = self.stc_sql.SelectedText.strip() or self.stc_sql.Text.strip()
         try:
             if sql:
-                guibase.log("Executing SQL script \"%s\".", sql)
+                logger.info("Executing SQL script \"%s\".", sql)
                 self.db.connection.executescript(sql)
                 self.grid_sql.SetTable(None)
                 self.grid_sql.CreateGrid(1, 1)
@@ -4130,7 +4128,7 @@ class DatabasePage(wx.Panel):
                 self.grid_sql.Size = size[0], size[1]
         except Exception as e:
             msg = util.format_exc(e)
-            guibase.logstatus_flash(msg)
+            guibase.status(msg, log=True)
             wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -4153,7 +4151,7 @@ class DatabasePage(wx.Panel):
                 self.grid_sql.SetCellValue(0, 0, str(affected_rows))
                 self.button_reset_grid_sql.Enabled = False
                 self.button_export_sql.Enabled = False
-            guibase.logstatus_flash("Executed SQL \"%s\" (%s).", sql, self.db)
+            guibase.status("Executed SQL \"%s\" (%s).", sql, self.db, log=True)
             size = self.grid_sql.Size
             self.grid_sql.Fit()
             # Jiggle size by 1 pixel to refresh scrollbars
@@ -4166,7 +4164,7 @@ class DatabasePage(wx.Panel):
                 [self.grid_sql.AutoSizeColLabelSize(x) for x in col_range]
         except Exception as e:
             msg = util.format_exc(e)
-            guibase.logstatus_flash(msg)
+            guibase.status(msg, log=True)
             wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -4189,7 +4187,7 @@ class DatabasePage(wx.Panel):
                 template = "Error saving table %s in \"%s\".\n\n%%r" % (
                            grid.table, self.db)
                 msg, msgfull = template % e, template % traceback.format_exc()
-                guibase.status_flash(msg), guibase.log(msgfull)
+                guibase.status(msg), logger.error(msgfull)
                 wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
                 break # break for grid
         return result
@@ -4234,7 +4232,7 @@ class DatabasePage(wx.Panel):
             "Are you sure you want to commit these changes (%s)?" %
             info, conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ):
-            guibase.log("Committing %s in table %s (%s).", info,
+            logger.info("Committing %s in table %s (%s).", info,
                         self.grid_table.Table.table, self.db)
             self.grid_table.Table.SaveChanges()
             self.on_change_table(None)
@@ -4317,7 +4315,7 @@ class DatabasePage(wx.Panel):
                 text = self.tree_tables.GetItemText(i).lower()
                 self.tree_tables.SetItemBold(i, text == lower)
                 i = self.tree_tables.GetNextSibling(i)
-            guibase.log("Loading table %s (%s).", table, self.db)
+            logger.info("Loading table %s (%s).", table, self.db)
             busy = controls.BusyPanel(self, "Loading table \"%s\"." % table)
             try:
                 grid_data = self.db_grids.get(lower)
@@ -4342,7 +4340,7 @@ class DatabasePage(wx.Panel):
                 busy.Close()
                 errormsg = "Could not load table %s.\n\n%s" % \
                            (table, traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
+                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -4362,7 +4360,7 @@ class DatabasePage(wx.Panel):
         busy, clist, plist = None, self.list_chats, self.list_participants
         if chat != self.chat:
             # Update chat list colours and scroll to the opened chat
-            guibase.log("Opening %s.", chat["title_long_lc"])
+            logger.info("Opening %s.", chat["title_long_lc"])
             self.list_chats.Freeze()
             scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
             index_selected = -1
@@ -4396,8 +4394,10 @@ class DatabasePage(wx.Panel):
                 # Refresh last messages, in case database has updated
                 self.db.get_conversations_stats([chat], log=False)
             except Exception:
-                guibase.logstatus_flash("Notice: failed to refresh %s.\n\n%s",
-                    chat["title_long_lc"], traceback.format_exc())
+                guibase.status("Notice: failed to refresh %s.",
+                               chat["title_long_lc"])
+                logger.exception("Notice: failed to refresh %s.",
+                                 chat["title_long_lc"])
             self.edit_filtertext.Value = self.chat_filter["text"] = ""
             dts = "first_message_datetime", "last_message_datetime"
             date_range = [chat[n].date() if chat[n] else None for n in dts]
@@ -4457,9 +4457,10 @@ class DatabasePage(wx.Panel):
                 self.stc_history.Populate(chat, self.db,
                     center_message_id=center_message_id)
             except Exception:
+                guibase.status("Error loading %s.", chat["title_long_lc"])
+                logger.exception("Error loading %s.", chat["title_long_lc"])
                 errormsg = "Error loading %s:\n\n%s" % \
                            (chat["title_long_lc"], traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
         if self.stc_history.GetMessage(0):
@@ -4671,9 +4672,8 @@ class DatabasePage(wx.Panel):
             wx.CallLater(100, self.load_later_data)
         except Exception:
             wx.CallAfter(self.update_tabheader)
-            errormsg = "Could not load chat list from %s.\n\n%s" % \
-                       (self.db, traceback.format_exc())
-            guibase.logstatus_flash(errormsg)
+            guibase.status("Could not load chat list from %s.", self.db)
+            logger.exception("Could not load chat list from %s.", self.db)
         wx.CallLater(500, self.update_info_page, False)
         wx.CallLater(200, self.load_tables_data)
         self.update_liveinfo()
@@ -4698,12 +4698,11 @@ class DatabasePage(wx.Panel):
                               self.chat["last_message_datetime"].date()
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
-            guibase.status_flash("Opened Skype database %s.", self.db)
+            guibase.status("Opened Skype database %s.", self.db)
         except Exception:
             if self:
-                errormsg = "Error loading additional data from %s.\n\n%s" % \
-                           (self.db, traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
+                guibase.status("Error loading additional data from %s.", self.db)
+                logger.exception("Error loading additional data from %s.", self.db)
         if self:
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(),
@@ -4749,9 +4748,7 @@ class DatabasePage(wx.Panel):
                 self.stc_sql.AutoCompAddSubWords(t["name"], fields)
         except Exception:
             if self:
-                errormsg = "Error loading table data from %s.\n\n%s" % \
-                           (self.db, traceback.format_exc())
-                guibase.log(errormsg)
+                logger.exception("Error loading table data from %s.", self.db)
 
 
     def update_tabheader(self):
@@ -5145,18 +5142,19 @@ class MergerPage(wx.Panel):
             busy = controls.BusyPanel(
                 self, "Exporting \"%s\"." % self.chat["title"]
             )
-            guibase.logstatus("Exporting to %s.", filepath)
+            guibase.status("Exporting to %s.", filepath, log=True)
             try:
                 messages = self.db1.message_iterator(self.chat_diff["messages"])
                 progressfunc = lambda *args: wx.SafeYield()
                 export.export_chats([self.chat], dirname, filename,
                     self.db1, messages=messages, progress=progressfunc)
-                guibase.logstatus_flash("Exported %s.", filepath)
+                guibase.status("Exported %s.", filepath, log=True)
                 util.start_file(filepath)
             except Exception:
+                guibase.status("Error saving %s.", filepath)
+                logger.exception("Error saving %s.", filepath)
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
-                guibase.logstatus_flash(errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
@@ -5287,7 +5285,7 @@ class MergerPage(wx.Panel):
                 params = locals()
                 self.worker_merge.work(params)
                 self.is_merging = True
-                guibase.logstatus("Merging %s from %s to %s.", info, db1, db2)
+                guibase.status("Merging %s from %s to %s.", info, db1, db2, log=True)
                 self.notebook.SetSelection(0)
 
 
@@ -5348,7 +5346,7 @@ class MergerPage(wx.Panel):
         if not self.chat or c["identity"] != self.chat["identity"]:
             self.label_merge_chat.Label = "New in %s:" \
                 % c["title_long_lc"]
-            guibase.log("Comparing %s (%s vs %s).", c["title_long_lc"],
+            logger.info("Comparing %s (%s vs %s).", c["title_long_lc"],
                         self.db1, self.db2)
             scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
             index_selected = -1
@@ -5471,7 +5469,7 @@ class MergerPage(wx.Panel):
             db_target.clear_cache()
             self.button_merge_contacts.Enabled = False
             self.button_merge_allcontacts.Enabled = list_source.ItemCount
-            guibase.log("Copied %s from %s into %s.", text_add, self.db1, self.db2)
+            logger.info("Copied %s from %s into %s.", text_add, self.db1, self.db2)
             wx.MessageBox("Copied %s\n\nfrom %s\n\ninto %s." % (text_add,
                 self.db1, self.db2), conf.Title, wx.OK | wx.ICON_INFORMATION)
 
@@ -5481,8 +5479,8 @@ class MergerPage(wx.Panel):
         Handler for clicking to scan for differences with the left database,
         starts scanning process.
         """
-        guibase.logstatus("Scanning differences between %s and %s.",
-                          self.db1, self.db2)
+        guibase.status("Scanning differences between %s and %s.",
+                       self.db1, self.db2, log=True)
         self.chats_diffdata.clear()
         self.button_merge_all.Enabled = False
         self.button_scan_all.Enabled = False
@@ -5512,7 +5510,7 @@ class MergerPage(wx.Panel):
         if result.get("output") and "done" not in result:
             self.html_report.AppendToPage(result["output"])
         if "status" in result:
-            guibase.status_flash(result["status"])
+            guibase.status(result["status"])
         if "index" in result:
             mindex, mcount = result["index"], result["count"]
             cindex, ccount = result["chatindex"], result["chatcount"]
@@ -5524,7 +5522,7 @@ class MergerPage(wx.Panel):
             self.is_scanning = False
             self.is_scanned = True
             s1 = util.plural("differing chat", self.chats_diffdata)
-            guibase.logstatus_flash("Found %s in %s.", s1, self.db1)
+            guibase.status("Found %s in %s.", s1, self.db1, log=True)
             self.button_swap.Enabled = True
             self.button_merge_chats.Enabled = True
             if self.chats_diffdata:
@@ -5584,7 +5582,7 @@ class MergerPage(wx.Panel):
                 "</b><br />" % conf.MergeHtmlBackgroundColour)
             self.page_merge_chats.Enabled = False
             self.page_merge_contacts.Enabled = False
-            guibase.logstatus("Merging %s from %s to %s.", info, db1, db2)
+            guibase.status("Merging %s from %s to %s.", info, db1, db2, log=True)
             params = locals()
             self.worker_merge.work(params)
             self.is_merging = True
@@ -5611,7 +5609,7 @@ class MergerPage(wx.Panel):
         if "error" in result:
             self.is_merging = False
             self.update_gauge(self.gauge_progress, 0, "%s error." % action)
-            guibase.log("%s error.\n\n%s", action, result["error"])
+            logger.error("%s error.\n\n%s", action, result["error"])
             msg = "%s error.\n\n%s" % (action, 
                   result.get("error_short", result["error"]))
             self.html_report.Freeze()
@@ -5622,7 +5620,7 @@ class MergerPage(wx.Panel):
             self.html_report.Thaw()
             wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
         if "status" in result:
-            guibase.status_flash(result["status"])
+            guibase.status(result["status"])
         if "done" in result:
             self.is_merging = False
             self.page_merge_chats.Enabled = True
@@ -5637,7 +5635,7 @@ class MergerPage(wx.Panel):
             self.chats2 = self.db2.get_conversations()
             info = result["output"]
             if "error" not in result:
-                guibase.logstatus_flash(info)
+                guibase.status(info, log=True)
                 self.update_gauge(self.gauge_progress, 100, "Merge complete.")
                 text = "<br /><br /> %s" % result["output"]
                 self.html_report.Freeze()
@@ -5753,8 +5751,8 @@ class MergerPage(wx.Panel):
                 self.stc_diff1.ClearAll()
                 self.button_merge_chat.Enabled = False
                 self.button_export_chat.Enabled = False
-                guibase.logstatus_flash("Merged %s of chat \"%s\" from %s to %s.",
-                                        info, chat2["title"], db1, db2)
+                guibase.status("Merged %s of chat \"%s\" from %s to %s.",
+                               info, chat2["title"], db1, db2, log=True)
                 # Update chat list
                 db2.get_conversations_stats([chat2], log=False)
                 self.chat["messages2"] = chat2["message_count"]
@@ -5823,7 +5821,7 @@ class MergerPage(wx.Panel):
             wx.CallAfter(self.update_tabheader)
             errormsg = "Could not load chat lists from %s and %s.\n\n%s" % \
                        (self.db1, self.db2, traceback.format_exc())
-            guibase.logstatus_flash(errormsg)
+            guibase.status(errormsg, log=True)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -5979,8 +5977,8 @@ class MergerPage(wx.Panel):
             # Database access can easily fail if the user closes the tab before
             # the later data has been loaded.
             if self:
-                guibase.log("Error loading additional data from %s or %s.\n\n%s",
-                            self.db1, self.db2, traceback.format_exc())
+                logger.exception("Error loading additional data from %s or %s.",
+                                 self.db1, self.db2)
                 wx.MessageBox("Error loading additional data from %s or %s."
                               "\n\nError: %r." % (self.db1, self.db2, e),
                               conf.Title, wx.OK | wx.ICON_WARNING)
@@ -5991,8 +5989,7 @@ class MergerPage(wx.Panel):
             if not self.is_scanned:
                 self.button_scan_all.Enabled = True
                 self.button_merge_all.Enabled = True
-            guibase.status_flash("Opened databases %s and %s.",
-                                 self.db1, self.db2)
+            guibase.status("Opened databases %s and %s.", self.db1, self.db2)
             self.page_merge_all.Layout()
             self.Refresh()
             if "linux2" == sys.platform and wx.version().startswith("2.8"):
@@ -7197,8 +7194,8 @@ class SqliteGridBase(wx.grid.GridTableBase):
                 del self.rows_all[idx]
                 self.idx_all.remove(idx)
         except Exception as e:
-            guibase.logstatus("Error saving changes in %s.\n\n%s",
-                              self.table, traceback.format_exc())
+            guibase.status("Error saving changes in %s.", self.table)
+            logger.exception("Error saving changes in %s.", self.table)
             wx.MessageBox(util.format_exc(e), conf.Title,
                           wx.OK | wx.ICON_WARNING)
         if self.View: self.View.Refresh()

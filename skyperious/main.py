@@ -22,6 +22,7 @@ import errno
 import getpass
 import glob
 import locale
+import logging
 import io
 import itertools
 import Queue
@@ -51,6 +52,7 @@ from . import util
 from . import workers
 if is_gui_possible:
     from . import skyperious
+
 
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
@@ -172,7 +174,8 @@ ARGUMENTS = {
 }
 
 
-window = None         # Application main window instance
+logger = logging.getLogger(__package__)
+window = None # Application main window instance
 
 
 def run_merge(filenames, output_filename=None):
@@ -217,7 +220,7 @@ def run_merge(filenames, output_filename=None):
                     bar.max = result["count"]
                     bar.update(result["index"])
                 if result.get("output"):
-                    guibase.log(result["output"])
+                    logger.info(result["output"])
             if not db1:
                 break # break for db1 in dbs
             bar.stop()
@@ -248,7 +251,7 @@ def run_search(filenames, query):
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            guibase.log("Searching \"%s\" in %s." % (query, db))
+            logger.info("Searching \"%s\" in %s." % (query, db))
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()
@@ -257,7 +260,7 @@ def run_search(filenames, query):
                           (db, result.get("error_short", result["error"])))
                     break # break while True
                 if "done" in result:
-                    guibase.log("Finished searching for \"%s\" in %s.", query, db)
+                    logger.info("Finished searching for \"%s\" in %s.", query, db)
                     break # break while True
                 if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
@@ -469,7 +472,7 @@ def run_export(filenames, format, chatnames, authornames, ask_password, store_pa
                 bar.afterword = " Exported %s to %s. " % (db, target)
                 bar.update(bar_total)
                 output()
-                guibase.log("Exported %s %sto %s as %s.", util.plural("chat", count),
+                logger.info("Exported %s %sto %s as %s.", util.plural("chat", count),
                             dbstr, target, format)
             else:
                 output("\nNo messages to export%s." %
@@ -521,7 +524,7 @@ def run_diff(filename1, filename2):
                 bar.max = result["count"]
                 bar.update(result["index"])
             if result.get("output"):
-                guibase.log(result["output"])
+                logger.info(result["output"])
     finally:
         worker and (worker.stop(), worker.join())
 
@@ -533,7 +536,11 @@ def run_diff(filename1, filename2):
 
 def run_gui(filenames):
     """Main GUI program entrance."""
-    global window
+    global logger, window
+
+    # Set up logging to GUI log window
+    logger.addHandler(guibase.GUILogHandler())
+    logger.setLevel(logging.DEBUG)
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
@@ -549,7 +556,7 @@ def run_gui(filenames):
                        "templates, util, wordcloud, workers, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
-    guibase.log("Started application on %s.", datetime.date.today())
+    logger.info("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
     app.MainLoop()
@@ -557,7 +564,7 @@ def run_gui(filenames):
 
 def run(nogui=False):
     """Parses command-line arguments and either runs GUI, or a CLI action."""
-    global is_gui_possible
+    global is_gui_possible, logger
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
@@ -614,6 +621,11 @@ def run(nogui=False):
         sys.stdout = codecs.getwriter(enc)(sys.stdout, "backslashreplace")
         sys.stderr = codecs.getwriter(enc)(sys.stderr, "backslashreplace")
 
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+
     if "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
@@ -629,10 +641,6 @@ def run(nogui=False):
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
 
-
-def run_cli():
-    """Runs program in command-line interface mode."""
-    run(nogui=True)
 
 
 class ConsoleWriter(object):

@@ -7,13 +7,19 @@ GUI frame template:
 - wx widget inspector window, initially hidden
 - option for log panel, handles logging messages via wx events
 
+------------------------------------------------------------------------------
+This file is part of Skyperious - a Skype database viewer and merger.
+Released under the MIT License.
+
 @author      Erki Suurjaak
 @created     03.04.2012
 @modified    24.07.2020
 """
 import datetime
+import logging
 import os
 import sys
+import traceback
 
 try:
     import wx
@@ -22,136 +28,66 @@ try:
     import wx.py
 except ImportError: wx = None
 
-
 from . controls import ColourManager, KEYS
 from . import conf
+from . import util
 from . import wx_accel
 
-
-if wx:
-    """Custom application event for adding to log."""
-    LogEvent,    EVT_LOG =    wx.lib.newevent.NewEvent()
-    """Custom application event for setting main window status."""
-    StatusEvent, EVT_STATUS = wx.lib.newevent.NewEvent()
+logger = logging.getLogger(__name__)
 
 
-deferred_logs = []    # Log messages cached before main window is available
-deferred_status = []  # Last status cached before main window is available
 
-
-def log(text, *args):
+def status(text="", *args, **kwargs):
     """
-    Logs a timestamped message to main window.
+    Sets main window status text, optionally logs the message.
 
-    @param   args  string format arguments, if any, to substitute in text
+    @param   args   string format arguments, if any, to substitute in text
+    @param   flash  whether to clear the status after timeout,
+                    by default after conf.StatusFlashLength if not given seconds
+    @param   log    whether to log the message to main window
     """
-    global deferred_logs
-    now = datetime.datetime.now()
-    try:
-        finaltext = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        finaltext = text % args if args else text
-    if "\n" in finaltext: # Indent all linebreaks
-        finaltext = finaltext.replace("\n", "\n\t\t")
-    msg = "%s.%03d\t%s" % (now.strftime("%H:%M:%S"), now.microsecond / 1000,
-                           finaltext)
-    try: window = wx.GetApp().TopWindow
-    except Exception: window = None
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, LogEvent(text=msg))
-    elif conf.IsCLI and conf.IsCLIVerbose:
-        sys.stderr.write(msg + "\n"), sys.stderr.flush()
-    else:
-        deferred_logs.append(msg)
+    log, flash = (kwargs.get(x) for x in ("log", "flash"))
+    window = wx and wx.GetApp() and wx.GetApp().GetTopWindow()
+    if not window and not log: return
 
-
-def status(text, *args):
-    """
-    Sets main window status text.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    global deferred_status
-    try:
-        msg = text % args if args else text
+    try: msg = text % args if args else text
     except UnicodeError:
         args = tuple(map(util.to_unicode, args))
         msg = text % args if args else text
-    try: window = wx.GetApp().TopWindow
-    except Exception: window = None
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, StatusEvent(text=msg))
-    elif conf.IsCLI and conf.IsCLIVerbose:
-        sys.stderr.write(msg + "\n")
-    else:
-        deferred_status[:] = [msg]
+    msg = re.sub("[\n\r\t]+", " ", msg)
+    if log: logger.info(msg)
+    if window: window.set_status(msg, timeout=flash)
 
 
 
-def status_flash(text, *args):
-    """
-    Sets main window status text that will be cleared after a timeout.
+class GUILogHandler(logging.Handler):
+    """Logging handler that forwards logging messages to GUI log window."""
 
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    global deferred_status
-    try:
-        msg = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        msg = text % args if args else text
-    try: window = wx.GetApp().TopWindow
-    except Exception: window = None
-    if window:
-        process_deferreds()
-        wx.PostEvent(window, StatusEvent(text=msg))
-        def clear_status():
-            if window.StatusBar and window.StatusBar.StatusText == msg:
-                window.SetStatusText("")
-        wx.CallLater(max(1, conf.StatusFlashLength), clear_status)
-    else:
-        deferred_status[:] = [msg]
+    def __init__(self):
+        self.deferred = [] # Messages logged before main window available
+        super(self.__class__, self).__init__()
 
 
-def logstatus(text, *args):
-    """
-    Logs a timestamped message to main window and sets main window status text.
+    def emit(self, record):
+        """Adds message to GUI log window, or postpones if window unavailable."""
+        now = datetime.datetime.now()
+        try: text = record.msg % record.args if record.args else record.msg
+        except UnicodeError:
+            args = tuple(map(util.to_unicode, record.args or ()))
+            text = record.msg % args if args else record.msg
+        if record.exc_info:
+            text += "\n\n" + "".join(traceback.format_exception(*record.exc_info))
+        if "\n" in text:
+            text = text.replace("\n", "\n\t\t\t") # Indent linebreaks
+            text = re.sub(r"^\s+$", "", text, flags=re.M) # Unindent whitespace-only lines
+        msg = "%s.%03d\t%s" % (now.strftime("%Y-%m-%d %H:%M:%S"), now.microsecond / 1000, text)
 
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    log(text, *args)
-    status(text, *args)
-
-
-def logstatus_flash(text, *args):
-    """
-    Logs a timestamped message to main window and sets main window status text
-    that will be cleared after a timeout.
-
-    @param   args  string format arguments, if any, to substitute in text
-    """
-    log(text, *args)
-    status_flash(text, *args)
-
-
-def process_deferreds():
-    """
-    Forwards log messages and status, cached before main window was available.
-    """
-    global deferred_logs, deferred_status
-    try: window = wx.GetApp().TopWindow
-    except Exception: window = None
-    if window:
-        if deferred_logs:
-            for msg in deferred_logs:
-                wx.PostEvent(window, LogEvent(text=msg))
-            del deferred_logs[:]
-        if deferred_status:
-            wx.PostEvent(window, StatusEvent(text=deferred_status[0]))
-            del deferred_status[:]
+        window = wx.GetApp() and wx.GetApp().GetTopWindow()
+        if window:
+            msgs = self.deferred + [msg]
+            for m in msgs: wx.CallAfter(window.log_message, m)
+            del self.deferred[:]
+        else: self.deferred.append(msg)
 
 
 
@@ -291,7 +227,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
                           (e.__class__.__name__, e))
 
 
-    def on_showhide_console(self, event):
+    def on_showhide_console(self, event=None):
         """Toggles the console shown/hidden."""
         show = not self.frame_console.IsShown()
         if show:
@@ -321,7 +257,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             self.menu_console.Check(show)
 
 
-    def on_open_widget_inspector(self, event):
+    def on_open_widget_inspector(self, event=None):
         """Toggles the widget inspection tool shown/hidden."""
         visible = not (self.widget_inspector.initialized
                        and self.widget_inspector._frame)
