@@ -714,14 +714,24 @@ class ConsoleWriter(object):
                 ConsoleWriter.handle = handle
                 ConsoleWriter.realwrite = handle.write
                 sys.stdin = open("CONIN$", "r")
-                exitfunc = lambda s: (handle.write(s), handle.flush(),
-                                      raw_input())
-                atexit.register(exitfunc, "\nPress ENTER to exit.")
+                atexit.register(self.on_exe_exit)
             except Exception:
                 try: win32console.FreeConsole()
                 except Exception: pass
                 ConsoleWriter.realwrite = self.stream.write
         ConsoleWriter.is_loaded = True
+
+
+    def on_exe_exit(self):
+        """atexit handler for compiled binary, keeps window open for a minute."""
+        countdown = 60
+        try:
+            self.write("\n")
+            while countdown:
+                output("\rClosing window in %s.." % countdown, end=" ")
+                time.sleep(1)
+                countdown -= 1
+        except Exception: pass
 
 
 
