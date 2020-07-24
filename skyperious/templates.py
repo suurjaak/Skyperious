@@ -1976,6 +1976,17 @@ from skyperious import conf
         <a href="page:info"><b><font color="{{conf.FgColour}}">Information</font></b></a>
     </td></tr></table>
   </td>
+  <td>
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:live"><img src="memory:HelpOnline.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        Log in to Skype online service<br />
+        in order to synchronize chat history from live, <br />
+        and download shared images in HTML export. 
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:live"><b><font color="{{conf.FgColour}}">Online</font></b></a>
+    </td></tr></table>
+  </td>
 </tr>
 </table>
 </center>

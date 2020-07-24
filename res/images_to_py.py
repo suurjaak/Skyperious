@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  20.07.2020
+@modified  24.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -81,6 +81,8 @@ IMAGES = {
         "Help image on default search page for tables page.",
     "HelpInfo.png":
         "Help image on default search page for information page.",
+    "HelpOnline.png":
+        "Help image on default search page for online page.",
     "HelpSearch.png":
         "Help image on default search page for search page.",
     "HelpSQL.png":
