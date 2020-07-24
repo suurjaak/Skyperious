@@ -97,7 +97,7 @@ class SkypeLogin(object):
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
                 if kwargs is not kwargslist[-1]: continue # for kwargs
-                logger.exception("Error connecting to Skype as '%s'.", self.username)
+                logger.exception("Error logging in to Skype as '%s'.", self.username)
                 try: os.unlink(path)
                 except Exception: pass
                 raise
@@ -143,6 +143,7 @@ class SkypeLogin(object):
         handles request rate limiting and transient communication errors.
 
         @param   __retry  special keyword argument, does not retry if falsy
+        @param   __raise  special keyword argument, does not raise if falsy
         """
         self.query_stamps.append(datetime.datetime.utcnow())
         while len(self.query_stamps) > self.RATE_LIMIT:
@@ -152,15 +153,16 @@ class SkypeLogin(object):
         delta = (dts[-1] - dts[0]) if len(dts) == self.RATE_LIMIT else 0
         if delta and delta.total_seconds() < self.RATE_WINDOW:
             time.sleep(self.RATE_WINDOW)
-        retry = kwargs.pop("__retry", True)
+        doretry, doraise = kwargs.pop("__retry", True), kwargs.pop("__raise", True)
         tries = 0
         while True:
             try: return func(*args, **kwargs)
             except Exception:
                 tries += 1
-                if tries > self.RETRY_LIMIT or not retry:
+                if tries > self.RETRY_LIMIT or not doretry:
                     logging.exception("Error calling %s.", func)
-                    raise
+                    if doraise: raise
+                    else: return
                 time.sleep(self.RETRY_DELAY)
             finally: # Replace with final
                 self.query_stamps[-1] = datetime.datetime.utcnow()
@@ -274,7 +276,7 @@ class SkypeLogin(object):
             if p["identity"] not in existing:
                 self.db.insert_row("participants", p, log=False)
             if p["identity"] not in self.cache["contacts"]:
-                contact = self.request(self.skype.contacts.contact, p["identity"])
+                contact = self.request(self.skype.contacts.contact, p["identity"], __raise=False)
                 if contact: newcontacts.append(contact)
         for c in newcontacts: self.save("contacts", c)
 
@@ -312,10 +314,6 @@ class SkypeLogin(object):
         Converts item from SkPy object to Skype database dict.
         """
         result, table = {}, table.lower()
-
-        with open(os.path.join(conf.VarDirectory, "fafafa_new.txt"), "ab") as f:
-            f.write("\n\n%r\n" % item) # @todo remove
-
 
         if table in ("accounts", "contacts"):
             # SkypeContact(id='username', name=Name(first='first', last='last'), location=Location(country='EE'), language='ET', avatar='https://avatar.skype.com/v1/avatars/username/public', birthday=datetime.date(1984, 5, 9))
@@ -358,9 +356,10 @@ class SkypeLogin(object):
                 result.update(identity=item.userId, type=skypedata.CHATS_TYPE_SINGLE)
                 contact = self.cache["contacts"].get(item.userId)
                 if not contact:
-                    citem = self.request(self.skype.contacts.contact, item.userId)
-                    self.save("contacts", citem)
-                    contact = self.cache["contacts"].get(item.userId)
+                    citem = self.request(self.skype.contacts.contact, item.userId, __raise=False)
+                    if citem:
+                        self.save("contacts", citem)
+                        contact = self.cache["contacts"].get(item.userId)
                 result.update(displayname=contact.get("fullname") or contact["skypename"] if contact else item.userId)
 
             elif isinstance(item, skpy.SkypeGroupChat):
@@ -535,10 +534,16 @@ class SkypeLogin(object):
         updateds, new, mtotalnew, mtotalupdated, run = set(), 0, 0, 0, True
         msgids = set()
         while run:
-            chats = self.request(self.skype.chats.recent)
-            if not chats: break # while True
+            chats = self.request(self.skype.chats.recent, __raise=False)
+            if not chats: break # while run
             for chat in chats.values():
                 if chat.id.startswith("48:"): # Skip specials like "48:calllogs"
+                    continue # for chat
+                if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
+                    # Weird empty conversation, getMsgs raises 404
+                    continue # for chat
+                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.username:
+                    # Conversation with self?
                     continue # for chat
                 cidentity = self.id_to_identity(chat.id)
 
@@ -556,7 +561,7 @@ class SkypeLogin(object):
                 mcount, mnew, mupdated, mrun = 0, 0, 0, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
-                    msgs = self.request(chat.getMsgs)
+                    msgs = self.request(chat.getMsgs, __raise=False) or []
                     for msg in msgs:
                         action = self.save("messages", msg, parent=chat)
                         if self.SAVE.SKIP != action:   mcount += 1
@@ -620,7 +625,8 @@ class SkypeLogin(object):
             return
         count, new, updated, run = 0, 0, 0, True
         for username in contacts:
-            contact = self.request(self.skype.contacts.contact, username)
+            contact = self.request(self.skype.contacts.contact, username, __raise=False)
+            if not contact: continue # for username
             action = self.save("contacts", contact)
             if self.SAVE.INSERT == action: new     += 1
             if self.SAVE.UPDATE == action: updated += 1

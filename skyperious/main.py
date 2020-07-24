@@ -84,6 +84,13 @@ ARGUMENTS = {
              {"args": ["-a", "--author"], "dest": "author", "required": False,
               "help": "names of specific authors whose chats to export",
               "nargs": "+"},
+             {"args": ["--ask-password"], "dest": "ask_password",
+              "action": "store_true", "required": False,
+              "help": "prompt for Skype password on HTML export "
+                      "to download shared images"},
+             {"args": ["--store-password"], "dest": "store_password",
+              "action": "store_true", "required": False,
+              "help": "store entered password in configuration"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -118,10 +125,10 @@ ARGUMENTS = {
               "help": "password for Skype account, if not using stored or prompted"},
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
-              "help": "store entered password in configuration"},
+              "help": "store given password in configuration"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
-              "help": "ask for Skype account password if not stored"},
+              "help": "prompt for Skype account password"},
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file to sync", },
              {"args": ["--verbose"], "action": "store_true",
@@ -268,7 +275,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
         result = result or kwargs
 
         if "error" in result:
-            if ns["bar"]: ns["bar"].stop()
+            if ns["bar"]: ns["bar"] = ns["bar"].stop()
             output("\nError syncing chat history: %(error)s" % result)
 
         elif "contacts" == result.get("table"):
@@ -283,8 +290,8 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
             else:
                 ns["bar"].max = result["total"]
                 if "count" in result:
-                    t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
-                    ns["bar"].afterword = " Synchronizing contacts, %s processed%s." % (result["count"], ", %s" % t if t else "")
+                    t = (", %s new" % result["new"]) if result["new"] else ""
+                    ns["bar"].afterword = " Synchronizing contacts, %s processed%s." % (result["count"], t)
                     ns["bar"].update(result["count"])
 
         elif "chats" == result.get("table"):
@@ -306,7 +313,11 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
                 chat = cc[0] if cc else None
 
                 title = chat["title_long_lc"] if chat else result["chat"]
-                if isinstance(title, unicode): title = title.encode(enc, errors="xmlcharrefreplace")
+                if isinstance(title, unicode):
+                    # Use encoded title for length constraint to work,
+                    # if output would introduce escape sequences.
+                    title2 = title.encode(enc, errors="backslashreplace")
+                    if len(title2) != len(title): title = title2
                 if len(title) > 25:
                     title = title[:25] + ".."
                     if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
@@ -344,52 +355,51 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
 
     username0, password0, passwords = username, password, {}
     for filename in filenames:
-        filename1 = os.path.realpath(filename)
-        file_exists = os.path.exists(filename1)
+        filepath = os.path.realpath(filename)
+        file_existed = os.path.exists(filepath)
 
         output("\nSynchronizing %s from live." % filename)
 
-        if not file_exists and not username0:
-            output("%s does not exist and no username given, cannot login." % filename)
-            continue # for filename
+        username = username0
+        prompt = "%s does not exist, enter Skype username: " % filename
+        while not file_existed and not username:
+            output(prompt, end="")
+            username = raw_input().strip()
 
-        if not file_exists:
-            with open(filename1, "w"): pass
-        db = skypedata.SkypeDatabase(filename1)
-        username = db.id or username0
+        if not file_existed:
+            with open(filepath, "w"): pass
+        db = skypedata.SkypeDatabase(filepath)
+        username = db.id or username
         password = password0 or passwords.get(username)
 
-        if not username:
-            output("%s has no Skype account information and no username given, cannot login." % filename)
-            continue # for filename
+        prompt = "%s does not contain account information, enter Skype username: " % filename
+        while not username:
+            output(prompt, end="")
+            username = raw_input().strip()
+            if username: break # while not db.id
 
-        if not password and conf.Login.get(filename1, {}).get("password"):
-            password = util.deobfuscate(conf.Login[filename1]["password"])
+        if not password and not ask_password \
+        and conf.Login.get(filepath, {}).get("password"):
+            password = util.deobfuscate(conf.Login[filepath]["password"])
 
-        if not password and ask_password:
-            prompt = "Enter Skype password for '%s': " % username
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore") # possible GetPassWarning
-                while not password:
-                    output(prompt, end="") # getpass output can raise errors
-                    password = getpass.getpass("", io.BytesIO()).strip()
-                    if not password: continue # while
+        prompt = "Enter Skype password for '%s': " % username
+        while not db.live.is_logged_in():
+            if ask_password or not password:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore") # possible GetPassWarning
+                    while not password:
+                        output(prompt, end="") # getpass output can raise errors
+                        password = getpass.getpass("", io.BytesIO()).strip()
+                        prompt = "Enter Skype password for '%s': " % username
 
-        if not password:
-            output("No password for '%s', cannot login." % username)
-            continue # for filename
-        else:
             passwords[username] = password
+            output("Logging in to Skype as '%s'.." % username, end="")
+            try: db.live.login(username, password)
+            except Exception as e:
+                prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
+            else: output(" success!")
 
-        output("Logging in to Skype as '%s'.." % username, end="")
-        try: db.live.login(username, password)
-        except Exception as e:
-            output("\nError logging in as '%s': %s\n\n%s" % 
-                  (username, util.format_exc(e), traceback.format_exc()))
-            continue # for filename
-        else: output(" success!")
-
-        if password0 and store_password:
+        if store_password:
             conf.Login.setdefault(filename, {})
             conf.Login[filename].update(store=True, password=util.obfuscate(password0))
             conf.save()
@@ -401,12 +411,28 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
         except Exception as e: progress(error=util.format_exc(e))
     
 
-def run_export(filenames, format, chatnames, authornames):
+def run_export(filenames, format, chatnames, authornames, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
 
     for db in dbs:
+
+        if (ask_password and db.id and conf.SharedImageAutoDownload
+        and format.lower().endswith("html")):
+            password, prompt = "", "Enter Skype password for '%s': " % db.id
+            while not db.live.is_logged_in():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore") # possible GetPassWarning
+                    while not password:
+                        output(prompt, end="") # getpass output can raise errors
+                        password = getpass.getpass("", io.BytesIO()).strip()
+                        prompt = "Enter Skype password for '%s': " % username
+
+                try: db.live.login(db.id, password)
+                except Exception as e:
+                    prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
+
         formatargs = collections.defaultdict(str)
         formatargs["skypename"] = os.path.basename(db.filename)
         formatargs.update(db.account or {})
@@ -583,15 +609,16 @@ def run(nogui=False):
         conf.IsCLIVerbose = arguments.verbose
         # Avoid Unicode errors when printing to console.
         enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
-        sys.stdout = codecs.getwriter(enc)(sys.stdout, "xmlcharrefreplace")
-        sys.stderr = codecs.getwriter(enc)(sys.stderr, "xmlcharrefreplace")
+        sys.stdout = codecs.getwriter(enc)(sys.stdout, "backslashreplace")
+        sys.stderr = codecs.getwriter(enc)(sys.stderr, "backslashreplace")
 
     if "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author)
+        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author,
+                   arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
     elif "sync" == arguments.command:
