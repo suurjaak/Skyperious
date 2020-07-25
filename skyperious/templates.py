@@ -117,9 +117,10 @@ from skyperious.lib.vendor import step
     #header_table td {
       vertical-align: top;
     }
-    #header_left {
+    #header_table #header_left {
       width: 145px;
-      text-align: left;
+      text-align: center;
+      vertical-align: middle;
     }
     #header_center a {
       text-decoration: underline;
@@ -445,6 +446,8 @@ from skyperious.lib.vendor import step
       display: none;
 %elif chat_picture_raw:
       margin: 0 10px 0 10px;
+      max-width: 125px;
+      max-height: 125px;
 %endif
 %if chat_picture_size:
       width: {{chat_picture_size[0]}}px;
