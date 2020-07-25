@@ -248,6 +248,252 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         wx.CallLater(20000, self.update_check)
 
 
+    def create_page_main(self, notebook):
+        """Creates the main page with database list and buttons."""
+        page = self.page_main = wx.Panel(notebook)
+        ColourManager.Manage(page, "BackgroundColour", "MainBgColour")
+        notebook.AddPage(page, "Databases")
+        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
+
+        splitter = self.splitter = wx.SplitterWindow(page, style=wx.BORDER_NONE)
+        splitter.SetMinimumPaneSize(300)
+
+        agw_style = (wx.LC_REPORT | wx.LC_NO_HEADER |
+                     wx.LC_SINGLE_SEL | wx.BORDER_NONE)
+        if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_USER_ROW_HEIGHT"):
+            agw_style |= wx.lib.agw.ultimatelistctrl.ULC_USER_ROW_HEIGHT
+        list_db = self.list_db = wx.lib.agw.ultimatelistctrl. \
+            UltimateListCtrl(parent=splitter, agwStyle=agw_style)
+        list_db.MinSize = 400, -1 # Maximize-restore would resize width to 100
+        list_db.InsertColumn(0, "")
+        il = wx.ImageList(*images.ButtonHome.Bitmap.Size)
+        il.Add(images.ButtonHome.Bitmap)
+        il.Add(images.ButtonListDatabase.Bitmap)
+        list_db.AssignImageList(il, wx.IMAGE_LIST_SMALL)
+        list_db.InsertImageStringItem(0, "Home", [0])
+        ColourManager.Manage(list_db, "ForegroundColour", "DBListForegroundColour")
+        ColourManager.Manage(list_db, "BackgroundColour", "DBListBackgroundColour")
+        try:
+            ColourManager.Manage(list_db._headerWin, "ForegroundColour", "DBListForegroundColour")
+            ColourManager.Manage(list_db._mainWin,   "BackgroundColour", "DBListBackgroundColour")
+        except Exception: pass
+        if hasattr(list_db, "SetUserLineHeight"):
+            h = images.ButtonListDatabase.Bitmap.Size[1]
+            list_db.SetUserLineHeight(int(h * 1.5))
+        list_db.Select(0)
+
+        panel_right = wx.lib.scrolledpanel.ScrolledPanel(splitter)
+        panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        panel_main = self.panel_db_main = wx.Panel(panel_right)
+        panel_detail = self.panel_db_detail = wx.Panel(panel_right)
+        panel_main.Sizer = wx.BoxSizer(wx.VERTICAL)
+        panel_detail.Sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Create main page label and buttons
+        label_main = wx.StaticText(panel_main,
+                                   label="Welcome to %s" % conf.Title)
+        ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
+        label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
+            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        BUTTONS_MAIN = [
+            ("button_opena", "&Open a database..", images.ButtonOpenA, 
+             "Choose a database from your computer to open."),
+            ("button_detect", "Detect databases", images.ButtonDetect,
+             "Auto-detect Skype databases from user folders."),
+            ("button_folder", "&Import from folder.", images.ButtonFolder,
+             "Select a folder where to look for SQLite databases "
+             "(*.db files)."),
+            ("button_live", "Create &new database from Skype online.", images.ButtonImport,
+             "Log in to Skype online service "
+             "and download chat history into a new database."),
+            ("button_missing", "Remove missing", images.ButtonRemoveMissing,
+             "Remove non-existing files from the database list."),
+            ("button_type", "Remove by type", images.ButtonRemoveType,
+             "Choose to remove Skype databases, or other SQLite databases."),
+            ("button_clear", "C&lear list", images.ButtonClear,
+             "Clear the current database list."), ]
+        for name, label, img, note in BUTTONS_MAIN:
+            button = controls.NoteButton(panel_main, label, note, img.Bitmap)
+            setattr(self, name, button)
+        self.button_missing.Hide(); self.button_type.Hide(); self.button_clear.Hide()
+
+        # Create detail page labels, values and buttons
+        label_db = self.label_db = wx.TextCtrl(parent=panel_detail, value="",
+            style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+        label_db.Font = wx.Font(12, wx.FONTFAMILY_SWISS,
+            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        ColourManager.Manage(label_db, "BackgroundColour", "WidgetColour")
+        label_db.SetEditable(False)
+
+        sizer_labels = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
+        LABELS = [("path", "Location"), ("size", "Size"),
+                  ("modified", "Last modified"), ("account", "Skype user"),
+                  ("chats", "Conversations"), ("messages", "Messages")]
+        for field, title in LABELS:
+            lbltext = wx.StaticText(parent=panel_detail, label="%s:" % title)
+            valtext = wx.TextCtrl(parent=panel_detail, value="",
+                                  size=(300, -1), style=wx.NO_BORDER)
+            ColourManager.Manage(valtext, "BackgroundColour", "WidgetColour")
+            ColourManager.Manage(valtext, "ForegroundColour", wx.SYS_COLOUR_WINDOWTEXT)
+            valtext.SetEditable(False)
+            ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
+            sizer_labels.Add(lbltext, border=5, flag=wx.LEFT)
+            sizer_labels.Add(valtext, proportion=1, flag=wx.GROW)
+            setattr(self, "label_" + field, valtext)
+
+        BUTTONS_DETAIL = [
+            ("button_open", "&Open", images.ButtonOpen, 
+             "Open the database for searching and exploring."),
+            ("button_compare", "Compare and &merge", images.ButtonCompare,
+             "Choose another Skype database to compare with, in order to merge "
+             "their differences."),
+            ("button_export", "&Export messages", images.ButtonExport,
+             "Export all conversations from the database as "
+             "HTML, text or spreadsheet."),
+            ("button_saveas", "Save &as..", images.ButtonSaveAs,
+             "Save a copy of the database under another name."),
+            ("button_remove", "&Remove", images.ButtonRemove,
+             "Remove this database from the list."), ]
+        for name, label, img, note in BUTTONS_DETAIL:
+            button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
+            setattr(self, name, button)
+
+        children = list(panel_main.Children) + list(panel_detail.Children)
+        for c in [panel_main, panel_detail] + children:
+            ColourManager.Manage(c, "BackgroundColour", "MainBgColour")
+        panel_right.SetupScrolling(scroll_x=False)
+        panel_detail.Hide()
+
+        list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
+        list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_open_from_list_db)
+        list_db.Bind(wx.EVT_CHAR_HOOK,           self.on_list_db_key)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_DRAG,
+                     self.on_dragstart_list_db)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_END_DRAG,
+                     self.on_dragstop_list_db)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_RDRAG,
+                     self.on_cancel_drag_list_db)
+        list_db.Bind(wx.EVT_SIZE,
+                     lambda e: (e.Skip(), list_db.SetColumnWidth(0, e.Size[0] - 5)))
+        self.button_opena.Bind(wx.EVT_BUTTON,         self.on_open_database)
+        self.button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
+        self.button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
+        self.button_live.Bind(wx.EVT_BUTTON,          self.on_live_login)
+        self.button_missing.Bind(wx.EVT_BUTTON,       self.on_remove_missing)
+        self.button_type.Bind(wx.EVT_BUTTON,          self.on_remove_type_menu)
+        self.button_clear.Bind(wx.EVT_BUTTON,         self.on_clear_databases)
+        self.button_open.Bind(wx.EVT_BUTTON,          self.on_open_current_database)
+        self.button_compare.Bind(wx.EVT_BUTTON,       self.on_compare_databases)
+        self.button_export.Bind(wx.EVT_BUTTON,        self.on_export_database_menu)
+        self.button_saveas.Bind(wx.EVT_BUTTON,        self.on_save_database_as)
+        self.button_remove.Bind(wx.EVT_BUTTON,        self.on_remove_database)
+
+        panel_main.Sizer.Add(label_main, border=10, flag=wx.ALL)
+        panel_main.Sizer.Add((0, 10))
+        panel_main.Sizer.Add(self.button_opena,  flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_detect, flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_folder, flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_live,   flag=wx.GROW)
+        panel_main.Sizer.AddStretchSpacer()
+        panel_main.Sizer.Add(self.button_missing, flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_type,    flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_clear,   flag=wx.GROW)
+        panel_detail.Sizer.Add(label_db, border=10, flag=wx.ALL | wx.GROW)
+        panel_detail.Sizer.Add(sizer_labels, border=10, flag=wx.ALL | wx.GROW)
+        panel_detail.Sizer.Add((0, 10))
+        panel_detail.Sizer.Add(self.button_open,    flag=wx.GROW)
+        panel_detail.Sizer.Add(self.button_compare, flag=wx.GROW)
+        panel_detail.Sizer.Add(self.button_export,  flag=wx.GROW)
+        panel_detail.Sizer.AddStretchSpacer()
+        panel_detail.Sizer.Add(self.button_saveas, flag=wx.GROW)
+        panel_detail.Sizer.Add(self.button_remove, flag=wx.GROW)
+        panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
+        panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
+        sizer.Add(splitter, border=10, proportion=1, flag=wx.ALL | wx.GROW)
+        splitter.SplitVertically(list_db, panel_right, sashPosition=self.Size[0]*4/7)
+        for filename in conf.DBFiles:
+            self.update_database_list(filename)
+
+
+    def create_menu(self):
+        """Creates the program menu."""
+        menu = wx.MenuBar()
+        self.SetMenuBar(menu)
+
+        menu_file = wx.Menu()
+        menu.Append(menu_file, "&File")
+
+        menu_open_database = self.menu_open_database = menu_file.Append(
+            wx.ID_ANY, "&Open database...\tCtrl-O",
+            "Choose a database file to open."
+        )
+        menu_recent = self.menu_recent = wx.Menu()
+        menu_file.AppendSubMenu(menu_recent, "&Recent databases",
+            "Recently opened databases.")
+        menu_file.AppendSeparator()
+        menu_options = self.menu_options = \
+            menu_file.Append(wx.ID_ANY, "&Advanced options",
+                "Edit advanced program options")
+        menu_iconize = self.menu_iconize = \
+            menu_file.Append(wx.ID_ANY, "Minimize to &tray",
+                "Minimize %s window to notification area" % conf.Title)
+        menu_exit = self.menu_exit = \
+            menu_file.Append(wx.ID_ANY, "E&xit\tAlt-X", "Exit")
+
+        menu_help = wx.Menu()
+        menu.Append(menu_help, "&Help")
+
+        menu_update = self.menu_update = menu_help.Append(wx.ID_ANY,
+            "Check for &updates",
+            "Check whether a new version of %s is available" % conf.Title)
+        menu_feedback = self.menu_feedback = menu_help.Append(wx.ID_ANY,
+            "Send &feedback",
+            "Send feedback or report a problem to program author")
+        menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
+            "Go to &homepage",
+            "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
+        menu_help.AppendSeparator()
+        menu_log = self.menu_log = menu_help.Append(wx.ID_ANY,
+            "Show &log window", "Show/hide the log messages window", wx.ITEM_CHECK)
+        menu_console = self.menu_console = menu_help.Append(wx.ID_ANY,
+            "Show Python &console\tCtrl-E",
+            "Show/hide a Python shell environment window", wx.ITEM_CHECK)
+        menu_help.AppendSeparator()
+        menu_tray = self.menu_tray = menu_help.Append(wx.ID_ANY,
+            "Display &icon in notification area",
+            "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
+        menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(wx.ID_ANY,
+            "Automatic up&date check",
+            "Automatically check for program updates periodically", wx.ITEM_CHECK)
+        menu_help.AppendSeparator()
+        menu_about = self.menu_about = menu_help.Append(
+            wx.ID_ANY, "&About %s" % conf.Title,
+            "Show program information and copyright")
+
+        self.history_file = wx.FileHistory(conf.MaxRecentFiles)
+        self.history_file.UseMenu(menu_recent)
+        # Reverse list, as FileHistory works like a stack
+        [self.history_file.AddFileToHistory(f) for f in conf.RecentFiles[::-1]]
+        self.Bind(wx.EVT_MENU_RANGE, self.on_recent_file, id=wx.ID_FILE1,
+                  id2=wx.ID_FILE1 + conf.MaxRecentFiles)
+        menu_tray.Check(conf.TrayIconEnabled)
+        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
+
+        self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
+        self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
+        self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
+        self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
+        self.Bind(wx.EVT_MENU, self.on_open_feedback, menu_feedback)
+        self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
+        self.Bind(wx.EVT_MENU, self.on_menu_homepage, menu_homepage)
+        self.Bind(wx.EVT_MENU, self.on_showhide_log, menu_log)
+        self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
+        self.Bind(wx.EVT_MENU, self.on_toggle_trayicon, menu_tray)
+        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
+        self.Bind(wx.EVT_MENU, self.on_about, menu_about)
+
+
     def update_check(self):
         """
         Checks for an updated Skyperious version if sufficient time
@@ -392,19 +638,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_size(self, event):
         """Handler for window size event, tweaks controls and saves size."""
+        event.Skip()
         conf.WindowSize = [-1, -1] if self.IsMaximized() else self.Size[:]
         conf.save()
-        event.Skip()
-        l, p = self.list_db, self.panel_db_main.Parent # Right panel scroll
-        fn = lambda: self and (p.Layout(), l.SetColumnWidth(0, l.Size[1] - 5))
-        wx.CallAfter(fn)
+        self.list_db.SendSizeEvent()
 
 
     def on_move(self, event):
         """Handler for window move event, saves position."""
-        conf.WindowPosition = event.Position[:]
-        conf.save()
         event.Skip()
+        if not self.IsIconized():
+            conf.WindowPosition = event.Position[:]
+            conf.save()
 
 
     def on_sys_colour_change(self, event):
@@ -515,251 +760,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         except: raise
 
 
-    def create_page_main(self, notebook):
-        """Creates the main page with database list and buttons."""
-        page = self.page_main = wx.Panel(notebook)
-        ColourManager.Manage(page, "BackgroundColour", "MainBgColour")
-        notebook.AddPage(page, "Databases")
-        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
-
-        splitter = self.splitter = wx.SplitterWindow(page, style=wx.BORDER_NONE)
-        splitter.SetMinimumPaneSize(300)
-
-        agw_style = (wx.LC_REPORT | wx.LC_NO_HEADER |
-                     wx.LC_SINGLE_SEL | wx.BORDER_NONE)
-        if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_USER_ROW_HEIGHT"):
-            agw_style |= wx.lib.agw.ultimatelistctrl.ULC_USER_ROW_HEIGHT
-        list_db = self.list_db = wx.lib.agw.ultimatelistctrl. \
-            UltimateListCtrl(parent=splitter, agwStyle=agw_style)
-        list_db.MinSize = 400, -1 # Maximize-restore would resize width to 100
-        list_db.InsertColumn(0, "")
-        il = wx.ImageList(*images.ButtonHome.Bitmap.Size)
-        il.Add(images.ButtonHome.Bitmap)
-        il.Add(images.ButtonListDatabase.Bitmap)
-        list_db.AssignImageList(il, wx.IMAGE_LIST_SMALL)
-        list_db.InsertImageStringItem(0, "Home", [0])
-        ColourManager.Manage(list_db, "ForegroundColour", "DBListForegroundColour")
-        ColourManager.Manage(list_db, "BackgroundColour", "DBListBackgroundColour")
-        try:
-            ColourManager.Manage(list_db._headerWin, "ForegroundColour", "DBListForegroundColour")
-            ColourManager.Manage(list_db._mainWin,   "BackgroundColour", "DBListBackgroundColour")
-        except Exception: pass
-        if hasattr(list_db, "SetUserLineHeight"):
-            h = images.ButtonListDatabase.Bitmap.Size[1]
-            list_db.SetUserLineHeight(int(h * 1.5))
-        list_db.Select(0)
-
-        panel_right = wx.lib.scrolledpanel.ScrolledPanel(splitter)
-        panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        panel_main = self.panel_db_main = wx.Panel(panel_right)
-        panel_detail = self.panel_db_detail = wx.Panel(panel_right)
-        panel_main.Sizer = wx.BoxSizer(wx.VERTICAL)
-        panel_detail.Sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Create main page label and buttons
-        label_main = wx.StaticText(panel_main,
-                                   label="Welcome to %s" % conf.Title)
-        ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
-        label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
-            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        BUTTONS_MAIN = [
-            ("opena", "&Open a database..", images.ButtonOpenA, 
-             "Choose a database from your computer to open."),
-            ("detect", "Detect databases", images.ButtonDetect,
-             "Auto-detect databases from user folders."),
-            ("folder", "&Import from folder.", images.ButtonFolder,
-             "Select a folder where to look for SQLite databases "
-             "(*.db files)."),
-            ("live", "Create database from &Skype online.", images.ButtonImport,
-             "Log in to Skype online service and download chat history "),
-            ("missing", "Remove missing", images.ButtonRemoveMissing,
-             "Remove non-existing files from the database list."),
-            ("type", "Remove by type", images.ButtonRemoveType,
-             "Choose to remove Skype databases, or other SQLite databases."),
-            ("clear", "C&lear list", images.ButtonClear,
-             "Clear the current database list."), ]
-        for name, label, img, note in BUTTONS_MAIN:
-            button = controls.NoteButton(panel_main, label, note, img.Bitmap)
-            setattr(self, "button_" + name, button)
-            exec("button_%s = self.button_%s" % (name, name)) in {}, locals()
-        button_missing.Hide(); button_type.Hide(); button_clear.Hide()
-
-        # Create detail page labels, values and buttons
-        label_db = self.label_db = wx.TextCtrl(parent=panel_detail, value="",
-            style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
-        label_db.Font = wx.Font(12, wx.FONTFAMILY_SWISS,
-            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        ColourManager.Manage(label_db, "BackgroundColour", "WidgetColour")
-        label_db.SetEditable(False)
-
-        sizer_labels = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
-        LABELS = [("path", "Location"), ("size", "Size"),
-                  ("modified", "Last modified"), ("account", "Skype user"),
-                  ("chats", "Conversations"), ("messages", "Messages")]
-        for field, title in LABELS:
-            lbltext = wx.StaticText(parent=panel_detail, label="%s:" % title)
-            valtext = wx.TextCtrl(parent=panel_detail, value="",
-                                  size=(300, -1), style=wx.NO_BORDER)
-            ColourManager.Manage(valtext, "BackgroundColour", "WidgetColour")
-            ColourManager.Manage(valtext, "ForegroundColour", wx.SYS_COLOUR_WINDOWTEXT)
-            valtext.SetEditable(False)
-            ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
-            sizer_labels.Add(lbltext, border=5, flag=wx.LEFT)
-            sizer_labels.Add(valtext, proportion=1, flag=wx.GROW)
-            setattr(self, "label_" + field, valtext)
-
-        BUTTONS_DETAIL = [
-            ("open", "&Open", images.ButtonOpen, 
-             "Open the database for searching and exploring."),
-            ("compare", "Compare and &merge", images.ButtonCompare,
-             "Choose another Skype database to compare with, in order to merge "
-             "their differences."),
-            ("export", "&Export messages", images.ButtonExport,
-             "Export all conversations from the database as "
-             "HTML, text or spreadsheet."),
-            ("saveas", "Save &as..", images.ButtonSaveAs,
-             "Save a copy of the database under another name."),
-            ("remove", "Remove", images.ButtonRemove,
-             "Remove this database from the list."), ]
-        for name, label, img, note in BUTTONS_DETAIL:
-            button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
-            setattr(self, "button_" + name, button)
-            exec("button_%s = self.button_%s" % (name, name)) # Hack local name
-
-        children = list(panel_main.Children) + list(panel_detail.Children)
-        for c in [panel_main, panel_detail] + children:
-            ColourManager.Manage(c, "BackgroundColour", "MainBgColour")
-        panel_right.SetupScrolling(scroll_x=False)
-        panel_detail.Hide()
-
-        list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
-        list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_open_from_list_db)
-        list_db.Bind(wx.EVT_CHAR_HOOK,           self.on_list_db_key)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_DRAG,
-                     self.on_dragstart_list_db)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_END_DRAG,
-                     self.on_dragstop_list_db)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_RDRAG,
-                     self.on_cancel_drag_list_db)
-        button_opena.Bind(wx.EVT_BUTTON,         self.on_open_database)
-        button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
-        button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
-        button_live.Bind(wx.EVT_BUTTON,          self.on_live_login)
-        button_missing.Bind(wx.EVT_BUTTON,       self.on_remove_missing)
-        button_type.Bind(wx.EVT_BUTTON,          self.on_remove_type_menu)
-        button_clear.Bind(wx.EVT_BUTTON,         self.on_clear_databases)
-        button_open.Bind(wx.EVT_BUTTON,          self.on_open_current_database)
-        button_compare.Bind(wx.EVT_BUTTON,       self.on_compare_databases)
-        button_export.Bind(wx.EVT_BUTTON,        self.on_export_database_menu)
-        button_saveas.Bind(wx.EVT_BUTTON,        self.on_save_database_as)
-        button_remove.Bind(wx.EVT_BUTTON,        self.on_remove_database)
-
-        panel_main.Sizer.Add(label_main, border=10, flag=wx.ALL)
-        panel_main.Sizer.Add((0, 10))
-        panel_main.Sizer.Add(button_opena, flag=wx.GROW)
-        panel_main.Sizer.Add(button_detect, flag=wx.GROW)
-        panel_main.Sizer.Add(button_folder, flag=wx.GROW)
-        panel_main.Sizer.Add(button_live, flag=wx.GROW)
-        panel_main.Sizer.AddStretchSpacer()
-        panel_main.Sizer.Add(button_missing, flag=wx.GROW)
-        panel_main.Sizer.Add(button_type, flag=wx.GROW)
-        panel_main.Sizer.Add(button_clear, flag=wx.GROW)
-        panel_detail.Sizer.Add(label_db, border=10, flag=wx.ALL | wx.GROW)
-        panel_detail.Sizer.Add(sizer_labels, border=10, flag=wx.ALL | wx.GROW)
-        panel_detail.Sizer.Add((0, 10))
-        panel_detail.Sizer.Add(button_open, flag=wx.GROW)
-        panel_detail.Sizer.Add(button_compare, flag=wx.GROW)
-        panel_detail.Sizer.Add(button_export, flag=wx.GROW)
-        panel_detail.Sizer.AddStretchSpacer()
-        panel_detail.Sizer.Add(button_saveas, flag=wx.GROW)
-        panel_detail.Sizer.Add(button_remove, flag=wx.GROW)
-        panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
-        panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
-        sizer.Add(splitter, border=10, proportion=1, flag=wx.ALL | wx.GROW)
-        splitter.SplitVertically(list_db, panel_right, sashPosition=self.Size[0]*4/7)
-        for filename in conf.DBFiles:
-            self.update_database_list(filename)
-
-
-    def create_menu(self):
-        """Creates the program menu."""
-        menu = wx.MenuBar()
-        self.SetMenuBar(menu)
-
-        menu_file = wx.Menu()
-        menu.Append(menu_file, "&File")
-
-        menu_open_database = self.menu_open_database = menu_file.Append(
-            wx.ID_ANY, "&Open database...\tCtrl-O",
-            "Choose a database file to open."
-        )
-        menu_recent = self.menu_recent = wx.Menu()
-        menu_file.AppendSubMenu(menu_recent, "&Recent databases",
-            "Recently opened databases.")
-        menu_file.AppendSeparator()
-        menu_options = self.menu_options = \
-            menu_file.Append(wx.ID_ANY, "&Advanced options",
-                "Edit advanced program options")
-        menu_iconize = self.menu_iconize = \
-            menu_file.Append(wx.ID_ANY, "Minimize to &tray",
-                "Minimize %s window to notification area" % conf.Title)
-        menu_exit = self.menu_exit = \
-            menu_file.Append(wx.ID_ANY, "E&xit\tAlt-X", "Exit")
-
-        menu_help = wx.Menu()
-        menu.Append(menu_help, "&Help")
-
-        menu_update = self.menu_update = menu_help.Append(wx.ID_ANY,
-            "Check for &updates",
-            "Check whether a new version of %s is available" % conf.Title)
-        menu_feedback = self.menu_feedback = menu_help.Append(wx.ID_ANY,
-            "Send &feedback",
-            "Send feedback or report a problem to program author")
-        menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
-            "Go to &homepage",
-            "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
-        menu_help.AppendSeparator()
-        menu_log = self.menu_log = menu_help.Append(wx.ID_ANY,
-            "Show &log window", "Show/hide the log messages window", wx.ITEM_CHECK)
-        menu_console = self.menu_console = menu_help.Append(wx.ID_ANY,
-            "Show Python &console\tCtrl-E",
-            "Show/hide a Python shell environment window", wx.ITEM_CHECK)
-        menu_help.AppendSeparator()
-        menu_tray = self.menu_tray = menu_help.Append(wx.ID_ANY,
-            "Display &icon in notification area",
-            "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
-        menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(wx.ID_ANY,
-            "Automatic up&date check",
-            "Automatically check for program updates periodically", wx.ITEM_CHECK)
-        menu_help.AppendSeparator()
-        menu_about = self.menu_about = menu_help.Append(
-            wx.ID_ANY, "&About %s" % conf.Title,
-            "Show program information and copyright")
-
-        self.history_file = wx.FileHistory(conf.MaxRecentFiles)
-        self.history_file.UseMenu(menu_recent)
-        # Reverse list, as FileHistory works like a stack
-        [self.history_file.AddFileToHistory(f) for f in conf.RecentFiles[::-1]]
-        self.Bind(wx.EVT_MENU_RANGE, self.on_recent_file, id=wx.ID_FILE1,
-                  id2=wx.ID_FILE1 + conf.MaxRecentFiles)
-        menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
-
-        self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
-        self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
-        self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
-        self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
-        self.Bind(wx.EVT_MENU, self.on_open_feedback, menu_feedback)
-        self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
-        self.Bind(wx.EVT_MENU, self.on_menu_homepage, menu_homepage)
-        self.Bind(wx.EVT_MENU, self.on_showhide_log, menu_log)
-        self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
-        self.Bind(wx.EVT_MENU, self.on_toggle_trayicon, menu_tray)
-        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
-        self.Bind(wx.EVT_MENU, self.on_about, menu_about)
-
-
     def on_toggle_autoupdate_check(self, event):
         """Handler for toggling automatic update checking, changes conf."""
         conf.UpdateCheckAutomatic = event.IsChecked()
@@ -859,7 +859,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """
         if self.button_detect.FindFocus() == self.button_detect:
             self.list_db.SetFocus()
-        guibase.status("Searching local computer for databases..", log=True)
+        guibase.status("Searching local computer for Skype databases..", log=True)
         self.button_detect.Enabled = False
         self.worker_detection.work(True)
 
@@ -1037,6 +1037,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
             if f in filenames: self.history_file.RemoveFileFromHistory(i)
         conf.save()
+        guibase.status("Removed %s from database list.",
+                       util.plural("non-existing file", filenames))
 
 
     def on_remove_type(self, event):
@@ -1067,6 +1069,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
             if f in filenames: self.history_file.RemoveFileFromHistory(i)
         conf.save()
+        t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
+        guibase.status("Removed %s from database list.", t)
 
 
     def on_remove_type_menu(self, event):
@@ -1077,8 +1081,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_remove_type, item)
 
-        sz_btn, pt_btn = event.EventObject.Size, event.EventObject.Position
-        pt_btn = event.EventObject.Parent.ClientToScreen(pt_btn)
+        btn = self.button_type
+        sz_btn, pt_btn = btn.Size, btn.Position
+        pt_btn = btn.Parent.ClientToScreen(pt_btn)
         menu.SetOwnerHeight(sz_btn.y)
         if menu.Size.width < sz_btn.width:
             menu.Size = sz_btn.width, menu.Size.height
@@ -1363,11 +1368,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for create database from live button, asks for username and
         password, opens database page and starts syncing data.
         """
-        self.button_live.Disable()
         dlg = LoginDialog(self, title="Log in to Skype online")
         dlgresult = dlg.ShowModal()
-        self.button_live.Enable()
-        self.button_live.SetFocus()
         if wx.ID_OK != dlgresult: return
         user, pw = dlg.Username, dlg.Password
         if not user or not pw: return
@@ -1984,8 +1986,6 @@ class DatabasePage(wx.Panel):
             busy.Close()
         self.edit_searchall.SetFocus()
         wx.CallAfter(self.edit_searchall.SelectAll)
-        if "linux2" == sys.platform and wx.version().startswith("2.8"):
-            wx.CallAfter(self.split_panels)
 
 
     def create_page_chats(self, notebook):
@@ -3040,31 +3040,6 @@ class DatabasePage(wx.Panel):
                 conf.SQLWindowTexts[self.db.filename] = sql_text
             elif self.db.filename in conf.SQLWindowTexts:
                 del conf.SQLWindowTexts[self.db.filename]
-
-
-    def split_panels(self):
-        """
-        Splits all SplitterWindow panels. To be called after layout in
-        Linux wx 2.8, as otherwise panels do not get sized properly.
-        """
-        if not self:
-            return
-        sash_pos = self.Size[1] / 3
-        panel1, panel2 = self.splitter_chats.Children
-        self.splitter_chats.Unsplit()
-        self.splitter_chats.SplitHorizontally(panel1, panel2, sash_pos)
-        panel1, panel2 = self.splitter_tables.Children
-        self.splitter_tables.Unsplit()
-        self.splitter_tables.SplitVertically(panel1, panel2, 270)
-        panel1, panel2 = self.splitter_sql.Children
-        self.splitter_sql.Unsplit()
-        self.splitter_sql.SplitHorizontally(panel1, panel2, sash_pos)
-        panel1, panel2 = self.splitter_import.Children
-        self.splitter_import.Unsplit()
-        self.splitter_import.SplitHorizontally(panel1, panel2, sash_pos)
-        wx.CallLater(1000, lambda: self and 
-                     (self.tree_tables.SetColumnWidth(0, -1),
-                      self.tree_tables.SetColumnWidth(1, -1)))
 
 
     def update_info_page(self, reload=True):
@@ -5208,23 +5183,6 @@ class MergerPage(wx.Panel):
         panel2.SetupScrolling()
 
 
-    def split_panels(self):
-        """
-        Splits all SplitterWindow panels. To be called after layout in
-        Linux wx 2.8, as otherwise panels do not get sized properly.
-        """
-        if not self:
-            return
-        sash_pos = self.Size[1] / 3
-        panel1, panel2 = self.splitter_merge.Children
-        self.splitter_merge.Unsplit()
-        self.splitter_merge.SplitHorizontally(panel1, panel2, sash_pos)
-        sash_pos = self.page_merge_contacts.Size[0] / 2
-        panel1, panel2 = self.splitter_contacts.Children
-        self.splitter_contacts.Unsplit()
-        self.splitter_contacts.SplitVertically(panel1, panel2, sash_pos)
-
-
     def on_export_chat(self, event):
         """
         Handler for clicking to export a chat diff, displays a save file dialog
@@ -6098,8 +6056,6 @@ class MergerPage(wx.Panel):
             guibase.status("Opened databases %s and %s.", self.db1, self.db2)
             self.page_merge_all.Layout()
             self.Refresh()
-            if "linux2" == sys.platform and wx.version().startswith("2.8"):
-                wx.CallAfter(self.split_panels)
             wx.CallAfter(self.update_tabheader)
 
 
@@ -7469,11 +7425,11 @@ class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_ctrls = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
         sizer_buttons = self.CreateButtonSizer(wx.OK | wx.CANCEL)
-        sizer_ctrls.Add(label_name)
+        sizer_ctrls.Add(label_name, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_ctrls.Add(edit_name, flag=wx.GROW)
-        sizer_ctrls.Add(label_pass)
+        sizer_ctrls.Add(label_pass, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_ctrls.Add(edit_pass, flag=wx.GROW)
-        self.Sizer.Add(sizer_ctrls, border=8, proportion=1, flag=wx.ALL | wx.GROW)
+        self.Sizer.Add(sizer_ctrls,   border=8, proportion=1, flag=wx.ALL | wx.GROW)
         self.Sizer.Add(sizer_buttons, border=8, flag=wx.ALIGN_CENTER_HORIZONTAL | wx.ALL)
         self.Layout()
         self.Fit()
