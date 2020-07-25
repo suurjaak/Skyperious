@@ -6,6 +6,7 @@ CHANGELOG
 - added support for syncing chat history from Skype online service;
 - restored shared image download functionality;
 - restored support functionality;
+- increased default font size for chat history, made it configurable;
 - removed obsolescence notice.
 
 

@@ -22,7 +22,7 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.dev17"
+Version = "4.0.dev18"
 VersionDate = "25.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -49,10 +49,10 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
-    "ExportDbTemplate", "LogSQL", "MinWindowSize", "MaxConsoleHistory",
-    "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory",
-    "MaxSearchMessages", "MaxSearchTableRows", "PlotDaysColour",
-    "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
+    "ExportDbTemplate", "HistoryFontSize", "LogSQL", "MinWindowSize",
+    "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
+    "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
+    "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "SearchResultsChunk", "SharedImageAutoDownload", "StatisticsPlotWidth",
     "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
     "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
@@ -195,7 +195,7 @@ SearchResultsChunk = 50
 HistoryFontName = "Tahoma"
 
 """Font size in chat history."""
-HistoryFontSize = 8
+HistoryFontSize = 10
 
 """Window background colour."""
 BgColour = "#FFFFFF"
