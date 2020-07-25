@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    24.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -27,14 +27,14 @@ try:
 except ImportError:
     xlsxwriter = None
 
-from . third_party import step
+from . lib import util
+from . lib.vendor import step
 
 from . import conf
 from . import emoticons
 from . import guibase
 from . import skypedata
 from . import templates
-from . import util
 
 try: # Used in measuring text extent for Excel column auto-width
     FONT_XLSX = ImageFont.truetype(conf.FontXlsxFile, 15)

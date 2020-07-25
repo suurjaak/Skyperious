@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    24.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -24,13 +24,12 @@ try:
 except ImportError:
     pass # Most functionality works without wx
 
-from . third_party import step
+from . lib import util
 
 from . import conf
 from . import searchparser
 from . import skypedata
 from . import templates
-from . import util
 
 logger = logging.getLogger(__name__)
 

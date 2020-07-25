@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -32,13 +32,13 @@ from xml.etree import cElementTree as ElementTree
 try: import wx # For avatar bitmaps in GUI program
 except ImportError: pass
 
-from . third_party import step
+from . lib import util
+from . lib import wordcloud
+from . lib.vendor import step
 
 from . import conf
 from . import emoticons
 from . import templates
-from . import util
-from . import wordcloud
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat

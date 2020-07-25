@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -44,11 +44,12 @@ try: # For printing to a console from a packaged Windows binary
 except ImportError:
     win32console = None
 
+from . lib import util
+
 from . import conf
 from . import export
 from . import guibase
 from . import skypedata
-from . import util
 from . import workers
 if is_gui_possible:
     from . import skyperious
@@ -556,9 +557,10 @@ def run_gui(filenames):
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
-    window.run_console("from . import conf, controls, emoticons, export, guibase, "
+    window.run_console("from skyperious import conf, emoticons, export, guibase, "
                        "images, live, main, searchparser, skypedata, skyperious, "
-                       "support, templates, util, wordcloud, workers, wx_accel")
+                       "support, templates, workers")
+    window.run_console("from skyperious.lib import controls, util, wordcloud, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     logger.info("Started application on %s.", datetime.date.today())

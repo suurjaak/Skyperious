@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    05.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -26,11 +26,12 @@ import urllib2
 import urlparse
 import wx
 
-import conf
-import controls
-import guibase
-import util
-import wx_accel
+from . lib import controls
+from . lib import util
+from . lib import wx_accel
+
+from . import conf
+from . import guibase
 
 """Current update dialog window, if any, for avoiding concurrent updates."""
 update_window = None

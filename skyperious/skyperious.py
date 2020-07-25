@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -50,11 +50,13 @@ import wx.stc
 try: from dateutil.relativedelta import relativedelta
 except ImportError: relativedelta = None
 
-from . controls import ColourManager
-from . third_party import step
+from . lib import controls
+from . lib.controls import ColourManager
+from . lib import util
+from . lib import wx_accel
+from . lib.vendor import step
 
 from . import conf
-from . import controls
 from . import emoticons
 from . import export
 from . import guibase
@@ -63,9 +65,7 @@ from . import live
 from . import skypedata
 from . import support
 from . import templates
-from . import util
 from . import workers
-from . import wx_accel
 
 
 """Custom application events for worker results."""

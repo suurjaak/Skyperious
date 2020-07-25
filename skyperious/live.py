@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.07.2020
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -28,10 +28,11 @@ except ImportError: pass
 try: import skpy
 except ImportError: pass
 
+from . lib import util
+
 from . import conf
 from . import guibase
 from . import skypedata
-from . import util
 
 
 logger = logging.getLogger(__name__)

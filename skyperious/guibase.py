@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    24.07.2020
+@modified    25.07.2020
 """
 import datetime
 import logging
@@ -29,10 +29,11 @@ try:
     import wx.py
 except ImportError: wx = None
 
-from . controls import ColourManager, KEYS
+from . lib.controls import ColourManager, KEYS
+from . lib import util
+from . lib import wx_accel
+
 from . import conf
-from . import util
-from . import wx_accel
 
 logger = logging.getLogger(__name__)
 
