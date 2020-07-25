@@ -25,6 +25,7 @@ except ImportError:
     pass # Most functionality works without wx
 
 from . lib import util
+from . lib.vendor import step
 
 from . import conf
 from . import searchparser
