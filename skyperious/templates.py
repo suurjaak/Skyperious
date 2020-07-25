@@ -406,6 +406,7 @@ from skyperious.third_party import step
       color: blue;
     }
     #shared_images table td:first-child, #transfers table td:first-child {
+      padding-right: 15px;
       text-align: right;
       white-space: normal;
     }
@@ -418,11 +419,8 @@ from skyperious.third_party import step
     #shared_images table td:last-child, #transfers table td:last-child {
       text-align: right;
     }
-    #transfers span {
-      font-weight: bold;
-      padding: 5px 0 10px 0;
-      display: block;
-      font-size: 1.1em;
+    #transfers .filename {
+      color: blue;
     }
     span.shared_image {
       background: black;
@@ -1008,7 +1006,11 @@ f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
         <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
-          <a href="{{util.path_to_url(f["filepath"] or f["filename"])}}" target="_blank">{{f["filepath"] or f["filename"]}}</a>
+%if f["filepath"]:
+          <a href="{{util.path_to_url(f["filepath"])}}" target="_blank" class="filename">{{f["filepath"]}}</a>
+%else:
+          <span class="filename">{{f["filename"]}}</span>
+%endif
         </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
           {{util.format_bytes(int(f["filesize"]))}}
         </td><td class="timestamp" title="{{f_datetime_title}}">
@@ -1607,7 +1609,15 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 %>
   <tr>
     <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
-    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{util.path_to_url(f["filepath"] or f["filename"])}}"><font color="{{conf.LinkColour}}">{{f["filepath"] or f["filename"]}}</font></a></font></td>
+    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}">
+%if f["filepath"]:
+    <a href="{{util.path_to_url(f["filepath"])}}">
+      <font color="{{conf.LinkColour}}">{{f["filepath"]}}</font>
+    </a>
+%else:
+    <font color="{{conf.LinkColour}}">{{f["filename"]}}</font>
+%endif
+    </font></td>
     <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
     <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
   </tr>
