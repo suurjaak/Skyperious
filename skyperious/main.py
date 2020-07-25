@@ -52,7 +52,7 @@ from . import guibase
 from . import skypedata
 from . import workers
 if is_gui_possible:
-    from . import skyperious
+    from . import gui
 
 
 ARGUMENTS = {
@@ -551,21 +551,21 @@ def run_gui(filenames):
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
     mylocale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
-    window = skyperious.MainWindow()
+    window = gui.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
     window.run_console("# All %s modules:" % conf.Title)
-    window.run_console("from skyperious import conf, emoticons, export, guibase, "
-                       "images, live, main, searchparser, skypedata, skyperious, "
-                       "support, templates, workers")
+    window.run_console("from skyperious import conf, emoticons, export, "
+                       "gui, guibase, images, live, main, searchparser, "
+                       "skypedata, support, templates, workers")
     window.run_console("from skyperious.lib import controls, util, wordcloud, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
     logger.info("Started application on %s.", datetime.date.today())
     for f in filter(os.path.isfile, filenames):
-        wx.CallAfter(wx.PostEvent, window, skyperious.OpenDatabaseEvent(file=f))
+        wx.CallAfter(wx.PostEvent, window, gui.OpenDatabaseEvent(file=f))
     app.MainLoop()
 
 
