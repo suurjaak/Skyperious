@@ -2,20 +2,21 @@ Skyperious 4.0
 ==============
 
 
-Obsolescence Notice
--------------------
+Important notice
+----------------
 
 Around 2017, starting from Skype version 8, Skype moved away from its famous
 peer-to-peer architecture to a client-server system, and started to store 
-its message history on its own servers only.
+conversation history on its own servers only.
 
-Formerly, it used a local SQLite main.db database to retain all history,
-which is what Skyperious was created to work with - merging chat histories from
-different computers into one.
+Formerly, it used a local SQLite main.db database to store chats and messages,
+which is what Skyperious was originally created to work with - merging chat 
+histories from different computers into one.
 
 Skyperious still works with existing main.db files, and can also download
 newer messages from Skype online service. But any changes done to the database
-no longer affect what is visible in official Skype releases.
+no longer affect what is visible in the official Skype program.
+
 
 ---
 
@@ -25,7 +26,8 @@ Skyperious is a Skype database viewer and merger, written in Python.
 You can open Skype SQLite databases and work with their contents:
 
 - search across all messages and contacts
-- browse chat history and export as HTML or spreadsheet, see chat statistics
+- read chat history in full, see chat statistics and word clouds
+- export chats as HTML, text or spreadsheet
 - synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
@@ -33,9 +35,8 @@ You can open Skype SQLite databases and work with their contents:
 
 and
 
-- synchronize messages in two Skype databases: keep chat history up-to-date on
-  different computers, or restore missing messages from older files into the
-  current one
+- synchronize messages in two Skype databases, merging their differences
+
 
 Additionally, it doubles as a useful database browser for any SQLite file.
 Also, a command line interface is available with key functions like
@@ -51,7 +52,7 @@ Using The Program
 
 Skyperious can look through user directories and detect Skype databases
 automatically, or you can select specific files or folders.
-Once added to the database list, a file can be opened for browsing, searching 
+Once added to the database list, a file can be opened for reading, searching 
 and exporting, or compared with another database for merging.
 
 Searching an opened database supports a simple Google-like query syntax. 
@@ -60,8 +61,9 @@ You can use keywords to search among specific authors or chats only
 Search supports wildcards, exact phrases, grouping, excluding,
 and either-or queries.
 
-Skyperious can create a new main.db database from scratch,
-by logging into Skype online service and downloading available history.
+Skyperious can log into Skype online service and download and save new messages
+in the local database file. It can also create a new main.db database from 
+scratch, by downloading all available history.
 
 HTML export can download shared photos and embed them in the resulting HTML,
 if password for the Skype account has been entered in online-page.
@@ -70,7 +72,7 @@ Image download is also supported in the command-line interface.
 
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
-browse and copy specific chats and contacts.
+read and copy specific chats and contacts.
 
 Skyperious offers a number of options from the command line:
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
