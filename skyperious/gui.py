@@ -1345,12 +1345,25 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         return prev.value.s.strip()
             return ""
 
+        def typelist(mytype):
+            def convert(v):
+                v = ast.literal_eval(v) if isinstance(v, basestring) else v
+                if not isinstance(v, (list, tuple)): v = tuple([v])
+                if not v: raise ValueError("Empty collection")
+                return tuple(map(mytype, v))
+            convert.__name__ = "tuple(%s)" % mytype.__name__
+            return convert
+
         for name in sorted(conf.OptionalFileDirectives):
             value, help = getattr(conf, name, None), get_field_doc(name)
             default = conf.Defaults.get(name)
             if value is None and default is None:
-                continue # continue for name
-            kind = wx.Size if isinstance(value, (tuple, list)) else type(value)
+                continue # for name
+
+            kind = type(value)
+            if isinstance(value, (tuple, list)):
+                kind = typelist(type(value[0]))
+                default = kind(default)
             dialog.AddProperty(name, value, help, default, kind)
         dialog.Realize()
 
