@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    22.01.2015
+@modified    25.07.2020
 ------------------------------------------------------------------------------
 """
 import functools
@@ -290,51 +290,52 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
                   [(type(t), t.Id, t.Label) for t in targets])
         event, target = None, None
         for target in targets:
-            if (isinstance(target, wx.Control) # has not been destroyed
-            and target.IsShownOnScreen()       # visible on current panel
-            and target.Enabled):
-                if isinstance(target, wx.Button):
-                    # Buttons do not get focus on shortcuts by convention
-                    event = wx.CommandEvent(wx.EVT_BUTTON.typeId, target.Id)
-                    event.SetEventObject(target)
-                elif isinstance(target, wx.ToggleButton):
-                    # Buttons do not get focus on shortcuts by convention
-                    event = wx.CommandEvent(wx.EVT_TOGGLEBUTTON.typeId,
-                                            target.Id)
-                    event.SetEventObject(target)
-                    # Need to change value, as event goes directly to handler
-                    target.Value = not target.Value
-                elif isinstance(target, wx.CheckBox):
-                    event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, target.Id)
-                    event.SetEventObject(target)
-                    # Need to change value, as event goes directly to handler
-                    if target.Is3State():
-                        target.Set3StateValue(CHK_3STATE_NEXT[target.Get3StateValue()])
-                    else: target.Value = not target.Value
-                    target.SetFocus()
-                elif isinstance(target, wx.ToolBar):
-                    # Toolbar shortcuts are defined in their shorthelp texts
-                    toolsmap, tb = dict(), target
-                    for i in range(tb.GetToolsCount() + 1):
-                        try:
-                            tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
-                            toolsmap[repr(tool)] = tool
-                        except Exception: pass # FindTool not implemented in GTK
-                    for tool in filter(None, toolsmap.values()):
-                        id = tool.GetId()
-                        text = tb.GetToolShortHelp(id)
-                        parts = re.split("\\(Alt-(%s)\\)" % key, text,
-                                         maxsplit=1, flags=re.IGNORECASE)
-                        if len(parts) > 1:
-                            event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
-                            event.SetEventObject(target)
-                            target.ToggleTool(id, not target.GetToolState(id))
-                            break # for tool
-                else:
-                    target.SetFocus()
-                    if isinstance(target, wx.TextCtrl):
-                        target.SelectAll()
-                break # for target
+            if not target or not isinstance(target, wx.Control) \
+            or not target.IsShownOnScreen() or not target.Enabled:
+                continue # for target
+
+            if isinstance(target, wx.Button):
+                # Buttons do not get focus on shortcuts by convention
+                event = wx.CommandEvent(wx.EVT_BUTTON.typeId, target.Id)
+                event.SetEventObject(target)
+            elif isinstance(target, wx.ToggleButton):
+                # Buttons do not get focus on shortcuts by convention
+                event = wx.CommandEvent(wx.EVT_TOGGLEBUTTON.typeId,
+                                        target.Id)
+                event.SetEventObject(target)
+                # Need to change value, as event goes directly to handler
+                target.Value = not target.Value
+            elif isinstance(target, wx.CheckBox):
+                event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, target.Id)
+                event.SetEventObject(target)
+                # Need to change value, as event goes directly to handler
+                if target.Is3State():
+                    target.Set3StateValue(CHK_3STATE_NEXT[target.Get3StateValue()])
+                else: target.Value = not target.Value
+                target.SetFocus()
+            elif isinstance(target, wx.ToolBar):
+                # Toolbar shortcuts are defined in their shorthelp texts
+                toolsmap, tb = dict(), target
+                for i in range(tb.GetToolsCount() + 1):
+                    try:
+                        tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
+                        toolsmap[repr(tool)] = tool
+                    except Exception: pass # FindTool not implemented in GTK
+                for tool in filter(None, toolsmap.values()):
+                    id = tool.GetId()
+                    text = tb.GetToolShortHelp(id)
+                    parts = re.split("\\(Alt-(%s)\\)" % key, text,
+                                     maxsplit=1, flags=re.IGNORECASE)
+                    if len(parts) > 1:
+                        event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
+                        event.SetEventObject(target)
+                        target.ToggleTool(id, not target.GetToolState(id))
+                        break # for tool
+            else:
+                target.SetFocus()
+                if isinstance(target, wx.TextCtrl):
+                    target.SelectAll()
+            break # for target
         if event:
             if DEBUG: print("Chose target %s." % (target.Label or target))
 
