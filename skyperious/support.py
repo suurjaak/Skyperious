@@ -192,6 +192,13 @@ def take_screenshot(fullscreen=True):
     dc_bmp.SelectObject(bmp)
     dc_bmp.Blit(0, 0, rect.width, rect.height, dc, rect.x, rect.y)
     dc_bmp.SelectObject(wx.NullBitmap)
+    del dc, dc_bmp
+    if bmp.Depth > 24:
+        try: # Drop alpha channel
+            img = bmp.ConvertToImage()
+            img.ClearAlpha()
+            bmp = img.ConvertToBitmap()
+        except Exception: pass
     return bmp
 
 
@@ -255,59 +262,66 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
                                 wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER)
         wx_accel.AutoAcceleratorMixIn.__init__(self)
         self.MinSize = (460, 460)
-        self.Sizer = wx.BoxSizer(wx.VERTICAL)
-        panel = self.panel = wx.Panel(self)
-        sizer = self.panel.Sizer = wx.BoxSizer(wx.VERTICAL)
 
-        sizer_upper = wx.BoxSizer(wx.HORIZONTAL)
+        panel = self.panel = wx.Panel(self)
+
         label = self.label_message = wx.StaticText(panel,
             label="Opinions, ideas for improvement, problems?")
         label_info = self.label_info = wx.StaticText(panel,
             label="For reply, include a contact e-mail.")
         label_info.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT)
-        sizer_upper.Add(label, flag=wx.GROW)
-        sizer_upper.AddStretchSpacer()
-        sizer_upper.Add(label_info)
-        sizer.Add(sizer_upper, border=8, flag=wx.GROW | wx.ALL)
 
         edit = self.edit_text = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
-        sizer.Add(edit, proportion=2, border=8,
-                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.GROW)
 
-        sizer_lower = wx.BoxSizer(wx.HORIZONTAL)
         bmp = self.bmp = wx.StaticBitmap(panel, size=self.THUMB_SIZE)
-        sizer_lower.Add(bmp)
-        sizer_controls = wx.BoxSizer(wx.VERTICAL)
         self.button_ok = wx.Button(panel, label="&Confirm")
         self.button_ok.ToolTip = "Confirm message before sending"
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
-        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
-        sizer_buttons.Add(self.button_cancel)
-        sizer_controls.Add(sizer_buttons)
         self.cb_fullscreen = wx.CheckBox(panel, label="&Full screen")
         self.button_saveimage = wx.Button(panel, label="Save &image")
         self.button_saveimage.ToolTip = "Save screenshot to file."
         self.cb_bmp = wx.CheckBox(panel, label="Include &screenshot")
-        sizer_controls.AddStretchSpacer()
+
+        self.Sizer       = wx.BoxSizer(wx.VERTICAL)
+        sizer            = self.panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_upper      = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_lower      = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_controls   = wx.BoxSizer(wx.VERTICAL)
+        sizer_buttons    = wx.BoxSizer(wx.HORIZONTAL)
         sizer_imagectrls = wx.BoxSizer(wx.VERTICAL)
+
+        sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
+        sizer_buttons.Add(self.button_cancel)
+
         sizer_imagectrls.Add(self.button_saveimage, border=8,
                              flag=wx.BOTTOM | wx.ALIGN_RIGHT)
         sizer_imagectrls.Add(self.cb_fullscreen, border=20, flag=wx.BOTTOM)
+
+        sizer_controls.Add(sizer_buttons)
+        sizer_controls.AddStretchSpacer()
         sizer_controls.Add(sizer_imagectrls, flag=wx.ALIGN_RIGHT)
         sizer_controls.Add(self.cb_bmp, border=5, flag=wx.TOP)
+
+        sizer_upper.Add(label, flag=wx.GROW)
+        sizer_upper.AddStretchSpacer()
+        sizer_upper.Add(label_info)
         sizer_lower.AddStretchSpacer()
         sizer_lower.Add(sizer_controls, flag=wx.GROW)
+        sizer_lower.Add(bmp)
+
+        sizer.Add(sizer_upper, border=8, flag=wx.GROW | wx.ALL)
+        sizer.Add(edit, proportion=2, border=8,
+                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.GROW)
         sizer.Add(sizer_lower, border=8, flag=wx.LEFT | wx.RIGHT |
                   wx.BOTTOM | wx.GROW)
-
         self.Sizer.Add(panel, proportion=1, flag=wx.GROW)
+
         self.Bind(wx.EVT_CHECKBOX, self.OnToggleFullScreen, self.cb_fullscreen)
         self.Bind(wx.EVT_CHECKBOX, self.OnToggleScreenshot, self.cb_bmp)
-        self.Bind(wx.EVT_BUTTON, self.OnSend, self.button_ok)
-        self.Bind(wx.EVT_BUTTON, self.OnCancel, self.button_cancel)
-        self.Bind(wx.EVT_BUTTON, self.OnSaveImage, self.button_saveimage)
-        self.Bind(wx.EVT_CLOSE, self.OnCancel)
+        self.Bind(wx.EVT_BUTTON,   self.OnSend,             self.button_ok)
+        self.Bind(wx.EVT_BUTTON,   self.OnCancel,           self.button_cancel)
+        self.Bind(wx.EVT_BUTTON,   self.OnSaveImage,        self.button_saveimage)
+        self.Bind(wx.EVT_CLOSE,    self.OnCancel)
 
         self.SetScreenshot(None)
         self.Fit()
