@@ -113,7 +113,7 @@ def export_chats(chats, path, format, db, messages=None, skip=True, progress=Non
 
         if format.lower().endswith("html") and conf.SharedImageAutoDownload \
         and not db.live.is_logged_in() \
-        and conf.Login.get(db.filename or {}).get("password"):
+        and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared images
             try: db.live.login(db.id, conf.Login[db.filename]["password"])
             except Exception: pass
