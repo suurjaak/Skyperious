@@ -745,9 +745,39 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_list_db_key(self, event):
         """
         Handler for pressing a key in dblist, loads selected database on Enter
-        removes from list on Delete, and focuses filter on Ctrl-F.
+        removes from list on Delete, refreshes columns on F5,
+        and focuses filter on Ctrl-F.
         """
-        if event.KeyCode in [ord("F")] and event.CmdDown():
+        if event.KeyCode in [wx.WXK_F5]:
+            items, selected_files, selected_home = [], [], False
+            selected = self.list_db.GetFirstSelected()
+            while selected >= 0:
+                if selected:
+                    selected_files.append(self.list_db.GetItemText(selected))
+                else: selected_home = True
+                selected = self.list_db.GetNextSelected(selected)
+
+            for filename in conf.DBFiles:
+                data = collections.defaultdict(lambda: None, name=filename)
+                if os.path.exists(filename):
+                    if filename in self.dbs:
+                        self.dbs[filename].update_fileinfo()
+                        data["size"] = self.dbs[filename].filesize
+                        data["last_modified"] = self.dbs[filename].last_modified
+                    else:
+                        data["size"] = os.path.getsize(filename)
+                        data["last_modified"] = datetime.datetime.fromtimestamp(
+                                                os.path.getmtime(filename))
+                self.db_filenames[filename].update(data)
+                items.append(data)
+            self.list_db.Populate(items, [1])
+            if selected_home: self.list_db.Select(0)
+            if selected_files:
+                for i in range(1, self.list_db.GetItemCount()):
+                    if self.list_db.GetItemText(i) in selected_files:
+                        self.list_db.Select(i)
+                self.update_database_detail()
+        elif event.KeyCode in [ord("F")] and event.CmdDown():
             self.edit_filter.SetFocus()
         if self.list_db.GetFirstSelected() > 0 and not event.AltDown() \
         and event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
