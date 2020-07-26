@@ -1590,8 +1590,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not self: return
         do_exit = True
         unsaved_pages = {} # {DatabasePage: filename, }
+        syncing_pages = {} # {DatabasePage: filename, }
         merging_pages = [] # [MergerPage title, ]
+
         for page, db in self.db_pages.items():
+            if page and db.live.is_logged_in() and page.worker_live.is_working():
+                syncing_pages[page] = db.filename
+        if syncing_pages:
+            if wx.OK != wx.MessageBox(
+                "Live syncing is currently in progress in %s.\n\nExit anyway?" % 
+                "\n".join(textwrap.wrap(", ".join(syncing_pages.values()))),
+                conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
+            ): do_exit = False
+
+        for page, db in self.db_pages.items() if do_exit else ():
             if page and page.get_unsaved_grids():
                 unsaved_pages[page] = db.filename
         if unsaved_pages:
@@ -1609,7 +1621,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                              if x.is_merging and x.title]
         if merging_pages:
             response = wx.MessageBox(
-                "Merging is currently in progress in %s.\nExit anyway? "
+                "Merging is currently in progress in %s.\n\nExit anyway? "
                 "This can result in corrupt data." % 
                 "\n".join(textwrap.wrap(", ".join(merging_pages))),
                 conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
@@ -1670,7 +1682,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         # Remove page from MainWindow data structures
         if isinstance(page, DatabasePage):
             do_close = True
-            unsaved = page.get_unsaved_grids()
+
+            if page.db.live.is_logged_in() and page.worker_live.is_working():
+                if wx.OK != wx.MessageBox(
+                    "Live syncing is currently in progress.\n\nClose anyway?",
+                    conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
+                ): do_close = False
+
+            unsaved = page.get_unsaved_grids() if do_close else []
             if unsaved:
                 response = wx.MessageBox(
                     "Some tables in %s have unsaved data (%s).\n\n"
