@@ -1,7 +1,7 @@
 #-*- coding: utf-8 -*-
 """
 Simple small script for generating a nicely formatted Python module with
-embedded Skype emoticon images and docstrings.
+accessible Skype emoticon images and docstrings.
 
 ------------------------------------------------------------------------------
 This file is part of Skyperious - a Skype database viewer and merger.
@@ -9,17 +9,18 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   26.01.2014
-@modified  10.03.2015
+@modified  26.07.2020
 """
-import base64
 import datetime
 import os
-import shutil
-import sys
-import wx.tools.img2py
+import zipfile
+
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "skyperious", "emoticons.py")
+PYTARGET = os.path.join("..", "skyperious", "emoticons.py")
+
+"""Target ZIP file to write."""
+ZIPTARGET = os.path.join("..", "skyperious", "res", "emoticons.zip")
 
 Q3 = '"""'
 
@@ -127,8 +128,8 @@ EMOTICONS = {
 }
 
 
-HEADER = """%s
-Contains embedded Skype emoticon image resources. Auto-generated.
+HEADER = '''"""
+Contains Skype emoticon image loaders. Auto-generated.
 Skype emoticon images are property of Skype, released under the
 Skype Component License 1.0.
 
@@ -136,19 +137,68 @@ Skype Component License 1.0.
 This file is part of Skyperious - a Skype database viewer and merger.
 Released under the MIT License.
 
+@author      Erki Suurjaak
 @created     11.06.2013
 @modified    %s
 ------------------------------------------------------------------------------
-%s
-try:
-    import wx
-    from wx.lib.embeddedimage import PyEmbeddedImage
-except ImportError:
-    class PyEmbeddedImage(object):
-        \"\"\"Data stand-in for wx.lib.embeddedimage.PyEmbeddedImage.\"\"\"
-        def __init__(self, data):
-            self.data = data
-""" % (Q3, datetime.date.today().strftime("%d.%m.%Y"), Q3)
+"""
+import base64
+import io
+import logging
+import os
+import zipfile
+
+try: import wx
+except ImportError: wx = None
+
+from . import conf
+
+logger = logging.getLogger(__name__)
+
+
+class ZipLoader(object):
+    _file   = None
+    _loaded = False
+
+    @staticmethod
+    def read(filename):
+        if not ZipLoader._loaded:
+            ZipLoader._loaded = True
+            try:
+                path = os.path.join(conf.ResourceDirectory, "emoticons.zip")
+                ZipLoader._file = zipfile.ZipFile(path, "r")
+            except Exception:
+                logger.exception("Error loading emoticons from %%s.", path)
+        if not ZipLoader._file: return None
+        try: return ZipLoader._file.open(filename).read()
+        except Exception:
+            logger.exception("Error loading emoticon %%s.", filename)
+
+
+class LazyFileImage(object):
+    """Loads image data from file on first access."""
+    def __init__(self, filename):
+        self._filename = filename
+        self._loaded, self._data, self._image = False, '', None
+
+    def GetData(self):
+        """Returns Base64-encoded image data string."""
+        if self._loaded: return self._data
+        self._loaded = True
+        raw = ZipLoader.read(self._filename)
+        if raw:
+            self._data = base64.b64encode(raw)
+            if wx: self._image = wx.Image(io.BytesIO(raw))
+        return self._data
+    Data = property(GetData)
+    data = property(GetData)
+
+    def GetImage(self):
+        """Returns wx.Image."""
+        if not self._loaded: self.GetData()
+        return self._image
+    Image = property(GetImage)
+''' % datetime.date.today().strftime("%d.%m.%Y")
 
 
 
@@ -157,16 +207,10 @@ def create_py(target):
     f = open(target, "w")
     f.write(HEADER)
     for name, data in sorted(EMOTICONS.items()):
-        if "file" not in data: continue # continue for name, data in ..            
-        f.write("\n\n%sSkype emoticon \"%s %s\".%s\n%s = PyEmbeddedImage(\n" %
-                (Q3, data["title"], data["strings"][0], Q3, name))
-        filename = os.path.join("emoticons", data["file"])
-        raw = base64.b64encode(open(filename, "rb").read())
-        while raw:
-            f.write("    \"%s\"\n" % raw[:72])
-            raw = raw[72:]
-        f.write(")\n")
-    f.write("\n\n%sEmoticon metadata: name, strings, title.%s\n"
+        if "file" not in data: continue # for name, data
+        f.write("\n\n%sSkype emoticon \"%s %s\".%s\n%s = LazyFileImage(\"%s\")" %
+                (Q3, data["title"], data["strings"][0], Q3, name, data["file"]))
+    f.write("\n\n\n%sEmoticon metadata: name, strings, title.%s\n"
             "EmoticonData = {\n" % (Q3, Q3))
     for name, data in sorted(EMOTICONS.items()):
         data_py = {"title": data["title"], "strings": data["strings"]}
@@ -178,5 +222,16 @@ def create_py(target):
     f.close()
 
 
+def create_zip(target):
+    with zipfile.ZipFile(target, mode="w") as zf:
+        for name, data in sorted(EMOTICONS.items()):
+            if not data.get("file"): continue # for name, data
+            zi = zipfile.ZipInfo(data["file"])
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            path = os.path.join("emoticons", data["file"])
+            with open(path, "rb") as f: zf.writestr(zi, f.read())
+
+
 if "__main__" == __name__:
-    create_py(TARGET)
+    create_py(PYTARGET)
+    create_zip(ZIPTARGET)
