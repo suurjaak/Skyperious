@@ -4,6 +4,7 @@ CHANGELOG
 4.0, 2020-07-24
 ---------------
 - added support for syncing chat history from Skype online service;
+- added 400+ more emoticon images;
 - restored shared image download functionality;
 - restored support functionality;
 - increased default font size for chat history, made it configurable;
