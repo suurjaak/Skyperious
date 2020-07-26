@@ -4,14 +4,13 @@ skyperious\. Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  15.03.2015
+@modified  26.07.2020
 """
 import glob
 import os
 import sys
 import time
 import zipfile
-import zlib
 
 
 if "__main__" == __name__:
@@ -54,13 +53,15 @@ if "__main__" == __name__:
         for subdir, wildcard in [("res", "*"),
         (pathjoin("res", "emoticons"), "*"), ("skyperious", "*.py"),
         ("skyperious", "skyperious.ini"),
-        ("dist", "*"), (pathjoin("skyperious", "third_party"), "*.py"),
-        (pathjoin("skyperious", "res"), "*.ttf")]:
+        ("dist", "*"), (pathjoin("skyperious", "lib"), "*.py"),
+        (pathjoin("skyperious", "lib", "vendor"), "*.py"),
+        (pathjoin("skyperious", "res"), "*")]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)
-            files = filter(lambda x: not x.lower().endswith(".zip"), files)
             files = filter(lambda x: not x.lower().endswith(".pyc"), files)
+            if "res" not in subdir:
+                files = filter(lambda x: not x.lower().endswith(".zip"), files)
             size += add_files(zf, files, subdir)
         rootfiles = ["CHANGELOG.md", "INSTALL.md", "LICENSE.md", "MANIFEST.in",
                      "README.md", "requirements.txt", "setup.py",
