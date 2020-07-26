@@ -13,20 +13,19 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    25.07.2020
+@modified    26.07.2020
 """
 import datetime
 import logging
 import os
 import re
-import sys
 import traceback
 
 try:
     import wx
     import wx.lib.inspection
-    import wx.lib.newevent
     import wx.py
+    import wx.stc
 except ImportError: wx = None
 
 from . lib.controls import ColourManager, KEYS
@@ -99,8 +98,6 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
     def __init__(self):
         wx_accel.AutoAcceleratorMixIn.__init__(self)
 
-        conf.load()
-
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
         self.console_commands = set() # Commands from run_console()
@@ -125,16 +122,34 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         sizer = panel.Sizer = wx.BoxSizer(wx.VERTICAL)
         ColourManager.Manage(panel, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
 
-        button_clear = wx.Button(parent=panel, label="C&lear log",
-                                 size=(100, -1))
-        button_clear.Bind(wx.EVT_BUTTON, lambda event: self.log.Clear())
-        edit_log = self.log = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
-        edit_log.SetEditable(False)
-        # Read-only controls tend to be made grey by default
-        ColourManager.Manage(edit_log, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
-        ColourManager.Manage(edit_log, "ForegroundColour", wx.SYS_COLOUR_GRAYTEXT)
+        button_clear = wx.Button(parent=panel, label="C&lear log", size=(100, -1))
+        edit_log = self.log = wx.stc.StyledTextCtrl(panel)
+        edit_log.SetMarginCount(0)
+        edit_log.SetReadOnly(True)
+        edit_log.SetTabWidth(edit_log.TabWidth * 2)
+        edit_log.SetWrapMode(wx.stc.STC_WRAP_WORD)
 
-        sizer.Add(button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP | 
+        def on_clear(event=None):
+            edit_log.SetReadOnly(False)
+            edit_log.ClearAll()
+            edit_log.SetReadOnly(True)
+        def on_colour(event=None):
+            if event: event.Skip()
+            fgcolour, crcolour, bgcolour = (
+                wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
+                for x in (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT,
+                          wx.SYS_COLOUR_WINDOW)
+            )
+            edit_log.SetCaretForeground(crcolour)
+            edit_log.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,
+                                  "back:%s,fore:%s" % (bgcolour, fgcolour))
+            edit_log.StyleClearAll() # Apply the new default style to all styles
+
+        button_clear.Bind(wx.EVT_BUTTON,     on_clear)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, on_colour)
+        on_colour()
+
+        sizer.Add(button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP |
                   wx.RIGHT)
         sizer.Add(edit_log, border=5, proportion=1, flag=wx.GROW | wx.ALL)
         return panel
@@ -146,14 +161,14 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         menu_file = wx.Menu()
         menu.Insert(0, menu_file, "&File")
         menu_recent = self.menu_recent = wx.Menu()
-        menu_file.AppendMenu(id=wx.NewId(), text="&Recent files",
+        menu_file.AppendMenu(id=wx.NewIdRef().Id, text="&Recent files",
             submenu=menu_recent, help="Recently opened files.")
         menu_file.AppendSeparator()
         menu_console = self.menu_console = menu_file.Append(
-            id=wx.NewId(), kind=wx.ITEM_CHECK, text="Show &console\tCtrl-E",
+            id=wx.NewIdRef().Id, kind=wx.ITEM_CHECK, text="Show &console\tCtrl-E",
             help="Show/hide a Python shell environment window")
         menu_inspect = self.menu_inspect = menu_file.Append(
-            id=wx.NewId(), kind=wx.ITEM_CHECK, text="Show &widget inspector",
+            id=wx.NewIdRef().Id, kind=wx.ITEM_CHECK, text="Show &widget inspector",
             help="Show/hide the widget inspector")
 
         self.file_history = wx.FileHistory(conf.MaxRecentFiles)
@@ -172,10 +187,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
 
     def on_exit(self, event):
         """Handler on application exit, saves configuration."""
-        do_exit = True
-        if do_exit:
-            conf.save()
-            self.Destroy()
+        conf.save()
+        self.Destroy()
 
 
     def on_keydown_console(self, event):
@@ -208,11 +221,6 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             conf.save()
 
 
-    def on_set_status(self, event):
-        """Event handler for adding a message to the log control."""
-        self.SetStatusText(event.text)
-
-
     def set_status(self, text, timeout=False):
         """Sets main window status bar text, optionally clears after timeout."""
         self.SetStatusText(text)
@@ -228,41 +236,41 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         if not hasattr(self, "log") \
         or hasattr(conf, "LogEnabled") and not conf.LogEnabled: return
 
-        try:
-            self.log.AppendText(text + "\n")
+        self.log.SetReadOnly(False)
+        try: self.log.AppendText(text + "\n")
         except Exception:
             try: self.log.AppendText(text.decode("utf-8", "replace") + "\n")
-            except Exception: pass
+            except Exception as e: print("Exception %s: %s in log_message" %
+                                         (e.__class__.__name__, e))
+        self.log.SetReadOnly(True)
 
 
     def on_showhide_console(self, event=None):
         """Toggles the console shown/hidden."""
         show = not self.frame_console.IsShown()
-        if show:
-            if not self.frame_console_shown:
-                # First showing of console, set height to a fraction of main
-                # form, and position it immediately under the main form, or
-                # covering its bottom if no room.
-                self.frame_console_shown = True
-                size = wx.Size(self.Size.width, max(200, self.Size.height / 3))
-                self.frame_console.Size = size
-                display = wx.GetDisplaySize()
-                y = 0
-                min_bottom_space = 130 # Leave space for autocomplete dropdown
-                if size.height > display.height - self.Size.height \
-                - self.Position.y - min_bottom_space:
-                    y = display.height - self.Size.height - self.Position.y \
-                        - size.height - min_bottom_space
-                self.frame_console.Position = (
-                    self.Position.x, self.Position.y + self.Size.height + y
-                )
-            # Scroll to the last line
-            self.console.ScrollToLine(self.console.LineCount + 3 - (
-                self.console.Size.height / self.console.GetTextExtent(" ")[1]
-            ))
+        if show and not self.frame_console_shown:
+            # First showing of console, set height to a fraction of main
+            # form, and position it immediately under the main form, or
+            # covering its bottom if no room.
+            self.frame_console_shown = True
+            size = wx.Size(self.Size.width, max(200, self.Size.height / 3))
+            self.frame_console.Size = size
+            display = wx.GetDisplaySize()
+            y = 0
+            min_bottom_space = 130 # Leave space for autocomplete dropdown
+            if size.height > display.height - self.Size.height \
+            - self.Position.y - min_bottom_space:
+                y = display.height - self.Size.height - self.Position.y \
+                    - size.height - min_bottom_space
+            self.frame_console.Position = (
+                self.Position.x, self.Position.y + self.Size.height + y
+            )
+        if show: self.console.ScrollToLine(self.console.LineCount + 3 - (
+            self.console.Size.height / self.console.GetTextExtent(" ")[1]
+        )) # Scroll to the last line
         self.frame_console.Show(show)
-        if hasattr(self, "menu_console"):
-            self.menu_console.Check(show)
+        self.frame_console.Iconize(False)
+        if hasattr(self, "menu_console"): self.menu_console.Check(show)
 
 
     def on_open_widget_inspector(self, event=None):

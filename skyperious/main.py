@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -613,6 +613,7 @@ def run(nogui=False):
                               for f in arguments.FILE], [])
         arguments.FILE = sorted(set(util.to_unicode(f) for f in arguments.FILE))
 
+    conf.load()
     if "gui" == arguments.command and (nogui or not is_gui_possible):
         argparser.print_help()
         status = None
@@ -620,7 +621,6 @@ def run(nogui=False):
                                 "will not run." % conf.Title)
         sys.exit(status)
     elif "gui" != arguments.command:
-        conf.load()
         conf.IsCLI = True
         conf.IsCLIVerbose = arguments.verbose
         # Avoid Unicode errors when printing to console.
