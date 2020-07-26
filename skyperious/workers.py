@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    25.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -805,7 +805,7 @@ class DetectDatabaseThread(WorkerThread):
 
             self._is_working, self._drop_results = True, False
             all_filenames = set() # To handle potential duplicates
-            for filenames in skypedata.detect_databases():
+            for filenames in skypedata.detect_databases(lambda: self._is_working):
                 filenames = all_filenames.symmetric_difference(filenames)
                 if not self._drop_results:
                     result = {"filenames": filenames}

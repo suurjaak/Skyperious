@@ -230,8 +230,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.Position.top = 50
         if self.list_db.GetItemCount() > 1:
             self.list_db.SetFocus()
-        else:
-            self.button_detect.SetFocus()
 
         self.trayicon = wx.adv.TaskBarIcon()
         if conf.TrayIconEnabled:
@@ -376,18 +374,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                      self.on_cancel_drag_list_db)
         list_db.Bind(wx.EVT_SIZE,
                      lambda e: (e.Skip(), list_db.SetColumnWidth(0, e.Size[0] - 5)))
-        self.button_opena.Bind(wx.EVT_BUTTON,         self.on_open_database)
-        self.button_detect.Bind(wx.EVT_BUTTON,        self.on_detect_databases)
-        self.button_folder.Bind(wx.EVT_BUTTON,        self.on_add_from_folder)
-        self.button_live.Bind(wx.EVT_BUTTON,          self.on_live_login)
-        self.button_missing.Bind(wx.EVT_BUTTON,       self.on_remove_missing)
-        self.button_type.Bind(wx.EVT_BUTTON,          self.on_remove_type_menu)
-        self.button_clear.Bind(wx.EVT_BUTTON,         self.on_clear_databases)
-        self.button_open.Bind(wx.EVT_BUTTON,          self.on_open_current_database)
-        self.button_compare.Bind(wx.EVT_BUTTON,       self.on_compare_databases)
-        self.button_export.Bind(wx.EVT_BUTTON,        self.on_export_database_menu)
-        self.button_saveas.Bind(wx.EVT_BUTTON,        self.on_save_database_as)
-        self.button_remove.Bind(wx.EVT_BUTTON,        self.on_remove_database)
+        self.button_opena.Bind(wx.EVT_BUTTON,   self.on_open_database)
+        self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
+        self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
+        self.button_live.Bind(wx.EVT_BUTTON,    self.on_live_login)
+        self.button_missing.Bind(wx.EVT_BUTTON, self.on_remove_missing)
+        self.button_type.Bind(wx.EVT_BUTTON,    self.on_remove_type_menu)
+        self.button_clear.Bind(wx.EVT_BUTTON,   self.on_clear_databases)
+        self.button_open.Bind(wx.EVT_BUTTON,    self.on_open_current_database)
+        self.button_compare.Bind(wx.EVT_BUTTON, self.on_compare_databases)
+        self.button_export.Bind(wx.EVT_BUTTON,  self.on_export_database_menu)
+        self.button_saveas.Bind(wx.EVT_BUTTON,  self.on_save_database_as)
+        self.button_remove.Bind(wx.EVT_BUTTON,  self.on_remove_database)
 
         panel_main.Sizer.Add(label_main, border=10, flag=wx.ALL)
         panel_main.Sizer.Add((0, 10))
@@ -854,14 +852,17 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_detect_databases(self, event):
         """
-        Handler for clicking to auto-detect databases, starts the
+        Handler for clicking to auto-detect databases, starts or stops the
         detection in a background thread.
         """
-        if self.button_detect.FindFocus() == self.button_detect:
-            self.list_db.SetFocus()
-        guibase.status("Searching local computer for Skype databases..", log=True)
-        self.button_detect.Enabled = False
-        self.worker_detection.work(True)
+        if self.worker_detection.is_working():
+            self.worker_detection.stop_work()
+            self.button_detect.Label = "Detect databases"
+            guibase.status("Stopped detecting databases.", log=True)
+        else:
+            guibase.status("Searching local computer for Skype databases..", log=True)
+            self.button_detect.Label = "Stop detecting databases"
+            self.worker_detection.work(True)
 
 
     def on_detect_databases_callback(self, result):
@@ -884,7 +885,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             name = ("" if result["count"] else "additional ") + "database"
             guibase.status("Detected %s.", util.plural(name, result["count"]), log=True)
         if result.get("done", False):
-            self.button_detect.Enabled = True
+            self.button_detect.Label = "Detect databases"
+            self.list_db.SendSizeEvent()
             wx.Bell()
 
 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2343,12 +2343,13 @@ def is_sqlite_file(filename, path=None):
     return result
 
 
-def detect_databases():
+def detect_databases(progress):
     """
     Tries to detect Skype database files on the current computer, looking
     under "Documents and Settings", and other potential locations.
 
-    @yield   each value is a list of detected database paths
+    @param   progress  callback function returning whether task should continue
+    @yield             each value is a list of detected database paths
     """
     # First, search system directories for main.db files.
     if "nt" == os.name:
@@ -2367,22 +2368,28 @@ def detect_databases():
     for search_path in filter(os.path.exists, search_paths):
         logger.info("Looking for Skype databases under %s.", search_path)
         for root, dirs, files in os.walk(search_path):
+            if progress and not progress(): return
             if os.path.basename(root).lower() in WINDOWS_APPDIRS:
                 # Skip all else under "Application Data" or "AppData\Roaming".
                 dirs[:] = [x for x in dirs if "skype" == x.lower()]
             results = []
             for f in files:
+                if progress and not progress(): break # for f
                 if "main.db" == f.lower() and is_skype_database(f, root):
                     results.append(os.path.realpath(os.path.join(root, f)))
             if results: yield results
+    if progress and not progress(): return
 
     # Then search current working directory for *.db files.
     search_path = util.to_unicode(os.getcwd())
     logger.info("Looking for Skype databases under %s.", search_path)
     for root, dirs, files in os.walk(search_path):
+        if progress and not progress(): return
         results = []
-        for f in (x for x in files if is_skype_database(x, root)):
-            results.append(os.path.realpath(os.path.join(root, f)))
+        for f in files:
+            if progress and not progress(): break # for f
+            if is_skype_database(f, root):
+                results.append(os.path.realpath(os.path.join(root, f)))
         if results: yield results
 
 
