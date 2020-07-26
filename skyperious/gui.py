@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3210,7 +3210,13 @@ class DatabasePage(wx.Panel):
 
     def on_change_chatfilter(self, event):
         """Handler for changing text in chat filter box, filters chat list."""
-        self.list_chats.SetFilter(event.String.strip())
+        clist = self.list_chats
+        clist.SetFilter(event.String.strip())
+        for i in range(clist.ItemCount) if self.chat else ():
+            if clist.GetItemMappedData(i) == self.chat:
+                f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                clist.SetItemFont(i, f)
+                break # for i
 
 
     def on_export_chat(self, event):
