@@ -70,7 +70,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    24.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1957,7 +1957,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
         self._formatters = collections.defaultdict(frmt)
-        id_copy, id_selectall = wx.NewId(), wx.NewId()
+        id_copy, id_selectall = wx.NewIdRef().Id, wx.NewIdRef().Id
         entries = [(wx.ACCEL_CTRL, x, id_copy)
                    for x in (ord("C"), wx.WXK_INSERT, wx.WXK_NUMPAD_INSERT)]
         entries += [(wx.ACCEL_CTRL, ord("A"), id_selectall)]

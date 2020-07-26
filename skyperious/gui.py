@@ -189,7 +189,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         notebook.Bind(wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CLOSING,
                       self.on_close_page)
         # Register Ctrl-F4 and Ctrl-W close handlers
-        id_close = wx.NewId()
+        id_close = wx.NewIdRef().Id
         def on_close_hotkey(event):
             notebook and notebook.DeletePage(notebook.GetSelection())
         notebook.SetAcceleratorTable(wx.AcceleratorTable([
