@@ -13,6 +13,9 @@ Stand-alone GUI components for wx:
   Non-modal text entry dialog with auto-complete dropdown, appears in lower
   right corner.
 
+- HintedTextCtrl(wx.TextCtrl):
+  A text control with a hint text shown when no value, hidden when focused.
+
 - NonModalOKDialog(wx.Dialog):
   A simple non-modal dialog with an OK button, stays on top of parent.
 
@@ -46,6 +49,11 @@ Stand-alone GUI components for wx:
   A sortable list view that can be batch-populated, autosizes its columns,
   supports clipboard copy.
 
+- SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
+                           wx.lib.mixins.listctrl.ColumnSorterMixin):
+  A sortable list view that can be batch-populated, autosizes its columns,
+  supports clipboard copy.
+
 - SQLiteTextCtrl(wx.stc.StyledTextCtrl):
   A StyledTextCtrl configured for SQLite syntax highlighting.
 
@@ -75,6 +83,7 @@ Released under the MIT License.
 """
 import ast
 import collections
+import copy
 import datetime
 import functools
 import locale
@@ -87,6 +96,7 @@ import wx.html
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.gradientbutton
 import wx.lib.agw.labelbook
+import wx.lib.agw.ultimatelistctrl
 try: # ShapedButton requires PIL, might not be installed
     import wx.lib.agw.shapedbutton
 except Exception: pass 
@@ -336,6 +346,148 @@ class ColourManager(object):
             setattr(ctrl, prop, mycolour)
         elif hasattr(ctrl, "Set" + prop):
             getattr(ctrl, "Set" + prop)(mycolour)
+
+
+
+class HintedTextCtrl(wx.TextCtrl):
+    """
+    A text control with a hint text shown when no value, hidden when focused.
+    Fires EVT_TEXT_ENTER event on text change.
+    Clears entered value on pressing Escape.
+    """
+
+
+    def __init__(self, parent, hint="", escape=True, adjust=False, **kwargs):
+        """
+        @param   hint    hint text shown when no value and no focus
+        @param   escape  whether to clear entered value on pressing Escape
+        @param   adjust  whether to adjust hint colour more towards background
+        """
+        super(HintedTextCtrl, self).__init__(parent, **kwargs)
+        self._text_colour = ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT)
+        self._hint_colour = ColourManager.GetColour(wx.SYS_COLOUR_GRAYTEXT) if not adjust else \
+                            ColourManager.Adjust(wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_WINDOW)
+        self.SetForegroundColour(self._text_colour)
+
+        self._hint = hint
+        self._adjust = adjust
+        self._hint_on = False # Whether textbox is filled with hint value
+        self._ignore_change = False # Ignore value change
+        if not self.Value:
+            self.Value = self._hint
+            self.SetForegroundColour(self._hint_colour)
+            self._hint_on = True
+
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED,  self.OnSysColourChange)
+        self.Bind(wx.EVT_SET_FOCUS,           self.OnFocus)
+        self.Bind(wx.EVT_KILL_FOCUS,          self.OnFocus)
+        self.Bind(wx.EVT_TEXT,                self.OnText)
+        if escape: self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+
+
+    def OnFocus(self, event):
+        """
+        Handler for focusing/unfocusing the control, shows/hides hint.
+        """
+        event.Skip() # Allow to propagate to parent, to show having focus
+        self._ignore_change = True
+        if self and self.FindFocus() is self:
+            if self._hint_on:
+                self.SetForegroundColour(self._text_colour)
+                wx.TextCtrl.ChangeValue(self, "")
+                self._hint_on = False
+            self.SelectAll()
+        elif self:
+            if self._hint and not self.Value:
+                # Control has been unfocused, set and colour hint
+                wx.TextCtrl.ChangeValue(self, self._hint)
+                self.SetForegroundColour(self._hint_colour)
+                self._hint_on = True
+        wx.CallAfter(setattr, self, "_ignore_change", False)
+
+
+    def OnKeyDown(self, event):
+        """Handler for keypress, empties text on escape."""
+        event.Skip()
+        if event.KeyCode in [wx.WXK_ESCAPE] and self.Value:
+            self.Value = ""
+            evt = wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_ENTER, self.Id)
+            evt.EventObject = self
+            evt.String = self.Value
+            wx.PostEvent(self, evt)
+
+
+    def OnText(self, event):
+        """Handler for text change, fires TEXT_ENTER event."""
+        event.Skip()
+        if self._ignore_change: return
+        evt = wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_ENTER, self.Id)
+        evt.SetEventObject(self)
+        evt.SetString(self.Value)
+        wx.PostEvent(self, evt)
+
+
+    def OnSysColourChange(self, event):
+        """Handler for system colour change, updates text colour."""
+        event.Skip()
+        self._text_colour = ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT)
+        self._hint_colour = ColourManager.GetColour(wx.SYS_COLOUR_GRAYTEXT) if not self._adjust else \
+                            ColourManager.Adjust(wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_WINDOW)
+        def after():
+            if not self: return
+            colour = self._hint_colour if self._hint_on else self._text_colour
+            self.SetForegroundColour(colour)
+        wx.CallAfter(after)
+
+
+    def GetHint(self):
+        """Returns the current hint."""
+        return self._hint
+    def SetHint(self, hint):
+        """Sets the hint value."""
+        self._hint = hint
+        if self._hint_on or not self.Value and not self.HasFocus():
+            self._ignore_change = True
+            wx.TextCtrl.ChangeValue(self, self._hint)
+            self.SetForegroundColour(self._hint_colour)
+            self._hint_on = True
+            wx.CallAfter(setattr, self, "_ignore_change", False)
+    Hint = property(GetHint, SetHint)
+
+
+    def GetValue(self):
+        """
+        Returns the current value in the text field, or empty string if filled
+        with hint.
+        """
+        return "" if self._hint_on else wx.TextCtrl.GetValue(self)
+    def SetValue(self, value):
+        """Sets the value in the text entry field."""
+        self._ignore_change = True
+        wx.TextCtrl.SetValue(self, value)
+        if value or self.FindFocus() is self:
+            self.SetForegroundColour(self._text_colour)
+            self._hint_on = False
+        elif not value and self.FindFocus() is not self:
+            wx.TextCtrl.SetValue(self, self._hint)
+            self.SetForegroundColour(self._hint_colour)
+            self._hint_on = True
+        wx.CallAfter(setattr, self, "_ignore_change", False)
+    Value = property(GetValue, SetValue)
+
+
+    def ChangeValue(self, value):
+        """Sets the new text control value."""
+        self._ignore_change = True
+        wx.TextCtrl.ChangeValue(self, value)
+        if value or self.FindFocus() is self:
+            self.SetForegroundColour(self._text_colour)
+            self._hint_on = False
+        elif not value and self.FindFocus() is not self:
+            wx.TextCtrl.SetValue(self, self._hint)
+            self.SetForegroundColour(self._hint_colour)
+            self._hint_on = True
+        wx.CallAfter(setattr, self, "_ignore_change", False)
 
 
 
@@ -2272,6 +2424,589 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         Sort function fed to ColumnSorterMixin, is given two integers which we
         have mapped on our own.
         """
+        col = self._col
+        ascending = self._colSortFlag[col]
+        item1 = self.itemDataMap[key1][col]
+        item2 = self.itemDataMap[key2][col]
+
+        #--- Internationalization of string sorting with locale module
+        if isinstance(item1, unicode) and isinstance(item2, unicode):
+            cmpVal = locale.strcoll(item1.lower(), item2.lower())
+        elif isinstance(item1, str) or isinstance(item2, str):
+            items = item1.lower(), item2.lower()
+            cmpVal = locale.strcoll(*map(unicode, items))
+        else:
+            if item1 is None:
+                cmpVal = -1
+            elif item2 is None:
+                cmpVal = 1
+            else:
+                cmpVal = cmp(item1, item2)
+
+        # If items are equal, pick something else to make the sort value unique
+        if cmpVal == 0:
+            cmpVal = apply(cmp, self.GetSecondarySortValues(col, key1, key2))
+
+        result = cmpVal if ascending else -cmpVal
+        return result
+
+
+
+class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
+                               wx.lib.mixins.listctrl.ColumnSorterMixin):
+    """
+    A sortable list control that can be batch-populated, autosizes its columns,
+    can be filtered by string value matched on any row column,
+    supports clipboard copy.
+    """
+    COL_PADDING = 30
+
+    SORT_ARROW_UP = wx.lib.embeddedimage.PyEmbeddedImage(
+        "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAADxJ"
+        "REFUOI1jZGRiZqAEMFGke2gY8P/f3/9kGwDTjM8QnAaga8JlCG3CAJdt2MQxDCAUaOjyjKMp"
+        "cRAYAABS2CPsss3BWQAAAABJRU5ErkJggg==")
+
+    #----------------------------------------------------------------------
+    SORT_ARROW_DOWN = wx.lib.embeddedimage.PyEmbeddedImage(
+        "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAEhJ"
+        "REFUOI1jZGRiZqAEMFGke9QABgYGBgYWdIH///7+J6SJkYmZEacLkCUJacZqAD5DsInTLhDR"
+        "bcPlKrwugGnCFy6Mo3mBAQChDgRlP4RC7wAAAABJRU5ErkJggg==")
+
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("agwStyle", 0)
+        if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_USER_ROW_HEIGHT"):
+            kwargs["agwStyle"] |= wx.lib.agw.ultimatelistctrl.ULC_USER_ROW_HEIGHT
+        if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_SHOW_TOOLTIPS"):
+            kwargs["agwStyle"] |= wx.lib.agw.ultimatelistctrl.ULC_SHOW_TOOLTIPS
+
+        wx.lib.agw.ultimatelistctrl.UltimateListCtrl.__init__(self, *args, **kwargs)
+        wx.lib.mixins.listctrl.ColumnSorterMixin.__init__(self, 0)
+        try:
+            ColourManager.Manage(self._headerWin, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
+            ColourManager.Manage(self._mainWin,   "BackgroundColour", wx.SYS_COLOUR_WINDOW)
+        except Exception: pass
+        self.itemDataMap = {}   # {item_id: [values], } for ColumnSorterMixin
+        self._data_map = {}     # {item_id: row dict, } currently visible data
+        self._id_rows = []      # [(item_id, {row dict}), ] all data items
+        self._id_images = {}    # {item_id: imageIds}
+        self._columns = []      # [(name, label), ]
+        self._filter = ""       # Filter string
+        self._col_widths = {}   # {col_index: width in pixels, }
+        self._col_maxwidth = -1 # Maximum width for auto-sized columns
+        self._top_row = None    # List top row data dictionary, if any
+        self._drag_start = None # Item index currently dragged
+        self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
+        self.AssignImageList(self._CreateImageList(), wx.IMAGE_LIST_SMALL)
+
+        # Default row column formatter function
+        frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
+        self._formatters = collections.defaultdict(frmt)
+        id_copy = wx.NewIdRef().Id
+        entries = [(wx.ACCEL_CMD, x, id_copy) for x in KEYS.INSERT + (ord("C"), )]
+        self.SetAcceleratorTable(wx.AcceleratorTable(entries))
+        self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
+        self.Bind(wx.EVT_LIST_COL_CLICK, self.OnSort)
+        self.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_DRAG,  self.OnDragStart)
+        self.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_END_DRAG,    self.OnDragStop)
+        self.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_RDRAG, self.OnDragCancel)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
+
+
+    def GetScrollThumb(self, orientation):
+        """Returns the scrollbar size in pixels."""
+        # Workaround for wxpython v4 bug of missing orientation parameter
+        return self._mainWin.GetScrollThumb(orientation) if self._mainWin else 0
+
+
+    def GetScrollRange(self, orientation):
+        """Returns the scrollbar range in pixels."""
+        # Workaround for wxpython v4 bug of missing orientation parameter
+        return self._mainWin.GetScrollRange(orientation) if self._mainWin else 0
+
+
+    def GetSortImages(self):
+        """For ColumnSorterMixin."""
+        return (0, 1)
+
+
+    def AssignImages(self, images):
+        """
+        Assigns images associated with the control.
+        SetTopRow/AppendRow/InsertRow/Populate use imageIds from this list.
+
+        @param   images  list of wx.Bitmap objects
+        """
+        for x in images: self.GetImageList(wx.IMAGE_LIST_SMALL).Add(x)
+        if hasattr(self, "SetUserLineHeight"):
+            h = images[0].Size[1]
+            self.SetUserLineHeight(int(h * 1.5))
+
+
+    def SetTopRow(self, data, imageIds=()):
+        """
+        Adds special top row to list, not subject to sorting or filtering.
+
+        @param   data      item data dictionary
+        @param   imageIds  list of indexes for the images associated to top row
+        """
+        self._top_row = data
+        if imageIds: self._id_images[-1] = self._ConvertImageIds(imageIds)
+        else: self._id_images.pop(-1, None)
+        self._PopulateTopRow()
+
+
+    def SetColumnFormatters(self, formatters):
+        """
+        Sets the functions used for formatting displayed column values.
+
+        @param   formatters  {col_name: function(rowdict, col_name), }
+        """
+        self._formatters.clear()
+        if formatters: self._formatters.update(formatters)
+
+
+    def Populate(self, rows, imageIds=()):
+        """
+        Populates the control with rows, clearing previous data, if any.
+        Re-selects the previously selected row, if any.
+
+        @param   rows      a list of data dicts
+        @param   imageIds  list of indexes for the images associated to rows
+        """
+        if rows: self._col_widths.clear()
+        self._id_rows[:] = []
+        if imageIds: imageIds = self._ConvertImageIds(imageIds)
+        for r in rows:
+            item_id = self.counter()
+            self._id_rows += [(item_id, r)]
+            if imageIds: self._id_images[item_id] = imageIds
+        self.RefreshRows()
+
+
+    def AppendRow(self, data, imageIds=()):
+        """
+        Appends the specified data to the control as a new row.
+
+        @param   data      item data dictionary
+        @param   imageIds  list of indexes for the images associated to this row
+        """
+        self.InsertRow(self.GetItemCount(), data, imageIds)
+
+
+    def InsertRow(self, index, data, imageIds=()):
+        """
+        Inserts the specified data to the control at specified index as a new row.
+
+        @param   data      item data dictionary
+        @param   imageIds  list of indexes for the images associated to this row
+        """
+        item_id = self.counter()
+        if imageIds:
+            imageIds = self._id_images[item_id] = self._ConvertImageIds(imageIds)
+
+        index = min(index, self.GetItemCount())
+        if self._RowMatchesFilter(data):
+            columns = [c[0] for c in self._columns]
+            for i, col_name in enumerate(columns):
+                col_value = self._formatters[col_name](data, col_name)
+
+                if imageIds and not i: self.InsertImageStringItem(index, col_value, imageIds)
+                elif not i: self.InsertStringItem(index, col_value)
+                else: self.SetStringItem(index, i, col_value)
+            self.SetItemData(index, item_id)
+            self.itemDataMap[item_id] = [data[c] for c in columns]
+            self._data_map[item_id] = data
+            self.SetItemTextColour(index, self.ForegroundColour)
+            self.SetItemBackgroundColour(index, self.BackgroundColour)
+        self._id_rows.insert(index - (1 if self._top_row else 0), (item_id, data))
+        if self.GetSortState()[0] >= 0:
+            self.SortListItems(*self.GetSortState())
+
+
+    def GetFilter(self):
+        return self._filter
+    def SetFilter(self, value, force_refresh=False):
+        """
+        Sets the text to filter list by. Any row not containing the text in any
+        column will be hidden.
+
+        @param   force_refresh  if True, all content is refreshed even if
+                                filter value did not change
+        """
+        if force_refresh or value != self._filter:
+            self._filter = value
+            if force_refresh: self._col_widths.clear()
+            if self._id_rows: self.RefreshRows()
+
+
+    def RefreshRows(self):
+        """
+        Clears the list and inserts all unfiltered rows, auto-sizing the
+        columns.
+        """
+        selected_ids, selected_idxs, selected = [], [], self.GetFirstSelected()
+        while selected >= 0:
+            selected_ids.append(self.GetItemData(selected))
+            selected_idxs.append(selected)
+            selected = self.GetNextSelected(selected)
+
+        self.Freeze()
+        try:
+            for i in selected_idxs:
+                self._mainWin.SendNotify(i, wx.wxEVT_COMMAND_LIST_ITEM_DESELECTED)
+            wx.lib.agw.ultimatelistctrl.UltimateListCtrl.DeleteAllItems(self)
+            self._PopulateTopRow()
+            self._PopulateRows(selected_ids)
+        finally: self.Thaw()
+
+
+    def ResetColumnWidths(self):
+        """Resets the stored column widths, triggering a fresh autolayout."""
+        self._col_widths.clear()
+        self.RefreshRows()
+
+
+    def DeleteItem(self, index):
+        """Deletes the row at the specified index."""
+        item_id = self.GetItemData(index)
+        data = self._data_map.get(item_id)
+        del self._data_map[item_id]
+        self._id_rows.remove((item_id, data))
+        self._id_images.pop(item_id, None)
+        return wx.lib.agw.ultimatelistctrl.UltimateListCtrl.DeleteItem(self, index)
+
+
+    def DeleteAllItems(self):
+        """Deletes all items data and clears the list."""
+        self.itemDataMap = {}
+        self._data_map = {}
+        self._id_rows = []
+        for item_id in self._id_images:
+            if item_id >= 0: self._id_images.pop(item_id)
+        self.Freeze()
+        try:
+            result = wx.lib.agw.ultimatelistctrl.UltimateListCtrl.DeleteAllItems(self)
+            self._PopulateTopRow()
+        finally: self.Thaw()
+        return result
+
+
+    def GetItemCountFull(self):
+        """Returns the full row count, including items hidden by filter."""
+        return len(self._id_rows)
+
+
+    def GetItemTextFull(self, idx):
+        """Returns item text by index, including items hidden by filter."""
+        data, col_name = self._id_rows[idx][-1], self._columns[0][0]
+        return self._formatters[col_name](data, col_name)
+
+
+    def SetColumnsMaxWidth(self, width):
+        """Sets the maximum width for all columns, used in auto-size."""
+        self._col_maxwidth = width
+
+
+    def SetColumns(self, columns):
+        """
+        Sets the list columns, clearing current columns if any.
+
+        @param   columns  [(column name, column label), ]
+        """
+        self.ClearAll()
+        self.SetColumnCount(len(columns))
+        for i, (name, label) in enumerate(columns):
+            col_label = label + "  " # Keep space for sorting arrows.
+            self.InsertColumn(i, col_label)
+            self._col_widths[i] = max(self._col_widths.get(i, 0),
+                self.GetTextExtent(col_label)[0] + self.COL_PADDING)
+            self.SetColumnWidth(i, self._col_widths[i])
+        self._columns = copy.deepcopy(columns)
+
+
+    def SetColumnAlignment(self, column, align):
+        """
+        Sets alignment for column at specified index.
+
+        @param   align  one of ULC_FORMAT_LEFT, ULC_FORMAT_RIGHT, ULC_FORMAT_CENTER
+        """
+        item = self.GetColumn(column)
+        item.SetAlign(align)
+        self.SetColumn(column, item)
+
+
+    def GetItemMappedData(self, index):
+        """Returns the data mapped to the specified row index."""
+        data_id = self.GetItemData(index)
+        data = self._data_map.get(data_id)
+        return data
+
+
+    def GetListCtrl(self):
+        """Required by ColumnSorterMixin."""
+        return self
+
+
+    def SortListItems(self, col=-1, ascending=1):
+        """Sorts the list items on demand."""
+        selected_ids, selected = [], self.GetFirstSelected()
+        while selected >= 0:
+            selected_ids.append(self.GetItemData(selected))
+            selected = self.GetNextSelected(selected)
+
+        wx.lib.mixins.listctrl.ColumnSorterMixin.SortListItems(
+            self, col, ascending)
+
+        if selected_ids: # Re-select the previously selected items
+            idindx = dict((self.GetItemData(i), i)
+                          for i in range(self.GetItemCount()))
+            [self.Select(idindx[i]) for i in selected_ids if i in idindx]
+
+
+    def GetColumnSorter(self):
+        """
+        Override ColumnSorterMixin.GetColumnSorter to specify our sorting,
+        which accounts for None values.
+        """
+        sorter = self.__ColumnSorter if hasattr(self, "itemDataMap") \
+            else wx.lib.mixins.listctrl.ColumnSorterMixin.GetColumnSorter(self)
+        return sorter
+
+
+    def OnSysColourChange(self, event):
+        """
+        Handler for system colour change, updates sort arrow and item colours.
+        """
+        event.Skip()
+        il, il2  = self.GetImageList(wx.IMAGE_LIST_SMALL), self._CreateImageList()
+        for i in range(il2.GetImageCount()): il.Replace(i, il2.GetBitmap(i))
+        self.RefreshRows()
+
+
+    def OnCopy(self, event):
+        """Copies selected rows to clipboard."""
+        rows, i = [], self.GetFirstSelected()
+        while i >= 0:
+            data = self.GetItemMappedData(i)
+            rows.append("\t".join(self._formatters[n](data, n)
+                                  for n, l in self._columns))
+            i = self.GetNextSelected(i)
+        if rows:
+            clipdata = wx.TextDataObject()
+            clipdata.SetText("\n".join(rows))
+            wx.TheClipboard.Open()
+            wx.TheClipboard.SetData(clipdata)
+            wx.TheClipboard.Close()
+
+
+    def OnSort(self, event):
+        """Handler on clicking column, sorts list."""
+        col, ascending = self.GetSortState()
+        if col == event.GetColumn() and not ascending: # Clear sort
+            self._col = -1
+            self._colSortFlag = [0] * self.GetColumnCount()
+            self.ClearColumnImage(col)
+            self.RefreshRows()
+        else:
+            ascending = 1 if col != event.GetColumn() else 1 - ascending
+            self.SortListItems(event.GetColumn(), ascending)
+
+
+    def OnDragStop(self, event):
+        """Handler for stopping drag in the list, rearranges list."""
+        start, stop = self._drag_start, max(1, event.GetIndex())
+        if not start or start == stop: return
+
+        selecteds, selected = [], self.GetFirstSelected()
+        while selected > 0:
+            selecteds.append(selected)
+            selected = self.GetNextSelected(selected)
+
+        idx = stop if start > stop else stop - len(selecteds)
+        if not selecteds: # Dragged beyond last item
+            idx, selecteds = self.GetItemCount() - 1, [start]
+
+        datas     = map(self.GetItemMappedData, selecteds)
+        image_ids = map(self._id_images.get, map(self.GetItemData, selecteds))
+
+        self.Freeze()
+        try:
+            for x in selecteds[::-1]: self.DeleteItem(x)
+            for i, (data, imageIds) in enumerate(zip(datas, image_ids)):
+                imageIds0 = self._ConvertImageIds(imageIds, reverse=True)
+                self.InsertRow(idx + i, data, imageIds0)
+                self.Select(idx + i)
+            self._drag_start = None
+        finally: self.Thaw()
+
+
+    def OnDragStart(self, event):
+        """Handler for dragging items in the list, cancels dragging."""
+        if self.GetSortState()[0] < 0 \
+        and (not self._top_row or event.GetIndex()):
+            self._drag_start = event.GetIndex()
+        else:
+            self._drag_start = None
+            self.OnDragCancel(event)
+
+
+    def OnDragCancel(self, event):
+        """Handler for cancelling item drag in the list, cancels dragging."""
+        class HackEvent(object): # UltimateListCtrl hack to cancel drag.
+            def __init__(self, pos=wx.Point()): self._position = pos
+            def GetPosition(self): return self._position
+        wx.CallAfter(lambda: self and self.Children[0].DragFinish(HackEvent()))
+
+
+    def _CreateImageList(self):
+        """
+        Creates image list for the control, populated with sort arrow images.
+        Arrow colours are adjusted for system foreground colours if necessary.
+        """
+        il = wx.lib.agw.ultimatelistctrl.PyImageList(*self.SORT_ARROW_UP.Bitmap.Size)
+        fgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT)
+        defrgb, myrgb = "\x00" * 3, "".join(map(chr, fgcolour.Get()))[:3]
+
+        for embedded in self.SORT_ARROW_UP, self.SORT_ARROW_DOWN:
+            if myrgb != defrgb:
+                img = embedded.Image.Copy()
+                if not img.HasAlpha(): img.InitAlpha()
+                data = img.GetDataBuffer()
+                for i in range(embedded.Image.Width * embedded.Image.Height):
+                    rgb = data[i*3:i*3 + 3]
+                    if rgb == defrgb: data[i*3:i*3 + 3] = myrgb
+                il.Add(img.ConvertToBitmap())
+            else:
+                il.Add(embedded.Bitmap)
+        return il
+
+
+    def _ConvertImageIds(self, imageIds, reverse=False):
+        """Returns user image indexes adjusted by internal image count."""
+        if not imageIds: return imageIds
+        shift = (-1 if reverse else 1) * len(self.GetSortImages() or [])
+        return [x + shift for x in imageIds]
+
+
+    def _PopulateTopRow(self):
+        """Populates top row state, if any."""
+        if not self._top_row: return
+
+        columns = [c[0] for c in self._columns]
+        col_value = self._formatters[columns[0]](self._top_row, columns[0])
+        if -1 in self._id_images:
+            self.InsertImageStringItem(0, col_value, self._id_images[-1])
+        else: self.InsertStringItem(0, col_value)
+        for i, col_name in enumerate(columns[1:], 1):
+            col_value = self._formatters[col_name](self._top_row, col_name)
+            self.SetStringItem(0, i, col_value)
+        self.SetItemBackgroundColour(0, self.BackgroundColour)
+        self.SetItemTextColour(0, self.ForegroundColour)
+
+        def resize():
+            if not self: return
+            w = sum((self.GetColumnWidth(i) for i in range(1, len(self._columns))), 0)
+            width = self.Size[0] - w - 5 # Space for padding
+            if self.GetScrollRange(wx.VERTICAL) > 1:
+                width -= self.GetScrollThumb(wx.VERTICAL) # Space for scrollbar
+            self.SetColumnWidth(0, width)
+        if self.GetItemCount() == 1: wx.CallAfter(resize)
+
+
+    def _PopulateRows(self, selected_ids=()):
+        """Populates all rows, restoring previous selecteds if any"""
+
+        # To map list item data ID to row, ListCtrl allows only integer per row
+        row_data_map = {} # {item_id: {row dict}, }
+        item_data_map = {} # {item_id: [row values], }
+        # For measuring by which to set column width: header or value
+        header_lengths = {} # {col_name: integer}
+        col_lengths = {} # {col_name: integer}
+        for col_name, col_label in self._columns:
+            col_lengths[col_name] = 0
+            # Keep space for sorting arrows.
+            width = self.GetTextExtent(col_label + "  ")[0] + self.COL_PADDING
+            header_lengths[col_name] = width
+        index = self.GetItemCount()
+        for item_id, row in self._id_rows:
+            if not self._RowMatchesFilter(row): continue # for item_id, row
+            col_name = self._columns[0][0]
+            col_value = self._formatters[col_name](row, col_name)
+            col_lengths[col_name] = max(col_lengths[col_name],
+                                        self.GetTextExtent(col_value)[0] + self.COL_PADDING)
+
+            if item_id in self._id_images:
+                self.InsertImageStringItem(index, col_value, self._id_images[item_id])
+            else: self.InsertStringItem(index, col_value)
+
+            self.SetItemData(index, item_id)
+            item_data_map[item_id] = {0: row[col_name]}
+            row_data_map[item_id] = row
+            col_index = 1 # First was already inserted
+            for col_name, col_label in self._columns[col_index:]:
+                col_value = self._formatters[col_name](row, col_name)
+                col_width = self.GetTextExtent(col_value)[0] + self.COL_PADDING
+                col_lengths[col_name] = max(col_lengths[col_name], col_width)
+                self.SetStringItem(index, col_index, col_value)
+                item_data_map[item_id][col_index] = row.get(col_name)
+                col_index += 1
+            self.SetItemTextColour(index, self.ForegroundColour)
+            self.SetItemBackgroundColour(index, self.BackgroundColour)
+            index += 1
+        self._data_map = row_data_map
+        self.itemDataMap = item_data_map
+
+        if self._id_rows and not self._col_widths:
+            if self._col_maxwidth > 0:
+                for col_name, width in col_lengths.items():
+                    col_lengths[col_name] = min(width, self._col_maxwidth)
+                for col_name, width in header_lengths.items():
+                    header_lengths[col_name] = min(width, self._col_maxwidth)
+            for i, (col_name, col_label) in enumerate(self._columns):
+                col_width = max(col_lengths[col_name], header_lengths[col_name])
+                self.SetColumnWidth(i, col_width)
+                self._col_widths[i] = col_width
+        elif self._col_widths:
+            for col, width in self._col_widths.items():
+                self.SetColumnWidth(col, width)
+        if self.GetSortState()[0] >= 0:
+            self.SortListItems(*self.GetSortState())
+
+        if selected_ids: # Re-select the previously selected items
+            idindx = dict((self.GetItemData(i), i)
+                          for i in range(self.GetItemCount()))
+            for item_id in selected_ids:
+                if item_id not in idindx: continue # for item_id
+                self.Select(idindx[item_id])
+                if idindx[item_id] >= self.GetCountPerPage():
+                    lh = self.GetUserLineHeight()
+                    dy = (idindx[item_id] - self.GetCountPerPage() / 2) * lh
+                    self.ScrollList(0, dy)
+
+
+    def _RowMatchesFilter(self, row):
+        """Returns whether the row dict matches the current filter."""
+        result = True
+        if self._filter:
+            result = False
+            patterns = map(re.escape, self._filter.split())
+            for col_name, col_label in self._columns:
+                col_value = self._formatters[col_name](row, col_name)
+                if all(re.search(p, col_value, re.I | re.U) for p in patterns):
+                    result = True
+                    break
+        return result
+
+
+    def __ColumnSorter(self, key1, key2):
+        """
+        Sort function fed to ColumnSorterMixin, is given two integers which we
+        have mapped on our own. Returns -1, 0 or 1.
+        """
+        if key1 not in self.itemDataMap or key2 not in self.itemDataMap:
+            return 0
+
         col = self._col
         ascending = self._colSortFlag[col]
         item1 = self.itemDataMap[key1][col]

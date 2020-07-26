@@ -7,6 +7,7 @@ CHANGELOG
 - added 400+ more emoticon images;
 - restored shared image download functionality;
 - restored support functionality;
+- made database list sortable and filterable, added date and size columns;
 - increased default font size for chat history, made it configurable;
 - removed obsolescence notice.
 

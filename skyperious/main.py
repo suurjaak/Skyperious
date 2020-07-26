@@ -563,7 +563,7 @@ def run_gui(filenames):
     window.run_console("from skyperious.lib import controls, util, wordcloud, wx_accel")
 
     window.run_console("self = wx.GetApp().TopWindow # Application main window instance")
-    logger.info("Started application on %s.", datetime.date.today())
+    logger.info("Started application.")
     for f in filter(os.path.isfile, filenames):
         wx.CallAfter(wx.PostEvent, window, gui.OpenDatabaseEvent(file=f))
     app.MainLoop()

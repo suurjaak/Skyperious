@@ -22,7 +22,7 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.dev28"
+Version = "4.0.dev29"
 VersionDate = "26.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -40,7 +40,7 @@ VarDirectory = os.path.join(ApplicationDirectory, "var")
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
-FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles",
+FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "Login", "RecentFiles", "SearchHistory",
     "SearchInChatInfo", "SearchInContacts", "SearchInMessages",
@@ -66,6 +66,9 @@ DBDoBackup = False
 
 """All detected/added databases."""
 DBFiles = []
+
+"""Database list sort state, [col, ascending]."""
+DBSort = []
 
 """History of commands entered in console."""
 ConsoleHistoryCommands = []

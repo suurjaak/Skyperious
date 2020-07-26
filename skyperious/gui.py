@@ -109,6 +109,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                 #            account, chats, messages, error},}
         self.dbs = {}           # Open databases {filename: SkypeDatabase, }
         self.db_pages = {}      # {DatabasePage: SkypeDatabase, }
+        self.db_filter = "" # Current database list filter
+        self.db_filter_timer = None # Database list filter callback timer
         self.merger_pages = {}  # {MergerPage: (SkypeDatabase, SkypeDatabase),}
         self.page_merge_latest = None # Last opened merger page
         self.page_db_latest = None    # Last opened database page
@@ -244,6 +246,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         else:
             self.Show(True)
         wx.CallLater(20000, self.update_check)
+        wx.CallLater(1, self.populate_database_list)
 
 
     def create_page_main(self, notebook):
@@ -256,29 +259,33 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         splitter = self.splitter = wx.SplitterWindow(page, style=wx.BORDER_NONE)
         splitter.SetMinimumPaneSize(300)
 
-        agw_style = (wx.LC_REPORT | wx.LC_NO_HEADER |
-                     wx.LC_SINGLE_SEL | wx.BORDER_NONE)
-        if hasattr(wx.lib.agw.ultimatelistctrl, "ULC_USER_ROW_HEIGHT"):
-            agw_style |= wx.lib.agw.ultimatelistctrl.ULC_USER_ROW_HEIGHT
-        list_db = self.list_db = wx.lib.agw.ultimatelistctrl. \
-            UltimateListCtrl(parent=splitter, agwStyle=agw_style)
+        panel_left = wx.Panel(splitter)
+        panel_left.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_header = wx.BoxSizer(wx.HORIZONTAL)
+
+        label_count = self.label_count = wx.StaticText(panel_left)
+        edit_filter = self.edit_filter = controls.HintedTextCtrl(panel_left, "Filter list",
+                                                                 style=wx.TE_PROCESS_ENTER)
+        edit_filter.ToolTip = "Filter database list (%s-F)" % controls.KEYS.NAME_CTRL
+
+        list_db = self.list_db = controls.SortableUltimateListCtrl(panel_left,
+            agwStyle=wx.LC_REPORT | wx.BORDER_NONE)
         list_db.MinSize = 400, -1 # Maximize-restore would resize width to 100
         list_db.InsertColumn(0, "")
-        il = wx.ImageList(*images.ButtonHome.Bitmap.Size)
-        il.Add(images.ButtonHome.Bitmap)
-        il.Add(images.ButtonListDatabase.Bitmap)
-        list_db.AssignImageList(il, wx.IMAGE_LIST_SMALL)
-        list_db.InsertImageStringItem(0, "Home", [0])
+
+        columns = [("name", "Name"), ("last_modified", "Modified"), ("size", "Size")]
+        frmt_dt = lambda r, c: r[c].strftime("%Y-%m-%d %H:%M:%S") if r.get(c) else ""
+        frmt_sz = lambda r, c: util.format_bytes(r[c]) if r.get(c) is not None else ""
+        formatters = {"last_modified": frmt_dt, "size": frmt_sz}
+        list_db.SetColumns(columns)
+        list_db.SetColumnFormatters(formatters)
+        list_db.SetColumnAlignment(2, wx.lib.agw.ultimatelistctrl.ULC_FORMAT_RIGHT)
+
+        list_db.AssignImages([images.ButtonHome.Bitmap, images.ButtonListDatabase.Bitmap])
         ColourManager.Manage(list_db, "ForegroundColour", "DBListForegroundColour")
         ColourManager.Manage(list_db, "BackgroundColour", "DBListBackgroundColour")
-        try:
-            ColourManager.Manage(list_db._headerWin, "ForegroundColour", "DBListForegroundColour")
-            ColourManager.Manage(list_db._mainWin,   "BackgroundColour", "DBListBackgroundColour")
-        except Exception: pass
-        if hasattr(list_db, "SetUserLineHeight"):
-            h = images.ButtonListDatabase.Bitmap.Size[1]
-            list_db.SetUserLineHeight(int(h * 1.5))
-        list_db.Select(0)
+        topdata = collections.defaultdict(lambda: None, name="Home")
+        list_db.SetTopRow(topdata, [0])
 
         panel_right = wx.lib.scrolledpanel.ScrolledPanel(splitter)
         panel_right.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -363,17 +370,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_right.SetupScrolling(scroll_x=False)
         panel_detail.Hide()
 
-        list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,  self.on_select_list_db)
-        list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_open_from_list_db)
-        list_db.Bind(wx.EVT_CHAR_HOOK,           self.on_list_db_key)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_DRAG,
-                     self.on_dragstart_list_db)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_END_DRAG,
-                     self.on_dragstop_list_db)
-        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_BEGIN_RDRAG,
-                     self.on_cancel_drag_list_db)
-        list_db.Bind(wx.EVT_SIZE,
-                     lambda e: (e.Skip(), list_db.SetColumnWidth(0, e.Size[0] - 5)))
+        edit_filter.Bind(wx.EVT_TEXT_ENTER,        self.on_filter_list_db)
+        list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,    self.on_select_list_db)
+        list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED,   self.on_open_from_list_db)
+        list_db.Bind(wx.EVT_CHAR_HOOK,             self.on_list_db_key)
+        list_db.Bind(wx.EVT_LIST_COL_CLICK,        self.on_sort_list_db)
+        list_db.Bind(wx.lib.agw.ultimatelistctrl.EVT_LIST_END_DRAG, self.on_drag_list_db)
+
         self.button_opena.Bind(wx.EVT_BUTTON,   self.on_open_database)
         self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
         self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
@@ -387,6 +390,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_saveas.Bind(wx.EVT_BUTTON,  self.on_save_database_as)
         self.button_remove.Bind(wx.EVT_BUTTON,  self.on_remove_database)
 
+        sizer_header.Add(label_count, flag=wx.ALIGN_BOTTOM)
+        sizer_header.AddStretchSpacer()
+        sizer_header.Add(edit_filter)
+        panel_left.Sizer.Add(sizer_header, border=5, flag=wx.BOTTOM | wx.GROW)
+        panel_left.Sizer.Add(list_db, proportion=1, flag=wx.GROW)
+
         panel_main.Sizer.Add(label_main, border=10, flag=wx.ALL)
         panel_main.Sizer.Add((0, 10))
         panel_main.Sizer.Add(self.button_opena,  flag=wx.GROW)
@@ -397,6 +406,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(self.button_missing, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_type,    flag=wx.GROW)
         panel_main.Sizer.Add(self.button_clear,   flag=wx.GROW)
+
         panel_detail.Sizer.Add(label_db, border=10, flag=wx.ALL | wx.GROW)
         panel_detail.Sizer.Add(sizer_labels, border=10, flag=wx.ALL | wx.GROW)
         panel_detail.Sizer.Add((0, 10))
@@ -406,12 +416,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_detail.Sizer.AddStretchSpacer()
         panel_detail.Sizer.Add(self.button_saveas, flag=wx.GROW)
         panel_detail.Sizer.Add(self.button_remove, flag=wx.GROW)
+
         panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         sizer.Add(splitter, border=10, proportion=1, flag=wx.ALL | wx.GROW)
-        splitter.SplitVertically(list_db, panel_right, sashPosition=self.Size[0]*4/7)
-        for filename in conf.DBFiles:
-            self.update_database_list(filename)
+        splitter.SplitVertically(panel_left, panel_right, sashPosition=self.Size[0]*4/7)
 
 
     def create_menu(self):
@@ -727,37 +736,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.notebook.SetAGWWindowStyleFlag(style)
 
 
-    def on_dragstop_list_db(self, event):
-        """Handler for stopping drag in the database list, rearranges list."""
-        start, stop = self.db_drag_start, max(1, event.GetIndex())
-        if start and start != stop:
-            filename = self.list_db.GetItemText(start)
-            self.list_db.DeleteItem(start)
-            idx = stop if start > stop else stop - 1
-            self.list_db.InsertImageStringItem(idx, filename, [1])
-            self.list_db.Select(idx)
-        self.db_drag_start = None
-
-
-    def on_dragstart_list_db(self, event):
-        """Handler for dragging items in the database list, cancels dragging."""
-        if event.GetIndex():
-            self.db_drag_start = event.GetIndex()
-        else:
-            self.db_drag_start = None
-            self.on_cancel_drag_list_db(event)
-
-
-    def on_cancel_drag_list_db(self, event):
-        """Handler for dragging items in the database list, cancels dragging."""
-        class HackEvent(object): # UltimateListCtrl hack to cancel drag.
-            def __init__(self, pos=wx.Point()): self._position = pos
-            def GetPosition(self): return self._position
-        try:
-            wx.CallAfter(self.list_db.Children[0].DragFinish, HackEvent())
-        except: raise
-
-
     def on_toggle_autoupdate_check(self, event):
         """Handler for toggling automatic update checking, changes conf."""
         conf.UpdateCheckAutomatic = event.IsChecked()
@@ -767,14 +745,56 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_list_db_key(self, event):
         """
         Handler for pressing a key in dblist, loads selected database on Enter
-        and removes from list on Delete.
+        removes from list on Delete, and focuses filter on Ctrl-F.
         """
+        if event.KeyCode in [ord("F")] and event.CmdDown():
+            self.edit_filter.SetFocus()
         if self.list_db.GetFirstSelected() > 0 and not event.AltDown() \
         and event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
             self.load_database_page(self.db_filename)
         elif event.KeyCode in [wx.WXK_DELETE] and self.db_filename:
             self.on_remove_database(None)
         event.Skip()
+
+
+    def on_sort_list_db(self, event):
+        """Handler for sorting dblist, saves sort state."""
+        event.Skip()
+        def save_sort_state():
+            if not self: return
+            conf.DBSort = self.list_db.GetSortState()
+            conf.save()
+        wx.CallAfter(save_sort_state) # Allow list to update sort state
+
+
+    def on_drag_list_db(self, event):
+        """Handler for dragging items around in dblist, saves file order."""
+        event.Skip()
+        def save_list_order():
+            del conf.DBFiles[:]
+            for i in range(self.list_db.GetItemCountFull()):
+                conf.DBFiles.append(self.list_db.GetItemTextFull(i))
+            conf.save()
+        wx.CallAfter(save_list_order) # Allow list to update items
+
+
+    def on_filter_list_db(self, event):
+        """Handler for filtering dblist, applies search filter after timeout."""
+        event.Skip()
+        search = event.String.strip()
+        if search == self.db_filter: return
+
+        def do_filter(search):
+            if not self: return
+            self.db_filter_timer = None
+            if search != self.db_filter: return
+            self.list_db.SetFilter(search)
+            self.update_database_count()
+
+        if self.db_filter_timer: self.db_filter_timer.Stop()
+        self.db_filter = search
+        if search: self.db_filter_timer = wx.CallLater(200, do_filter, search)
+        else: do_filter(search)
 
 
     def on_open_feedback(self, event):
@@ -890,6 +910,51 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.Bell()
 
 
+    def populate_database_list(self):
+        """
+        Inserts all databases into the list, updates UI buttons.
+        """
+        if not self: return
+        items, selected_files = [], []
+        for filename in conf.DBFiles:
+            filename = util.to_unicode(filename)
+            data = collections.defaultdict(lambda: None, name=filename)
+            if os.path.exists(filename):
+                data["size"] = os.path.getsize(filename)
+                data["last_modified"] = datetime.datetime.fromtimestamp(
+                                        os.path.getmtime(filename))
+            self.db_filenames[filename] = data
+            items.append(data)
+            if filename in conf.LastSelectedFiles: selected_files += [filename]
+
+        self.list_db.Populate(items, [1])
+        if conf.DBSort and conf.DBSort[0] >= 0:
+            self.list_db.SortListItems(*conf.DBSort)
+
+        if selected_files:
+            idx = -1
+            for i in range(1, self.list_db.GetItemCount()):
+                if self.list_db.GetItemText(i) in selected_files:
+                    if idx < 0: idx = i
+                    self.list_db.Select(i)
+                    self.list_db.SetFocus()
+
+            if idx >= self.list_db.GetCountPerPage():
+                lh = self.list_db.GetUserLineHeight()
+                dy = (idx - self.list_db.GetCountPerPage() / 2) * lh
+                self.list_db.ScrollList(0, dy)
+                self.list_db.Update()
+        else:
+            self.list_db.Select(0)
+
+        self.button_missing.Show(bool(items))
+        self.button_type.Show(bool(items))
+        self.button_clear.Show(bool(items))
+        self.panel_db_main.Layout()
+        self.update_database_count()
+        if selected_files: wx.CallLater(100, self.update_database_detail)
+
+
     def update_database_list(self, filename=""):
         """
         Inserts the database into the list, if not there already, and updates
@@ -905,7 +970,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if filename not in conf.DBFiles:
                 conf.DBFiles.append(filename)
                 conf.save()
-            data = collections.defaultdict(lambda: None)
+            data = collections.defaultdict(lambda: None, name=filename)
             if os.path.exists(filename):
                 data["size"] = os.path.getsize(filename)
                 data["last_modified"] = datetime.datetime.fromtimestamp(
@@ -913,37 +978,37 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             data_old = self.db_filenames.get(filename)
             if not data_old or data_old["size"] != data["size"] \
             or data_old["last_modified"] != data["last_modified"]:
-                if filename not in self.db_filenames:
-                    self.db_filenames[filename] = data
-                    idx = self.list_db.GetItemCount()
-                    self.list_db.InsertImageStringItem(idx, filename, [1])
-                    # self is not shown: form creation time, reselect last file
-                    if not self.Shown and filename in conf.LastSelectedFiles:
-                        self.list_db.Select(idx)
-                        def scroll_to_selected():
-                            if idx < self.list_db.GetCountPerPage(): return
-                            lh = self.list_db.GetUserLineHeight()
-                            dy = (idx - self.list_db.GetCountPerPage() / 2) * lh
-                            self.list_db.ScrollList(0, dy)
-                        wx.CallAfter(lambda: self and scroll_to_selected())
-                    result = True
+                self.db_filenames.setdefault(filename, data).update(data)
+                if not data_old: self.list_db.AppendRow(data, [1])
+                result = True
 
-        self.button_missing.Shown = (self.list_db.GetItemCount() > 1)
-        self.button_type.Shown = (self.list_db.GetItemCount() > 1)
-        self.button_clear.Shown = (self.list_db.GetItemCount() > 1)
-        if self.Shown:
-            self.list_db.SetColumnWidth(0, self.list_db.Size.width - 5)
+        has_items = (self.list_db.GetItemCountFull() > 1)
+        if self.button_missing.Shown != has_items:
+            self.button_missing.Show(has_items)
+            self.button_type.Show(has_items)
+            self.button_clear.Show(has_items)
+            self.panel_db_main.Layout()
+        self.update_database_count()
         return result
+
+
+    def update_database_count(self):
+        """Updates database count label."""
+        count = self.list_db.GetItemCount() - 1
+        total = len(self.db_filenames)
+        text = ""
+        if total: text = util.plural("file", count)
+        if count != total: text += " visible (%s in total)" % total
+        self.label_count.Label = text
 
 
     def on_clear_databases(self, event):
         """Handler for clicking to clear the database list."""
-        if (self.list_db.GetItemCount() > 1) and wx.OK == wx.MessageBox(
+        if (self.list_db.GetItemCountFull() > 1) and wx.OK == wx.MessageBox(
             "Are you sure you want to clear the list of all databases?",
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ):
-            while self.list_db.GetItemCount() > 1:
-                self.list_db.DeleteItem(1)
+            self.list_db.Populate([])
             del conf.DBFiles[:]
             del conf.LastSelectedFiles[:]
             del conf.RecentFiles[:]
@@ -1012,6 +1077,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.db_filename = None
             self.list_db.Select(0)
             self.update_database_list()
+            self.panel_db_main.Layout()
             conf.save()
 
 
@@ -1536,41 +1602,49 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.dbs[filename]
 
 
+    def update_database_detail(self):
+        """Updates database detail panel with current database information."""
+        if not self or not self.db_filename: return
+
+        filename = self.db_filename
+        path, tail = os.path.split(filename)
+        self.label_db.Value = tail
+        self.label_path.Value = path
+        self.label_size.Value = self.label_modified.Value = ""
+        self.label_account.Value = self.label_chats.Value = ""
+        self.label_messages.Value = ""
+        self.label_account.ForegroundColour = self.ForegroundColour
+        self.label_size.ForegroundColour = self.ForegroundColour
+        self.label_chats.ForegroundColour = self.ForegroundColour
+        if not self.panel_db_detail.Shown:
+            self.panel_db_main.Hide()
+            self.panel_db_detail.Show()
+            self.panel_db_detail.Parent.Layout()
+        if os.path.exists(filename):
+            sz = os.path.getsize(filename)
+            dt = datetime.datetime.fromtimestamp(os.path.getmtime(filename))
+            self.label_size.Value = util.format_bytes(sz)
+            self.label_modified.Value = dt.strftime("%Y-%m-%d %H:%M:%S")
+            data = self.db_filenames[filename]
+            if data["size"] == sz and data["last_modified"] == dt \
+            and data["messages"]:
+                # File does not seem changed: use cached values
+                self.label_account.Value = data["account"]
+                self.label_chats.Value = data["chats"]
+                self.label_messages.Value = data["messages"]
+            else:
+                wx.CallLater(10, self.update_database_stats, filename)
+        else:
+            self.label_size.Value = "File does not exist."
+            self.label_size.ForegroundColour = conf.LabelErrorColour
+
+
     def on_select_list_db(self, event):
         """Handler for selecting an item in main list, updates info panel."""
         if event.GetIndex() > 0 \
         and event.GetText() != self.db_filename:
-            filename = self.db_filename = event.GetText()
-            path, tail = os.path.split(filename)
-            self.label_db.Value = tail
-            self.label_path.Value = path
-            self.label_size.Value = self.label_modified.Value = ""
-            self.label_account.Value = self.label_chats.Value = ""
-            self.label_messages.Value = ""
-            self.label_account.ForegroundColour = self.ForegroundColour
-            self.label_size.ForegroundColour = self.ForegroundColour
-            self.label_chats.ForegroundColour = self.ForegroundColour
-            if not self.panel_db_detail.Shown:
-                self.panel_db_main.Hide()
-                self.panel_db_detail.Show()
-                self.panel_db_detail.Parent.Layout()
-            if os.path.exists(filename):
-                sz = os.path.getsize(filename)
-                dt = datetime.datetime.fromtimestamp(os.path.getmtime(filename))
-                self.label_size.Value = util.format_bytes(sz)
-                self.label_modified.Value = dt.strftime("%Y-%m-%d %H:%M:%S")
-                data = self.db_filenames[filename]
-                if data["size"] == sz and data["last_modified"] == dt \
-                and data["messages"]:
-                    # File does not seem changed: use cached values
-                    self.label_account.Value = data["account"]
-                    self.label_chats.Value = data["chats"]
-                    self.label_messages.Value = data["messages"]
-                else:
-                    wx.CallLater(10, self.update_database_stats, filename)
-            else:
-                self.label_size.Value = "File does not exist."
-                self.label_size.ForegroundColour = conf.LabelErrorColour
+            self.db_filename = event.GetText()
+            self.update_database_detail()
         elif event.GetIndex() == 0 and not self.panel_db_main.Shown:
             self.db_filename = None
             self.panel_db_main.Show()
@@ -1644,7 +1718,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
             # Save last selected files in db lists, to reselect them on rerun
             conf.DBFiles = [self.list_db.GetItemText(i)
-                            for i in range(1, self.list_db.GetItemCount())]
+                            for i in range(1, self.list_db.GetItemCountFull())]
             del conf.LastSelectedFiles[:]
             selected = self.list_db.GetFirstSelected()
             while selected > 0:
@@ -1873,10 +1947,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.Bind(wx.EVT_LIST_DELETE_ALL_ITEMS,
                           self.on_clear_searchall, page.edit_searchall)
         if page:
-            for i in range(1, self.list_db.GetItemCount()):
-                if self.list_db.GetItemText(i) == filename:
-                    self.list_db.Select(i)
-                    break # break for i
+            for i in range(0, self.list_db.GetItemCount()):
+                self.list_db.Select(i, (self.list_db.GetItemText(i) == filename))
             for i in range(self.notebook.GetPageCount()):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)
@@ -2054,14 +2126,10 @@ class DatabasePage(wx.Panel):
         list_chats.SetColumns(columns)
         list_chats.SetColumnFormatters(formatters)
         list_chats.SetColumnsMaxWidth(300)
-        label_filter = wx.StaticText(panel1, label="Filter ch&ats:")
-        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_chatfilter = self.edit_chatfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in chat list"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_chatfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_chatfilter, edit_chatfilter)
+        edit_chatfilter = self.edit_chatfilter = controls.HintedTextCtrl(
+            panel1, "Filter list", size=(75, -1))
+        edit_chatfilter.SetToolTip("Filter items in chat list")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_chatfilter, edit_chatfilter)
         sizer_top.Add(edit_chatfilter, flag=wx.RIGHT, border=15)
         button_export_chats = self.button_export_chats = \
             wx.Button(parent=panel1, label="Exp&ort chats")
