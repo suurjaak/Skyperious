@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    25.07.2020
+@modified    26.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -161,7 +161,7 @@ class SkypeLogin(object):
             except Exception:
                 tries += 1
                 if tries > self.RETRY_LIMIT or not doretry:
-                    logging.exception("Error calling %s.", func)
+                    logger.exception("Error calling %s.", func)
                     if doraise: raise
                     else: return
                 time.sleep(self.RETRY_DELAY)
