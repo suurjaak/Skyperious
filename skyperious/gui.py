@@ -16,6 +16,7 @@ import base64
 import collections
 import copy
 import datetime
+import functools
 import hashlib
 import inspect
 import logging
@@ -1688,6 +1689,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filename = self.list_db.GetItemText(selected)
             conf.LastSelectedFiles.append(filename)
             selected = self.list_db.GetNextSelected(selected)
+        conf.save()
 
 
     def on_exit(self, event):
@@ -3394,30 +3396,75 @@ class DatabasePage(wx.Panel):
             selecteds.append(selected)
             selected = self.list_chats.GetNextSelected(selected)
 
+        def handler(do_all=False, do_singlefile=False, do_timerange=False):
+            return functools.partial(self.on_export_chats,
+                                     do_all, do_singlefile, do_timerange)
+
         menu = wx.lib.agw.flatmenu.FlatMenu()
+        menu_sel  = wx.lib.agw.flatmenu.FlatMenu()
+        menu_all  = wx.lib.agw.flatmenu.FlatMenu()
+        menu_date = wx.lib.agw.flatmenu.FlatMenu()
+
         item_sel = wx.lib.agw.flatmenu.FlatMenuItem(
-            menu, wx.ID_ANY, "Export selected chats into individual &files")
+            menu, wx.ID_ANY, "Export &selected chats", subMenu=menu_sel)
+        item_all = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu, wx.ID_ANY, "Export &all chats", subMenu=menu_all)
+        item_date = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu, wx.ID_ANY, "Export &date range", subMenu=menu_date)
         item_sel.Enable(len(selecteds))
+
+        item_sel_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu_sel, wx.ID_ANY, "Into individual &files")
+        menu_sel.AppendItem(item_sel_multi)
+        self.Bind(wx.EVT_MENU, handler(), item_sel_multi)
+        if export.xlsxwriter:
+            item_sel_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu_sel, wx.ID_ANY, "Into a single &Excel workbook, "
+                "with separate sheets")
+            menu_sel.AppendItem(item_sel_single)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_sel_single)
+
+        item_all_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu_all, wx.ID_ANY, "Into individual &files")
+        menu_all.AppendItem(item_all_multi)
+        self.Bind(wx.EVT_MENU, handler(do_all=True), item_all_multi)
+        if export.xlsxwriter:
+            item_all_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu_all, wx.ID_ANY, "Into a single &Excel workbook, "
+                "with separate sheets")
+            menu_all.AppendItem(item_all_single)
+            myhandler = handler(do_all=True, do_singlefile=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_all_single)
+
+        item_sel_date_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu_date, wx.ID_ANY, "Selected chats into individual &files")
+        menu_date.AppendItem(item_sel_date_multi)
+        item_sel_date_multi.Enable(len(selecteds))
+        self.Bind(wx.EVT_MENU, handler(do_timerange=True), item_sel_date_multi)
+        if export.xlsxwriter:
+            item_sel_date_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu_sel, wx.ID_ANY, "Selected chats into a single &Excel workbook, "
+                "with separate sheets")
+            menu_date.AppendItem(item_sel_date_single)
+            item_sel_date_single.Enable(len(selecteds))
+            myhandler = handler(do_singlefile=True, do_timerange=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_sel_date_single)
+        menu_date.AppendSeparator()
+        item_all_date_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu_date, wx.ID_ANY, "All chats into &individual files")
+        menu_date.AppendItem(item_all_date_multi)
+        self.Bind(wx.EVT_MENU, handler(do_all=True, do_timerange=True), item_all_date_multi)
+        if export.xlsxwriter:
+            item_all_date_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu_all, wx.ID_ANY, "&All chats into a single Excel workbook, "
+                "with separate sheets")
+            menu_date.AppendItem(item_all_date_single)
+            myhandler = handler(do_all=True, do_singlefile=True, do_timerange=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_all_date_single)
+
         menu.AppendItem(item_sel)
-        if export.xlsxwriter:
-            item_sel2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                "Export selected into a single &Excel workbook, "
-                "with separate sheets")
-            item_sel2.Enable(len(selecteds))
-            menu.AppendItem(item_sel2)
-        menu.AppendSeparator()
-        item_all = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-               "Export &all chats into individual files")
-        item_all.Enable(len(self.chats))
         menu.AppendItem(item_all)
-        if export.xlsxwriter:
-            item_all2 = wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                "Export all &into a single Excel workbook, "
-                "with separate sheets")
-            item_all2.Enable(len(self.chats))
-            menu.AppendItem(item_all2)
-        for item in menu.GetMenuItems():
-            self.Bind(wx.EVT_MENU, self.on_export_chats, item)
+        menu.AppendItem(item_date)
 
         sz_btn, pt_btn = event.EventObject.Size, event.EventObject.Position
         pt_btn = event.EventObject.Parent.ClientToScreen(pt_btn)
@@ -3427,7 +3474,7 @@ class DatabasePage(wx.Panel):
         menu.Popup(pt_btn, self)
 
 
-    def on_export_chats(self, event):
+    def on_export_chats(self, do_all, do_singlefile, do_timerange, event):
         """
         Handler for clicking to export selected or all chats, displays a select
         folder dialog and exports chats to individual files under the folder.
@@ -3435,11 +3482,23 @@ class DatabasePage(wx.Panel):
         chats = [self.list_chats.GetItemMappedData(i)
                  for i in range(self.list_chats.ItemCount)]
 
-        # Find menuitem index and label from original menu by event ID
-        nitems = enumerate(event.EventObject.GetMenuItems())
-        index = next((i for i, m in nitems if m.GetId() == event.Id), None)
-        do_all = index > 1
-        do_singlefile = index in [1, 4]
+        timerange = None
+        if do_timerange:
+            timerange = []
+            for label in ("start", "end"):
+                extra = "end at last" if "end" == label else "start from first"
+                dialog = wx.TextEntryDialog(self,
+                    "Enter %s date as YYYY-MM-DD, or leave blank to %s:" % (label, extra),
+                    "Date range", style=wx.OK | wx.CANCEL)
+                if wx.ID_OK != dialog.ShowModal(): return
+
+                v, dt = dialog.GetValue().strip(), None
+                try:
+                    if v: dt = datetime.datetime.strptime(v, "%Y-%m-%d").date()
+                except Exception:
+                    return wx.MessageBox("Invalid date value: '%s'." % v,
+                                         conf.Title, wx.OK | wx.ICON_WARNING)
+                timerange.append(util.datetime_to_epoch(dt))
 
         if not do_all:
             selected, chats = self.list_chats.GetFirstSelected(), []
@@ -3478,7 +3537,7 @@ class DatabasePage(wx.Panel):
             try:
                 progressfunc = lambda *args: wx.SafeYield()
                 files, count, message_count = export.export_chats(chats, dirname,
-                    format, self.db, skip=do_all, progress=progressfunc)
+                    format, self.db, timerange=timerange, skip=do_all, progress=progressfunc)
             except Exception:
                 errormsg = "Error exporting chats:\n\n%s" % \
                            traceback.format_exc()
