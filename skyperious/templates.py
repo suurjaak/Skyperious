@@ -1951,7 +1951,7 @@ from skyperious import conf
 %>
 <font face="{{conf.HistoryFontName}}" size="2" color="{{conf.FgColour}}">
 <center>
-<h5><font color="{{conf.SkypeLinkColour}}">Explore the database</font></h5>
+<h5><font color="{{conf.SkypeLinkColour}}">Overview</font></h5>
 <table cellpadding="10" cellspacing="0">
 <tr>
   <td>

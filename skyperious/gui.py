@@ -350,7 +350,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         BUTTONS_DETAIL = [
             ("button_open", "&Open", images.ButtonOpen, 
-             "Open the database for searching and exploring."),
+             "Open the database for reading."),
             ("button_compare", "Compare and &merge", images.ButtonCompare,
              "Choose another Skype database to compare with, in order to merge "
              "their differences."),
