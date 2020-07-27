@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.07.2020
+@modified    27.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -55,6 +55,9 @@ if is_gui_possible:
     from . import gui
 
 
+def date(s): return datetime.datetime.strptime(s, "%Y-%m-%d").date()
+
+
 ARGUMENTS = {
     "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
     "arguments": [
@@ -87,6 +90,10 @@ ARGUMENTS = {
              {"args": ["-a", "--author"], "dest": "author", "required": False,
               "help": "names of specific authors whose chats to export",
               "nargs": "+"},
+             {"args": ["-s", "--start"], "dest": "start_date", "required": False,
+              "help": "date to export messages from, as YYYY-MM-DD", "type": date},
+             {"args": ["-e", "--end"], "dest": "end_date", "required": False,
+              "help": "date to export messages until, as YYYY-MM-DD", "type": date},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
@@ -417,10 +424,11 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
         db.close()
     
 
-def run_export(filenames, format, chatnames, authornames, ask_password, store_password):
+def run_export(filenames, format, chatnames, authornames, start_date, end_date, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
+    timerange = map(util.datetime_to_epoch, (start_date, end_date))
 
     for db in dbs:
 
@@ -468,17 +476,21 @@ def run_export(filenames, format, chatnames, authornames, ask_password, store_pa
             db.get_conversations_stats(chats)
             bar_total = sum(c["message_count"] for c in chats)
             bartext = " Exporting %.*s.." % (30, db.filename) # Enforce width
-            bar = ProgressBar(max=bar_total, afterword=bartext)
+            pulse = any(x is not None for x in timerange)
+            bar = ProgressBar(max=bar_total, afterword=bartext, pulse=pulse)
             bar.start()
             result = export.export_chats(chats, export_dir, filename, db,
-                                         progress=bar.update)
-            files, count = result
+                                         timerange=timerange, progress=bar.update)
+            files, count, message_count = result
             bar.stop()
             if count:
-                bar.afterword = " Exported %s to %s. " % (db, target)
+                bar.afterword = " Exported %s from %s to %s. " % (
+                    util.plural("message", message_count), db, target)
                 bar.update(bar_total)
                 output()
-                logger.info("Exported %s %sto %s as %s.", util.plural("chat", count),
+                logger.info("Exported %s and %s %sto %s as %s.",
+                            util.plural("chat", count),
+                            util.plural("message", message_count),
                             dbstr, target, format)
             else:
                 output("\nNo messages to export%s." %
@@ -628,10 +640,13 @@ def run(nogui=False):
         sys.stdout = codecs.getwriter(enc)(sys.stdout, "backslashreplace")
         sys.stderr = codecs.getwriter(enc)(sys.stderr, "backslashreplace")
 
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
-        logger.addHandler(handler)
-        logger.setLevel(logging.DEBUG)
+        if conf.IsCLIVerbose:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+            logger.addHandler(handler)
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.addHandler(logging.NullHandler())
 
     if "diff" == arguments.command:
         run_diff(*arguments.FILE)
@@ -639,6 +654,7 @@ def run(nogui=False):
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author,
+                   arguments.start_date, arguments.end_date,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)

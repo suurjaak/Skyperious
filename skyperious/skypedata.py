@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.07.2020
+@modified    27.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -458,7 +458,7 @@ class SkypeDatabase(object):
 
     def get_messages(self, chat=None, ascending=True,
                      additional_sql=None, additional_params=None,
-                     timestamp_from=None, use_cache=True):
+                     timestamp_from=None, timestamp_to=None, use_cache=True):
         """
         Yields all the messages (or messages for the specified chat), as
         {"datetime": datetime, ..}, ordered from earliest to latest.
@@ -471,6 +471,7 @@ class SkypeDatabase(object):
         @param   additional_sql     additional SQL string added to the end
         @param   additional_params  SQL parameter dict for additional_sql
         @param   timestamp_from     timestamp beyond which messages will start
+        @param   timestamp_to       timestamp beyond which messages will end
         @param   use_cache          whether to use cached values if available.
                                     The LIKE keywords will be ignored if True.
         """
@@ -492,8 +493,11 @@ class SkypeDatabase(object):
                     for i, c in enumerate(cc):
                         params["convo_id%s" % i] = c["id"]
                 if timestamp_from:
-                    sql += " AND m.timestamp %s :timestamp" % "<>"[ascending]
-                    params["timestamp"] = timestamp_from
+                    sql += " AND m.timestamp %s :timestamp_from" % "<>"[ascending]
+                    params["timestamp_from"] = timestamp_from
+                if timestamp_to:
+                    sql += " AND m.timestamp %s :timestamp_to" % "><"[ascending]
+                    params["timestamp_to"] = timestamp_to
                 if additional_sql:
                     sql += " AND (%s)" % additional_sql
                     params.update(additional_params or {})

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    14.07.2020
+@modified    27.07.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -147,10 +147,12 @@ def deobfuscate(text, key=string.punctuation):
 
 
 def datetime_to_epoch(dt):
-    """Returns datetime.datetime as UNIX timestamp, or None if dt is None."""
+    """Returns datetime.datetime or .date as UNIX timestamp, or None if dt is None."""
     result = None
-    if isinstance(dt, datetime.datetime):
-        x = calendar.timegm(dt.timetuple()) + dt.microsecond / 1e6
+    if isinstance(dt, datetime.date):
+        x = calendar.timegm(dt.timetuple())
+        if isinstance(dt, datetime.datetime):
+            x += dt.microsecond / 1e6
         if x >= 0: result = x if x % 1 else int(x)
     return result
 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.07.2020
+@modified    27.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1254,7 +1254,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
 
         if wx.ID_OK == self.dialog_savefile.ShowModal():
-            db, files, count, error, errormsg = None, [], 0, False, None
+            db, files, count, message_count, error, errormsg = None, [], 0, 0, False, None
 
             db = self.load_database(self.db_filename)
             dirname = os.path.dirname(self.dialog_savefile.GetPath())
@@ -1297,15 +1297,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     progressfunc = lambda *args: wx.SafeYield()
                     result = export.export_chats(chats, export_dir, format, db,
                                                  progress=progressfunc)
-                    files, count = result
+                    files, count, message_count = result
                 except Exception:
                     errormsg = "Error exporting chats:\n\n%s" % \
                                traceback.format_exc()
                     error = True
                 busy.Close()
             if not error:
-                guibase.status("Exported %s from %s as %s "
-                               "under %s.", util.plural("chat", count), db.filename,
+                guibase.status("Exported %s and %s from %s as %s "
+                               "under %s.", util.plural("chat", count),
+                               util.plural("message", message_count), db.filename,
                                extname.upper(), export_dir, log=True)
             elif errormsg:
                 guibase.status(errormsg, log=True)
@@ -3364,9 +3365,11 @@ class DatabasePage(wx.Panel):
             try:
                 messages = self.stc_history.GetMessages()
                 progressfunc = lambda *args: wx.SafeYield()
-                export.export_chats([self.chat], dirname, filename, self.db,
+                result = export.export_chats([self.chat], dirname, filename, self.db,
                     messages=messages, skip=False, progress=progressfunc)
-                guibase.status("Exported %s.", filepath)
+                files, count, message_count = result
+                guibase.status("Exported %s to %s.",
+                               util.plural("message", message_count), filepath, log=True)
                 try: util.start_file(filepath)
                 except Exception:
                     logger.exception("Error starting %s.", filepath)
@@ -3471,18 +3474,19 @@ class DatabasePage(wx.Panel):
                  extname.upper(), dirname)
             busy = controls.BusyPanel(self, msg)
             guibase.status(msg, log=True)
-            files, count, errormsg = [], 0, None
+            files, count, message_count, errormsg = [], 0, 0, None
             try:
                 progressfunc = lambda *args: wx.SafeYield()
-                files, count = export.export_chats(chats, dirname, format,
-                    self.db, skip=do_all, progress=progressfunc)
+                files, count, message_count = export.export_chats(chats, dirname,
+                    format, self.db, skip=do_all, progress=progressfunc)
             except Exception:
                 errormsg = "Error exporting chats:\n\n%s" % \
                            traceback.format_exc()
             busy.Close()
             if not errormsg:
-                guibase.status("Exported %s from %s as %s under %s.",
-                               util.plural("chat", count), self.db,
+                guibase.status("Exported %s and %s from %s as %s under %s.",
+                               util.plural("chat", count), 
+                               util.plural("message", message_count), self.db,
                                extname.upper(), dirname, log=True)
                 util.start_file(dirname if len(files) > 1 else files[0])
             else:
@@ -3524,9 +3528,11 @@ class DatabasePage(wx.Panel):
                 if messages:
                     guibase.status("Filtering and exporting to %s.", filepath, log=True)
                     progressfunc = lambda *args: wx.SafeYield()
-                    export.export_chats([self.chat], dirname, filename, self.db,
-                        messages=messages, progress=progressfunc)
-                    guibase.status("Exported %s.", filepath, log=True)
+                    result = export.export_chats([self.chat], dirname, filename,
+                        self.db, messages=messages, progress=progressfunc)
+                    files, count, message_count = result
+                    guibase.status("Exported %s to %s.",
+                                   util.plural("message", message_count), filepath, log=True)
                     util.start_file(filepath)
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
@@ -5348,9 +5354,11 @@ class MergerPage(wx.Panel):
             try:
                 messages = self.db1.message_iterator(self.chat_diff["messages"])
                 progressfunc = lambda *args: wx.SafeYield()
-                export.export_chats([self.chat], dirname, filename,
+                result = export.export_chats([self.chat], dirname, filename,
                     self.db1, messages=messages, progress=progressfunc)
-                guibase.status("Exported %s.", filepath, log=True)
+                files, count, message_count = result
+                guibase.status("Exported %s to %s.", util.plural("message", message_count),
+                               filepath, log=True)
                 util.start_file(filepath)
             except Exception:
                 guibase.status("Error saving %s.", filepath)
