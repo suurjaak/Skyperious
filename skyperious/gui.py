@@ -5070,6 +5070,7 @@ class MergerPage(wx.Panel):
         self.db1.register_consumer(self), self.db2.register_consumer(self)
         self.title = title
         parent_notebook.InsertPage(1, self, title)
+        ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
         busy = controls.BusyPanel(
             self, "Comparing \"%s\"\n and \"%s\"." % (db1, db2))
 
@@ -5156,6 +5157,12 @@ class MergerPage(wx.Panel):
 
         self.Layout()
         self.load_data()
+        # Hack to get scrolled panels lay out properly
+        notebook.SetSelection(1)
+        self.page_merge_chats.Layout()
+        notebook.SetSelection(2)
+        self.page_merge_contacts.Layout()
+        notebook.SetSelection(0)
         busy.Close()
 
 
@@ -5313,7 +5320,7 @@ class MergerPage(wx.Panel):
                                       sashPosition=self.Size.width)
         splitter.SplitHorizontally(panel1, panel2,
                                    sashPosition=self.Size.height / 3)
-        panel_stc2.SetupScrolling()
+        panel_stc2.SetupScrolling(scroll_x=False)
 
 
     def create_page_merge_contacts(self, notebook):
@@ -5383,7 +5390,7 @@ class MergerPage(wx.Panel):
         sizer.AddSpacer(10)
         sizer.Add(splitter, proportion=1, border=5,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT)
-        panel2.SetupScrolling()
+        panel2.SetupScrolling(scroll_x=False)
 
 
     def on_export_chat(self, event):
