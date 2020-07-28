@@ -2824,7 +2824,8 @@ class DatabasePage(wx.Panel):
 
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
-        splitter_sync.SplitHorizontally(panel_sync1, panel_sync2)
+        pos = self.Size[1] / 3
+        splitter_sync.SplitHorizontally(panel_sync1, panel_sync2, sashPosition=pos)
 
 
     def on_sys_colour_change(self, event):
