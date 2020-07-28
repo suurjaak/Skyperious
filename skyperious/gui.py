@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -373,6 +373,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         edit_filter.Bind(wx.EVT_TEXT_ENTER,        self.on_filter_list_db)
         list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,    self.on_select_list_db)
+        list_db.Bind(wx.EVT_LIST_ITEM_DESELECTED,  self.on_deselect_list_db)
         list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED,   self.on_open_from_list_db)
         list_db.Bind(wx.EVT_CHAR_HOOK,             self.on_list_db_key)
         list_db.Bind(wx.EVT_LIST_COL_CLICK,        self.on_sort_list_db)
@@ -1689,6 +1690,23 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.LastSelectedFiles.append(filename)
             selected = self.list_db.GetNextSelected(selected)
         conf.save()
+
+
+    def on_deselect_list_db(self, event):
+        """Handler for deselecting an item in main list, updates info panel."""
+        if not conf.LastSelectedFiles or not event.GetIndex(): return
+
+        filename = event.GetText()
+        conf.LastSelectedFiles[:] = [x for x in conf.LastSelectedFiles
+                                     if x != filename]
+        if self.db_filename == filename: self.db_filename = None
+
+        if conf.LastSelectedFiles:
+            self.update_database_detail()
+        else:
+            self.panel_db_main.Show()
+            self.panel_db_detail.Hide()
+            self.panel_db_main.Parent.Layout()
 
 
     def on_exit(self, event):
