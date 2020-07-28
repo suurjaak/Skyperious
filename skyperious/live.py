@@ -190,6 +190,21 @@ class SkypeLogin(object):
             dbitem0 = next((v for v in self.cache[table].values()
                             if v.get("remote_id") == dbitem["remote_id"]
                             and v["convo_id"] == dbitem["convo_id"]), dbitem0)
+        if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
+        and not dbitem.get("displayname"):
+            if dbitem0 and dbitem0["displayname"]:
+                dbitem["displayname"] = dbitem0["displayname"]
+            else: # Assemble name from participants
+                for x in item.userIds[:4]: # Use up to 4 names
+                    if x not in self.cache["contacts"]:
+                        contact = self.request(self.skype.contacts.contact, x)
+                        if contact: self.save("contacts", contact)
+                cc = [self.cache["contacts"].get(x, {})["fullname"] or x
+                      for x in item.userIds]
+                dbitem["displayname"] = ", ".join(cc[:4])
+                if len(cc) > 4: dbitem["displayname"] += ", ..."
+            dbitem1 = dict(dbitem)
+
 
         dbtable = "conversations" if "chats" == table else table
         if dbitem0:
@@ -377,8 +392,9 @@ class SkypeLogin(object):
             elif isinstance(item, skpy.SkypeGroupChat):
                 # SkypeGroupChat(id='19:xyz==@p2p.thread.skype', alerts=True, topic='chat topic', creatorId='username;epid={87e22f7c-d816-ea21-6cb3-05b477922f95}', userIds=['username1', 'username2'], adminIds=['username'], open=False, history=True, picture='https://experimental-api.asm.skype.com/..')
 
-                result.update(type=skypedata.CHATS_TYPE_GROUP,
-                              displayname=item.topic or result["identity"], meta_topic=item.topic)
+                result.update(type=skypedata.CHATS_TYPE_GROUP, meta_topic=item.topic)
+                if item.topic:
+                    result.update(displayname=item.topic)
                 if item.creatorId:
                     creator = re.sub(";.+$", "", item.creatorId)
                     if creator: result.update(creator=creator)
