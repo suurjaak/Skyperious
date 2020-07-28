@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    26.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -846,7 +846,7 @@ class LiveThread(WorkerThread):
                 if "login" == action["action"]:
                     self._skype.login(password=action["password"])
                 elif "populate" == action["action"]:
-                    self._skype.populate()
+                    self._skype.populate(action.get("chats"))
             except Exception as e:
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)

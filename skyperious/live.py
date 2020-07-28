@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    27.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -521,33 +521,47 @@ class SkypeLogin(object):
         return result
 
 
-    def populate(self):
-        """Retrieves all available contacts, chats and messages."""
+    def populate(self, chats=()):
+        """
+        Retrieves all available contacts, chats and messages, or selected chats only.
+        
+        @param   chats  list of chat identities to populate if not everything
+        """
         if self.populated:
             self.skype = None
             self.login() # Re-login to reset query cache
         self.build_cache()
-        self.save("accounts", self.skype.user)
-        logger.info("Starting to sync '%s' from Skype online service as '%s'.", self.db, self.username)
-        self.populate_contacts()
-        self.populate_history()
+        if not chats: self.save("accounts", self.skype.user)
+        cstr = "%s " % util.plural("chat", chats, with_items=False) if chats else ""
+        logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
+                    cstr, self.db, self.username)
+        if not chats: self.populate_contacts()
+        self.populate_history(chats)
         self.cache.clear()
         self.populated = True
-        logger.info("Finished syncing '%s'.", self.db)
+        logger.info("Finished syncing %s'%s'.", cstr, self.db)
 
 
-    def populate_history(self):
-        """Retrieves all conversations and their messages."""
+    def populate_history(self, chats=()):
+        """
+        Retrieves all conversations and their messages.
+
+        @param   chats  list of chat identities to populate if not all
+        """
         if self.progress and not self.progress(action="populate", table="chats", start=True):
             return
         if not self.cache: self.build_cache()
 
+        identities = map(self.identity_to_id, chats or ())
+        getter = lambda c: self.request(self.skype.chats.chat, c, __raise=False)
+        selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
+
         updateds, new, mtotalnew, mtotalupdated, run = set(), 0, 0, 0, True
         msgids = set()
         while run:
-            chats = self.request(self.skype.chats.recent, __raise=False)
-            if not chats: break # while run
-            for chat in chats.values():
+            mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
+            if not mychats: break # while run
+            for chat in mychats.values():
                 if chat.id.startswith("48:"): # Skip specials like "48:calllogs"
                     continue # for chat
                 if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
@@ -601,6 +615,7 @@ class SkypeLogin(object):
                     run = False
                     break # for chat
                 if not mrun: break # for chat
+            if chats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds if x in self.cache["chats"]]
         for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
@@ -712,9 +727,27 @@ class SkypeLogin(object):
 
 
     @staticmethod
+    def identity_to_id(identity):
+        """
+        Returns conversation or contact ID in Skype live;
+        "8:username" from "username" for single chats,
+        or "19:I3VzZXJuYW1lMS8kdXNlcm5hbWUyOzEyMzQ1NmFiY2RlZg==@p2p.thread.skype"
+        from "#username1/$username2;123456abcdef"
+        for older peer-to-peer group chats,
+        or "19:xyz@thread.skype" as-is for newer group chats.
+        """
+        result = identity
+        if not result.endswith("@thread.skype"):
+            if result.startswith("#"):
+                result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
+            elif not result.endswith("thread.skype"):
+                result = "8:%s" % result
+        return result
+
+
+    @staticmethod
     def make_db_path(username):
         """Returns the default database path for username."""
         base = util.safe_filename(username)
         if base != username: base += "_%x" % hash(username)
         return os.path.join(conf.VarDirectory, "%s.main.db" % base)
-

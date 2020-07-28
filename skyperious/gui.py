@@ -1506,6 +1506,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                      conf.Title, wx.OK | wx.ICON_ERROR)
 
             conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
+            # @todo seda võiks vist mitte teha.. ainult kui meil oli tühi baas ehk not self.db.id
             skype.save("accounts", skype.skype.user)
             skype.db.update_accountinfo()
         finally: busy.Close()
@@ -2732,7 +2733,8 @@ class DatabasePage(wx.Panel):
                                            style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
         label_progress   = self.label_sync_progress = wx.StaticText(panel_sync2)
         edit_sync_status = self.edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
-        button_sync      = self.button_sync      = controls.NoteButton(panel_sync2, label="S&ynchronize history in local database", bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync      = self.button_sync      = controls.NoteButton(panel_sync2, label="S&ynchronize history in local database", bmp=images.ButtonMergeLeftMulti.Bitmap)
+        button_sync_sel  = self.button_sync_sel  = controls.NoteButton(panel_sync2, label="Synchronize selec&ted chats", bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = self.button_sync_stop = controls.NoteButton(panel_sync2, label="Stop synchronizing", bmp=images.ButtonStop.Bitmap)
 
         ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
@@ -2766,8 +2768,10 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(edit_sync_status, "BackgroundColour", "BgColour")
         edit_sync_status.SetEditable(False)
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
         button_sync.Note = "Query Skype online services for new messages and save them in local database."
+        button_sync_sel.Note  = "Select specific chats to synchronize in local database."
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
         if not live.skpy:
@@ -2780,6 +2784,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_auto)
         self.Bind(wx.EVT_BUTTON,   self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync,         button_sync)
+        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
 
@@ -2812,6 +2817,7 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(label_progress, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         sizer_sync2.Add(edit_sync_status, proportion=1, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
 
         sizer2.Add(splitter_sync, proportion=1, flag=wx.GROW)
@@ -2913,6 +2919,42 @@ class DatabasePage(wx.Panel):
         self.worker_live.work({"action": "populate"})
 
 
+    def on_live_sync_sel(self, event=None):
+        """
+        Opens choice dialog for selecting chats and starts synchronizing
+        local database from Skype online service.
+        """
+        FIELDS = ["identity", "title", "title_long", "type"]
+        chats = sorted(self.chats, key=lambda x: (x["type"], x["title"]))
+        chats = [{k: x.get(k) for k in FIELDS} for x in chats]
+        for x in chats:
+            t = x["title"] if skypedata.CHATS_TYPE_SINGLE == x["type"] else x["title_long"]
+            if len(t) > 60:
+                t = "%s.." % t[:60]
+                if skypedata.CHATS_TYPE_SINGLE != x["type"]: t += '"'
+            if skypedata.CHATS_TYPE_SINGLE == x["type"] and x["identity"] != x["title"]:
+                t += " (%s)" % x["identity"]
+            x["title"] = t
+
+        dlg = wx.MultiChoiceDialog(self, "Select chats to synchronize:",
+                                   conf.Title, [x["title"] for x in chats])
+        if wx.ID_OK != dlg.ShowModal() or not dlg.GetSelections(): return
+
+        selchats = [chats[i] for i in dlg.GetSelections()]
+        slabel = "Updating %s (%s) from Skype online service.." % (
+                 util.plural("chat", selchats), ", ".join(x["title"] for x in selchats))
+        plabel = "Updating %s from Skype online service.." % util.plural("chat", selchats)
+        self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
+        self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+        self.label_sync_progress.Label = plabel
+        self.list_chats_sync.DeleteAllItems()
+        self.gauge_sync.Pulse()
+        self.button_sync.Disable()
+        self.button_sync_stop.Enable()
+        self.gauge_sync.ContainingSizer.Layout()
+        self.worker_live.work({"action": "populate", "chats": [x["identity"] for x in selchats]})
+
+
     def on_live_sync_stop(self, event=None):
         """Stops synchronizing local database from Skype online service."""
         if wx.OK != wx.MessageBox("Are you sure you want to stop synchronization?",
@@ -2920,6 +2962,7 @@ class DatabasePage(wx.Panel):
         ) or not self.worker_live.is_working(): return
         self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
         self.button_sync.Enable()
+        self.button_sync_sel.Enable()
         self.button_sync_stop.Disable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.stop_work()
@@ -2940,6 +2983,7 @@ class DatabasePage(wx.Panel):
                     slabel = err
                     self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
                     self.button_sync.Enable()
+                    self.button_sync_sel.Enable()
                     self.button_sync_stop.Disable()
                     wx.Bell()
                     self.update_info_page()
@@ -2951,6 +2995,7 @@ class DatabasePage(wx.Panel):
                         plabel = slabel = "Synchronization complete."
                         self.gauge_sync.Value = 100
                     self.button_sync.Enable()
+                    self.button_sync_sel.Enable()
                     self.button_sync_stop.Disable()
                     wx.Bell()
                     self.update_info_page()
