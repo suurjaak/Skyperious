@@ -7404,8 +7404,6 @@ class SqliteGridBase(wx.grid.GridTableBase):
             if not row["__deleted__"] and self._is_row_unfiltered(row):
                 self.rows_current.append(row)
         if self.sort_column is not None:
-            pass#if self.View: self.View.Fit()
-        else:
             self.sort_ascending = not self.sort_ascending
             self.SortColumn(self.sort_column)
         self.NotifyViewChange(rows_before)
