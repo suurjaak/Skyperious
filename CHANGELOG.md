@@ -10,6 +10,7 @@ CHANGELOG
 - restored support functionality;
 - made database list sortable and filterable, added date and size columns;
 - increased default font size for chat history, made it configurable;
+- updated emoticon parsing;
 - removed obsolescence notice.
 
 

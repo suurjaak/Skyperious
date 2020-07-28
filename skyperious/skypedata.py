@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1429,52 +1429,24 @@ class MessageParser(object):
     """HTML entities in the body to be replaced before feeding to xml.etree."""
     REPLACE_ENTITIES = {"&apos;": "'"}
 
-    """Regex for checking if string ends with any HTML entity, like "&lt;"."""
-    ENTITY_CHECKBEHIND_RGX = re.compile(".*(&[#\\w]{2,};)$")
-
-    """Regex for checking if string starts with any HTML entity, like "&lt;"."""
-    ENTITY_CHECKAHEAD_RGX = re.compile("^(&[#\\w]{2,};).*")
-
     """Regex for replacing raw emoticon texts with emoticon tags."""
     EMOTICON_RGX = re.compile("(%s)" % "|".join(
                               s for i in emoticons.EmoticonData.values()
                               for s in map(re.escape, i["strings"])))
 
-    # Regexes for checking if an emoticon is preceded or followed by
-    # a non-alphanumeric character or a smiley or an empty string.
-    EMOTICON_CHECKBEHIND_RGX = re.compile("(\\W)|(%s)|(^)$" % "|".join(
-                               s for i in emoticons.EmoticonData.values()
-                               for s in map(re.escape, i["strings"])),
-                               re.UNICODE)
-    EMOTICON_CHECKAHEAD_RGX  = re.compile("^(\\W)|(%s)|(^)$" % "|".join(
-                               s for i in emoticons.EmoticonData.values()
-                               for s in map(re.escape, i["strings"])),
-                               re.UNICODE)
-
     """
-    Replacer callback for raw emoticon text. Must check whether the preceding
-    text up to the first or following text from the last emoticon char is not
-    an HTML entity, e.g. "(&lt;)" or ":&quot;", and whether emoticon start and
-    preceding text or emoticon end and following text is not alphanumeric.
+    Replacer callback for raw emoticon text, with verification look-ahead.
+    Emoticon can be preceded by anything, followed by possible punctuation,
+    and must end with whitespace, or string ending, or another emoticon.
     """
     EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
         (emoticons.EmoticonStrings[m.group(1)], m.group(1))
         if m.group(1) in emoticons.EmoticonStrings
-        and (m.group(1)[:1] != ";" # Check HTML entity end, like '&lt;('
-             or not MessageParser.ENTITY_CHECKBEHIND_RGX.match(
-                m.string[max(0, m.start(1) - 7):m.start(1) + 1]))
-        and (m.group(1)[-1:] != "&" # Check for HTML entity start, like ':&gt;'
-             or not MessageParser.ENTITY_CHECKAHEAD_RGX.match(
-                m.string[m.end(1) - 1:m.end(1) + 5]))
-        and (m.group(1)[:1] not in string.ascii_letters
-             # Letter at start: check for not being the end a word, like 'max('
-             or MessageParser.EMOTICON_CHECKBEHIND_RGX.match(
-                m.string[max(0, m.start(1) - 16):m.start(1)]))
-        and (m.group(1)[-1:] not in string.ascii_letters
-             # Letter at end: check for not being the start a word, like ':psi'
-             or MessageParser.EMOTICON_CHECKAHEAD_RGX.match(
-                m.string[m.start(1) + len(m.group(1)):m.start(1) + 32]))
-        else m.group(1))
+        and re.match("^%s*[%s]*(\s|$)" % (MessageParser.EMOTICON_RGX.pattern,
+                                          re.escape(".,;:?!'\"")),
+                     m.string[m.start(1) + len(m.group(1)):])
+        else m.group(1)
+    )
 
     """Regex for checking the existence of any character all emoticons have."""
     EMOTICON_CHARS_RGX = re.compile("[:|()/]")
