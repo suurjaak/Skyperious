@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -262,10 +262,12 @@ def export_chat_template(chat, filename, db, messages):
             # Collect chat and participant images.
             namespace.update({"participants": [], "chat_picture_size": None,
                               "chat_picture_raw": None, })
-            if chat["meta_picture"]:
-                raw = skypedata.fix_image_raw(chat["meta_picture"])
+            pic = chat["meta_picture"] or chat.get("__link", {}).get("meta_picture")
+            if pic:
+                raw = skypedata.fix_image_raw(pic)
                 namespace["chat_picture_raw"] = raw
                 namespace["chat_picture_size"] = util.img_size(raw)
+                
 
             contacts = dict((c["skypename"], c) for c in db.get_contacts())
             partics = dict((p["identity"], p) for p in chat["participants"])
