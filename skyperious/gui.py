@@ -802,9 +802,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Handler for dragging items around in dblist, saves file order."""
         event.Skip()
         def save_list_order():
-            del conf.DBFiles[:]
-            for i in range(self.list_db.GetItemCountFull()):
-                conf.DBFiles.append(self.list_db.GetItemTextFull(i))
+            conf.DBFiles = [self.list_db.GetItemText(i)
+                            for i in range(1, self.list_db.GetItemCountFull())]
             conf.save()
         wx.CallAfter(save_list_order) # Allow list to update items
 
@@ -1013,7 +1012,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if not data_old: self.list_db.AppendRow(data, [1])
                 result = True
 
-        has_items = bool(self.list_db.GetItemCountFull())
+        has_items = self.list_db.GetItemCountFull() > 1
         if self.button_missing.Shown != has_items:
             self.button_missing.Show(has_items)
             self.button_type.Show(has_items)
@@ -1035,7 +1034,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_clear_databases(self, event):
         """Handler for clicking to clear the database list."""
-        if self.list_db.GetItemCountFull() and wx.OK == wx.MessageBox(
+        if self.list_db.GetItemCountFull() > 1 and wx.OK == wx.MessageBox(
             "Are you sure you want to clear the list of all databases?",
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ):
@@ -1750,8 +1749,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.worker_detection.stop()
 
             # Save last selected files in db lists, to reselect them on rerun
-            conf.DBFiles = [self.list_db.GetItemText(i)
-                            for i in range(self.list_db.GetItemCountFull())]
             del conf.LastSelectedFiles[:]
             selected = self.list_db.GetFirstSelected()
             while selected > 0:
