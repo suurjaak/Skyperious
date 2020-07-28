@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.07.2020
+@modified    29.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1516,7 +1516,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         page = page0 or self.load_database_page(filename)
         if not page: return
 
-        page.update_liveinfo()
+        if page0: page.update_liveinfo()
         page.notebook.Selection = page.pageorder[page.page_live]        
         if not page0 and conf.Login[filename].get("auto") \
         or page.worker_live.is_working():
@@ -2853,8 +2853,9 @@ class DatabasePage(wx.Panel):
 
 
     def update_liveinfo(self):
-        """Refreshes controls in login-page."""
-        opts = conf.Login.get(self.db.filename, {})
+        """Refreshes account settings in login-page from configuration."""
+        opts = conf.Login.get(self.db.filename) or {}
+        logger.info("update_liveinfo %s", opts) # @todo remove
         self.edit_user.Value = self.db.id if self.db.id else ""
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
@@ -2866,12 +2867,16 @@ class DatabasePage(wx.Panel):
     def on_change_ctrl_login(self, event):
         """Handler for changing a login control like password or checkboxes, updates conf."""
         ctrl, value = event.EventObject, event.EventObject.Value
+        logger.info("on_change_ctrl_login %s v %s", ctrl, value) # @todo remove
         if ctrl is self.edit_pw:
             name, value = "password", util.obfuscate(value)
         elif ctrl is self.check_login_store: name = "store"
         elif ctrl is self.check_login_auto:  name = "auto"
         self.check_login_auto.Enable(self.check_login_store.Value)
         conf.Login.setdefault(self.db.filename, {})[name] = value
+        if "store" == name and value and self.edit_pw.Value:
+            pw = util.obfuscate(self.edit_pw.Value)
+            conf.Login[self.db.filename]["password"] = pw
         if not self.check_login_store.Value:
             self.check_login_auto.Value = False
             conf.Login[self.db.filename].pop("store",    None)
@@ -3093,7 +3098,6 @@ class DatabasePage(wx.Panel):
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
                     if result.get("opts", {}).get("auto"): wx.CallAfter(self.on_live_sync)
-                self.update_liveinfo()
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
