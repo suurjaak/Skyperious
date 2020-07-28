@@ -45,52 +45,49 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
 <section>
 
-<h2>Important notice, 2019-09-21</h2>
+<h2>Important notice</h2>
 
 
-<p>As of Skype version 8.50 or thereabouts, conversation history is <strong><em>no longer
-available</em></strong> on the user machine. Previously, all chat history was kept in a 
-local SQLite database file. With the new versions, chat messages seem to 
-be kept on cloud servers only, retrieved on command by the Skype client,
-unavailable to external tools.</p>
+<p>Around 2017, starting from Skype version 8, Skype moved away from its famous
+peer-to-peer architecture to a client-server system, and started to store 
+conversation history on its own servers only.</p>
 
-<p>As such, Skyperious is now <strong><em>obsolete</em></strong>, further development is discontinued.</p>
+<p>Formerly, it used a local SQLite <code>main.db</code> database to store chats and messages,
+which is what Skyperious was originally created to work with - merging chat 
+histories from different computers into one.</p>
 
+<p>Skyperious still works with existing <code>main.db</code> files, and can also download
+newer messages from Skype online service. But any changes done to the database
+no longer affect what is visible in the official Skype program.</p>
 
-<br /><br /><br /><br /><br /><br /><hr />
+<hr />
 
 
 <p>Skyperious is a Skype database viewer and merger, written in Python.</p>
 
-You can open Skype SQLite databases and look at their contents:
+You can open Skype SQLite databases and work with their contents:
 <ul>
 <li>search across all messages and contacts</li>
-<li>browse chat history and export as HTML or spreadsheet, see chat statistics</li>
-<li>import contacts from a CSV file to your Skype contacts</li>
+<li>read chat history in full, see chat statistics and word clouds</li>
+<li>export chats as HTML, text or spreadsheet</li>
+<li>synchronize messages from Skype online service</li>
 <li>view any database table and and export their data</li>
 <li>change, add or delete data in any table</li>
 <li>execute direct SQL queries</li>
-</ul>
-and
-<ul>
-<li>synchronize messages in two Skype databases: keep chat history up-to-date on
-    different computers, or restore missing messages from older files into the
-    current one
-</li>
 </ul>
 
 <p>
 Additionally, it doubles as a useful database tool for any SQLite file.<br />
 Also, a <a href="help.html#commandline">command line interface</a> is available
-with key functions like exporting, searching, and merging.<br />
+with key functions like exporting, searching, syncing, and merging.<br />
 The graphical version includes a Python console window.
 </p>
 
@@ -109,6 +106,15 @@ You can use keywords to search among specific authors or chats only
 (<code>date:2012</code>, <code>date:2010..2013-06</code>). Search supports 
 wildcards, exact phrases, grouping, excluding, and either-or queries.
 </p><p>
+Skyperious can log into Skype online service and download and save new messages
+int the local database file. It can also create a new <code>main.db</code> database from 
+scratch, by downloading all available history.
+</p><p>
+HTML export can download shared photos and embed them in the resulting HTML,
+if password for the Skype account has been entered in online-page.
+This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
+Image download is also supported in the command-line interface.
+</p><p>
 In database comparison, you can scan one database for messages not found in
 the other, and copy all detected messages to the other database. Or you can 
 browse and copy specific chats and contacts.
@@ -118,6 +124,7 @@ Skyperious offers a number of options from the command line:
 <pre>
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
+  sync FILE                  download new messages from Skype online service
   merge FILE1 FILE2          merge two or more Skype databases into a new database
   diff FILE1 FILE2           compare chat history in two Skype databases
   gui [FILE]                 launch Skyperious graphical program (default option)
@@ -146,7 +153,7 @@ If running from pip installation, run <code>skyperious</code> from the command-l
 If running from straight source code, go to Skyperious directory, and launch 
 <code>skyperious.sh</code> where shell scripts are supported, or launch 
 <code>skyperious.bat</code> under Windows, or open a terminal and run 
-<code>python skyperious/main.py</code>.
+<code>python -m skyperious</code>.
 </p>
 
 
@@ -155,28 +162,32 @@ If running from straight source code, go to Skyperious directory, and launch
 Skyperious has been built using the following open-source software:
 <ul>
 <li>Python 2.7.18, <a href="http://www.python.org">www.python.org</a></li>
-<li>wxPython 4.1, <a href="http://wxpython.org">wxpython.org</a></li>
-<li>Pillow 6.2.2, <a href="https://pypi.python.org/pypi/Pillow/">wxpython.org</a></li>
+<li>wxPython 4.1.0, <a href="http://wxpython.org">wxpython.org</a></li>
+<li>beautifulsoup4 4.9.1, <a href="https://pypi.org/project/beautifulsoup4">pypi.org/project/beautifulsoup4</a></li>
+<li>dateutil 2.8.1, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
+<li>Pillow 6.2.2, <a href="https://pypi.org/project/Pillow">pypi.org/project/Pillow</a></li>
+<li>pyparsing 2.4.7, <a href="https://pypi.org/project/pyparsing">pypi.org/project/pyparsing</a></li>
+<li>SkPy 0.9.1, <a href="https://pypi.org/project/SkPy">pypi.org/project/SkPy</a></li>
 <li>step, Simple Template Engine for Python, <a href="https://github.com/dotpy/step">github.com/dotpy/step</a></li>
-<li>pyparsing 2.0.3, <a href="http://pyparsing.wikispaces.com/">pyparsing.wikispaces.com</a></li>
-<li>XlsxWriter 0.7.3, <a href="https://github.com/jmcnamara/XlsxWriter">github.com/jmcnamara/XlsxWriter</a></li>
-<li>dateutil 2.4.2, <a href="https://pypi.python.org/pypi/python-dateutil">pypi.python.org/pypi/python-dateutil</a></li>
-<li>PyInstaller 3.5, <a href="http://www.pyinstaller.org">www.pyinstaller.org</a></li>
+<li>XlsxWriter 1.2.9, <a href="https://pypi.org/project/XlsxWriter">pypi.org/project/XlsxWriter</a></li>
 </ul>
 
+<p>Binaries compiled with PyInstaller,
+<a href="https://www.pyinstaller.org">www.pyinstaller.org</a>.</p>
+
 <p>Installers created with Nullsoft Scriptable Install System,
-<a href="http://nsis.sourceforge.net/">http://nsis.sourceforge.net/</a>.</p>
+<a href="https://nsis.sourceforge.io/">nsis.sourceforge.io</a>.</p>
 
 <p>Emoticon images in HTML export are property of Skype Limited, &copy; 2004-2006,
 released under the <a href="https://github.com/suurjaak/Skyperious/blob/master/res/emoticons/Skype%20Component%20License.txt">Skype Component License 1.0</a> .</p>
 
 <p>Default avatar icon from:
   Fancy Avatars, &copy; 2009 Brandon Mathis,
-  <a href="http://brandonmathis.com/projects/fancy-avatars/">http://brandonmathis.com/projects/fancy-avatars/</a></p>
+  <a href="https://github.com/imathis/fancy-avatars">github.com/imathis/fancy-avatars</a></p>
 
 <p>Several icons from:
   Fugue Icons, &copy; 2010 Yusuke Kamiyamane,
-  <a href="http://p.yusukekamiyamane.com/">http://p.yusukekamiyamane.com/</a></p>
+  <a href="https://p.yusukekamiyamane.com/">p.yusukekamiyamane.com</a></p>
 
 
 <a name="license"><h2>License</h2></a>

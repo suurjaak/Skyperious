@@ -45,9 +45,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_3.6-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.0-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -244,14 +244,15 @@
 <pre>
 <code>$ skyperious -h</code>
 
-usage: skyperious [-h] [--verbose] {export,search,merge,diff,gui} ...
+usage: skyperious [-h] [--verbose] {export,search,sync,merge,diff,gui} ...
 
 Skyperious - Skype SQLite database viewer and merger.
 
 positional arguments:
-  {export,search,merge,diff,gui}
+  {export,search,sync,merge,diff,gui}
     export              export Skype databases as HTML, text or spreadsheet
     search              search Skype databases for messages or data
+    sync                download new messages from Skype online service
     merge               merge two or more Skype databases into a new database
     diff                compare chat history in two Skype databases
     gui                 launch Skyperious graphical program (default option)
@@ -265,10 +266,11 @@ optional arguments:
 <pre>
 <code>$ skyperious -h export</code>
 
-usage: main.py export [-h] [-t {html,xlsx,csv,txt,xlsx_single}]
-                      [-c CHAT [CHAT ...]] [-a AUTHOR [AUTHOR ...]]
-                      [--verbose]
-                      FILE [FILE ...]
+usage: skyperious export [-h] [-t {html,xlsx,csv,txt,xlsx_single}]
+                         [-c CHAT [CHAT ...]] [-a AUTHOR [AUTHOR ...]]
+                         [-s START_DATE] [-e END_DATE] [--ask-password]
+                         [--store-password] [--verbose]
+                         FILE [FILE ...]
 
 Export all message history from a Skype database into files under a new
 folder, or a single Excel workbook with chats on separate sheets.
@@ -286,8 +288,13 @@ optional arguments:
                         names of specific chats to export
   -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
                         names of specific authors whose chats to export
-  -p, --password        ask for Skype password on HTML export, to download
+  -s START_DATE, --start START_DATE
+                        date to export messages from, as YYYY-MM-DD
+  -e END_DATE, --end END_DATE
+                        date to export messages until, as YYYY-MM-DD
+  --ask-password        prompt for Skype password on HTML export to download
                         shared images
+  --store-password      store entered password in configuration
   --verbose             print detailed progress messages to stderr
 </pre>
 
@@ -296,7 +303,7 @@ optional arguments:
 <code>$ skyperious -h search</code>
 
 usage: skyperious search [-h] [-t {message,contact,chat,table}] [--verbose]
-                      QUERY FILE [FILE ...]
+                         QUERY FILE [FILE ...]
 
 Search Skype databases for messages, chat or contact information, or table
 data.
@@ -313,6 +320,37 @@ optional arguments:
                         search in message body (default), in contact
                         information, in chat title and participants, or in any
                         database table
+  --verbose             print detailed progress messages to stderr
+</pre>
+
+
+<pre>
+<code>$ skyperious -h sync</code>
+
+usage: skyperious sync [-h] [-u USERNAME] [-p PASSWORD] [--store-password]
+                       [--ask-password] [-c CHAT [CHAT ...]]
+                       [-a AUTHOR [AUTHOR ...]] [--verbose]
+                       FILE [FILE ...]
+
+Synchronize Skype database via login to Skype online service.
+
+positional arguments:
+  FILE                  Skype database file to sync
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -u USERNAME, --username USERNAME
+                        username for Skype account, used only if the Skype
+                        database does not contain account information yet
+  -p PASSWORD, --password PASSWORD
+                        password for Skype account, if not using stored or
+                        prompted
+  --store-password      store given password in configuration
+  --ask-password        prompt for Skype account password
+  -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
+                        names of specific chats to sync
+  -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
+                        names of specific authors whose chats to sync
   --verbose             print detailed progress messages to stderr
 </pre>
 
