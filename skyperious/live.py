@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    26.07.2020
+@modified    27.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -225,6 +225,16 @@ class SkypeLogin(object):
         if "chats" == table:
             self.insert_participants(item, dbitem, dbitem0)
             self.insert_chats(item, dbitem, dbitem0)
+        if "chats" == table and isinstance(item, skpy.SkypeGroupChat):
+            # See if older chat entry is present and set its alt_identity
+            identity0 = self.id_to_identity(item.id)
+            chat0 = self.cache["chats"].get(identity0) if identity0 != item.id else None
+            if chat0:
+                if not chat0.get("alt_identity"):
+                    change = {"alt_identity": item.id}
+                    self.db.update_row(dbtable, change, chat0)
+                    chat0.update(change)
+                result = self.SAVE.NOCHANGE
 
         if "messages" == table and isinstance(item, skpy.SkypeFileMsg) and item.file:
             self.insert_transfers(item, dbitem, dbitem0)
@@ -350,7 +360,7 @@ class SkypeLogin(object):
 
         elif "chats" == table:
 
-            result.update(identity=self.id_to_identity(item.id))
+            result.update(identity=item.id)
             if isinstance(item, skpy.SkypeSingleChat):
                 # SkypeSingleChat(id='8:username', alerts=True, userId='username')
 
@@ -409,7 +419,7 @@ class SkypeLogin(object):
                 result.update(from_dispname=contact.get("fullname") or contact["skypename"])
 
             if parent:
-                identity = self.id_to_identity(parent.id) if isinstance(parent, skpy.SkypeGroupChat) else parent.userId
+                identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
                     self.save("chats", parent)
@@ -546,7 +556,7 @@ class SkypeLogin(object):
                 if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.username:
                     # Conversation with self?
                     continue # for chat
-                cidentity = self.id_to_identity(chat.id)
+                cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
 
                 if cidentity in updateds: continue # for chat
                 action = self.save("chats", chat)
