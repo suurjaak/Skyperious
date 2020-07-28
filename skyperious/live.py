@@ -94,6 +94,8 @@ class SkypeLogin(object):
         if token and os.path.isfile(path) and os.path.getsize(path):
             kwargslist.insert(0, {"tokenFile": path}) # Try with existing token
         else:
+            try: os.makedirs(conf.VarDirectory)
+            except Exception: pass
             with open(path, "w"): pass
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
