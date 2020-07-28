@@ -3313,46 +3313,47 @@ class DatabasePage(wx.Panel):
                 do_refresh = self.save_unsaved_grids()
             elif wx.CANCEL == response:
                 do_refresh = False
-        if do_refresh:
-            self.db.clear_cache()
-            self.db_grids.clear()
-            self.load_tables_data()
-            if self.grid_table.Table:
-                grid, table_name = self.grid_table, self.grid_table.Table.table
-                scrollpos = map(grid.GetScrollPos, [wx.HORIZONTAL, wx.VERTICAL])
-                cursorpos = grid.GridCursorCol, grid.GridCursorRow
-                self.on_change_table(None)
-                grid.Table = None # Reset grid data to empty
-                grid.Freeze()
+        if not do_refresh: return
 
-                tableitem = None
-                table_name = table_name.lower()
-                table = next((t for t in self.db.get_tables()
-                              if t["name"].lower() == table_name), None)
-                item = self.tree_tables.GetNext(self.tree_tables.GetRootItem())
-                while table and item and item.IsOk():
-                    table2 = self.tree_tables.GetItemPyData(item)
-                    if table2 and table2.lower() == table["name"].lower():
-                        tableitem = item
-                        break # break while table and item and itek.IsOk()
-                    item = self.tree_tables.GetNextSibling(item)
-                if tableitem:
-                    # Only way to create state change in wx.lib.gizmos.TreeListCtrl
-                    class HackEvent(object):
-                        def __init__(self, item): self._item = item
-                        def GetItem(self):        return self._item
-                    self.on_change_tree_tables(HackEvent(tableitem))
-                    self.tree_tables.SelectItem(tableitem)
-                    grid.Scroll(*scrollpos)
-                    grid.SetGridCursor(*cursorpos)
-                else:
-                    self.label_table.Label = ""
-                    for x in [wx.ID_ADD, wx.ID_DELETE, wx.ID_UNDO, wx.ID_SAVE]:
-                        self.tb_grid.EnableTool(x, False)
-                    self.button_reset_grid_table.Enabled = False
-                    self.button_export_table.Enabled = False
-                grid.Thaw()
-                self.page_tables.Refresh()
+        self.db.clear_cache()
+        self.load_tables_data()
+        if self.grid_table.Table:
+            grid, table_name = self.grid_table, self.grid_table.Table.table
+            scrollpos = map(grid.GetScrollPos, [wx.HORIZONTAL, wx.VERTICAL])
+            cursorpos = grid.GridCursorCol, grid.GridCursorRow
+            self.on_change_table(None)
+            grid.Table = None # Reset grid data to empty
+            grid.Freeze()
+            self.db_grids.clear()
+
+            tableitem = None
+            table_name = table_name.lower()
+            table = next((t for t in self.db.get_tables()
+                          if t["name"].lower() == table_name), None)
+            item = self.tree_tables.GetNext(self.tree_tables.GetRootItem())
+            while table and item and item.IsOk():
+                table2 = self.tree_tables.GetItemPyData(item)
+                if table2 and table2.lower() == table["name"].lower():
+                    tableitem = item
+                    break # break while table and item and itek.IsOk()
+                item = self.tree_tables.GetNextSibling(item)
+            if tableitem:
+                # Only way to create state change in wx.lib.gizmos.TreeListCtrl
+                class HackEvent(object):
+                    def __init__(self, item): self._item = item
+                    def GetItem(self):        return self._item
+                self.on_change_tree_tables(HackEvent(tableitem))
+                self.tree_tables.SelectItem(tableitem)
+                grid.Scroll(*scrollpos)
+                grid.SetGridCursor(*cursorpos)
+            else:
+                self.label_table.Label = ""
+                for x in [wx.ID_ADD, wx.ID_DELETE, wx.ID_UNDO, wx.ID_SAVE]:
+                    self.tb_grid.EnableTool(x, False)
+                self.button_reset_grid_table.Enabled = False
+                self.button_export_table.Enabled = False
+            grid.Thaw()
+            self.page_tables.Refresh()
 
 
     def on_change_range_date(self, event):
