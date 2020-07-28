@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.07.2020
+@modified    28.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -139,6 +139,11 @@ ARGUMENTS = {
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype account password"},
+             {"args": ["-c", "--chat"], "dest": "chat", "required": False,
+              "help": "names of specific chats to sync", "nargs": "+"},
+             {"args": ["-a", "--author"], "dest": "author", "required": False,
+              "help": "names of specific authors whose chats to sync",
+              "nargs": "+"},
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file to sync", },
              {"args": ["--verbose"], "action": "store_true",
@@ -278,7 +283,8 @@ def run_search(filenames, query):
         worker and (worker.stop(), worker.join())
 
 
-def run_sync(filenames, username=None, password=None, ask_password=False, store_password=False):
+def run_sync(filenames, username=None, password=None, ask_password=False,
+             store_password=False, chatnames=(), authornames=()):
     """Synchronizes history in specified database from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
@@ -416,10 +422,15 @@ def run_sync(filenames, username=None, password=None, ask_password=False, store_
             conf.Login[filename].update(store=True, password=util.obfuscate(password0))
             conf.save()
 
+        chats = []
+        if chatnames or authornames:
+            cc = db.get_conversations(chatnames, authornames)
+            chats = [c["identity"] for c in cc]
+
         output()
         db.live.progress = progress
         ns["filename"] = filename
-        try: db.live.populate()
+        try: db.live.populate(chats)
         except Exception as e: progress(error=util.format_exc(e))
         db.close()
     
@@ -660,7 +671,8 @@ def run(nogui=False):
         run_search(arguments.FILE, arguments.QUERY)
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
-                 arguments.ask_password, arguments.store_password)
+                 arguments.ask_password, arguments.store_password,
+                 arguments.chat, arguments.author)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
 
