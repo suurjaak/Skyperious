@@ -125,7 +125,7 @@ ARGUMENTS = {
               "help": "print detailed progress messages to stderr"}, ],
         }, 
         {"name": "sync",
-         "help": "synchronize database from Skype online service",
+         "help": "download new messages from Skype online service",
          "description": "Synchronize Skype database via login to Skype online service.",
          "arguments": [
              {"args": ["-u", "--username"], "dest": "username",

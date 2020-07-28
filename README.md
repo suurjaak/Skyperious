@@ -82,6 +82,7 @@ Skyperious offers a number of options from the
 ```
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
+  sync FILE                  download new messages from Skype online service
   merge FILE1 FILE2          merge two or more Skype databases into a new database
   diff FILE1 FILE2           compare chat history in two Skype databases
   gui [FILE]                 launch Skyperious graphical program (default option)
@@ -104,7 +105,7 @@ installed.
 If running from pip installation, run `skyperious` from the command-line. 
 If running from straight source code, launch `skyperious.sh` where shell 
 scripts are supported, or launch `skyperious.bat` under Windows, or open 
-a terminal and run `python skyperious/main.py` in Skyperious directory.
+a terminal and run `python -m skyperious` in Skyperious directory.
 
 
 Installation
