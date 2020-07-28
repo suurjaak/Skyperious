@@ -68,6 +68,7 @@ class SkypeLogin(object):
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
         self.populated    = False
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
+        self.msg_stamps   = {} # {remote_id: last timestamp}
 
 
     def is_logged_in(self):
@@ -198,10 +199,11 @@ class SkypeLogin(object):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
+                if dbitem["timestamp"] < self.msg_stamps[dbitem["remote_id"]]:
+                    dbitem.pop("body_xml") # We have a later more valid content
+                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp"], self.msg_stamps[dbitem["remote_id"]])
                 if dbitem["timestamp"] > dbitem0["timestamp"]:
                     dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp")})
-                else:
-                    dbitem.pop("body_xml")
                 result, dbitem1 = self.SAVE.SKIP, dict(dbitem)
 
             self.db.update_row(dbtable, dbitem, dbitem0, log=False)
@@ -211,6 +213,9 @@ class SkypeLogin(object):
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
             result = self.SAVE.INSERT
+
+        if "messages" == table and dbitem1["remote_id"] not in self.msg_stamps:
+            self.msg_stamps[dbitem1["remote_id"]] = dbitem1["timestamp"]
 
         if identity is not None:
             cacheitem = dict(dbitem)
@@ -425,8 +430,8 @@ class SkypeLogin(object):
                     self.save("chats", parent)
                     chat = self.cache["chats"].get(identity)
                 result.update(convo_id=chat["id"])
-            if item.clientId:
-                result.update(remote_id=hash(item.clientId))
+            remote_id = item.raw.get("skypeeditedid") or item.clientId
+            if remote_id: result.update(remote_id=hash(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
                 result.update(dialog_partner=item.userId)

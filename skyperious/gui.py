@@ -1505,8 +1505,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                      (user, util.format_exc(e)),
                                      conf.Title, wx.OK | wx.ICON_ERROR)
 
+
             conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
-            # @todo seda võiks vist mitte teha.. ainult kui meil oli tühi baas ehk not self.db.id
             skype.save("accounts", skype.skype.user)
             skype.db.update_accountinfo()
         finally: busy.Close()
@@ -3024,7 +3024,7 @@ class DatabasePage(wx.Panel):
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
                     elif result.get("start") and "messages" != result["table"] and self.worker_live.is_working():
-                        plabel = slabel = "Synchronizing %s.." % result["table"]
+                        plabel = slabel = "Synchronizing %s.." % ("contacts" if "contacts" == result["table"] else "messages")
 
                     if result.get("end"):
                         slabel = "Synchronized %s" % result["table"]
