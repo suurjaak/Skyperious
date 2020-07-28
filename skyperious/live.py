@@ -199,8 +199,7 @@ class SkypeLogin(object):
                     if x not in self.cache["contacts"]:
                         contact = self.request(self.skype.contacts.contact, x)
                         if contact: self.save("contacts", contact)
-                cc = [self.cache["contacts"].get(x, {})["fullname"] or x
-                      for x in item.userIds]
+                cc = map(self.get_contact_name, item.userIds)
                 dbitem["displayname"] = ", ".join(cc[:4])
                 if len(cc) > 4: dbitem["displayname"] += ", ..."
             dbitem1 = dict(dbitem)
@@ -229,7 +228,8 @@ class SkypeLogin(object):
             dbitem["__inserted__"] = True
             result = self.SAVE.INSERT
 
-        if "messages" == table and dbitem1["remote_id"] not in self.msg_stamps:
+        if "messages" == table and "remote_id" in dbitem1 \
+        and dbitem1["remote_id"] not in self.msg_stamps:
             self.msg_stamps[dbitem1["remote_id"]] = dbitem1["timestamp"]
 
         if identity is not None:
@@ -274,9 +274,7 @@ class SkypeLogin(object):
                  filesize=msg.file.size, starttime=row["timestamp"],
                  chatmsg_guid=row["guid"], chatmsg_index=0,
                  type=skypedata.TRANSFER_TYPE_OUTBOUND, partner_handle=msg.userId,
-                 partner_dispname=msg.userId)
-        contact = self.cache["contacts"].get(msg.userId)
-        if contact: t.update(partner_dispname=contact.get("fullname") or contact["skypename"])
+                 partner_dispname=self.get_contact_name(msg.userId))
         existing = None
         if row0:
             cursor = self.db.execute("SELECT 1 FROM transfers WHERE "
@@ -347,7 +345,8 @@ class SkypeLogin(object):
 
             result.update(is_permanent=1, skypename=item.id, languages=item.language)
             if item.name:
-                result.update(fullname=unicode(item.name))
+                name = unicode(item.name)
+                result.update(displayname=name, fullname=name)
             if item.birthday:
                 result.update(birthday=self.date_to_integer(item.birthday))
             if item.location and item.location.country:
@@ -381,13 +380,10 @@ class SkypeLogin(object):
                 # SkypeSingleChat(id='8:username', alerts=True, userId='username')
 
                 result.update(identity=item.userId, type=skypedata.CHATS_TYPE_SINGLE)
-                contact = self.cache["contacts"].get(item.userId)
-                if not contact:
+                if item.userId not in self.cache["contacts"]:
                     citem = self.request(self.skype.contacts.contact, item.userId, __raise=False)
-                    if citem:
-                        self.save("contacts", citem)
-                        contact = self.cache["contacts"].get(item.userId)
-                result.update(displayname=contact.get("fullname") or contact["skypename"] if contact else item.userId)
+                    if citem: self.save("contacts", citem)
+                result.update(displayname=self.get_contact_name(item.userId))
 
             elif isinstance(item, skpy.SkypeGroupChat):
                 # SkypeGroupChat(id='19:xyz==@p2p.thread.skype', alerts=True, topic='chat topic', creatorId='username;epid={87e22f7c-d816-ea21-6cb3-05b477922f95}', userIds=['username1', 'username2'], adminIds=['username'], open=False, history=True, picture='https://experimental-api.asm.skype.com/..')
@@ -421,8 +417,8 @@ class SkypeLogin(object):
 
             ts = util.datetime_to_epoch(item.time)
             result.update(is_permanent=1, timestamp=int(ts), author=item.userId,
-                          from_dispname=item.userId, body_xml=item.content,
-                          timestamp__ms=ts*1000)
+                          from_dispname=self.get_contact_name(item.userId),
+                          body_xml=item.content, timestamp__ms=ts*1000)
 
             # Ensure that pk_id fits into INTEGER-column
             try: pk_id = int(item.id) if int(item.id).bit_length() < 64 else hash(item.id)
@@ -430,10 +426,6 @@ class SkypeLogin(object):
             guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
             guid *= 32 / len(guid)
             result.update(pk_id=pk_id, guid=guid)
-
-            contact = self.cache["contacts"].get(item.userId)
-            if contact:
-                result.update(from_dispname=contact.get("fullname") or contact["skypename"])
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) else parent.userId
@@ -522,8 +514,7 @@ class SkypeLogin(object):
                 if tag and tag.text:
                     author = self.id_to_identity(tag.text)
                     result.update(author=author)
-                    contact = self.cache["contacts"].get(author)
-                    result.update(from_dispname=contact.get("fullname") or contact["skypename"] if contact else tag.text)
+                    result.update(from_dispname=self.get_contact_name(author))
 
             elif "RichText/Media_Video"    == item.type \
             or   "RichText/Media_AudioMsg" == item.type:
@@ -720,6 +711,16 @@ class SkypeLogin(object):
         result = None
         if isinstance(date, datetime.date):
             result = 10000 * date.year + 100 * date.month + date.day
+        return result
+
+
+    def get_contact_name(self, identity):
+        """Returns contact displayname or fullname or identity."""
+        result = None
+        contact = self.cache["contacts"].get(identity)
+        if contact:
+            result = contact.get("displayname") or contact.get("fullname")
+        result = result or identity
         return result
 
 
