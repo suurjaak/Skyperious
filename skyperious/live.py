@@ -231,14 +231,10 @@ class SkypeLogin(object):
             self.insert_participants(item, dbitem, dbitem0)
             self.insert_chats(item, dbitem, dbitem0)
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat):
-            # See if older chat entry is present and set its alt_identity
+            # See if older-style chat entry is present
             identity0 = self.id_to_identity(item.id)
             chat0 = self.cache["chats"].get(identity0) if identity0 != item.id else None
             if chat0:
-                if not chat0.get("alt_identity"):
-                    change = {"alt_identity": item.id}
-                    self.db.update_row(dbtable, change, chat0)
-                    chat0.update(change)
                 result = self.SAVE.NOCHANGE
 
         if "messages" == table and isinstance(item, skpy.SkypeFileMsg) and item.file:
