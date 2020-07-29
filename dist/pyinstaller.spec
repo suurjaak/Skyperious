@@ -4,7 +4,7 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  06.07.2020
+@modified  29.07.2020
 """
 import os
 import struct
@@ -35,7 +35,8 @@ a = Analysis(
 )
 a.datas += [("conf.py", "skyperious/conf.py", "DATA"), # For configuration docstrings
             ("res/Carlito.ttf", "skyperious/res/Carlito.ttf", "DATA"),
-            ("res/CarlitoBold.ttf", "skyperious/res/CarlitoBold.ttf", "DATA"), ]
+            ("res/CarlitoBold.ttf", "skyperious/res/CarlitoBold.ttf", "DATA"),
+            ("res/emoticons.zip", "skyperious/res/emoticons.zip", "DATA"), ]
 a.binaries = a.binaries - TOC([
     ('tcl85.dll', None, None),
     ('tk85.dll',  None, None),
