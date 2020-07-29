@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    28.07.2020
+@modified    29.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -474,7 +474,7 @@ class SkypeLogin(object):
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
-                                       tuple(map(urllib.quote, [item.file.size, item.file.name])))
+                                       tuple(map(urllib.quote, map(util.to_unicode, [item.file.size, item.file.name]))))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
                 # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='live:.cid.c63ad15063a6dfca', chatId='19:e1a913fec4eb4be9b989379768d24229@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:live:.cid.c63ad15063a6dfca</initiator><value>Groupie: topic</value></topicupdate>', topic='Groupie: topic')
