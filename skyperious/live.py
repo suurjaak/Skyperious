@@ -31,7 +31,6 @@ except ImportError: pass
 from . lib import util
 
 from . import conf
-from . import guibase
 from . import skypedata
 
 
@@ -272,68 +271,85 @@ class SkypeLogin(object):
 
     def insert_transfers(self, msg, row, row0):
         """Inserts Transfers-row for SkypeFileMsg, if not already present."""
-        t = dict(is_permanent=1, filename=msg.file.name, convo_id=row["convo_id"],
-                 filesize=msg.file.size, starttime=row["timestamp"],
-                 chatmsg_guid=row["guid"], chatmsg_index=0,
-                 type=skypedata.TRANSFER_TYPE_OUTBOUND, partner_handle=msg.userId,
-                 partner_dispname=self.get_contact_name(msg.userId))
-        existing = None
-        if row0:
-            cursor = self.db.execute("SELECT 1 FROM transfers WHERE "
-                                     "convo_id = :convo_id AND chatmsg_guid = :guid", row0, log=False)
-            existing = cursor.fetchone()
-        if not existing: self.db.insert_row("transfers", t, log=False)
+        try:
+            t = dict(is_permanent=1, filename=msg.file.name, convo_id=row["convo_id"],
+                     filesize=msg.file.size, starttime=row["timestamp"],
+                     chatmsg_guid=row["guid"], chatmsg_index=0,
+                     type=skypedata.TRANSFER_TYPE_OUTBOUND, partner_handle=msg.userId,
+                     partner_dispname=self.get_contact_name(msg.userId))
+            existing = None
+            if row0:
+                cursor = self.db.execute("SELECT 1 FROM transfers WHERE "
+                                         "convo_id = :convo_id AND chatmsg_guid = :guid", row0, log=False)
+                existing = cursor.fetchone()
+            if not existing: self.db.insert_row("transfers", t, log=False)
+        except Exception:
+            logger.exception("Error inserting Transfers-row for message %s.", msg)
 
 
     def insert_participants(self, chat, row, row0):
         """Inserts Participants-rows for SkypeChat, if not already present."""
-        participants, newcontacts = [], []
-        usernames = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
-                    else set([self.username, chat.userId])
-        for username in usernames:
-            p = dict(is_permanent=1, convo_id=row["id"], identity=username)
-            if isinstance(chat, skpy.SkypeGroupChat) and username == chat.creatorId:
-                p.update(rank=1)
-            participants.append(p)
-        existing = set()
-        if row0:
-            cursor = self.db.execute("SELECT identity FROM participants WHERE convo_id = :id", row0, log=False)
-            existing.update(x["identity"] for x in cursor)
-        for p in participants:
-            if p["identity"] not in existing:
-                self.db.insert_row("participants", p, log=False)
-            if p["identity"] not in self.cache["contacts"]:
-                contact = self.request(self.skype.contacts.contact, p["identity"], __raise=False)
-                if contact: newcontacts.append(contact)
-        for c in newcontacts: self.save("contacts", c)
+        try:
+            participants, newcontacts = [], []
+            usernames = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
+                        else set([self.username, chat.userId])
+            for username in usernames:
+                p = dict(is_permanent=1, convo_id=row["id"], identity=username)
+                if isinstance(chat, skpy.SkypeGroupChat) and username == chat.creatorId:
+                    p.update(rank=1)
+                participants.append(p)
+            existing = set()
+            if row0:
+                cursor = self.db.execute("SELECT identity FROM participants "
+                                         "WHERE convo_id = :id", row0, log=False)
+                existing.update(x["identity"] for x in cursor)
+            for p in participants:
+                if p["identity"] not in existing:
+                    self.db.insert_row("participants", p, log=False)
+                if p["identity"] not in self.cache["contacts"]:
+                    contact = self.request(self.skype.contacts.contact,
+                                           p["identity"], __raise=False)
+                    if contact: newcontacts.append(contact)
+            for c in newcontacts: self.save("contacts", c)
+        except Exception:
+            logger.exception("Error inserting Participants-rows for chat %s.", chat)
 
 
     def insert_chats(self, chat, row, row0):
         """Inserts Chats-row for SkypeChat, if not already present."""
-        if self.db.execute("SELECT 1 FROM chats WHERE conv_dbid = :id", row).fetchone():
-            return
+        try:
+            if self.db.execute("SELECT 1 FROM chats "
+                               "WHERE conv_dbid = :id", row, log=False).fetchone():
+                return
 
-        cursor = self.db.execute("SELECT identity FROM participants WHERE convo_id = :id", row, log=False)
-        memberstr = " ".join(sorted(x["identity"] for x in cursor))
-        c = dict(is_permanent=1, name=row["identity"], conv_dbid=row["id"],
-                 posters=memberstr, participants=memberstr, activemembers=memberstr,
-                 friendlyname=row["displayname"])
-        self.db.insert_row("chats", c, log=False)
+            cursor = self.db.execute("SELECT identity FROM participants "
+                                     "WHERE convo_id = :id", row, log=False)
+            memberstr = " ".join(sorted(x["identity"] for x in cursor))
+            c = dict(is_permanent=1, name=row["identity"], conv_dbid=row["id"],
+                     posters=memberstr, participants=memberstr,
+                     activemembers=memberstr, friendlyname=row["displayname"])
+            self.db.insert_row("chats", c, log=False)
+        except Exception:
+            logger.exception("Error inserting Chats-row for chat %s.", chat)
 
 
     def insert_calls(self, msg, row, row0):
         """Inserts Calls-row for SkypeCallMsg."""
-        if row0 or skpy.SkypeCallMsg.State.Started == msg.state: return
+        try:
+            if row0 or skpy.SkypeCallMsg.State.Started == msg.state: return
 
-        duration = 0
-        bs = BeautifulSoup(msg.content, "html.parser") if BeautifulSoup else None
-        for tag in bs.find_all("duration") if bs else ():
-            try: duration = max(duration, int(float(tag.text)))
-            except Exception: pass
+            duration = 0
+            bs = BeautifulSoup(msg.content, "html.parser") if BeautifulSoup else None
+            for tag in bs.find_all("duration") if bs else ():
+                try: duration = max(duration, int(float(tag.text)))
+                except Exception: pass
 
-        ts = row["timestamp"] - duration
-        c = dict(conv_dbid=row["convo_id"], begin_timestamp=ts, name="1-%s" % ts, duration=duration)
-        self.db.insert_row("calls", c, log=False)
+            ts = row["timestamp"] - duration
+            c = dict(conv_dbid=row["convo_id"], begin_timestamp=ts,
+                     name="1-%s" % ts, duration=duration)
+            self.db.insert_row("calls", c, log=False)
+        except Exception:
+            logger.exception("Error inserting Calls-row for message %s.", msg)
 
 
     def convert(self, table, item, parent=None):
@@ -474,7 +490,8 @@ class SkypeLogin(object):
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
-                                       tuple(map(urllib.quote, map(util.to_unicode, [item.file.size, item.file.name]))))
+                                       tuple(urllib.quote(util.to_unicode(x))
+                                             for x in [item.file.size or 0, item.file.name or "file"]))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
                 # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='live:.cid.c63ad15063a6dfca', chatId='19:e1a913fec4eb4be9b989379768d24229@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:live:.cid.c63ad15063a6dfca</initiator><value>Groupie: topic</value></topicupdate>', topic='Groupie: topic')
@@ -512,11 +529,14 @@ class SkypeLogin(object):
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_PICTURE,
                               type=skypedata.MESSAGE_TYPE_TOPIC)
-                tag = BeautifulSoup and BeautifulSoup(item.content, "html.parser").find("initiator")
-                if tag and tag.text:
-                    author = self.id_to_identity(tag.text)
-                    result.update(author=author)
-                    result.update(from_dispname=self.get_contact_name(author))
+                try:
+                    tag = BeautifulSoup and BeautifulSoup(item.content, "html.parser").find("initiator")
+                    if tag and tag.text:
+                        author = self.id_to_identity(tag.text)
+                        result.update(author=author)
+                        result.update(from_dispname=self.get_contact_name(author))
+                except Exception:
+                    logger.warn("Error parsing message %s.", item, exc_info=True)
 
             elif "RichText/Media_Video"    == item.type \
             or   "RichText/Media_AudioMsg" == item.type:
@@ -583,7 +603,13 @@ class SkypeLogin(object):
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
 
                 if cidentity in updateds: continue # for chat
-                action = self.save("chats", chat)
+                try: action = self.save("chats", chat)
+                except Exception:
+                    logger.exception("Error saving chat %s.", chat)
+                    if self.progress and not self.progress():
+                        run = False
+                        break # for chat
+                    continue # for chat
                 if self.SAVE.INSERT == action: new += 1
                 if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                     updateds.add(cidentity)
@@ -598,7 +624,13 @@ class SkypeLogin(object):
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
                     for msg in msgs:
-                        action = self.save("messages", msg, parent=chat)
+                        try: action = self.save("messages", msg, parent=chat)
+                        except Exception:
+                            logger.exception("Error saving chat '%s' message %s.", cidentity, msg)
+                            if self.progress and not self.progress():
+                                msgs, mrun = [], False
+                                break # for msg
+                            continue # for msg
                         if self.SAVE.SKIP != action:   mcount += 1
                         if self.SAVE.INSERT == action: mnew += 1
                         if self.SAVE.UPDATE == action: mupdated += 1
@@ -659,11 +691,16 @@ class SkypeLogin(object):
             action="populate", table="contacts", total=total
         ):
             return
-        count, new, updated, run = 0, 0, 0, True
+        count, new, updated = 0, 0, 0
         for username in contacts:
             contact = self.request(self.skype.contacts.contact, username, __raise=False)
             if not contact: continue # for username
-            action = self.save("contacts", contact)
+            try: action = self.save("contacts", contact)
+            except Exception:
+                logger.exception("Error saving contact %s.", contact)
+                if self.progress and not self.progress():
+                    break # for username
+                continue # for username
             if self.SAVE.INSERT == action: new     += 1
             if self.SAVE.UPDATE == action: updated += 1
             count += 1
