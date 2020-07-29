@@ -1293,8 +1293,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     extname.upper(), export_dir))
                 wx.SafeYield() # Allow UI to refresh
                 try:
-                    if not db.has_consumers():
-                        db.get_conversations_stats(chats)
+                    db.get_conversations_stats(chats)
                     progressfunc = lambda *args: wx.SafeYield()
                     result = export.export_chats(chats, export_dir, format, db,
                                                  progress=progressfunc)
@@ -1316,7 +1315,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.dbs[db.filename]
                 db.close()
             if db and not error:
-                util.start_file(export_dir if len(files) > 1 else files[0])
+                util.start_file(files[0] if do_singlefile else export_dir)
         self.button_export.Enabled = True
         if focused_control: focused_control.SetFocus()
             
@@ -3615,7 +3614,7 @@ class DatabasePage(wx.Panel):
                                util.plural("chat", count), 
                                util.plural("message", message_count), self.db,
                                extname.upper(), dirname, log=True)
-                util.start_file(dirname if len(files) > 1 else files[0])
+                util.start_file(files[0] if do_singlefile else dirname)
             else:
                 guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
