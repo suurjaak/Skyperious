@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.07.2020
+@modified    29.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1967,8 +1967,8 @@ class MessageParser(object):
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
-            logger.error("Exception for %s: %s", message["body_xml"], e)
-            for elem in dom.findall("*"):
+            logger.exception("Exception for '%s'.", message["body_xml"])
+            for elem in [dom] + dom.findall("*"):
                 for attr in ["text", "tail"]:
                     val = getattr(elem, attr)
                     if val and isinstance(val, str):
@@ -1983,7 +1983,8 @@ class MessageParser(object):
             except Exception:
                 logger.error("Failed to parse the message \"%s\" from %s.",
                              message["body_xml"], message["author"])
-                raise
+                result = message["body_xml"] or ""
+                result = result.replace("<", "&lt;").replace(">", "&gt;")
         # emdash workaround, cElementTree won't handle unknown entities
         result = result.replace("{EMDASH}", "&mdash;") \
                        .replace("\n", "<br />")
