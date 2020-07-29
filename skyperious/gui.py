@@ -4938,7 +4938,7 @@ class DatabasePage(wx.Panel):
                 if not hasattr(emoticons, emoticon): continue # for emoticon
                 img = getattr(emoticons, emoticon).Image
                 fn = "emoticon_%s.png" % emoticon
-                if fn not in fs["files"]:
+                if img and fn not in fs["files"]:
                     fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
 
