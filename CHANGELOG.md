@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-4.0, 2020-07-27
+4.0, 2020-07-29
 ---------------
 - added support for syncing chat history from Skype online service;
 - added 400+ more emoticon images;
