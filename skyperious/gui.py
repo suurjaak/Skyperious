@@ -1288,9 +1288,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if not error:
                 chats = db.get_conversations()
                 busy = controls.BusyPanel(
-                    self, "Exporting all %s from \"%s\"\nas %s\nunder %s." %
-                    (util.plural("chat", chats), db.filename,
-                    extname.upper(), export_dir))
+                    self, 'Exporting all chats from "%s"\nas %s under %s.' %
+                    (db.filename, extname.upper(), export_dir))
                 wx.SafeYield() # Allow UI to refresh
                 try:
                     db.get_conversations_stats(chats)
@@ -3428,7 +3427,7 @@ class DatabasePage(wx.Panel):
                 filename += ".%s" % extname
                 filepath = os.path.join(dirname, filename)
             busy = controls.BusyPanel(
-                self, "Exporting \"%s\"." % self.chat["title"]
+                self, 'Exporting "%s".' % self.chat["title"]
             )
             guibase.status("Exporting to %s.", filepath)
             try:
@@ -3595,9 +3594,8 @@ class DatabasePage(wx.Panel):
                 extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
                 format = extname
 
-            msg = "Exporting %s from \"%s\"\nas %s under %s." % \
-                (util.plural("chat", chats), self.db.filename,
-                 extname.upper(), dirname)
+            msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
+                  ("all " if do_all else "", self.db.filename, extname.upper(), dirname)
             busy = controls.BusyPanel(self, msg)
             guibase.status(msg, log=True)
             files, count, message_count, errormsg = [], 0, 0, None
