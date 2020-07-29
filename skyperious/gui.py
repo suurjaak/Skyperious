@@ -1056,7 +1056,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         original = self.db_filename
         if not os.path.exists(original):
             wx.MessageBox(
-                "The file \"%s\" does not exist on this computer." % original,
+                'The file "%s" does not exist on this computer.' % original,
                 conf.Title, wx.OK | wx.ICON_INFORMATION
             )
             return
@@ -1074,11 +1074,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 shutil.copyfile(original, newpath)
                 success = True
             except Exception as e:
-                logger.error("%r when trying to copy %s to %s.",
-                             e, original, newpath)
-                wx.MessageBox("Failed to copy \"%s\" to \"%s\"." %
-                              (original, newpath), conf.Title,
-                              wx.OK | wx.ICON_WARNING)
+                guibase.status("Error trying to copy %s to %s: %s",
+                               original, newpath, util.format_exc(e))
+                logger.exception("Error trying to copy %s to %s.", original, newpath)
+                wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
+                              conf.Title, wx.OK | wx.ICON_WARNING)
             if success:
                 guibase.status("Saved a copy of %s as %s.", original, newpath,
                                log=True)
@@ -1255,7 +1255,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
 
         if wx.ID_OK == self.dialog_savefile.ShowModal():
-            db, files, count, message_count, error, errormsg = None, [], 0, 0, False, None
+            db, files, count, message_count = None, [], 0, 0
+            error, errormsg, errormsg_short = False, None, None
 
             db = self.load_database(self.db_filename)
             dirname = os.path.dirname(self.dialog_savefile.GetPath())
@@ -1274,7 +1275,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 export_dir = util.unique_path(os.path.join(dirname, folder))
                 try:
                     os.mkdir(export_dir)
-                except Exception:
+                except Exception as e:
+                    errormsg_short = "Failed to create directory %s: %s" % (
+                                     export_dir, util.format_exc(e))
                     errormsg = "Failed to create directory %s:\n\n%s" % \
                                (export_dir, traceback.format_exc())
                     error = True
@@ -1297,9 +1300,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     result = export.export_chats(chats, export_dir, format, db,
                                                  progress=progressfunc)
                     files, count, message_count = result
-                except Exception:
-                    errormsg = "Error exporting chats:\n\n%s" % \
-                               traceback.format_exc()
+                except Exception as e:
+                    errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
+                    errormsg = "Error exporting chats:\n\n%s" % traceback.format_exc()
                     error = True
                 busy.Close()
             if not error:
@@ -1308,7 +1311,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                util.plural("message", message_count), db.filename,
                                extname.upper(), export_dir, log=True)
             elif errormsg:
-                guibase.status(errormsg, log=True)
+                guibase.status(errormsg_short or errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             if db and not db.has_consumers():
                 del self.dbs[db.filename]
@@ -3598,12 +3601,13 @@ class DatabasePage(wx.Panel):
                   ("all " if do_all else "", self.db.filename, extname.upper(), dirname)
             busy = controls.BusyPanel(self, msg)
             guibase.status(msg, log=True)
-            files, count, message_count, errormsg = [], 0, 0, None
+            files, count, message_count, errormsg, errormsg_short = [], 0, 0, None, None
             try:
                 progressfunc = lambda *args: wx.SafeYield()
                 files, count, message_count = export.export_chats(chats, dirname,
                     format, self.db, timerange=timerange, skip=do_all, progress=progressfunc)
-            except Exception:
+            except Exception as e:
+                errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
                 errormsg = "Error exporting chats:\n\n%s" % \
                            traceback.format_exc()
             busy.Close()
@@ -3614,7 +3618,7 @@ class DatabasePage(wx.Panel):
                                extname.upper(), dirname, log=True)
                 util.start_file(files[0] if do_singlefile else dirname)
             else:
-                guibase.status(errormsg, log=True)
+                guibase.status(errormsg_short or errormsg)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -3661,10 +3665,11 @@ class DatabasePage(wx.Panel):
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
                                   conf.Title, wx.OK | wx.ICON_INFORMATION)
-            except Exception:
+            except Exception as e:
+                guibase.status("Error saving %s: %s", filepath, util.format_exc(e))
+                logger.exception("Error saving %s.", filepath)
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
-                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             finally:
                 busy.Close()
@@ -4421,11 +4426,12 @@ class DatabasePage(wx.Panel):
                                        self.db, sql, table)
                     guibase.status("Exported %s.", filename, log=True)
                     util.start_file(filename)
-                except Exception:
-                    msg = "Error saving %s:\n\n%s" % \
-                          (filename, traceback.format_exc())
-                    guibase.status(msg, log=True)
-                    wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                except Exception as e:
+                    guibase.status("Error saving %s: %s", filename, util.format_exc(e))
+                    logger.exception("Error saving %s.", filename)
+                    errormsg = "Error saving %s:\n\n%s" % \
+                               (filename, traceback.format_exc())
+                    wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 finally:
                     busy.Close()
 
@@ -4533,11 +4539,13 @@ class DatabasePage(wx.Panel):
                 grid.SaveChanges()
             except Exception as e:
                 result = False
-                template = "Error saving table %s in \"%s\".\n\n%%r" % (
-                           grid.table, self.db)
-                msg, msgfull = template % e, template % traceback.format_exc()
-                guibase.status(msg), logger.error(msgfull)
-                wx.MessageBox(msg, conf.Title, wx.OK | wx.ICON_WARNING)
+                guibase.status('Error saving table %s in "%s": %s',
+                               grid.table, self.db, util.format_exc(e))
+                logger.exception('Error saving table %s in "%s".',
+                                 grid.table, self.db)
+                errormsg = 'Error saving table %s in "%s":\n\n%s' % (
+                           grid.table, self.db, traceback.format_exc())
+                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
                 break # break for grid
         return result
 
@@ -4685,11 +4693,12 @@ class DatabasePage(wx.Panel):
                 self.button_export_table.Enabled = True
                 self.button_reset_grid_table.Enabled = True
                 busy.Close()
-            except Exception:
+            except Exception as e:
                 busy.Close()
+                guibase.status("Could not load table %s: %s", table, util.format_exc(e))
+                logger.exception("Could not load table %s.", table)
                 errormsg = "Could not load table %s.\n\n%s" % \
                            (table, traceback.format_exc())
-                guibase.status(errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -4805,8 +4814,9 @@ class DatabasePage(wx.Panel):
             try:
                 self.stc_history.Populate(chat, self.db,
                     center_message_id=center_message_id)
-            except Exception:
-                guibase.status("Error loading %s.", chat["title_long_lc"])
+            except Exception as e:
+                guibase.status("Error loading %s: %s",
+                               chat["title_long_lc"], util.format_exc(e))
                 logger.exception("Error loading %s.", chat["title_long_lc"])
                 errormsg = "Error loading %s:\n\n%s" % \
                            (chat["title_long_lc"], traceback.format_exc())
@@ -5048,9 +5058,10 @@ class DatabasePage(wx.Panel):
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
             guibase.status("Opened Skype database %s.", self.db)
-        except Exception:
+        except Exception as e:
             if self:
-                guibase.status("Error loading additional data from %s.", self.db)
+                guibase.status("Error loading additional data from %s: %s",
+                               self.db, util.format_exc(e))
                 logger.exception("Error loading additional data from %s.", self.db)
         if self:
             # Refresh list from loaded data, sort by last message datetime
@@ -6158,11 +6169,14 @@ class MergerPage(wx.Panel):
             self.chats1 = chats1
             self.chats2 = chats2
             wx.CallLater(200, self.load_later_data)
-        except Exception:
+        except Exception as e:
             wx.CallAfter(self.update_tabheader)
+            guibase.status("Could not load chat lists from %s and %s: %s",
+                           self.db1, self.db2, util.format_exc(e))
+            logger.exception("Could not load chat lists from %s and %s.",
+                             self.db1, self.db2)
             errormsg = "Could not load chat lists from %s and %s.\n\n%s" % \
                        (self.db1, self.db2, traceback.format_exc())
-            guibase.status(errormsg, log=True)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
@@ -6321,7 +6335,7 @@ class MergerPage(wx.Panel):
                 logger.exception("Error loading additional data from %s or %s.",
                                  self.db1, self.db2)
                 wx.MessageBox("Error loading additional data from %s or %s."
-                              "\n\nError: %r." % (self.db1, self.db2, e),
+                              "\n\nError: %s." % (self.db1, self.db2, util.format_exc(e)),
                               conf.Title, wx.OK | wx.ICON_WARNING)
 
         if self:
