@@ -2102,7 +2102,7 @@ class MessageParser(object):
             for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
             self.stats["counts"][author]["files"] += len(files)
-            size_files = sum([util.try_until(lambda: int(i["filesize"])) or 0
+            size_files = sum([util.try_until(lambda: int(i["filesize"]))[1] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
         elif MESSAGE_TYPE_MESSAGE == message["type"]:

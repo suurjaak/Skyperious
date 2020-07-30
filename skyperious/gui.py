@@ -3033,7 +3033,7 @@ class DatabasePage(wx.Panel):
         """Callback for workers.LiveThread results."""
 
         def after(result):
-            if not self: return
+            if not self or not result or "action" not in result: return
 
             if "populate" == result["action"]:
                 plabel, slabel = None, None
