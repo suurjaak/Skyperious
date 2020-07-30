@@ -1,7 +1,17 @@
 CHANGELOG
 =========
 
-4.0, 2020-07-27
+4.0.2, 2020-07-30
+-----------------
+- ensure that error reporting does not raise error.
+
+
+4.0.1, 2020-07-30
+-----------------
+- fixed live sync failing on unexpected errors.
+
+
+4.0, 2020-07-29
 ---------------
 - added support for syncing chat history from Skype online service;
 - added 400+ more emoticon images;
