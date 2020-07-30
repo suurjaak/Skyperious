@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 
-Skyperious uses dateutil (http://pypi.python.org/pypi/python-dateutil),
+Skyperious uses dateutil (http://pypi.org/project/python-dateutil),
 released under the BSD License.
 
 dateutil - Extensions to the standard Python datetime module.
@@ -36,8 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses beautifulsoup4
-(https://github.com/Terrance/SkPy), released under the MIT License.
+Skyperious uses beautifulsoup4 (https://pypi.org/project/beautifulsoup4),
+released under the MIT License.
 
 Copyright (c) 2004-2019 Leonard Richardson
 
@@ -71,7 +71,8 @@ available under the MIT license. Copyright (c) 2018 Isaac Muse
 -------------------------------------------------------------------------------
 
 Skyperious uses jsOnlyLightbox
-(https://github.com/felixhagspiel/jsOnlyLightbox), released under the MIT License.
+(https://github.com/felixhagspiel/jsOnlyLightbox),
+released under the MIT License.
 
 The MIT License (MIT)
 
@@ -97,7 +98,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses Pillow (https://pypi.python.org/pypi/Pillow/) - a fork of PIL,
+Skyperious uses Pillow (https://pypi.org/project/Pillow/) - a fork of PIL,
 the Python Imaging Library (http://www.pythonware.com/products/pil/),
 released under the Python Imaging Library License.
 
@@ -129,8 +130,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses pyparsing,
-(http://pyparsing.wikispaces.com/), released under the MIT License.
+Skyperious uses pyparsing (https://pypi.org/project/pyparsing),
+released under the MIT License.
 
 Copyright (c) 2003-2013 Paul T. McGuire
 
@@ -156,7 +157,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -------------------------------------------------------------------------------
 
 Skyperious uses SkPy - Python library for interacting with the Skype HTTP API
-(https://github.com/Terrance/SkPy), released under the BSD License.
+(https://pypi.org/project/SkPy), released under the BSD License.
 
 BSD 3-Clause License
 
@@ -191,7 +192,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -------------------------------------------------------------------------------
 
 Skyperious uses step - Simple Template Engine for Python
-(https://github.com/dotpy/step), released under the BSD License.
+(https://pypi.org/project/step-template), released under the BSD License.
 
 Copyright (c) 2012 Daniele Mazzocchio (danix@kernel-panic.it)
 All rights reserved.
@@ -220,8 +221,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 
-Skyperious uses XlsxWriter,
-(https://github.com/jmcnamara/XlsxWriter), released under the MIT License.
+Skyperious uses XlsxWriter (https://pypi.org/project/XlsxWriter),
+released under the MIT License.
 
 Copyright (c) 2014, John McNamara <jmcnamara@cpan.org>
 All rights reserved.

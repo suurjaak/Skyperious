@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1904,7 +1904,7 @@ under the MIT License.
   <li>SkPy{{" 0.9.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/SkPy"><font color="{{conf.LinkColour}}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
-      <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
+      <a href="https://pypi.org/project/step-template"><font color="{{conf.LinkColour}}">pypi.org/project/step-template</font></a></li>
   <li>XlsxWriter{{" 1.2.9" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{conf.LinkColour}}">
           pypi.org/project/XlsxWriter</font></a></li>
