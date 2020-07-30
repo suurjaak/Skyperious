@@ -73,7 +73,7 @@ Stand-alone GUI components for wx:
   Paints and returns (wx.Bitmap, rects) with histogram plot from data.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak

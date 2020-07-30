@@ -18,7 +18,7 @@ Parses a Google-like search grammar into SQL for querying a Skype database.
 If pyparsing is unavailable, falls back to naive split into words and keywords.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak

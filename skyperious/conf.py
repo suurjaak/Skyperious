@@ -5,7 +5,7 @@ an external file. Configuration file has simple INI file format,
 and all values are kept in JSON.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
@@ -22,7 +22,7 @@ import sys
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.2.dev1"
+Version = "4.0.2.dev2"
 VersionDate = "30.07.2020"
 
 if getattr(sys, "frozen", False):

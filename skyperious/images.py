@@ -2,12 +2,12 @@
 Contains embedded image and icon resources for Skyperious. Auto-generated.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    24.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 try:

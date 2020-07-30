@@ -4,12 +4,12 @@ Skype emoticon images are property of Skype, released under the
 Skype Component License 1.0.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     11.06.2013
-@modified    26.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import base64

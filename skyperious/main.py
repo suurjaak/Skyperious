@@ -4,7 +4,7 @@ Skyperious main program entrance: launches GUI application or executes command
 line interface, handles logging and status calls.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
@@ -59,7 +59,7 @@ def date(s): return datetime.datetime.strptime(s, "%Y-%m-%d").date()
 
 
 ARGUMENTS = {
-    "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
+    "description": "%s - Skype chat history tool." % conf.Title,
     "arguments": [
         {"args": ["--verbose"], "action": "store_true",
          "help": "print detailed progress messages to stderr"},

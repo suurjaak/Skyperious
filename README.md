@@ -1,5 +1,5 @@
-Skyperious 4.0
-==============
+Skyperious
+==========
 
 
 Important Notice
@@ -21,7 +21,7 @@ no longer affect what is visible in the official Skype program.
 ---
 
 
-Skyperious is a Skype database viewer and merger, written in Python.
+Skyperious is a Skype chat history tool, written in Python.
 
 You can open Skype SQLite databases and work with their contents:
 

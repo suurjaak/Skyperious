@@ -25,7 +25,7 @@ Uses primitive heuristic analysis to detect connected label-control pairs:
   e.g. "iptext" and "iptext_label"|"iptext.label"|"iptext label"|"labeliptext"
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak

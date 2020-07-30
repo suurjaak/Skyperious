@@ -3,7 +3,7 @@
 Setup.py for Skyperious. 
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
@@ -20,7 +20,7 @@ from skyperious import conf
 setuptools.setup(
     name=conf.Title,
     version=conf.Version,
-    description="Skype SQLite database viewer, merger and exporter",
+    description="Skype chat history tool",
     url="https://github.com/suurjaak/Skyperious",
 
     author="Erki Suurjaak",
@@ -51,7 +51,7 @@ setuptools.setup(
 
     long_description_content_type="text/markdown",
     long_description=
-"""Skyperious is a Skype database viewer and merger, written in Python.
+"""Skyperious is a Skype chat history tool, written in Python.
 
 You can open Skype SQLite databases and work with their contents:
 
