@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    26.07.2020
+@modified    30.07.2020
 """
 import datetime
 import logging
@@ -52,12 +52,15 @@ def status(text="", *args, **kwargs):
     if not window and not log: return
 
     try: msg = text % args if args else text
-    except UnicodeError:
-        args = tuple(map(util.to_unicode, args))
-        msg = text % args if args else text
+    except Exception:
+        try:
+            args = tuple(map(util.to_unicode, args))
+            msg = text % args if args else text
+        except Exception: msg = text
     msg = re.sub("[\n\r\t]+", " ", msg)
     if log: logger.info(msg)
-    if window: window.set_status(msg, timeout=flash)
+    try: window and window.set_status(msg, timeout=flash)
+    except Exception: pass
 
 
 
@@ -71,25 +74,30 @@ class GUILogHandler(logging.Handler):
 
     def emit(self, record):
         """Adds message to GUI log window, or postpones if window unavailable."""
-        now = datetime.datetime.now()
-        try: text = record.msg % record.args if record.args else record.msg
-        except UnicodeError:
-            args = tuple(map(util.to_unicode, record.args or ()))
-            text = record.msg % args if args else record.msg
-        if record.exc_info:
-            text += "\n\n" + "".join(traceback.format_exception(*record.exc_info))
-        if "\n" in text:
-            text = text.replace("\n", "\n\t\t\t") # Indent linebreaks
-            text = re.sub(r"^\s+$", "", text, flags=re.M) # Unindent whitespace-only lines
-        msg = "%s.%03d\t%s" % (now.strftime("%Y-%m-%d %H:%M:%S"), now.microsecond / 1000, text)
+        try:
+            now = datetime.datetime.now()
+            try: text = record.msg % record.args if record.args else record.msg
+            except Exception:
+                try:
+                    args = tuple(map(util.to_unicode, record.args or ()))
+                    text = record.msg % args if args else record.msg
+                except Exception: text = record.msg
+            if record.exc_info:
+                text += "\n\n" + "".join(traceback.format_exception(*record.exc_info))
+            if "\n" in text:
+                text = text.replace("\n", "\n\t\t\t") # Indent linebreaks
+                text = re.sub(r"^\s+$", "", text, flags=re.M) # Unindent whitespaced lines
+            msg = "%s.%03d\t%s" % (now.strftime("%Y-%m-%d %H:%M:%S"),
+                                   now.microsecond / 1000, text)
 
-        window = wx.GetApp() and wx.GetApp().GetTopWindow()
-        if window:
-            msgs = self.deferred + [msg]
-            for m in msgs: wx.CallAfter(window.log_message, m)
-            del self.deferred[:]
-        else: self.deferred.append(msg)
-
+            window = wx.GetApp() and wx.GetApp().GetTopWindow()
+            if window:
+                msgs = self.deferred + [msg]
+                for m in msgs: wx.CallAfter(window.log_message, m)
+                del self.deferred[:]
+            else: self.deferred.append(msg)
+        except Exception: pass
+        
 
 
 class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    29.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -163,7 +163,7 @@ class SkypeLogin(object):
             except Exception:
                 tries += 1
                 if tries > self.RETRY_LIMIT or not doretry:
-                    logger.exception("Error calling %s.", func)
+                    logger.exception("Error calling %r.", func)
                     if doraise: raise
                     else: return
                 time.sleep(self.RETRY_DELAY)
@@ -198,8 +198,11 @@ class SkypeLogin(object):
             else: # Assemble name from participants
                 for x in item.userIds[:4]: # Use up to 4 names
                     if x not in self.cache["contacts"]:
-                        contact = self.request(self.skype.contacts.contact, x)
-                        if contact: self.save("contacts", contact)
+                        contact = self.request(self.skype.contacts.contact, x, __raise=False)
+                        try:
+                            if contact: self.save("contacts", contact)
+                        except Exception:
+                            logger.exception("Error saving contact %r.", contact)
                 cc = map(self.get_contact_name, item.userIds)
                 dbitem["displayname"] = ", ".join(cc[:4])
                 if len(cc) > 4: dbitem["displayname"] += ", ..."
@@ -284,7 +287,7 @@ class SkypeLogin(object):
                 existing = cursor.fetchone()
             if not existing: self.db.insert_row("transfers", t, log=False)
         except Exception:
-            logger.exception("Error inserting Transfers-row for message %s.", msg)
+            logger.exception("Error inserting Transfers-row for message %r.", msg)
 
 
     def insert_participants(self, chat, row, row0):
@@ -312,7 +315,7 @@ class SkypeLogin(object):
                     if contact: newcontacts.append(contact)
             for c in newcontacts: self.save("contacts", c)
         except Exception:
-            logger.exception("Error inserting Participants-rows for chat %s.", chat)
+            logger.exception("Error inserting Participants-rows for chat %r.", chat)
 
 
     def insert_chats(self, chat, row, row0):
@@ -330,7 +333,7 @@ class SkypeLogin(object):
                      activemembers=memberstr, friendlyname=row["displayname"])
             self.db.insert_row("chats", c, log=False)
         except Exception:
-            logger.exception("Error inserting Chats-row for chat %s.", chat)
+            logger.exception("Error inserting Chats-row for chat %r.", chat)
 
 
     def insert_calls(self, msg, row, row0):
@@ -349,7 +352,7 @@ class SkypeLogin(object):
                      name="1-%s" % ts, duration=duration)
             self.db.insert_row("calls", c, log=False)
         except Exception:
-            logger.exception("Error inserting Calls-row for message %s.", msg)
+            logger.exception("Error inserting Calls-row for message %r.", msg)
 
 
     def convert(self, table, item, parent=None):
@@ -536,7 +539,7 @@ class SkypeLogin(object):
                         result.update(author=author)
                         result.update(from_dispname=self.get_contact_name(author))
                 except Exception:
-                    logger.warn("Error parsing message %s.", item, exc_info=True)
+                    logger.warn("Error parsing author from message %r.", item, exc_info=True)
 
             elif "RichText/Media_Video"    == item.type \
             or   "RichText/Media_AudioMsg" == item.type:
@@ -561,7 +564,10 @@ class SkypeLogin(object):
             self.skype = None
             self.login() # Re-login to reset query cache
         self.build_cache()
-        if not chats: self.save("accounts", self.skype.user)
+        if not chats:
+            try: self.save("accounts", self.skype.user)
+            except Exception:
+                logger.exception("Error saving account %r.", self.skype.user)
         cstr = "%s " % util.plural("chat", chats, with_items=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
@@ -605,7 +611,7 @@ class SkypeLogin(object):
                 if cidentity in updateds: continue # for chat
                 try: action = self.save("chats", chat)
                 except Exception:
-                    logger.exception("Error saving chat %s.", chat)
+                    logger.exception("Error saving chat %r.", chat)
                     if self.progress and not self.progress():
                         run = False
                         break # for chat
@@ -626,7 +632,7 @@ class SkypeLogin(object):
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)
                         except Exception:
-                            logger.exception("Error saving chat '%s' message %s.", cidentity, msg)
+                            logger.exception("Error saving message %r.", msg)
                             if self.progress and not self.progress():
                                 msgs, mrun = [], False
                                 break # for msg
@@ -697,7 +703,7 @@ class SkypeLogin(object):
             if not contact: continue # for username
             try: action = self.save("contacts", contact)
             except Exception:
-                logger.exception("Error saving contact %s.", contact)
+                logger.exception("Error saving contact %r.", contact)
                 if self.progress and not self.progress():
                     break # for username
                 continue # for username

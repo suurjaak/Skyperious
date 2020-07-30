@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    28.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -150,7 +150,8 @@ class SearchThread(WorkerThread):
                     wrap_b = lambda x: "**%s**" % x.group(0)
                     output = {"format": "text"}
                 FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
-                logger.info('Searching "%(text)s" in %(table)s (%(db)s).' % search)
+                logger.info('Searching "%s" in %s (%s).',
+                            search["text"], search["table"], search["db"])
 
                 parser = skypedata.MessageParser(search["db"],
                                                  wrapper=wrap_html)
@@ -331,7 +332,7 @@ class SearchThread(WorkerThread):
                             result_count += 1
                             try: result["output"] += template_row.expand(locals())
                             except Exception:
-                                logger.exception("Error formatting search result for row %s in %s.\n\n%s",
+                                logger.exception("Error formatting search result for row %s in %s.",
                                                  row, search["db"])
                                 count -= 1
                                 result_count -= 1
@@ -389,7 +390,7 @@ class SearchThread(WorkerThread):
                 result["done"] = True
                 result["count"] = result_count
                 self.postback(result)
-                logger.info("Search found %(count)s results." % result)
+                logger.info("Search found %s results.", result["count"])
             except Exception as e:
                 if not result:
                     result = {}

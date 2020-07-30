@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -264,7 +264,7 @@ def run_search(filenames, query):
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            logger.info("Searching \"%s\" in %s." % (query, db))
+            logger.info('Searching "%s" in %s.', query, db)
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()

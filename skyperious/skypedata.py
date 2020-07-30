@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -22,7 +22,6 @@ import os
 import re
 import sqlite3
 import shutil
-import string
 import sys
 import textwrap
 import time
@@ -978,7 +977,7 @@ class SkypeDatabase(object):
                     for row in res.fetchall():
                         table_columns.append(row)
                 except sqlite3.DatabaseError:
-                    logger.exception("Error getting %s column data for %s.\n\n%s",
+                    logger.exception("Error getting %s column data for %s.",
                                      table, self.filename)
                 self.tables[table]["columns"] = table_columns
         return table_columns

@@ -8,11 +8,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import ast
-import base64
 import collections
 import copy
 import datetime
@@ -1370,7 +1369,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             # Close DB with no owner
             for db in filter(None, [db1, db2]):
                 if not db.has_consumers():
-                    logger.info("Closed database %s." % db.filename)
+                    logger.info("Closed database %s.", db.filename)
                     del self.dbs[db.filename]
                     db.close()
         if page:
@@ -1508,8 +1507,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
             conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
-            skype.save("accounts", skype.skype.user)
-            skype.db.update_accountinfo()
+            if not skype.db.id:
+                try:
+                    skype.save("accounts", skype.skype.user)
+                    skype.db.update_accountinfo()
+                except Exception:
+                    logger.exception("Error saving account %r.", skype.skype.user)
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
@@ -1518,6 +1521,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not page: return
 
         if page0: page.update_liveinfo()
+        if not conf.Login.get(filename, {}).get("store"):
+            conf.Login.get(filename, {}).pop("password", None)
         page.notebook.Selection = page.pageorder[page.page_live]        
         if not page0 and conf.Login[filename].get("auto") \
         or page.worker_live.is_working():
@@ -1868,7 +1873,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if db.filename in self.dbs:
                     del self.dbs[db.filename]
                 db.close()
-                logger.info("Closed database %s." % db)
+                logger.info("Closed database %s.", db)
         # Remove any dangling references
         if self.page_merge_latest == page:
             self.page_merge_latest = None

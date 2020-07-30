@@ -13,7 +13,6 @@ Released under the MIT License.
 """
 import base64
 import datetime
-import hashlib
 import HTMLParser
 import logging
 import os
