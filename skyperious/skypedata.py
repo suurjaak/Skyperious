@@ -1629,7 +1629,7 @@ class MessageParser(object):
                 for f in dom.findall("*/file"):
                     files[int(f.get("index"))] = {
                         "filename": f.text, "filepath": "",
-                        "filesize": f.get("size"),
+                        "filesize": f.get("size", 0),
                         "partner_handle": message["author"],
                         "partner_dispname": get_author_name(message),
                         "starttime": message["timestamp"],
@@ -2103,7 +2103,8 @@ class MessageParser(object):
             for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
             self.stats["counts"][author]["files"] += len(files)
-            size_files = sum([int(i["filesize"]) for i in files])
+            size_files = sum([util.try_until(lambda: int(i["filesize"])) or 0
+                              for i in files])
             self.stats["counts"][author]["bytes"] += size_files
         elif MESSAGE_TYPE_MESSAGE == message["type"]:
             self.stats["messages"] += 1
