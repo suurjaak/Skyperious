@@ -358,8 +358,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "HTML, text or spreadsheet."),
             ("button_saveas", "Save &as..", images.ButtonSaveAs,
              "Save a copy of the database under another name."),
-            ("button_remove", "&Remove", images.ButtonRemove,
-             "Remove this database from the list."), ]
+            ("button_remove", "&Remove", images.ButtonRemoveType,
+             "Remove this database from the list."),
+            ("button_delete", "Delete", images.ButtonRemove,
+             "Delete this database from disk."), ]
         for name, label, img, note in BUTTONS_DETAIL:
             button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
             setattr(self, name, button)
@@ -390,6 +392,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_export.Bind(wx.EVT_BUTTON,  self.on_export_database_menu)
         self.button_saveas.Bind(wx.EVT_BUTTON,  self.on_save_database_as)
         self.button_remove.Bind(wx.EVT_BUTTON,  self.on_remove_database)
+        self.button_delete.Bind(wx.EVT_BUTTON,  self.on_delete_database)
 
         sizer_header.Add(label_count, flag=wx.ALIGN_BOTTOM)
         sizer_header.AddStretchSpacer()
@@ -417,6 +420,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_detail.Sizer.AddStretchSpacer()
         panel_detail.Sizer.Add(self.button_saveas, flag=wx.GROW)
         panel_detail.Sizer.Add(self.button_remove, flag=wx.GROW)
+        panel_detail.Sizer.Add(self.button_delete, flag=wx.GROW)
 
         panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
@@ -1065,50 +1069,93 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             defaultFile=os.path.basename(original),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
-        if wx.ID_OK == dialog.ShowModal():
-            wx.YieldIfNeeded() # Allow UI to refresh
-            newpath = dialog.GetPath()
-            success = False
-            try:
-                shutil.copyfile(original, newpath)
-                success = True
-            except Exception as e:
-                guibase.status("Error trying to copy %s to %s: %s",
-                               original, newpath, util.format_exc(e))
-                logger.exception("Error trying to copy %s to %s.", original, newpath)
-                wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
-                              conf.Title, wx.OK | wx.ICON_WARNING)
-            if success:
-                guibase.status("Saved a copy of %s as %s.", original, newpath,
-                               log=True)
-                self.update_database_list(newpath)
+        if wx.ID_OK != dialog.ShowModal(): return
+
+        wx.YieldIfNeeded() # Allow UI to refresh
+        newpath = dialog.GetPath()
+        success = False
+        try:
+            shutil.copyfile(original, newpath)
+            success = True
+        except Exception as e:
+            guibase.status("Error trying to copy %s to %s: %s",
+                           original, newpath, util.format_exc(e))
+            logger.exception("Error trying to copy %s to %s.", original, newpath)
+            wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
+                          conf.Title, wx.OK | wx.ICON_WARNING)
+        if success:
+            guibase.status("Saved a copy of %s as %s.", original, newpath,
+                           log=True)
+            self.update_database_list(newpath)
+
+
+    def on_delete_database(self, event):
+        """Handler for clicking to delete a database."""
+        filename = self.db_filename
+        if not filename or wx.OK != wx.MessageBox(
+            "Delete %s from disk?" % filename,
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ): return
+
+        if filename in self.dbs:
+            return wx.MessageBox("%s is currently open in %s, cannot delete." %
+                                 (filename, conf.Title), conf.Title, wx.OK)
+
+        try: os.unlink(filename)
+        except Exception as e:
+            logger.exception("Error deleting %s.", filename)
+            return wx.MessageBox("Failed to delete %s:\n\n%s" %
+                                 (filename, util.format_exc(e)),
+                                 conf.Title, wx.OK | wx.ICON_ERROR)
+        
+        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+            if filename in lst: lst.remove(filename)
+        for dct in conf.LastSearchResults, self.db_filenames:
+            dct.pop(filename, None)
+        for i in range(self.list_db.GetItemCount()):
+            if self.list_db.GetItemText(i) == filename:
+                self.list_db.DeleteItem(i)
+                break # break for i in range(self.list_db..
+        conf.Login.pop(filename, None)
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i in [i for i, f in historyfiles if f == filename]:
+            self.history_file.RemoveFileFromHistory(i)
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.update_database_list()
+        self.panel_db_main.Layout()
+        conf.save()
 
 
     def on_remove_database(self, event):
         """Handler for clicking to remove an item from the database list."""
         filename = self.db_filename
-        if filename and wx.OK == wx.MessageBox(
+        if not filename or wx.OK != wx.MessageBox(
             "Remove %s from database list?" % filename,
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ):
-            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-                if filename in lst: lst.remove(filename)
-            for dct in conf.LastSearchResults, self.db_filenames:
-                dct.pop(filename, None)
-            for i in range(self.list_db.GetItemCount()):
-                if self.list_db.GetItemText(i) == filename:
-                    self.list_db.DeleteItem(i)
-                    break # break for i in range(self.list_db..
-            # Remove from recent file history
-            historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                            for i in range(self.history_file.Count)]
-            for i in [i for i, f in historyfiles if f == filename]:
-                self.history_file.RemoveFileFromHistory(i)
-            self.db_filename = None
-            self.list_db.Select(0)
-            self.update_database_list()
-            self.panel_db_main.Layout()
-            conf.save()
+        ): return
+
+        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+            if filename in lst: lst.remove(filename)
+        for dct in conf.LastSearchResults, self.db_filenames:
+            dct.pop(filename, None)
+        for i in range(self.list_db.GetItemCount()):
+            if self.list_db.GetItemText(i) == filename:
+                self.list_db.DeleteItem(i)
+                break # break for i in range(self.list_db..
+        conf.Login.pop(filename, None)
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i in [i for i, f in historyfiles if f == filename]:
+            self.history_file.RemoveFileFromHistory(i)
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.update_database_list()
+        self.panel_db_main.Layout()
+        conf.save()
 
 
     def on_remove_missing(self, event):
@@ -1126,6 +1173,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             for dct in conf.LastSearchResults, self.db_filenames:
                 dct.pop(filename, None)
             self.list_db.DeleteItem(selected)
+            conf.Login.pop(filename, None)
         self.update_database_list()
 
         if not selecteds: return
@@ -1158,6 +1206,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             for dct in conf.LastSearchResults, self.db_filenames:
                 dct.pop(filename, None)
             self.list_db.DeleteItem(selected)
+            conf.Login.pop(filename, None)
         self.update_database_list()
 
         if not selecteds: return
@@ -2861,7 +2910,6 @@ class DatabasePage(wx.Panel):
     def update_liveinfo(self):
         """Refreshes account settings in login-page from configuration."""
         opts = conf.Login.get(self.db.filename) or {}
-        logger.info("update_liveinfo %s", opts) # @todo remove
         self.edit_user.Value = self.db.id if self.db.id else ""
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
@@ -2873,7 +2921,6 @@ class DatabasePage(wx.Panel):
     def on_change_ctrl_login(self, event):
         """Handler for changing a login control like password or checkboxes, updates conf."""
         ctrl, value = event.EventObject, event.EventObject.Value
-        logger.info("on_change_ctrl_login %s v %s", ctrl, value) # @todo remove
         if ctrl is self.edit_pw:
             name, value = "password", util.obfuscate(value)
         elif ctrl is self.check_login_store: name = "store"
