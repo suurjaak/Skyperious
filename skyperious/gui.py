@@ -5280,6 +5280,7 @@ class MergerPage(wx.Panel):
         button_scan.MinSize = button_merge.MinSize = (400, -1)
         html.SetFonts(normal_face=self.Font.FaceName,
                       fixed_face=self.Font.FaceName, sizes=[8] * 7)
+        ColourManager.Manage(html, "ForegroundColour", "FgColour")
         ColourManager.Manage(html, "BackgroundColour", "MergeHtmlBackgroundColour")
         html.Hide()
         panel_gauge.Hide()
@@ -5629,8 +5630,8 @@ class MergerPage(wx.Panel):
                 if not self.html_report.Shown:
                     self.html_report.Show()
                     self.html_report.ContainingSizer.Layout()
-                self.html_report.SetPage("<body bgcolor='%s'><b>%s progress:"
-                    "</b><br />" % (conf.MergeHtmlBackgroundColour, action))
+                self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>%s progress:"
+                    "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour, action))
                 db1, db2 = self.db1, self.db2
                 chats = list(filter(None, selecteds))
                 if self.is_scanned:
@@ -5846,7 +5847,7 @@ class MergerPage(wx.Panel):
         if not self.html_report.Shown:
             self.html_report.Show()
             self.html_report.ContainingSizer.Layout()
-        html = ("<body bgcolor='%s'><font color='%s'<b>Scan results:</b>"
+        html = ("<body bgcolor='%s'><font color='%s'><b>Scan results:</b>"
                 "<br /><br />" %
                 (conf.MergeHtmlBackgroundColour, conf.FgColour))
         self.html_report.SetPage(html)
@@ -5899,8 +5900,9 @@ class MergerPage(wx.Panel):
                 self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
             else:
-                self.html_report.SetPage("<body bgcolor='%s'>No new messages."
-                    "</body>" % conf.MergeHtmlBackgroundColour)
+                self.html_report.SetPage("<body bgcolor='%s'><font color='%s'>"
+                    "No new messages.</font></body>" % 
+                    (conf.MergeHtmlBackgroundColour, conf.FgColour))
             self.update_gauge(self.gauge_progress, 100, "Scan complete.")
             wx.Bell()
 
@@ -5935,8 +5937,8 @@ class MergerPage(wx.Panel):
             if not self.html_report.Shown:
                 self.html_report.Show()
                 self.html_report.ContainingSizer.Layout()
-            self.html_report.SetPage("<body bgcolor='%s'><b>Merge progress:"
-                "</b><br />" % conf.MergeHtmlBackgroundColour)
+            self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>Merge progress:"
+                "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour))
             self.page_merge_chats.Enabled = False
             self.page_merge_contacts.Enabled = False
             guibase.status("Merging %s from %s to %s.", info, db1, db2, log=True)
