@@ -1,5 +1,5 @@
-Skyperious 4.0
-==============
+Skyperious 4.0.1
+================
 
 
 Important notice
