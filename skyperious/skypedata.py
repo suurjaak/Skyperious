@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.07.2020
+@modified    31.07.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -199,6 +199,19 @@ class SkypeDatabase(object):
     def __str__(self):
         if self and hasattr(self, "filename"):
             return self.filename
+
+
+    def make_title_col(self, table_alias="conversations"):
+        """Returns SQL expression for selecting chat title."""
+        PREFS = ["given_displayname", "displayname", "meta_topic", "identity"]
+        cols = self.get_table_columns("conversations")
+        colnames = [x["name"].lower() for x in cols]
+        mycols = [x for x in PREFS if x in colnames]
+
+        result = ""
+        for i, n in enumerate(mycols):
+            result += " WHEN COALESCE(TRIM(%s), '') != '' THEN %s" % (n, n)
+        return "CASE %s ELSE '#' || %s.id END" % (result.strip(), table_alias)
 
 
     def check_integrity(self):
@@ -410,11 +423,11 @@ class SkypeDatabase(object):
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             result[k] = next(res, {}).get("count")
 
+        titlecol = self.make_title_col("c")
         typestr = ", ".join(map(str, MESSAGE_TYPES_BASE))
-        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
-            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
+        res = self.execute("SELECT m.*, %s AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (%s) ORDER BY m.timestamp DESC LIMIT 1" % typestr)
+            "WHERE m.type IN (%s) ORDER BY m.timestamp DESC LIMIT 1" % (titlecol, typestr))
         msg_last = next(res, None)
         if msg_last:
             if msg_last.get("timestamp"):
@@ -429,11 +442,10 @@ class SkypeDatabase(object):
         if not full:
             return result
 
-        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
-            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
+        res = self.execute("SELECT m.*, %s AS chat_title, c.type AS chat_type "
             "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
             "WHERE m.type IN (%s) ORDER BY m.timestamp ASC LIMIT 1"
-            % typestr)
+            % (titlecol, typestr))
         msg_first = next(res, None)
         if msg_first:
             if msg_first.get("timestamp"):
@@ -607,12 +619,12 @@ class SkypeDatabase(object):
                           "identity = :identity%s" % i + 
                          (")" if i == len(chatidentities) - 1 else ""))
                 args["identity%s" % i] = identity
+            titlecol = self.make_title_col()
             rows = self.execute(
-                "SELECT *, "
-                "COALESCE(displayname, meta_topic, identity) AS title, "
+                "SELECT *, %s AS title, "
                 "NULL AS created_datetime, NULL AS last_activity_datetime "
                 "FROM conversations %s"
-                "ORDER BY last_activity_timestamp DESC" % where, args
+                "ORDER BY last_activity_timestamp DESC" % (titlecol, where), args
             ).fetchall()
 
             # Chats can refer to older entries, prior to system from Skype 7.
