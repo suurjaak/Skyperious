@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-4.0.2, 2020-07-30
+4.0.2, 2020-07-31
 -----------------
+- added option to rename chats;
 - added option to delete database;
 - ensured that error reporting does not raise error.
 

@@ -2260,15 +2260,22 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats,    id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
 
+        button_rename = self.button_rename_chat = \
+            wx.Button(parent=panel_stc1, label="Re&name chat")
         button_export = self.button_export_chat = \
             wx.Button(parent=panel_stc1, label="&Export messages to file")
+        button_rename.SetToolTip(
+            "Set new title for conversation in database")
         button_export.SetToolTip(
             "Export currently shown messages to a file")
+        self.Bind(wx.EVT_BUTTON, self.on_rename_chat, button_rename)
         self.Bind(wx.EVT_BUTTON, self.on_export_chat, button_export)
         sizer_header.Add(label_chat, proportion=1, border=5, flag=wx.LEFT |
                          wx.ALIGN_BOTTOM)
         sizer_header.Add(tb, flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_header.Add(button_export, border=15, flag=wx.LEFT |
+        sizer_header.Add(button_rename, border=15, flag=wx.LEFT |
+                         wx.ALIGN_CENTER_VERTICAL)
+        sizer_header.Add(button_export, border=5, flag=wx.LEFT |
                          wx.ALIGN_CENTER_VERTICAL)
 
         stc = self.stc_history = ChatContentSTC(
@@ -3442,6 +3449,39 @@ class DatabasePage(wx.Panel):
                 f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
                 clist.SetItemFont(i, f)
                 break # for i
+
+
+    def on_rename_chat(self, event):
+        """
+        Handler for clicking to rename a chat, opens a text entry dialog
+        and saves entered value as Conversations.given_displayname.
+        """
+        dlg = wx.TextEntryDialog(self, "Set new title for the conversation",
+                                 conf.Title, value=self.chat["title"],
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if not v or v == self.chat["title"]: return
+
+        self.db.update_row("conversations", {"given_displayname": v}, self.chat)
+        self.chat["given_displayname"] = self.chat["title"] = v
+
+        ltitle = ("Chat with %s" if skypedata.CHATS_TYPE_SINGLE == self.chat["type"]
+                  else 'Group chat "%s"') % v
+        self.chat["title_long"] = ltitle
+        self.chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
+
+        self.list_chats.RefreshRows()
+        # Add shortcut key flag to chat label
+        self.label_chat.Label = self.chat["title_long"].replace(
+            "chat", "&chat"
+        ).replace("Chat", "&Chat") + ":"
+        self.label_chat.Parent.Layout()
+        self.populate_chat_statistics()
+        if self.html_stats.Shown:
+            self.show_stats(True) # To restore scroll position
 
 
     def on_export_chat(self, event):
@@ -5057,6 +5097,11 @@ class DatabasePage(wx.Panel):
                 info = last_search.get("info")
                 tabid = self.counter() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
+
+            # Hide chat rename-button if given_displayname not available
+            chat_cols = self.db.get_table_columns("conversations")
+            if not any(x["name"] == "given_displayname" for x in chat_cols):
+                self.button_rename_chat.Hide()
 
             # Populate the chats list
             self.chats = self.db.get_conversations()

@@ -1356,14 +1356,15 @@ class SkypeDatabase(object):
         if log: logger.info("Updating 1 row in table %s, %s.",
                             self.tables[table]["name"], self.filename)
         self.ensure_backup()
-        col_data = [x for x in self.get_table_columns(table) if x["name"] in row]
+        colmap = {x["name"]: x for x in self.get_table_columns(table)}
+        col_data = [colmap[x] for x in row if x in colmap]
         values, where = row.copy(), ""
         setsql = ", ".join("%(name)s = :%(name)s" % x for x in col_data)
         if rowid is not None:
             pk_key = "PK%s" % int(time.time()) # Avoid existing field collision
             where, values[pk_key] = "ROWID = :%s" % pk_key, rowid
         else:
-            for pk in [c["name"] for c in col_data if c["pk"]]:
+            for pk in [n for n, c in colmap.items() if c["pk"]]:
                 pk_key = "PK%s" % int(time.time())
                 values[pk_key] = original_row[pk]
                 where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
