@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.07.2020
+@modified    31.07.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -573,7 +573,9 @@ def run_gui(filenames):
 
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
-    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
+    # Avoid dialog buttons in native language
+    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH_US, wx.LOCALE_LOAD_DEFAULT)
+    mylocale.AddCatalog("wxstd")
     window = gui.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 
