@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    25.07.2020
+@modified    01.08.2020
 """
 import calendar
 import collections
@@ -229,8 +229,11 @@ class SearchQueryParser(object):
                 if len(escaped) > len(word):
                     add_escape = " ESCAPE '%s'" % ESCAPE_CHAR
                 if keyword.endswith("from") or keyword.endswith("chat"):
-                    fields = ["m.author", "m.from_dispname"]
-                    param = "author_like%s" % len(sql_params)
+                    if keyword.endswith("from"):
+                        fields = ["m.author", "m.from_dispname", "cn.given_displayname",
+                                  "cn.fullname", "cn.displayname", "cn.skypename",
+                                  "cn.pstnnumber"]
+                        param = "author_like%s" % len(sql_params)
                     if keyword.endswith("chat"):
                         fields = ["c.identity", "c.displayname",
                                   "c.given_displayname", "c.meta_topic"]

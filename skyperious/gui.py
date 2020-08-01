@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2020
+@modified    01.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2260,15 +2260,15 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats,    id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
 
-        button_rename = self.button_rename_chat = \
-            wx.Button(parent=panel_stc1, label="Re&name chat")
+        button_rename = self.button_rename = \
+            wx.Button(parent=panel_stc1, label="Re&name")
         button_export = self.button_export_chat = \
             wx.Button(parent=panel_stc1, label="&Export messages to file")
         button_rename.SetToolTip(
-            "Set new title for conversation in database")
+            "Set new name for the conversation or a participant")
         button_export.SetToolTip(
             "Export currently shown messages to a file")
-        self.Bind(wx.EVT_BUTTON, self.on_rename_chat, button_rename)
+        self.Bind(wx.EVT_BUTTON, self.on_rename_item, button_rename)
         self.Bind(wx.EVT_BUTTON, self.on_export_chat, button_export)
         sizer_header.Add(label_chat, proportion=1, border=5, flag=wx.LEFT |
                          wx.ALIGN_BOTTOM)
@@ -3213,12 +3213,14 @@ class DatabasePage(wx.Panel):
         account = self.db.account or {}
         bmp = skypedata.get_avatar(account) or images.AvatarDefaultLarge.Bitmap
         self.bmp_account.SetBitmap(bmp)
-        [sizer.Remove(0) for i in sizer.Children]
+        ctrls = []
+        for x in sizer.Children: ctrls.append(x.Window), sizer.Remove(0)
+        for x in ctrls: x.Destroy()
 
-        fields = ["fullname", "skypename", "mood_text", "phone_mobile",
-                  "phone_home", "phone_office", "emails", "country",
-                  "province", "city", "homepage", "gender", "birthday",
-                  "languages", "nrof_authed_buddies", "about",
+        fields = ["fullname", "given_displayname", "skypename", "mood_text",
+                  "phone_mobile", "phone_home", "phone_office", "emails",
+                  "country", "province", "city", "homepage", "gender",
+                  "birthday", "languages", "nrof_authed_buddies", "about",
                   "skypeout_balance", ]
 
         for field in fields:
@@ -3451,34 +3453,124 @@ class DatabasePage(wx.Panel):
                 break # for i
 
 
+    def on_rename_item(self, event):
+        """
+        Handler for clicking to rename the chat or a participant, opens a submenu.
+        """
+        chat_cols = self.db.get_table_columns("conversations")
+        contact_cols = self.db.get_table_columns("contacts")
+
+        menu  = wx.Menu()
+        pmenu = wx.Menu()
+
+        for p in self.chat["participants"]:
+            item = wx.MenuItem(menu, -1, "%(name)s (%(identity)s)" % p["contact"])
+            pmenu.Append(item)
+            pmenu.Bind(wx.EVT_MENU, functools.partial(self.on_rename_contact, p["contact"]),
+                       id=item.GetId())
+
+        item_chat = wx.MenuItem(menu, -1, "Rename &chat")
+        menu.Bind(wx.EVT_MENU, self.on_rename_chat, id=item_chat.GetId())
+
+        menu.Append(item_chat)
+        item_participants = menu.AppendSubMenu(pmenu, "Rename &participant")
+
+        item_participants.Enable(any(x["name"] == "given_displayname" for x in contact_cols))
+        item_chat.Enable(any(x["name"] == "given_displayname" for x in chat_cols))
+
+        self.button_rename.PopupMenu(menu, (0, self.button_rename.Size[1]))
+
+
     def on_rename_chat(self, event):
         """
         Handler for clicking to rename a chat, opens a text entry dialog
         and saves entered value as Conversations.given_displayname.
         """
-        dlg = wx.TextEntryDialog(self, "Set new title for the conversation",
+        dlg = wx.TextEntryDialog(self, "Give new display name for the conversation",
                                  conf.Title, value=self.chat["title"],
                                  style=wx.OK | wx.CANCEL)
         dlg.CenterOnParent()
         if wx.ID_OK != dlg.ShowModal(): return
 
         v = dlg.GetValue().strip()
-        if not v or v == self.chat["title"]: return
+        if v == self.chat["title"] \
+        or not v and not self.chat.get("given_displayname"): return
+
+        PREFS = ["displayname", "meta_topic", "identity"]
+        key0, name0 = next((k, self.chat[k]) for k in PREFS if self.chat.get(k))
+        if not v:
+            if wx.OK != wx.MessageBox(
+                'Remove given display name, falling back to %s "%s"?' % 
+                (key0, name0), conf.Title, wx.OK | wx.CANCEL
+            ): return
+            v = None
 
         self.db.update_row("conversations", {"given_displayname": v}, self.chat)
-        self.chat["given_displayname"] = self.chat["title"] = v
+        self.chat["given_displayname"] = v
+        self.chat["title"] = v or name0
 
         ltitle = ("Chat with %s" if skypedata.CHATS_TYPE_SINGLE == self.chat["type"]
-                  else 'Group chat "%s"') % v
+                  else 'Group chat "%s"') % (v or name0)
         self.chat["title_long"] = ltitle
         self.chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
 
+        scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
         self.list_chats.RefreshRows()
+        self.list_chats.ScrollLines(scrollpos)
         # Add shortcut key flag to chat label
         self.label_chat.Label = self.chat["title_long"].replace(
             "chat", "&chat"
         ).replace("Chat", "&Chat") + ":"
         self.label_chat.Parent.Layout()
+        self.populate_chat_statistics()
+        if self.html_stats.Shown:
+            self.show_stats(True) # To restore scroll position
+
+
+    def on_rename_contact(self, contact, event):
+        """
+        Handler for clicking to rename a contact, opens a text entry dialog
+        and saves entered value as Contacts.given_displayname.
+        """
+        label = "database account" if contact["identity"] == self.db.id else "contact"
+        dlg = wx.TextEntryDialog(self, 'Give new display name for %s "%s":' %
+                                 (label, contact["identity"]),
+                                 conf.Title, value=contact["name"],
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if v == contact["name"] \
+        or not v and not contact.get("given_displayname") \
+        or not v and contact["identity"] == self.db.id \
+        and not self.db.account.get("given_displayname"): return
+
+        PREFS = ["fullname", "displayname", "skypename", "pstnnumber"]
+        key0, name0 = next((k, contact[k]) for k in PREFS if contact.get(k))
+        if not v:
+            if wx.OK != wx.MessageBox(
+                'Remove given display name from "%s", falling back to %s "%s"?' % 
+                (contact["identity"], key0, name0),
+                conf.Title, wx.OK | wx.CANCEL
+            ): return
+            v = None
+
+        self.db.update_row("contacts", {"given_displayname": v}, contact)
+        contact["given_displayname"] = v
+        contact["name"] = v or name0
+
+        if contact["identity"] == self.db.id:
+            self.db.update_row("accounts", {"given_displayname": v}, self.db.account)
+            self.db.account["given_displayname"] = v
+            self.db.account["name"] = v or name0
+            self.update_accountinfo()
+
+        idx = next((i for i in enumerate(self.list_participants.GetItemCount())
+                    if self.list_participants.GetItemData(i)["contact"] is contact), None)
+        if idx is not None:
+            self.list_participants.SetItemText(idx, "%(name)s (%(identity)s)" % contact)
+        self.stc_history.RefreshMessages()
         self.populate_chat_statistics()
         if self.html_stats.Shown:
             self.show_stats(True) # To restore scroll position
@@ -5098,10 +5190,12 @@ class DatabasePage(wx.Panel):
                 tabid = self.counter() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
 
-            # Hide chat rename-button if given_displayname not available
+            # Hide rename-button if given_displayname not available
             chat_cols = self.db.get_table_columns("conversations")
-            if not any(x["name"] == "given_displayname" for x in chat_cols):
-                self.button_rename_chat.Hide()
+            contact_cols = self.db.get_table_columns("contacts")
+            if  not any(x["name"] == "given_displayname" for x in chat_cols) \
+            and not any(x["name"] == "given_displayname" for x in contact_cols):
+                self.button_rename.Disable(), self.button_rename.Hide()
 
             # Populate the chats list
             self.chats = self.db.get_conversations()
@@ -6822,7 +6916,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 dom = self._parser.parse(m)
                 length_before = self.STC.Length
                 time_value = m["datetime"].strftime("%H:%M")
-                displayname = m["from_dispname"]
+                displayname = self._db.get_author_name(m)
                 special_tag = dom.find("msgstatus")
                 # Info messages like "/me is thirsty" -> author on same line.
                 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])

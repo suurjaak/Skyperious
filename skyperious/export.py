@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    28.07.2020
+@modified    01.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -208,7 +208,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, timerange=None, skip=T
             try:
                 text = text.decode("utf-8")
             except UnicodeError: pass
-            values = [m["datetime"], m["from_dispname"], text, m["author"]]
+            values = [m["datetime"], db.get_author_name(m), text, m["author"]]
             style[1] = "local" if db.id == m["author"] else "remote"
             writer.writerow(values, style)
             chat_message_count += 1
@@ -328,7 +328,7 @@ def export_chat_csv(chat, filename, db, messages):
                 text = text.decode("utf-8")
             except UnicodeError: pass
             values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
-                      m["from_dispname"], text ]
+                      db.get_author_name(m), text ]
             values = [v.encode("latin1", "replace") for v in values]
             writer.writerow(values)
             message_count += 1

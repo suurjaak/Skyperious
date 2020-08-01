@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    31.07.2020
+@modified    01.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1072,7 +1072,7 @@ previous_author = None
 %endif
 <%
 content = parser.parse(m, output={"format": "html", "export": True})
-from_name = m["from_dispname"] if previous_author != m["author"] else ""
+from_name = db.get_author_name(m) if previous_author != m["author"] else ""
 # Info messages like "/me is thirsty" -> author on same line.
 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
@@ -1087,7 +1087,7 @@ author_class = "remote" if m["author"] != db.id else "local"
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
-    <span class="{{author_class}}">{{m["from_dispname"]}}</span>
+    <span class="{{author_class}}">{{db.get_author_name(m)}}</span>
 %endif
       {{!content}}
     </div></td>
@@ -1159,9 +1159,9 @@ previous_day = m["datetime"].date()
 %endif
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
 {{m["datetime"].strftime("%H:%M")}}
-{{m["from_dispname"]}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
+{{db.get_author_name(m)}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %else:
-{{m["datetime"].strftime("%H:%M")}} {{m["from_dispname"]}}:
+{{m["datetime"].strftime("%H:%M")}} {{db.get_author_name(m)}}:
 {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %endif
 
@@ -1765,7 +1765,7 @@ if (skypedata.CHATS_TYPE_SINGLE != chat["type"]):
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
+    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{search["db"].get_author_name(m)}}{{after}}</font></a>
   </td><td align="right" nowrap>
     &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
   </td>
@@ -1773,7 +1773,7 @@ elif m["author"] == search["db"].id:
 <tr><td></td>
   <td width="100%" valign="top" colspan="2">
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
-    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{m["from_dispname"]}}</font>
+    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{search["db"].get_author_name(m)}}</font>
 %endif
   {{!body}}<br /></td>
 </tr>
@@ -1790,7 +1790,7 @@ if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{m["from_dispname"]}}{{after}}: {{body}}
+{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{search["db"].get_author_name(m)}}{{after}}: {{body}}
 """
 
 
@@ -2305,7 +2305,7 @@ from skyperious import conf
 
 """Message template for copying to clipboard."""
 MESSAGE_CLIPBOARD = """
-[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{m["from_dispname"]}}: {{parser.parse(m, output={"format": "text"})}}
+[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{parser.db.get_author_name(m)}}: {{parser.parse(m, output={"format": "text"})}}
 """
 
 

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    30.07.2020
+@modified    01.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -187,7 +187,7 @@ class SearchThread(WorkerThread):
                         for participant in chat["participants"]:
                             contact = participant["contact"]
                             if contact:
-                                for n in filter(None, [contact["fullname"],
+                                for n in filter(bool, [contact["name"], contact["fullname"],
                                 contact["displayname"], contact["identity"]]):
                                     if self.match_all(n, match_words) \
                                     and contact not in matching_authors:
@@ -227,10 +227,10 @@ class SearchThread(WorkerThread):
                     # Possibly more: country (ISO code, need map), birthday
                     # (base has YYYYMMDD in integer field).
                     match_fields = [
-                        "displayname", "skypename", "province", "city",
-                        "pstnnumber", "phone_home", "phone_office",
-                        "phone_mobile", "homepage", "emails", "about",
-                        "mood_text",
+                        "given_displayname", "displayname", "skypename",
+                        "province", "city", "pstnnumber", "phone_home",
+                        "phone_office", "phone_mobile", "homepage", "emails",
+                        "about", "mood_text",
                     ]
                     template_contact = FACTORY("contact")
                     for contact in contacts:
