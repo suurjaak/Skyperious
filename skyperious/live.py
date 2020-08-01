@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    30.07.2020
+@modified    01.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -672,11 +672,14 @@ class SkypeLogin(object):
             where = " WHERE convo_id IN (%s)" % idstr
             args = dict(("id%s" % (j+1), x) for j, x in enumerate(myids))
 
-            lasts = self.db.execute("SELECT id, convo_id, MAX(timestamp) AS ts "
+            stats = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
+                                    "MAX(timestamp) AS last "
                                     "FROM messages%s GROUP BY convo_id" % where, args)
-            for row in lasts:
+            for row in stats:
                 self.db.execute("UPDATE conversations SET last_message_id = :id, "
-                                "last_activity_timestamp = :ts WHERE id = :convo_id", row)
+                                "last_activity_timestamp = :last, "
+                                "creation_timestamp = COALESCE(creation_timestamp, :first) "
+                                "WHERE id = :convo_id", row)
 
         if self.progress: self.progress(
             action="populate", table="chats", end=True, count=len(updateds), new=new,
