@@ -5,7 +5,8 @@ CHANGELOG
 -----------------
 - added option to rename chats;
 - added option to delete database;
-- ensured that error reporting does not raise error.
+- use OS- and user-specific config and data directories where necessary;
+- ensure that error reporting does not raise error.
 
 
 4.0.1, 2020-07-30

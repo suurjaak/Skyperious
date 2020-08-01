@@ -29,7 +29,7 @@ setuptools.setup(
     platforms=["any"],
     keywords="skype sqlite merge export",
 
-    install_requires=["beautifulsoup4", "pyparsing", "Pillow<=6.2.2", "python-dateutil", "SkPy", "wxPython>=4.0", "XlsxWriter"],
+    install_requires=["appdirs", "beautifulsoup4", "pyparsing", "Pillow<=6.2.2", "python-dateutil", "SkPy", "wxPython>=4.0", "XlsxWriter"],
     entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
     packages=setuptools.find_packages(),

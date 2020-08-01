@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    30.07.2020
+@modified    31.07.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1893,6 +1893,8 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 4.1.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
+  <li>appdirs{{" 1.4.4" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.org/project/appdirs"><font color="{{conf.LinkColour}}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4{{" 4.9.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{conf.LinkColour}}">pypi.org/project/beautifulsoup4</font></a></li>
   <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/python-dateutil">

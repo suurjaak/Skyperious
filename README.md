@@ -131,6 +131,7 @@ If running from source code, Skyperious needs Python 2.7,
 and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
 The following are also listed in `requirements.txt` for pip:
+* appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
 * dateutil (https://pypi.org/project/python-dateutil)
 * Pillow (https://pypi.org/project/Pillow)

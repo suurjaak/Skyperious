@@ -19,10 +19,12 @@ import json
 import os
 import sys
 
+import appdirs
+
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.2.dev8"
+Version = "4.0.2.dev9"
 VersionDate = "31.07.2020"
 
 if getattr(sys, "frozen", False):
@@ -350,7 +352,18 @@ WordCloudWordsAuthorMax = 50
 
 def load():
     """Loads FileDirectives from ConfigFile into this module's attributes."""
-    global Defaults
+    global Defaults, VarDirectory, ConfigFile
+
+    configpaths = [ConfigFile]
+    if not Defaults:
+        # Instantiate OS- and user-specific paths
+        try:
+            p = appdirs.user_config_dir(Title, False)
+            configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+        except Exception: pass
+        try: VarDirectory = appdirs.user_data_dir(Title, False)
+        except Exception: pass
+
     section = "*"
     module = sys.modules[__name__]
     VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))
@@ -360,7 +373,10 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        parser.read(ConfigFile)
+        # Try user-specific path first, then path under application folder
+        for path in configpaths[::-1]:
+            if os.path.isfile(path) and parser.read(ConfigFile):
+                break # for path
 
         def parse_value(name):
             try: # parser.get can throw an error if value not found
@@ -383,15 +399,26 @@ def load():
 
 def save():
     """Saves FileDirectives into ConfigFile."""
+    configpaths = [ConfigFile]
+    try:
+        p = appdirs.user_config_dir(Title, False)
+        configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+    except Exception: pass
+
     section = "*"
     module = sys.modules[__name__]
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     parser.add_section(section)
     try:
-        try: os.makedirs(os.path.split(ConfigFile)[0])
-        except Exception: pass
-        f = open(ConfigFile, "wb")
+        for path in configpaths:
+            # Try path under application folder first, then user-specific path
+            try: os.makedirs(os.path.split(path)[0])
+            except Exception: pass
+            try: f = open(path, "wb")
+            except Exception: continue # for path
+            else: break # for path
+
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:

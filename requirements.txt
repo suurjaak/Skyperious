@@ -1,3 +1,4 @@
+appdirs
 beautifulsoup4
 Pillow<=6.2.2
 pyparsing
