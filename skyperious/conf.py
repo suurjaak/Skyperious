@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.2.dev11"
-VersionDate = "01.08.2020"
+Version = "4.0.2.dev12"
+VersionDate = "02.08.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -55,9 +55,10 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchResultsChunk", "SharedImageAutoDownload", "StatisticsPlotWidth",
-    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
-    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedImageAutoDownload",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
+    "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -148,6 +149,12 @@ LogEnabled = True
 
 """Whether to log all SQL statements to log window."""
 LogSQL = False
+
+"""Whether to pop up message dialogs for unhandled errors."""
+PopupUnexpectedErrors = True
+
+"""Number of unhandled errors encountered during current runtime."""
+UnexpectedErrorCount = 0
 
 """URLs for download list, changelog, and homepage."""
 DownloadURL  = "https://erki.lap.ee/downloads/Skyperious/"

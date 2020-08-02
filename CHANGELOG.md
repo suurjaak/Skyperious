@@ -1,12 +1,12 @@
 CHANGELOG
 =========
 
-4.0.2, 2020-07-31
+4.0.2, 2020-08-02
 -----------------
 - added option to rename chats and contacts;
 - added option to delete database;
 - use OS- and user-specific config and data directories where necessary;
-- ensure that error reporting does not raise error.
+- improved error handling and reporting.
 
 
 4.0.1, 2020-07-30
