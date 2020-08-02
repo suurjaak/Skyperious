@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1665,11 +1665,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if "name" in stats and "skypename" in stats:
                 self.label_account.Value = "%(name)s (%(skypename)s)" % stats
             text = "%(chats)s" % stats
-            if "lastmessage_chat" in stats:
+            if stats.get("lastmessage_chat"):
                 text += ", latest %(lastmessage_chat)s" % stats
             self.label_chats.Value = text
             text = "%(messages)s" % stats
-            if "lastmessage_dt" in stats:
+            if stats.get("lastmessage_dt"):
                 text += ", last at %(lastmessage_dt)s" % stats
             self.label_messages.Value = text
             data = self.db_filenames.get(filename, {})
@@ -3320,8 +3320,9 @@ class DatabasePage(wx.Panel):
         text = ""
         if "firstmessage_dt" in stats:
             text = "%(firstmessage_dt)s %(firstmessage_from)s" % stats
-            if stats.get("firstmessage_skypename") == self.db.id \
-            or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype"):
+            if stats.get("firstmessage_chat") \
+            and (stats.get("firstmessage_skypename") == self.db.id
+            or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype")):
                 text += " in %(firstmessage_chat)s" % stats
         self.edit_info_firstmessage.Value = text
 

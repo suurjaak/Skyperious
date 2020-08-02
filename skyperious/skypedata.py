@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -420,47 +420,55 @@ class SkypeDatabase(object):
         if self.account:
             result.update({"name": self.account.get("name"),
                            "skypename": self.account.get("skypename")})
+        COUNTS = ["Conversations", "Messages"]
+        if full: COUNTS += ["Contacts", "Transfers"]
+        for table in COUNTS:
+            res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
+            label = "chats" if "Conversations" == table else table.lower()
+            result[label] = next(res, {}).get("count")
+
         for k, table in [("chats", "Conversations"), ("messages", "Messages"),
                        ("contacts", "Contacts"), ("transfers", "Transfers")]:
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             result[k] = next(res, {}).get("count")
 
-        titlecol = self.make_title_col(alias="c")
+        titlecol = self.make_title_col()
         typestr = ", ".join(map(str, MESSAGE_TYPES_BASE))
-        res = self.execute("SELECT m.*, %s AS chat_title, c.type AS chat_type "
-            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (%s) ORDER BY m.timestamp DESC LIMIT 1" % (titlecol, typestr))
-        msg_last = next(res, None)
-        if msg_last:
-            if msg_last.get("timestamp"):
-                dt = self.stamp_to_date(msg_last["timestamp"])
-                result["lastmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
-            result["lastmessage_from"] = self.get_author_name(msg_last)
-            result["lastmessage_skypename"] = msg_last["author"]
-            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_last["chat_type"]
-                     else "chat with %s") % msg_last["chat_title"]
-            result["lastmessage_chat"] = title
-            result["lastmessage_chattype"] = msg_last["chat_type"]
-        if not full:
-            return result
 
-        res = self.execute("SELECT m.*, %s AS chat_title, c.type AS chat_type "
-            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (%s) ORDER BY m.timestamp ASC LIMIT 1"
-            % (titlecol, typestr))
-        msg_first = next(res, None)
-        if msg_first:
-            if msg_first.get("timestamp"):
-                dt = self.stamp_to_date(msg_first["timestamp"])
-                result["firstmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
-            result["firstmessage_from"] = self.get_author_name(msg_first)
-            result["firstmessage_skypename"] = msg_first["author"]
-            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_first["chat_type"]
-                     else "chat with %s") % msg_first["chat_title"]
-            result["firstmessage_chat"] = title
-            result["firstmessage_chattype"] = msg_first["chat_type"]
+        for i, label in enumerate(["last", "first"]):
+            direction = "ASC" if i else "DESC"
+            res = self.execute("SELECT author, from_dispname, convo_id, timestamp "
+                               "FROM Messages WHERE type IN (%s) "
+                               "ORDER BY timestamp %s LIMIT 1" % (typestr, direction))
+            msg = next(res, None)
+            if msg:
+                chat = next((x for x in self.table_rows.get("conversations", [])
+                             if x["id"] == msg["convo_id"]), None)
+                chat = chat or self.execute(
+                    "SELECT *, %s AS title FROM conversations "
+                    "WHERE id = ?" % titlecol, [msg["convo_id"]]
+                ).fetchone()
+                if msg.get("timestamp"):
+                    dt = self.stamp_to_date(msg["timestamp"])
+                    result["%smessage_dt" % label] = dt.strftime("%Y-%m-%d %H:%M")
+                contact = self.account if msg["author"] == self.id else None
+                contact = contact or self.table_objects.get("contacts", {}).get(msg["author"])
+                if not contact:
+                    cntitlecol = self.make_title_col("contacts")
+                    contact = self.execute(
+                        "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
+                        "%s AS name FROM contacts WHERE identity = ?"
+                    % cntitlecol, [msg["author"]]).fetchone()
+                result["%smessage_from" % label] = self.get_author_name(msg, contact)
+                result["%smessage_skypename" % label] = msg["author"]
+                if chat:
+                    title = ('"%s"' if CHATS_TYPE_SINGLE != chat["type"]
+                             else "chat with %s") % chat["title"]
+                    result["%smessage_chat" % label] = title
+                    result["%smessage_chattype" % label] = chat["type"]
+            if not full: break # for i, label
 
-        for i in range(2):
+        for i in range(2) if full else ():
             row = self.execute("SELECT COUNT(*) AS count FROM Messages "
                 "WHERE author %s= :skypename AND type IN (%s)"
                 % ("!="[i], typestr), result).fetchone()
@@ -809,30 +817,34 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_contact_name(self, identity):
+    def get_contact_name(self, identity, contact=None):
         """
         Returns the full name for the specified contact, or given identity if
         not set.
 
         @param   identity  skypename or pstnnumber
+        @param   contact   cached Contacts-row, if any
         """
         name = ""
         if identity == self.id:
             name = self.account["name"]
         else:
-            self.get_contacts()
-            if identity in self.table_objects["contacts"]:
-                name = self.table_objects["contacts"][identity]["name"]
+            if not contact:
+                self.get_contacts()
+                contact = self.table_objects["contacts"].get(identity)
+            if contact: name = contact["name"]
         name = name or identity
         return name
 
 
-    def get_author_name(self, message):
+    def get_author_name(self, message, contact=None):
         """
         Returns the display name of the message author,
         contact name if contact available else message from_dispname or author.
+
+        @param   contact   cached Contacts-row, if any
         """
-        result = self.get_contact_name(message["author"])
+        result = self.get_contact_name(message["author"], contact)
         if result == message["author"] and message.get("from_dispname"):
             result = message["from_dispname"]
         return result
