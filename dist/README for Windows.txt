@@ -62,7 +62,7 @@ Search supports wildcards, exact phrases, grouping, excluding,
 and either-or queries.
 
 Skyperious can log into Skype online service and download and save new messages
-in the local database file. It can also create a new main.db database from 
+into the local database file. It can also create a new main.db database from 
 scratch, by downloading all available history.
 
 HTML export can download shared photos and embed them in the resulting HTML,
@@ -73,6 +73,13 @@ Image download is also supported in the command-line interface.
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 read and copy specific chats and contacts.
+
+Skyperious can also merge chat history exported from Skype into an existing 
+`main.db` database, via 
+Compare and merge -> Select a Skype chat history export archive from your computer.
+Skype export is available in Skype client under 
+Settings -> Messaging -> Export chat history from Skype 7.x; 
+and in Skype web interface under My account -> Export files and chat history.
 
 Skyperious offers a number of options from the command line:
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet

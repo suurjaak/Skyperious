@@ -1379,9 +1379,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         nitems = enumerate(event.EventObject.GetMenuItems())
         indexitem = [(i, m) for i, m in nitems if m.GetId() == event.Id]
         i, item = indexitem[0] if indexitem else (-1, None)
-        if i > 0 and item:
+        has_export = bool(live.ijson)
+        is_export = has_export and (i == 1)
+        if i > has_export and item:
             filename2 = item.GetLabel().split(" ", 1).pop()
-        elif not i: # First menu item: open a file from computer
+        elif is_export: # Second menu item: open a Skype export archive from computer
+            dialog = wx.FileDialog(
+                parent=self, message="Open", defaultFile="",
+                wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
+                         "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
+                         "All files|*.*",
+                style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
+            dialog.ShowModal()
+            filename2 = dialog.GetPath()
+        else: # First menu item: open a file from computer
             dialog = wx.FileDialog(
                 parent=self, message="Open", defaultFile="",
                 wildcard="SQLite database (*.db)|*.db|All files|*.*",
@@ -1392,24 +1403,31 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.MessageBox("Cannot compare %s with itself." % (filename1),
                           conf.Title, wx.OK | wx.ICON_WARNING)
         else:
-            self.compare_databases(filename1, filename2)
+            self.compare_databases(filename1, filename2, is_export)
 
 
-    def compare_databases(self, filename1, filename2):
+    def compare_databases(self, filename1, filename2, is_export=False):
         """Opens the two databases for comparison, if possible."""
+        if not filename1 or not filename2: return
+
+        title = "Database comparison"
         db1, db2, page = None, None, None
-        if filename1 and filename2:
-            db1 =  self.load_database(filename1)
-        if db1:
+        if is_export:
+            db2 = live.SkypeExport(filename2)
+            db1 = self.load_database(filename1)
+            title = "Merge from Skype export"
+        if not db1 and not is_export:
+            db1 = self.load_database(filename1)
+        if db1 and not db2:
             db2 = self.load_database(filename2)
         if db1 and db2:
-            dbset = set((db1, db2))
+            dbset = set(map(str, (db1, db2)))
             page = next((x for x in self.merger_pages
-                         if x and set([x.db1, x.db2]) == dbset), None)
+                         if x and set(map(str, (x.db1, x.db2))) == dbset), None)
             if not page:
                 logger.info("Merge page for %s and %s.", db1, db2)
-                page = MergerPage(self.notebook, db1, db2,
-                       self.get_unique_tab_title("Database comparison"))
+                page = MergerPage(self.notebook, db2, db1,
+                       self.get_unique_tab_title(title))
                 self.merger_pages[page] = (db1, db2)
                 self.UpdateAccelerators()
                 conf.save()
@@ -1418,7 +1436,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             for db in filter(None, [db1, db2]):
                 if not db.has_consumers():
                     logger.info("Closed database %s.", db.filename)
-                    del self.dbs[db.filename]
+                    self.dbs.pop(db.filename, None)
                     db.close()
         if page:
             for i in range(self.notebook.GetPageCount()):
@@ -1438,6 +1456,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         item = fm.FlatMenuItem(menu, wx.ID_ANY,
                                "&Select a file from your computer..")
         menu.AppendItem(item)
+        if live.ijson:
+            item = fm.FlatMenuItem(menu, wx.ID_ANY,
+                                   "Select a Skype chat history &export archive from your computer..")
+            menu.AppendItem(item)
         recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
         others = [f for f in conf.DBFiles
                   if f not in recents and f != self.db_filename]
@@ -1801,7 +1823,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 page.save_page_conf()
                 page.worker_live.stop()
                 for worker in page.workers_search.values(): worker.stop()
-            for page in self.merger_pages: page.worker_merge.stop()
+                page.db.close()
+            for page in self.merger_pages:
+                page.worker_merge.stop(), page.worker_import.stop()
+                page.db1.close(), page.db2.close()
             self.worker_detection.stop()
 
             # Save last selected files in db lists, to reselect them on rerun
@@ -1894,6 +1919,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
             page.worker_merge.stop()
+            page.worker_import.stop()
             logger.info("Closed comparison tab for %s and %s.",
                         page.db1, page.db2)
 
@@ -1904,7 +1930,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if db.filename in self.dbs:
                     del self.dbs[db.filename]
                 db.close()
-                logger.info("Closed database %s.", db)
+                logger.info("Closed database %s.", db.filename)
         # Remove any dangling references
         if self.page_merge_latest == page:
             self.page_merge_latest = None
@@ -3567,7 +3593,7 @@ class DatabasePage(wx.Panel):
             self.db.account["name"] = v or name0
             self.update_accountinfo()
 
-        idx = next((i for i in enumerate(self.list_participants.GetItemCount())
+        idx = next((i for i in range(self.list_participants.GetItemCount())
                     if self.list_participants.GetItemData(i)["contact"] is contact), None)
         if idx is not None:
             self.list_participants.SetItemText(idx, "%(name)s (%(identity)s)" % contact)
@@ -5316,7 +5342,7 @@ class MergerPage(wx.Panel):
         self.is_scanned = False # Whether global scan has been run
         self.db1 = db1
         self.db2 = db2
-        guibase.status("Opening databases %s and %s.", self.db1, self.db2)
+        guibase.status("Opening %s and %s.", self.db1, self.db2)
         self.db1.register_consumer(self), self.db2.register_consumer(self)
         self.title = title
         parent_notebook.InsertPage(1, self, title)
@@ -5352,6 +5378,7 @@ class MergerPage(wx.Panel):
             ("type_name", "Type"), ("people", "People"), ]
         self.Bind(EVT_WORKER, self.on_worker_merge_result)
         self.worker_merge = workers.MergeThread(self.on_worker_merge_callback)
+        self.worker_import = workers.SkypeArchiveThread(self.on_worker_import_callback)
 
         sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -5424,10 +5451,10 @@ class MergerPage(wx.Panel):
 
         panel = wx.Panel(page, style=wx.BORDER_STATIC)
         label1 = self.label_all1 = wx.StaticText(panel, style=wx.ALIGN_RIGHT,
-            label="%s\n\nAnalyzing..%s" % (self.db1.filename, "\n" * 7))
+            label="%s\n\nAnalyzing..%s" % (self.db1, "\n" * 7))
         bmp_arrow = wx.StaticBitmap(panel, bitmap=images.MergeToRight.Bitmap)
         label2 = self.label_all2 = wx.StaticText(panel,
-            label="%s\n\nAnalyzing..%s" % (self.db2.filename, "\n" * 7))
+            label="%s\n\nAnalyzing..%s" % (self.db2, "\n" * 7))
         button_scan = self.button_scan_all = controls.NoteButton(panel,
             label="&Scan and report", note="Scan through the left database "
             "and find messages not present on the right.",
@@ -5717,6 +5744,40 @@ class MergerPage(wx.Panel):
             wx.PostEvent(self, WorkerEvent(result=result))
 
 
+    def on_worker_import_callback(self, result):
+        """Callback function for SkypeArchiveThread, updates UI."""
+        if not self: return
+
+        def after(result):
+            if "counts" in result:
+
+                t = ", ".join(util.plural(x[:-1], result["counts"][x])
+                              for x in sorted(result["counts"]))
+                self.label_gauge.Label = "Parsed %s." % t
+                self.panel_gauge.Layout()
+
+            elif "error" in result:
+                self.html_report.AppendToPage("<br /><br /> <b>Error parsing Skype export:</b>&nbsp;&nbsp;"
+                                              + result["error_short"].replace("<", "&lt;"))
+                self.html_report.Scroll(0, self.html_report.GetScrollRange(wx.VERTICAL))
+                self.gauge_progress.Value = 0
+                self.panel_gauge.Hide()
+                self.page_merge_all.Layout()
+            elif "done" in result:
+                stats = self.db1.get_general_statistics()
+                text = "<br /><br />Parsed %s, %s and %s." % tuple(
+                    util.plural(x[:-1], stats[x]) for x in ("chats", "contacts", "messages")
+                )
+                self.html_report.AppendToPage(text)
+                scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
+                self.html_report.Scroll(0, scrollpos)
+                self.gauge_progress.Value = 100
+                self.panel_gauge.Hide()
+                self.load_data()
+
+        wx.CallAfter(after, result)
+
+
     def on_swap(self, event):
         """
         Handler for clicking to swap left and right databases, changes data
@@ -5934,12 +5995,11 @@ class MergerPage(wx.Panel):
         Handler for clicking to merge contacts from one database to the other,
         either selected or all contacts, depending on button clicked.
         """
-        button = event.EventObject
         db_target, db_source = self.db2, self.db1
         list_source = self.list_contacts
         source = 0
         contacts, contactgroups, indices = [], [], []
-        if button is self.button_merge_allcontacts:
+        if event.Id == self.button_merge_allcontacts.Id:
             for i in range(list_source.ItemCount):
                 data = list_source.GetItemMappedData(i)
                 if "Contact" == data["__type"]:
@@ -6141,8 +6201,9 @@ class MergerPage(wx.Panel):
             msg = "%s error.\n\n%s" % (action, 
                   result.get("error_short", result["error"]))
             self.html_report.Freeze()
-            self.html_report.AppendToPage("<br /> <b>Error merging chats:</b>"
-                                          + result["error"])
+            self.html_report.AppendToPage("<br /><br /> <b>Error merging chats:</b>&nbsp;&nbsp;"
+                                          + result["error"].replace("<", "&lt;")
+                                            .replace(" ", "&nbsp;").replace("\n", "<br />"))
             scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
             self.html_report.Scroll(0, scrollpos)
             self.html_report.Thaw()
@@ -6311,6 +6372,26 @@ class MergerPage(wx.Panel):
         template = step.Template(templates.MERGE_DB_LINKS, escape=True)
         self.html_dblabel.SetPage(template.expand(namespace))
         self.html_dblabel.BackgroundColour = wx.NullColour
+
+        if isinstance(self.db1, live.SkypeExport) and not self.db1.export_parsed:
+            self.button_swap.Hide()
+            self.worker_import.work({"action": "parse", "db": self.db1})
+            self.html_report.Show()
+
+            html = ("<body bgcolor='%s'><font color='%s'>Parsing Skype chat history export %s .." %
+                    (conf.MergeHtmlBackgroundColour, conf.FgColour, self.db1))
+            self.html_report.SetPage(html)
+            self.update_gauge(self.gauge_progress, 0)
+            self.gauge_progress.Pulse()
+            self.update_tabheader()
+
+            for i in range(2):
+                db = self.db2 if i else self.db1
+                db.update_fileinfo()
+                label = self.label_all2 if i else self.label_all1
+                label.Label = "%s.\n\nSize %s.\nAnalyzing.." % (
+                              db, util.format_bytes(db.filesize))
+            return
 
         try:
             # Populate the chat comparison list
@@ -6520,7 +6601,7 @@ class MergerPage(wx.Panel):
             if not self.is_scanned:
                 self.button_scan_all.Enabled = True
                 self.button_merge_all.Enabled = True
-            guibase.status("Opened databases %s and %s.", self.db1, self.db2)
+            guibase.status("Opened %s and %s.", self.db1, self.db2)
             self.page_merge_all.Layout()
             self.Refresh()
             wx.CallAfter(self.update_tabheader)

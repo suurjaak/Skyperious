@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -612,7 +612,6 @@ class MergeThread(WorkerThread):
         error, e = None, None
         db1, db2 = params["db1"], params["db2"]
         chats = params["chats"]
-        chats1_count = len(db1.get_conversations())
         count_messages = 0
         count_participants = 0
         result = {"count": sum(len(x["diff"]["messages"]) for x in chats),
@@ -849,6 +848,45 @@ class LiveThread(WorkerThread):
                 elif "populate" == action["action"]:
                     self._skype.populate(action.get("chats"))
             except Exception as e:
+                result["error"] = traceback.format_exc()
+                result["error_short"] = util.format_exc(e)
+            if not self._is_working: result["stop"] = True
+
+            if not self._drop_results: self.postback(result)
+            self._is_working = False
+
+
+class SkypeArchiveThread(WorkerThread):
+    """
+    Skype export file parser thread, carries out importing to temporary database.
+    """
+
+
+    def __init__(self, callback):
+        """
+        @param   callback  function to call with parse progress
+        """
+        super(SkypeArchiveThread, self).__init__(callback)
+
+
+    def run(self):
+        self._is_running = True
+
+        def progress(**kwargs):
+            if kwargs and not self._drop_results: self.postback(kwargs)
+            return self.is_working 
+
+        while self._is_running:
+            action = self._queue.get()
+            if not action: continue # while self._is_running
+
+            self._is_working, self._drop_results = True, False
+            result = {"action": action["action"], "opts": action, "done": True}
+            try:
+                if "parse" == action["action"]:
+                    action["db"].export_read(progress)
+            except Exception as e:
+                logger.exception("Error parsing Skype export %s.", action["db"].export_path)
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)
             if not self._is_working: result["stop"] = True

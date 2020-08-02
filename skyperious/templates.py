@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -2268,10 +2268,14 @@ For searching messages from specific chats, add "chat:name", and from specific c
 
 """Database links on merge page."""
 MERGE_DB_LINKS = """<%
-from skyperious import conf
+from skyperious import conf, live
 
 %>
+%if isinstance(db1, live.SkypeExport):
+<font color="{{conf.FgColour}}">From {{db1}} into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+%else:
 <font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+%endif
 """
 
 

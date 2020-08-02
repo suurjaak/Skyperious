@@ -170,6 +170,8 @@ class SkypeDatabase(object):
         """
         self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
+        self.filesize = None
+        self.last_modified = None
         self.backup_created = False
         self.consumers = set() # Registered objects using this database
         self.account = None    # Row from table Accounts
@@ -206,12 +208,14 @@ class SkypeDatabase(object):
         """Returns SQL expression for selecting chat/contact/account title."""
         PREFS = ["given_displayname", "fullname", "displayname", "meta_topic",
                  "skypename", "pstnnumber", "identity"]
+        DEFS = {"chats": "identity", "accounts": "skypename", "contacts": "skypename"}
         cols = self.get_table_columns(table)
         colnames = [x["name"].lower() for x in cols]
         mycols = [x for x in PREFS if x in colnames]
+        if not cols: mycols = DEFS.get(table, [])
 
         result = ""
-        for i, n in enumerate(mycols):
+        for n in mycols:
             result += " WHEN COALESCE(TRIM(%s), '') != '' THEN %s" % (n, n)
         return "CASE %s ELSE '#' || %s.id END" % (result.strip(), alias or table)
 
@@ -332,7 +336,7 @@ class SkypeDatabase(object):
             except Exception: pass
 
 
-    def execute(self, sql, params=[], log=True):
+    def execute(self, sql, params=(), log=True):
         """Shorthand for self.connection.execute()."""
         result = None
         if self.connection:
@@ -420,8 +424,8 @@ class SkypeDatabase(object):
         if self.account:
             result.update({"name": self.account.get("name"),
                            "skypename": self.account.get("skypename")})
-        COUNTS = ["Conversations", "Messages"]
-        if full: COUNTS += ["Contacts", "Transfers"]
+        COUNTS = ["Conversations", "Messages", "Contacts"]
+        if full: COUNTS += ["Transfers"]
         for table in COUNTS:
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             label = "chats" if "Conversations" == table else table.lower()
@@ -1051,7 +1055,10 @@ class SkypeDatabase(object):
         for i, val in enumerate(list_values):
             if "blob" == map_columns[list_columns[i]]["type"].lower() and val:
                 if isinstance(val, unicode):
-                    val = val.encode("latin1")
+                    try:
+                        val = val.encode("latin1")
+                    except Exception:
+                        val = val.encode("utf-8")
                 val = sqlite3.Binary(val)
             result.append(val)
         if is_dict:
@@ -1482,8 +1489,8 @@ class MessageParser(object):
     EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
         (emoticons.EmoticonStrings[m.group(1)], m.group(1))
         if m.group(1) in emoticons.EmoticonStrings
-        and re.match("^%s*[%s]*(\s|$)" % (MessageParser.EMOTICON_RGX.pattern,
-                                          re.escape(".,;:?!'\"")),
+        and re.match(r"^%s*[%s]*(\s|$)" % (self.EMOTICON_RGX.pattern,
+                                           re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
         else m.group(1)
     )
@@ -1819,7 +1826,7 @@ class MessageParser(object):
                 url = link.get("href")
             elif not url: # Parse link from message contents
                 text = ElementTree.tostring(dom, "utf-8", "text")
-                match = re.search("(https?://[^\s<]+)", text)
+                match = re.search(r"(https?://[^\s<]+)", text)
                 if match: # Make link clickable
                     url = match.group(0)
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)

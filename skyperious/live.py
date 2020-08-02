@@ -8,24 +8,29 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.08.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
 import collections
 import datetime
+import json
 import logging
 import os
 import re
 import struct
+import tarfile
+import tempfile
 import time
 import urllib
 import warnings
 
-BeautifulSoup = skpy = None
+BeautifulSoup = skpy = ijson = None
 try: from bs4 import BeautifulSoup
 except ImportError: pass
 try: import skpy
+except ImportError: pass
+try: import ijson
 except ImportError: pass
 
 from . lib import util
@@ -437,16 +442,11 @@ class SkypeLogin(object):
         elif "messages" == table:
 
             ts = util.datetime_to_epoch(item.time)
+            pk_id, guid = self.make_message_ids(item.id)
             result.update(is_permanent=1, timestamp=int(ts), author=item.userId,
+                          pk_id=pk_id, guid=guid,
                           from_dispname=self.get_contact_name(item.userId),
                           body_xml=item.content, timestamp__ms=ts*1000)
-
-            # Ensure that pk_id fits into INTEGER-column
-            try: pk_id = int(item.id) if int(item.id).bit_length() < 64 else hash(item.id)
-            except Exception: pk_id = hash(item.id)
-            guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
-            guid *= 32 / len(guid)
-            result.update(pk_id=pk_id, guid=guid)
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) else parent.userId
@@ -468,7 +468,7 @@ class SkypeLogin(object):
                              type=skypedata.MESSAGE_TYPE_MESSAGE)
 
             elif isinstance(item, skpy.SkypeCallMsg):
-                # SkypeCallMsg(id='1593784617947', type='Event/Call', time=datetime.datetime(2020, 7, 3, 13, 56, 57, 949000), clientId='3666747505059875266', userId='username', chatId='8:username', content='<partlist type="ended" alt="" callId="1593784540478"><part identity="username"><name>Display Name</name><duration>84.82</duration></part><part identity="8:username2"><name>Display Name 2</name><duration>84.82</duration></part></partlist>', state=SkypeCallMsg.State.Ended, userIds=['username', '8:username2'], userNames=['Display Name', 'Display Name 2'])
+                # SkypeCallMsg(id='1593784617947', type='Event/Call', time=datetime.datetime(2020, 7, 3, 13, 56, 57, 949000), clientId='3666747505059875266', userId='username', chatId='8:username', content='<partlist type="ended" alt="" callId="1593784540478"><part identity="8:username"><name>Display Name</name><duration>84.82</duration></part><part identity="8:username2"><name>Display Name 2</name><duration>84.82</duration></part></partlist>', state=SkypeCallMsg.State.Ended, userIds=['username', '8:username2'], userNames=['Display Name', 'Display Name 2'])
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL2)
                 if skpy.SkypeCallMsg.State.Ended == item.state:
@@ -493,11 +493,11 @@ class SkypeLogin(object):
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
-                                       tuple(urllib.quote(util.to_unicode(x))
-                                             for x in [item.file.size or 0, item.file.name or "file"]))
+                                       (urllib.quote(util.to_unicode(item.file.size or 0)),
+                                        util.to_unicode(item.file.name or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
-                # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='live:.cid.c63ad15063a6dfca', chatId='19:e1a913fec4eb4be9b989379768d24229@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:live:.cid.c63ad15063a6dfca</initiator><value>Groupie: topic</value></topicupdate>', topic='Groupie: topic')
+                # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='username', chatId='19:abcdef..@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:username</initiator><value>The Topic</value></topicupdate>', topic='The Topic')
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_TOPIC,
                               type=skypedata.MESSAGE_TYPE_TOPIC,
@@ -598,7 +598,8 @@ class SkypeLogin(object):
             mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
             if not mychats: break # while run
             for chat in mychats.values():
-                if chat.id.startswith("48:"): # Skip specials like "48:calllogs"
+                if chat.id.startswith("48:") or chat.id.startswith("28:"):
+                    # Skip specials like "48:calllogs" or "28:concierge"
                     continue # for chat
                 if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
                     # Weird empty conversation, getMsgs raises 404
@@ -735,7 +736,7 @@ class SkypeLogin(object):
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
-            url0 = re.sub("https\:\/\/.+\.asm", "https://experimental-api.asm", url)
+            url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
         for url in urls:
             raw = self.download_image(url)
@@ -783,7 +784,7 @@ class SkypeLogin(object):
         or "19:xyz@thread.skype" for newer group chats.
         """
         result = chatid
-        if not result.endswith("@thread.skype"):
+        if result and not result.endswith("@thread.skype"):
             result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
             if result.endswith("@p2p.thread.skype"):
                 result = result[:-len("@p2p.thread.skype")]
@@ -803,7 +804,7 @@ class SkypeLogin(object):
         or "19:xyz@thread.skype" as-is for newer group chats.
         """
         result = identity
-        if not result.endswith("@thread.skype"):
+        if result and not result.endswith("@thread.skype"):
             if result.startswith("#"):
                 result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
             elif not result.endswith("thread.skype"):
@@ -817,3 +818,466 @@ class SkypeLogin(object):
         base = util.safe_filename(username)
         if base != username: base += "_%x" % hash(username)
         return os.path.join(conf.VarDirectory, "%s.main.db" % base)
+
+
+    @staticmethod
+    def make_message_ids(msg_id):
+        """Returns (pk_id, guid) for message ID."""
+        try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else hash(msg_id)
+        except Exception: pk_id = hash(msg_id) # Ensure fit into INTEGER-column
+        guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
+        guid *= 32 / len(guid)
+        return (pk_id, guid)
+
+
+
+class SkypeExport(skypedata.SkypeDatabase):
+    """
+    Class for parsing a Skype export file and populating the database.
+    File is a JSON file, or a TAR file containing "messages.json".
+
+    The JSON file has the following structure: {
+      'exportDate':    '2020-07-06T20:55',
+      'userId':        '8:accountname',
+      'conversations': [{
+
+        'displayName':     'chat name',
+        'version':         1594056032575.0,
+        'id':              'chat ID',
+        'properties':      {
+            'conversationblocked': False,
+            'conversationstatus':  None,
+            'lastimreceivedtime':  '2020-07-01T11:16:16.634Z',
+            'consumptionhorizon':  '1594056032374;1594056031232;2130221778977763996'
+        },
+        'threadProperties': {
+          'membercount': 15,
+          'topic':       'chat topic',
+          'members':     '["accountname",..]', # Note that the list is a JSON string
+        },
+        'MessageList':   [{
+          'conversationid': 'chat ID', 
+          'displayName':    None,
+          'messagetype':    'RichText',
+          'properties':     None,
+          'content':        'message content',
+          'version':        1594056032374.0,
+          'amsreferences':  None,
+          'from':           'accountname',
+          'id':             '1594056032374'
+          'originalarrivaltime': '2020-07-06T17:20:30.609Z',
+        }, ..],
+      }, ..],
+    }.
+
+    Account names can have prefix like '8:accountname'.
+
+    Message type can be one of the following (not complete list): [
+     'Event/Call', 'InviteFreeRelationshipChanged/Initialized', 'Notice', 
+     'PopCard', 'RichText', 'RichText/Media_Album', 'RichText/Media_Card',
+     'RichText/Media_GenericFile', 'RichText/Media_Video', 'RichText/UriObject',
+     'Text', 'ThreadActivity/AddMember', 'ThreadActivity/DeleteMember',
+     'ThreadActivity/HistoryDisclosedUpdate', 'ThreadActivity/JoiningEnabledUpdate',
+     'ThreadActivity/PictureUpdate', 'ThreadActivity/TopicUpdate'
+    ].
+
+    Message properties can be (not complete list):
+    - {"edittime": "1592494326832", "isserversidegenerated": True}
+    - {"deletetime": "1592494326832"}
+    """
+
+
+    def __init__(self, filename):
+        self.export_path = filename
+        self.export_filesize = os.path.getsize(filename)
+        ts = os.path.getmtime(filename)
+        self.export_last_modified = datetime.datetime.fromtimestamp(ts)
+        self.export_parsed = False
+
+        fh, dbpath = tempfile.mkstemp(".db")
+        os.close(fh)
+        super(SkypeExport, self).__init__(dbpath, log_error=False)
+        for table in self.CREATE_STATEMENTS: self.create_table(table)
+        
+
+    def __str__(self):
+        return self.export_path
+
+
+    def get_filesize(self): return self.export_filesize
+    filesize = property(get_filesize, lambda *a: None)
+
+    def get_last_modified(self): return self.export_last_modified
+    last_modified = property(get_last_modified, lambda *a: None)
+
+
+    def close(self):
+        """Closes the database, clears memory, and deletes temporary database."""
+        super(SkypeExport, self).close()
+        try: os.unlink(self.filename)
+        except Exception: pass
+
+
+    def export_read(self, progress=None):
+        """Reads in export file and populates database."""
+        f, tf = None, None
+        try:
+            try:
+                tf = tarfile.open(self.export_path)
+                f = tf.extractfile("messages.json")
+            except Exception: f = open(self.export_path, "rb")
+        except Exception: raise
+        else: self.export_parse(f, progress)
+        finally:
+            util.try_until(lambda:  f.close())
+            util.try_until(lambda: tf.close())
+            util.try_until(self.clear_cache)
+            self.export_parsed = True
+
+
+    def export_parse(self, f, progress=None):
+        """Parses JSON data from file pointer and inserts to database."""
+        parser = ijson.parse(f)
+
+        self.get_tables()
+        self.table_objects.setdefault("contacts", {})
+        self.table_rows.setdefault("participants", [])
+        chat, msg, edited_msgs, skip_chat = {}, {}, {}, False
+        counts = {"chats": 0, "messages": 0}
+        lastcounts = dict(counts)
+        while True:
+            # Prefix is a dot-separated path of nesting, composed of
+            # dictionary keys and "item" for list elements,
+            # e.g. "conversations.item.MessageList.item.content"
+            prefix, evt, value = next(parser, (None, None, None))
+            if not prefix and not evt: break # while True
+
+            # Dictionary start: ("nested path", "start_map", None)
+            if "start_map" == evt:
+                if "conversations.item" == prefix:
+                    chat = {"is_permanent": 1}
+                    chat["id"] = self.insert_row("conversations", chat)
+                    counts["chats"] += 1
+                elif "conversations.item.MessageList.item" == prefix:
+                    msg = {"is_permanent": 1, "convo_id": chat["id"], "__type": None}
+
+            # Dictionary end: ("nested path", "end_map", None)
+            elif "end_map" == evt:
+                if "conversations.item" == prefix:
+                    if skip_chat:
+                        skip_chat = False
+                        self.delete_row("conversations", chat, log=False)
+                        counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
+                                                           [chat["id"]], log=False).rowcount
+                        counts["chats"] -= 1
+                    else:
+                        chat = self.export_finalize_chat(chat)
+                        self.update_row("conversations", chat, chat, log=False)
+                    edited_msgs.clear()
+                elif "conversations.item.MessageList.item" == prefix:
+                    if not skip_chat: 
+                        msg = self.export_finalize_message(msg, chat, edited_msgs)
+                        if msg:
+                            msg["id"] = self.insert_row("messages", msg, log=False)
+                            counts["messages"] += 1
+
+            # List start: ("nested path", "start_array", None)
+            elif "start_array" == evt: pass
+
+            # List end: ("nested path", "end_array", None)
+            elif "end_array" == evt: pass
+
+            # List element start: ("nested path.item", "data type", element value)
+            elif (prefix or "").endswith(".item"): pass
+
+            # Dictionary key: ("nested path", "map_key", "key name")
+            elif "map_key" == evt: pass
+
+            # Dictionary value: ("nested path.key name", "data type", value)
+            else:
+                if "userId" == prefix:
+                    account = dict(skypename=self.live.id_to_identity(value),
+                                   is_permanent=1)
+                    self.insert_row("accounts", account)
+                    self.update_accountinfo()
+
+                elif "conversations.item.id" == prefix:
+                    # Skip specials like "48:calllogs" or "28:concierge"
+                    skip_chat = value.startswith("48:") or value.startswith("28:")
+                    chat["identity"] = value
+                    chat["type"] = skypedata.CHATS_TYPE_GROUP
+                    if value.startswith("8:"):
+                        chat["identity"] = value[2:]
+                        chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+
+                elif "conversations.item.displayName" == prefix:
+                    chat["displayname"] = value
+
+                elif "conversations.item.threadProperties.topic" == prefix:
+                    chat["meta_topic"] = value
+
+                elif "conversations.item.threadProperties.members" == prefix:
+                    if skip_chat: continue # while True
+                    for identity in map(self.live.id_to_identity, json.loads(value)):
+                        if identity not in self.table_objects["contacts"] and identity != self.id:
+                            contact = dict(skypename=identity, is_permanent=1)
+                            contact["id"] = self.insert_row("contacts", contact)
+                            self.table_objects["contacts"][identity] = contact
+                        p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
+                        p["id"] = self.insert_row("participants", p, log=False)
+                        self.table_rows["participants"].append(p)
+
+                elif "conversations.item.MessageList.item.id" == prefix:
+                    if skip_chat: continue # while True
+                    pk_id, guid = self.live.make_message_ids(value)
+                    msg.update(pk_id=pk_id, guid=guid)
+
+                elif "conversations.item.MessageList.item.from" == prefix:
+                    if skip_chat: continue # while True
+                    msg["author"] = self.live.id_to_identity(value)
+
+                elif "conversations.item.MessageList.item.displayName" == prefix:
+                    if value: msg["from_dispname"] = value
+
+                elif "conversations.item.MessageList.item.content" == prefix:
+                    msg["body_xml"] = value
+
+                elif "conversations.item.MessageList.item.originalarrivaltime" == prefix:
+                    if skip_chat: continue # while True
+                    ts = self.export_parse_timestamp(value)
+                    msg["timestamp"] = int(ts)
+                    msg["timestamp__ms"] = ts * 1000
+
+                elif "conversations.item.MessageList.item.properties.edittime" == prefix:
+                    msg["edited_timestamp"] = int(value) / 1000
+
+                elif "conversations.item.MessageList.item.properties.deletetime" == prefix:
+                    if skip_chat: continue # while True
+                    msg["edited_timestamp"] = int(value) / 1000
+                    msg["body_xml"] = ""
+
+                elif "conversations.item.MessageList.item.properties.isserversidegenerated" == prefix:
+                    if skip_chat: continue # while True
+                    if value: msg["__generated"] = True
+
+                elif "conversations.item.MessageList.item.messagetype" == prefix:
+                    msg["__type"] = value # For post-processing
+
+            if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
+            or counts["messages"] and not counts["messages"] % 100) \
+            and not progress(counts=counts):
+                break # while True
+
+            lastcounts = dict(counts)
+
+
+    def export_finalize_chat(self, chat):
+        """
+        Populates last fields, inserts account participant if lacking.
+        """
+        if "meta_topic" in chat and "displayname" not in chat:
+            chat["displayname"] = chat["meta_topic"]
+
+        # Insert account participant if not inserted
+        if not any(self.id == x["identity"] and chat["id"] == x["convo_id"]
+                   for x in self.table_rows["participants"]):
+            p = dict(is_permanent=1, convo_id=chat["id"], identity=self.id)
+            p["id"] = self.insert_row("participants", p, log=False)
+            self.table_rows["participants"].append(p)
+
+        return chat
+
+
+    def export_finalize_message(self, msg, chat, edited_msgs):
+        """
+        Populates last fields, inserts contacts and participants where lacking,
+        updates contact/account displayname. Returns None to skip message insert.
+        """
+        if "edited_timestamp" in msg: msg["edited_by"] = msg["author"]
+
+        if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
+            msg["dialog_partner"] = msg["author"]
+
+        msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_MESSAGE,
+                   type=skypedata.MESSAGE_TYPE_MESSAGE)
+
+        if 'Event/Call' == msg["__type"]:
+            # <partlist type="ended" alt="" callId="1593784540478"><part identity="8:username"><name>Display Name</name><duration>84.82</duration></part><part identity="8:username2"><name>Display Name 2</name><duration>84.82</duration></part></partlist>
+
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL2,
+                       type=skypedata.MESSAGE_TYPE_CALL)
+            if 'type="ended"' in msg.get("body_xml", ""):
+                msg.update(type=skypedata.MESSAGE_TYPE_CALL_END)
+
+        elif "RichText/Contacts" == msg["__type"]:
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
+                       type=skypedata.MESSAGE_TYPE_CONTACTS)
+
+        elif "RichText/UriObject" == msg["__type"]:
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
+                       type=skypedata.MESSAGE_TYPE_SHARE_PHOTO)
+
+        elif "RichText/Media_GenericFile" == msg["__type"]:
+            # <URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>
+
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
+                       type=skypedata.MESSAGE_TYPE_FILE)
+            try:
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                name = bs.find("originalname").get("v")
+                size = bs.find("filesize").get("v")
+                msg["body_xml"] = '<files><file index="0" size="%s">%s</file></files>' % (
+                                  urllib.quote(util.to_unicode(size or 0)),
+                                  util.to_unicode(name or "file").replace("<", "&lt;").replace(">", "&gt;"))
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing file from %s.", msg, exc_info=True)
+
+        elif "ThreadActivity/TopicUpdate" == msg["__type"]:
+            # <topicupdate><eventtime>1594466832367</eventtime><initiator>8:username</initiator><value>The Topic</value></topicupdate>
+
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_TOPIC,
+                       type=skypedata.MESSAGE_TYPE_TOPIC)
+            try:
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                if initiator: msg["author"] = initiator
+                msg["body_xml"] = bs.find("value").text
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing topic from %s.", msg, exc_info=True)
+
+        elif "ThreadActivity/AddMember" == msg["__type"]:
+            # <addmember><eventtime>1594467205492</eventtime><initiator>8:username</initiator><target>8:username2</target></addmember>
+
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_CONTACTS,
+                       type=skypedata.MESSAGE_TYPE_PARTICIPANTS)
+            try:
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                if initiator: msg["author"] = initiator
+                msg["identities"] = self.live.id_to_identity(bs.find("target").text)
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing identities from %s.", msg, exc_info=True)
+
+        elif "ThreadActivity/DeleteMember" == msg["__type"]:
+            # <deletemember><eventtime>1594467133727</eventtime><initiator>8:username</initiator><target>8:username2</target></deletemember>
+
+            try:
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                target = self.live.id_to_identity(bs.find("target").text)
+                if initiator: msg["author"] = initiator
+                if msg["author"] == target:
+                    msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_LEAVE,
+                               type=skypedata.MESSAGE_TYPE_LEAVE)
+                else:
+                    msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_REMOVE,
+                               type=skypedata.MESSAGE_TYPE_REMOVE,
+                               identities=target)
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing identities from %s.", msg, exc_info=True)
+
+        elif "RichText/Location" == msg["__type"]:
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
+                       type=skypedata.MESSAGE_TYPE_INFO)
+
+        elif "ThreadActivity/PictureUpdate" == msg["__type"]:
+            # <pictureupdate><eventtime>1594466869930</eventtime><initiator>8:username</initiator><value>URL@https://api.asm.skype.com/v1/objects/0-weu-d15-abcdef..</value></pictureupdate>
+
+            msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_PICTURE,
+                       type=skypedata.MESSAGE_TYPE_TOPIC)
+            try:
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                if initiator: msg["author"] = initiator
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing author from %s.", msg, exc_info=True)
+
+        elif "RichText/Media_Video"    == msg["__type"] \
+        or   "RichText/Media_AudioMsg" == msg["__type"]:
+            # <URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef../views/thumbnail" type="Video.1/Message.1" doc_id="0-weu-d8-abcdef.." width="640" height="480">To view this video message, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..</a><OriginalName v="937029c3-6a12-4202-bdaf-aac9e341c63d.mp4"></OriginalName><FileSize v="103470"></FileSize></URIObject>
+
+            msg.update(type=skypedata.MESSAGE_TYPE_SHARE_VIDEO2)
+
+        elif msg["__type"] not in ("Text", "RichText", "InviteFreeRelationshipChanged/Initialized", "RichText/Media_Card"):
+            # One of 'Notice', 'PopCard', 'RichText/Media_Album',
+            # 'ThreadActivity/HistoryDisclosedUpdate', 'ThreadActivity/JoiningEnabledUpdate', ..
+            return None
+
+        if "author" not in msg or "timestamp" not in msg \
+        or msg.get("__generated") and not msg.get("body_xml") \
+        and "edited_timestamp" not in msg:
+            return None # Can be blank messages, especially from serverside
+
+        if "<e_m " in msg.get("body_xml"):
+            # <e_m ts="1526383416" ts_ms="1526383417250" a="skypename" t="61"/>
+
+            try:
+                # Edited messages can be in form "new content<e_m ..>",
+                # where ts_ms is the timestamp of the original message.
+                # Message may also start with "Edited previous message: ".
+                STRIP_PREFIX = "Edited previous message: "
+                bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                tag = bs.find("e_m")
+                ts_ms = int(tag.get("ts_ms"))
+                msg["edited_timestamp"] = msg["timestamp"]
+                msg["edited_by"] = msg["author"]
+                msg["timestamp"] = ts_ms / 1000
+                msg["timestamp__ms"] = ts_ms
+                if msg["body_xml"].startswith(STRIP_PREFIX):
+                    msg["body_xml"] = msg["body_xml"][len(STRIP_PREFIX):]
+                tag.unwrap() # Remove tag from soup
+                if not bs.encode(): msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
+            except Exception:
+                if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
+
+        if (msg["author"], msg["timestamp__ms"]) in edited_msgs:
+            # Take pk_id and guid from earlier message
+            msg0 = edited_msgs[(msg["author"], msg["timestamp__ms"])]
+            msg0.update(pk_id=msg["pk_id"], guid=msg["guid"])
+            self.update_row("messages", msg0, msg0, log=False)
+            return None # Edited message, final version already parsed
+
+        if "edited_timestamp" in msg:
+            edited_msgs[(msg["author"], msg["timestamp__ms"])] = msg
+
+        # Insert contact if not inserted
+        if msg["author"] != self.id \
+        and msg["author"] not in self.table_objects["contacts"]:
+            contact = dict(skypename=msg["author"], is_permanent=1)
+            contact["id"] = self.insert_row("contacts", contact)
+            self.table_objects["contacts"][msg["author"]] = contact
+
+        # Insert participant if not inserted
+        if not any(msg["author"] == x["identity"] and msg["convo_id"] == x["convo_id"]
+                   for x in self.table_rows["participants"]):
+            p = dict(is_permanent=1, convo_id=msg["convo_id"], identity=msg["author"])
+            p["id"] = self.insert_row("participants", p, log=False)
+            self.table_rows["participants"].append(p)
+
+        # Take contact/account displayname from message if not populated
+        ptable, pitem = None, {}
+        if msg["author"] == self.id:
+            ptable, pitem = "accounts", self.account
+        if msg["author"] in self.table_objects["contacts"]:
+            ptable, pitem = "contacts", self.table_objects["contacts"][msg["author"]]
+        if msg.get("from_dispname") and "displayname" not in pitem:
+            pitem["displayname"] = msg["from_dispname"]
+            self.update_row(ptable, pitem, pitem, log=False)
+
+        return msg
+
+
+    @staticmethod
+    def export_parse_timestamp(value):
+        """
+        Returns UNIX timestamp from datetime string like "2020-07-06T17:20:30.609Z".
+        """
+        v, suf = value.replace("T", " ").rstrip("Z"), ""
+        if "." in v: v, suf = v.split(".")
+        dt = datetime.datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
+        if suf:
+            try:
+                suf = re.sub(r"[\D]", "", suf).ljust(6, "0")
+                dt = dt.replace(microsecond=int(suf))
+            except Exception: pass
+        return util.datetime_to_epoch(dt)
