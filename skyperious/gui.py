@@ -3,16 +3,15 @@
 Skyperious UI application main window class and project-specific UI classes.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.07.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
-import base64
 import collections
 import copy
 import datetime
@@ -270,7 +269,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         edit_filter.ToolTip = "Filter database list (%s-F)" % controls.KEYS.NAME_CTRL
 
         list_db = self.list_db = controls.SortableUltimateListCtrl(panel_left,
-            agwStyle=wx.LC_REPORT | wx.BORDER_NONE)
+            agwStyle=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_NONE)
         list_db.MinSize = 400, -1 # Maximize-restore would resize width to 100
         list_db.InsertColumn(0, "")
 
@@ -359,8 +358,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "HTML, text or spreadsheet."),
             ("button_saveas", "Save &as..", images.ButtonSaveAs,
              "Save a copy of the database under another name."),
-            ("button_remove", "&Remove", images.ButtonRemove,
-             "Remove this database from the list."), ]
+            ("button_remove", "&Remove", images.ButtonRemoveType,
+             "Remove this database from the list."),
+            ("button_delete", "Delete", images.ButtonRemove,
+             "Delete this database from disk."), ]
         for name, label, img, note in BUTTONS_DETAIL:
             button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
             setattr(self, name, button)
@@ -373,7 +374,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         edit_filter.Bind(wx.EVT_TEXT_ENTER,        self.on_filter_list_db)
         list_db.Bind(wx.EVT_LIST_ITEM_SELECTED,    self.on_select_list_db)
-        list_db.Bind(wx.EVT_LIST_ITEM_DESELECTED,  self.on_deselect_list_db)
         list_db.Bind(wx.EVT_LIST_ITEM_ACTIVATED,   self.on_open_from_list_db)
         list_db.Bind(wx.EVT_CHAR_HOOK,             self.on_list_db_key)
         list_db.Bind(wx.EVT_LIST_COL_CLICK,        self.on_sort_list_db)
@@ -391,6 +391,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_export.Bind(wx.EVT_BUTTON,  self.on_export_database_menu)
         self.button_saveas.Bind(wx.EVT_BUTTON,  self.on_save_database_as)
         self.button_remove.Bind(wx.EVT_BUTTON,  self.on_remove_database)
+        self.button_delete.Bind(wx.EVT_BUTTON,  self.on_delete_database)
 
         sizer_header.Add(label_count, flag=wx.ALIGN_BOTTOM)
         sizer_header.AddStretchSpacer()
@@ -418,6 +419,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_detail.Sizer.AddStretchSpacer()
         panel_detail.Sizer.Add(self.button_saveas, flag=wx.GROW)
         panel_detail.Sizer.Add(self.button_remove, flag=wx.GROW)
+        panel_detail.Sizer.Add(self.button_delete, flag=wx.GROW)
 
         panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
@@ -1066,50 +1068,93 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             defaultFile=os.path.basename(original),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
-        if wx.ID_OK == dialog.ShowModal():
-            wx.YieldIfNeeded() # Allow UI to refresh
-            newpath = dialog.GetPath()
-            success = False
-            try:
-                shutil.copyfile(original, newpath)
-                success = True
-            except Exception as e:
-                guibase.status("Error trying to copy %s to %s: %s",
-                               original, newpath, util.format_exc(e))
-                logger.exception("Error trying to copy %s to %s.", original, newpath)
-                wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
-                              conf.Title, wx.OK | wx.ICON_WARNING)
-            if success:
-                guibase.status("Saved a copy of %s as %s.", original, newpath,
-                               log=True)
-                self.update_database_list(newpath)
+        if wx.ID_OK != dialog.ShowModal(): return
+
+        wx.YieldIfNeeded() # Allow UI to refresh
+        newpath = dialog.GetPath()
+        success = False
+        try:
+            shutil.copyfile(original, newpath)
+            success = True
+        except Exception as e:
+            guibase.status("Error trying to copy %s to %s: %s",
+                           original, newpath, util.format_exc(e))
+            logger.exception("Error trying to copy %s to %s.", original, newpath)
+            wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
+                          conf.Title, wx.OK | wx.ICON_WARNING)
+        if success:
+            guibase.status("Saved a copy of %s as %s.", original, newpath,
+                           log=True)
+            self.update_database_list(newpath)
+
+
+    def on_delete_database(self, event):
+        """Handler for clicking to delete a database."""
+        filename = self.db_filename
+        if not filename or wx.OK != wx.MessageBox(
+            "Delete %s from disk?" % filename,
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ): return
+
+        if filename in self.dbs:
+            return wx.MessageBox("%s is currently open in %s, cannot delete." %
+                                 (filename, conf.Title), conf.Title, wx.OK)
+
+        try: os.unlink(filename)
+        except Exception as e:
+            logger.exception("Error deleting %s.", filename)
+            return wx.MessageBox("Failed to delete %s:\n\n%s" %
+                                 (filename, util.format_exc(e)),
+                                 conf.Title, wx.OK | wx.ICON_ERROR)
+        
+        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+            if filename in lst: lst.remove(filename)
+        for dct in conf.LastSearchResults, self.db_filenames:
+            dct.pop(filename, None)
+        for i in range(self.list_db.GetItemCount()):
+            if self.list_db.GetItemText(i) == filename:
+                self.list_db.DeleteItem(i)
+                break # break for i in range(self.list_db..
+        conf.Login.pop(filename, None)
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i in [i for i, f in historyfiles if f == filename]:
+            self.history_file.RemoveFileFromHistory(i)
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.update_database_list()
+        self.panel_db_main.Layout()
+        conf.save()
 
 
     def on_remove_database(self, event):
         """Handler for clicking to remove an item from the database list."""
         filename = self.db_filename
-        if filename and wx.OK == wx.MessageBox(
+        if not filename or wx.OK != wx.MessageBox(
             "Remove %s from database list?" % filename,
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ):
-            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-                if filename in lst: lst.remove(filename)
-            for dct in conf.LastSearchResults, self.db_filenames:
-                dct.pop(filename, None)
-            for i in range(self.list_db.GetItemCount()):
-                if self.list_db.GetItemText(i) == filename:
-                    self.list_db.DeleteItem(i)
-                    break # break for i in range(self.list_db..
-            # Remove from recent file history
-            historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                            for i in range(self.history_file.Count)]
-            for i in [i for i, f in historyfiles if f == filename]:
-                self.history_file.RemoveFileFromHistory(i)
-            self.db_filename = None
-            self.list_db.Select(0)
-            self.update_database_list()
-            self.panel_db_main.Layout()
-            conf.save()
+        ): return
+
+        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+            if filename in lst: lst.remove(filename)
+        for dct in conf.LastSearchResults, self.db_filenames:
+            dct.pop(filename, None)
+        for i in range(self.list_db.GetItemCount()):
+            if self.list_db.GetItemText(i) == filename:
+                self.list_db.DeleteItem(i)
+                break # break for i in range(self.list_db..
+        conf.Login.pop(filename, None)
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i in [i for i, f in historyfiles if f == filename]:
+            self.history_file.RemoveFileFromHistory(i)
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.update_database_list()
+        self.panel_db_main.Layout()
+        conf.save()
 
 
     def on_remove_missing(self, event):
@@ -1127,6 +1172,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             for dct in conf.LastSearchResults, self.db_filenames:
                 dct.pop(filename, None)
             self.list_db.DeleteItem(selected)
+            conf.Login.pop(filename, None)
         self.update_database_list()
 
         if not selecteds: return
@@ -1159,6 +1205,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             for dct in conf.LastSearchResults, self.db_filenames:
                 dct.pop(filename, None)
             self.list_db.DeleteItem(selected)
+            conf.Login.pop(filename, None)
         self.update_database_list()
 
         if not selecteds: return
@@ -1332,9 +1379,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         nitems = enumerate(event.EventObject.GetMenuItems())
         indexitem = [(i, m) for i, m in nitems if m.GetId() == event.Id]
         i, item = indexitem[0] if indexitem else (-1, None)
-        if i > 0 and item:
+        has_export = bool(live.ijson)
+        is_export = has_export and (i == 1)
+        if i > has_export and item:
             filename2 = item.GetLabel().split(" ", 1).pop()
-        elif not i: # First menu item: open a file from computer
+        elif is_export: # Second menu item: open a Skype export archive from computer
+            dialog = wx.FileDialog(
+                parent=self, message="Open", defaultFile="",
+                wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
+                         "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
+                         "All files|*.*",
+                style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
+            dialog.ShowModal()
+            filename2 = dialog.GetPath()
+        else: # First menu item: open a file from computer
             dialog = wx.FileDialog(
                 parent=self, message="Open", defaultFile="",
                 wildcard="SQLite database (*.db)|*.db|All files|*.*",
@@ -1345,24 +1403,31 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.MessageBox("Cannot compare %s with itself." % (filename1),
                           conf.Title, wx.OK | wx.ICON_WARNING)
         else:
-            self.compare_databases(filename1, filename2)
+            self.compare_databases(filename1, filename2, is_export)
 
 
-    def compare_databases(self, filename1, filename2):
+    def compare_databases(self, filename1, filename2, is_export=False):
         """Opens the two databases for comparison, if possible."""
+        if not filename1 or not filename2: return
+
+        title = "Database comparison"
         db1, db2, page = None, None, None
-        if filename1 and filename2:
-            db1 =  self.load_database(filename1)
-        if db1:
+        if is_export:
+            db2 = live.SkypeExport(filename2)
+            db1 = self.load_database(filename1)
+            title = "Merge from Skype export"
+        if not db1 and not is_export:
+            db1 = self.load_database(filename1)
+        if db1 and not db2:
             db2 = self.load_database(filename2)
         if db1 and db2:
-            dbset = set((db1, db2))
+            dbset = set(map(str, (db1, db2)))
             page = next((x for x in self.merger_pages
-                         if x and set([x.db1, x.db2]) == dbset), None)
+                         if x and set(map(str, (x.db1, x.db2))) == dbset), None)
             if not page:
                 logger.info("Merge page for %s and %s.", db1, db2)
-                page = MergerPage(self.notebook, db1, db2,
-                       self.get_unique_tab_title("Database comparison"))
+                page = MergerPage(self.notebook, db2, db1,
+                       self.get_unique_tab_title(title))
                 self.merger_pages[page] = (db1, db2)
                 self.UpdateAccelerators()
                 conf.save()
@@ -1370,8 +1435,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             # Close DB with no owner
             for db in filter(None, [db1, db2]):
                 if not db.has_consumers():
-                    logger.info("Closed database %s." % db.filename)
-                    del self.dbs[db.filename]
+                    logger.info("Closed database %s.", db.filename)
+                    self.dbs.pop(db.filename, None)
                     db.close()
         if page:
             for i in range(self.notebook.GetPageCount()):
@@ -1391,6 +1456,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         item = fm.FlatMenuItem(menu, wx.ID_ANY,
                                "&Select a file from your computer..")
         menu.AppendItem(item)
+        if live.ijson:
+            item = fm.FlatMenuItem(menu, wx.ID_ANY,
+                                   "Select a Skype chat history &export archive from your computer..")
+            menu.AppendItem(item)
         recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
         others = [f for f in conf.DBFiles
                   if f not in recents and f != self.db_filename]
@@ -1508,8 +1577,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
             conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
-            skype.save("accounts", skype.skype.user)
-            skype.db.update_accountinfo()
+            if not skype.db.id:
+                try:
+                    skype.save("accounts", skype.skype.user)
+                    skype.db.update_accountinfo()
+                except Exception:
+                    logger.exception("Error saving account %r.", skype.skype.user)
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
@@ -1518,6 +1591,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not page: return
 
         if page0: page.update_liveinfo()
+        if not conf.Login.get(filename, {}).get("store"):
+            conf.Login.get(filename, {}).pop("password", None)
         page.notebook.Selection = page.pageorder[page.page_live]        
         if not page0 and conf.Login[filename].get("auto") \
         or page.worker_live.is_working():
@@ -1612,11 +1687,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if "name" in stats and "skypename" in stats:
                 self.label_account.Value = "%(name)s (%(skypename)s)" % stats
             text = "%(chats)s" % stats
-            if "lastmessage_chat" in stats:
+            if stats.get("lastmessage_chat"):
                 text += ", latest %(lastmessage_chat)s" % stats
             self.label_chats.Value = text
             text = "%(messages)s" % stats
-            if "lastmessage_dt" in stats:
+            if stats.get("lastmessage_dt"):
                 text += ", last at %(lastmessage_dt)s" % stats
             self.label_messages.Value = text
             data = self.db_filenames.get(filename, {})
@@ -1694,23 +1769,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.save()
 
 
-    def on_deselect_list_db(self, event):
-        """Handler for deselecting an item in main list, updates info panel."""
-        if not conf.LastSelectedFiles or not event.GetIndex(): return
-
-        filename = event.GetText()
-        conf.LastSelectedFiles[:] = [x for x in conf.LastSelectedFiles
-                                     if x != filename]
-        if self.db_filename == filename: self.db_filename = None
-
-        if conf.LastSelectedFiles:
-            self.update_database_detail()
-        else:
-            self.panel_db_main.Show()
-            self.panel_db_detail.Hide()
-            self.panel_db_main.Parent.Layout()
-
-
     def on_exit(self, event):
         """
         Handler on application exit, asks about unsaved changes, if any.
@@ -1765,7 +1823,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 page.save_page_conf()
                 page.worker_live.stop()
                 for worker in page.workers_search.values(): worker.stop()
-            for page in self.merger_pages: page.worker_merge.stop()
+                page.db.close()
+            for page in self.merger_pages:
+                page.worker_merge.stop(), page.worker_import.stop()
+                page.db1.close(), page.db2.close()
             self.worker_detection.stop()
 
             # Save last selected files in db lists, to reselect them on rerun
@@ -1858,6 +1919,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
             page.worker_merge.stop()
+            page.worker_import.stop()
             logger.info("Closed comparison tab for %s and %s.",
                         page.db1, page.db2)
 
@@ -1868,7 +1930,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if db.filename in self.dbs:
                     del self.dbs[db.filename]
                 db.close()
-                logger.info("Closed database %s." % db)
+                logger.info("Closed database %s.", db.filename)
         # Remove any dangling references
         if self.page_merge_latest == page:
             self.page_merge_latest = None
@@ -2224,15 +2286,22 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats,    id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
 
+        button_rename = self.button_rename = \
+            wx.Button(parent=panel_stc1, label="Re&name")
         button_export = self.button_export_chat = \
             wx.Button(parent=panel_stc1, label="&Export messages to file")
+        button_rename.SetToolTip(
+            "Set new name for the conversation or a participant")
         button_export.SetToolTip(
             "Export currently shown messages to a file")
+        self.Bind(wx.EVT_BUTTON, self.on_rename_item, button_rename)
         self.Bind(wx.EVT_BUTTON, self.on_export_chat, button_export)
         sizer_header.Add(label_chat, proportion=1, border=5, flag=wx.LEFT |
                          wx.ALIGN_BOTTOM)
         sizer_header.Add(tb, flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_header.Add(button_export, border=15, flag=wx.LEFT |
+        sizer_header.Add(button_rename, border=15, flag=wx.LEFT |
+                         wx.ALIGN_CENTER_VERTICAL)
+        sizer_header.Add(button_export, border=5, flag=wx.LEFT |
                          wx.ALIGN_CENTER_VERTICAL)
 
         stc = self.stc_history = ChatContentSTC(
@@ -2856,7 +2925,6 @@ class DatabasePage(wx.Panel):
     def update_liveinfo(self):
         """Refreshes account settings in login-page from configuration."""
         opts = conf.Login.get(self.db.filename) or {}
-        logger.info("update_liveinfo %s", opts) # @todo remove
         self.edit_user.Value = self.db.id if self.db.id else ""
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
@@ -2868,7 +2936,6 @@ class DatabasePage(wx.Panel):
     def on_change_ctrl_login(self, event):
         """Handler for changing a login control like password or checkboxes, updates conf."""
         ctrl, value = event.EventObject, event.EventObject.Value
-        logger.info("on_change_ctrl_login %s v %s", ctrl, value) # @todo remove
         if ctrl is self.edit_pw:
             name, value = "password", util.obfuscate(value)
         elif ctrl is self.check_login_store: name = "store"
@@ -2981,7 +3048,7 @@ class DatabasePage(wx.Panel):
         """Callback for workers.LiveThread results."""
 
         def after(result):
-            if not self: return
+            if not self or not result or "action" not in result: return
 
             if "populate" == result["action"]:
                 plabel, slabel = None, None
@@ -3172,12 +3239,14 @@ class DatabasePage(wx.Panel):
         account = self.db.account or {}
         bmp = skypedata.get_avatar(account) or images.AvatarDefaultLarge.Bitmap
         self.bmp_account.SetBitmap(bmp)
-        [sizer.Remove(0) for i in sizer.Children]
+        ctrls = []
+        for x in sizer.Children: ctrls.append(x.Window), sizer.Remove(0)
+        for x in ctrls: x.Destroy()
 
-        fields = ["fullname", "skypename", "mood_text", "phone_mobile",
-                  "phone_home", "phone_office", "emails", "country",
-                  "province", "city", "homepage", "gender", "birthday",
-                  "languages", "nrof_authed_buddies", "about",
+        fields = ["fullname", "given_displayname", "skypename", "mood_text",
+                  "phone_mobile", "phone_home", "phone_office", "emails",
+                  "country", "province", "city", "homepage", "gender",
+                  "birthday", "languages", "nrof_authed_buddies", "about",
                   "skypeout_balance", ]
 
         for field in fields:
@@ -3277,8 +3346,9 @@ class DatabasePage(wx.Panel):
         text = ""
         if "firstmessage_dt" in stats:
             text = "%(firstmessage_dt)s %(firstmessage_from)s" % stats
-            if stats.get("firstmessage_skypename") == self.db.id \
-            or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype"):
+            if stats.get("firstmessage_chat") \
+            and (stats.get("firstmessage_skypename") == self.db.id
+            or skypedata.CHATS_TYPE_SINGLE != stats.get("firstmessage_chattype")):
                 text += " in %(firstmessage_chat)s" % stats
         self.edit_info_firstmessage.Value = text
 
@@ -3408,6 +3478,129 @@ class DatabasePage(wx.Panel):
                 f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
                 clist.SetItemFont(i, f)
                 break # for i
+
+
+    def on_rename_item(self, event):
+        """
+        Handler for clicking to rename the chat or a participant, opens a submenu.
+        """
+        chat_cols = self.db.get_table_columns("conversations")
+        contact_cols = self.db.get_table_columns("contacts")
+
+        menu  = wx.Menu()
+        pmenu = wx.Menu()
+
+        for p in self.chat["participants"]:
+            item = wx.MenuItem(menu, -1, "%(name)s (%(identity)s)" % p["contact"])
+            pmenu.Append(item)
+            pmenu.Bind(wx.EVT_MENU, functools.partial(self.on_rename_contact, p["contact"]),
+                       id=item.GetId())
+
+        item_chat = wx.MenuItem(menu, -1, "Rename &chat")
+        menu.Bind(wx.EVT_MENU, self.on_rename_chat, id=item_chat.GetId())
+
+        menu.Append(item_chat)
+        item_participants = menu.AppendSubMenu(pmenu, "Rename &participant")
+
+        item_participants.Enable(any(x["name"] == "given_displayname" for x in contact_cols))
+        item_chat.Enable(any(x["name"] == "given_displayname" for x in chat_cols))
+
+        self.button_rename.PopupMenu(menu, (0, self.button_rename.Size[1]))
+
+
+    def on_rename_chat(self, event):
+        """
+        Handler for clicking to rename a chat, opens a text entry dialog
+        and saves entered value as Conversations.given_displayname.
+        """
+        dlg = wx.TextEntryDialog(self, "Give new display name for the conversation",
+                                 conf.Title, value=self.chat["title"],
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if v == self.chat["title"] \
+        or not v and not self.chat.get("given_displayname"): return
+
+        PREFS = ["displayname", "meta_topic", "identity"]
+        key0, name0 = next((k, self.chat[k]) for k in PREFS if self.chat.get(k))
+        if not v:
+            if wx.OK != wx.MessageBox(
+                'Remove given display name, falling back to %s "%s"?' % 
+                (key0, name0), conf.Title, wx.OK | wx.CANCEL
+            ): return
+            v = None
+
+        self.db.update_row("conversations", {"given_displayname": v}, self.chat)
+        self.chat["given_displayname"] = v
+        self.chat["title"] = v or name0
+
+        ltitle = ("Chat with %s" if skypedata.CHATS_TYPE_SINGLE == self.chat["type"]
+                  else 'Group chat "%s"') % (v or name0)
+        self.chat["title_long"] = ltitle
+        self.chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
+
+        scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
+        self.list_chats.RefreshRows()
+        self.list_chats.ScrollLines(scrollpos)
+        # Add shortcut key flag to chat label
+        self.label_chat.Label = self.chat["title_long"].replace(
+            "chat", "&chat"
+        ).replace("Chat", "&Chat") + ":"
+        self.label_chat.Parent.Layout()
+        self.populate_chat_statistics()
+        if self.html_stats.Shown:
+            self.show_stats(True) # To restore scroll position
+
+
+    def on_rename_contact(self, contact, event):
+        """
+        Handler for clicking to rename a contact, opens a text entry dialog
+        and saves entered value as Contacts.given_displayname.
+        """
+        label = "database account" if contact["identity"] == self.db.id else "contact"
+        dlg = wx.TextEntryDialog(self, 'Give new display name for %s "%s":' %
+                                 (label, contact["identity"]),
+                                 conf.Title, value=contact["name"],
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if v == contact["name"] \
+        or not v and not contact.get("given_displayname") \
+        or not v and contact["identity"] == self.db.id \
+        and not self.db.account.get("given_displayname"): return
+
+        PREFS = ["fullname", "displayname", "skypename", "pstnnumber"]
+        key0, name0 = next((k, contact[k]) for k in PREFS if contact.get(k))
+        if not v:
+            if wx.OK != wx.MessageBox(
+                'Remove given display name from "%s", falling back to %s "%s"?' % 
+                (contact["identity"], key0, name0),
+                conf.Title, wx.OK | wx.CANCEL
+            ): return
+            v = None
+
+        self.db.update_row("contacts", {"given_displayname": v}, contact)
+        contact["given_displayname"] = v
+        contact["name"] = v or name0
+
+        if contact["identity"] == self.db.id:
+            self.db.update_row("accounts", {"given_displayname": v}, self.db.account)
+            self.db.account["given_displayname"] = v
+            self.db.account["name"] = v or name0
+            self.update_accountinfo()
+
+        idx = next((i for i in range(self.list_participants.GetItemCount())
+                    if self.list_participants.GetItemData(i)["contact"] is contact), None)
+        if idx is not None:
+            self.list_participants.SetItemText(idx, "%(name)s (%(identity)s)" % contact)
+        self.stc_history.RefreshMessages()
+        self.populate_chat_statistics()
+        if self.html_stats.Shown:
+            self.show_stats(True) # To restore scroll position
 
 
     def on_export_chat(self, event):
@@ -5024,6 +5217,13 @@ class DatabasePage(wx.Panel):
                 tabid = self.counter() if 0 != last_search.get("id") else 0
                 self.html_searchall.InsertTab(0, title, tabid, html, info)
 
+            # Hide rename-button if given_displayname not available
+            chat_cols = self.db.get_table_columns("conversations")
+            contact_cols = self.db.get_table_columns("contacts")
+            if  not any(x["name"] == "given_displayname" for x in chat_cols) \
+            and not any(x["name"] == "given_displayname" for x in contact_cols):
+                self.button_rename.Disable(), self.button_rename.Hide()
+
             # Populate the chats list
             self.chats = self.db.get_conversations()
             self.list_chats.Populate(self.chats)
@@ -5142,7 +5342,7 @@ class MergerPage(wx.Panel):
         self.is_scanned = False # Whether global scan has been run
         self.db1 = db1
         self.db2 = db2
-        guibase.status("Opening databases %s and %s.", self.db1, self.db2)
+        guibase.status("Opening %s and %s.", self.db1, self.db2)
         self.db1.register_consumer(self), self.db2.register_consumer(self)
         self.title = title
         parent_notebook.InsertPage(1, self, title)
@@ -5178,6 +5378,7 @@ class MergerPage(wx.Panel):
             ("type_name", "Type"), ("people", "People"), ]
         self.Bind(EVT_WORKER, self.on_worker_merge_result)
         self.worker_merge = workers.MergeThread(self.on_worker_merge_callback)
+        self.worker_import = workers.SkypeArchiveThread(self.on_worker_import_callback)
 
         sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -5250,10 +5451,10 @@ class MergerPage(wx.Panel):
 
         panel = wx.Panel(page, style=wx.BORDER_STATIC)
         label1 = self.label_all1 = wx.StaticText(panel, style=wx.ALIGN_RIGHT,
-            label="%s\n\nAnalyzing..%s" % (self.db1.filename, "\n" * 7))
+            label="%s\n\nAnalyzing..%s" % (self.db1, "\n" * 7))
         bmp_arrow = wx.StaticBitmap(panel, bitmap=images.MergeToRight.Bitmap)
         label2 = self.label_all2 = wx.StaticText(panel,
-            label="%s\n\nAnalyzing..%s" % (self.db2.filename, "\n" * 7))
+            label="%s\n\nAnalyzing..%s" % (self.db2, "\n" * 7))
         button_scan = self.button_scan_all = controls.NoteButton(panel,
             label="&Scan and report", note="Scan through the left database "
             "and find messages not present on the right.",
@@ -5275,6 +5476,7 @@ class MergerPage(wx.Panel):
         button_scan.MinSize = button_merge.MinSize = (400, -1)
         html.SetFonts(normal_face=self.Font.FaceName,
                       fixed_face=self.Font.FaceName, sizes=[8] * 7)
+        ColourManager.Manage(html, "ForegroundColour", "FgColour")
         ColourManager.Manage(html, "BackgroundColour", "MergeHtmlBackgroundColour")
         html.Hide()
         panel_gauge.Hide()
@@ -5323,14 +5525,10 @@ class MergerPage(wx.Panel):
         sizer_top.Add(wx.StaticText(parent=panel1, label="&Chat comparison:",
                       name="chats_label"), flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_top.AddStretchSpacer()
-        label_filter = wx.StaticText(panel1, label="Filter ch&ats:")
-        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_chatfilter = self.edit_chatfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in chat list"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_chatfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_chatfilter, edit_chatfilter)
+        edit_chatfilter = self.edit_chatfilter = controls.HintedTextCtrl(
+            panel1, "Filter chats", style=wx.TE_PROCESS_ENTER, size=(75, -1))
+        edit_chatfilter.SetToolTip("Filter items in chat list")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_chatfilter, edit_chatfilter)
         sizer_top.Add(edit_chatfilter, flag=wx.BOTTOM | wx.ALIGN_TOP, border=5)
         sizer_top.AddSpacer(20)
         self.button_merge_chats = wx.Button(panel1, label="Merge &selected")
@@ -5421,14 +5619,10 @@ class MergerPage(wx.Panel):
                             name="contact_list_label")
         sizer_top.Add(lbl, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_top.AddStretchSpacer()
-        label_filter = wx.StaticText(panel1, label="Filter c&ontacts:")
-        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_contactfilter = self.edit_contactfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in contact lists"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_contactfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_contactfilter,
+        edit_contactfilter = self.edit_contactfilter = controls.HintedTextCtrl(
+            panel1, "Filter contacts", style=wx.TE_PROCESS_ENTER, size=(90, -1))
+        edit_contactfilter.SetToolTip("Filter items in contact lists")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_contactfilter,
                   edit_contactfilter)
         sizer_top.Add(edit_contactfilter)
 
@@ -5542,6 +5736,40 @@ class MergerPage(wx.Panel):
             wx.PostEvent(self, WorkerEvent(result=result))
 
 
+    def on_worker_import_callback(self, result):
+        """Callback function for SkypeArchiveThread, updates UI."""
+        if not self: return
+
+        def after(result):
+            if "counts" in result:
+
+                t = ", ".join(util.plural(x[:-1], result["counts"][x])
+                              for x in sorted(result["counts"]))
+                self.label_gauge.Label = "Parsed %s." % t
+                self.panel_gauge.Layout()
+
+            elif "error" in result:
+                self.html_report.AppendToPage("<br /><br /> <b>Error parsing Skype export:</b>&nbsp;&nbsp;"
+                                              + result["error_short"].replace("<", "&lt;"))
+                self.html_report.Scroll(0, self.html_report.GetScrollRange(wx.VERTICAL))
+                self.gauge_progress.Value = 0
+                self.panel_gauge.Hide()
+                self.page_merge_all.Layout()
+            elif "done" in result:
+                stats = self.db1.get_general_statistics()
+                text = "<br /><br />Parsed %s, %s and %s." % tuple(
+                    util.plural(x[:-1], stats[x]) for x in ("chats", "contacts", "messages")
+                )
+                self.html_report.AppendToPage(text)
+                scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
+                self.html_report.Scroll(0, scrollpos)
+                self.gauge_progress.Value = 100
+                self.panel_gauge.Hide()
+                self.load_data()
+
+        wx.CallAfter(after, result)
+
+
     def on_swap(self, event):
         """
         Handler for clicking to swap left and right databases, changes data
@@ -5624,10 +5852,10 @@ class MergerPage(wx.Panel):
                 if not self.html_report.Shown:
                     self.html_report.Show()
                     self.html_report.ContainingSizer.Layout()
-                self.html_report.SetPage("<body bgcolor='%s'><b>%s progress:"
-                    "</b><br />" % (conf.MergeHtmlBackgroundColour, action))
+                self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>%s progress:"
+                    "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour, action))
                 db1, db2 = self.db1, self.db2
-                chats = list(filter(None, selecteds))
+                chats = filter(bool, selecteds)
                 if self.is_scanned:
                     type = "merge_left"
                     cc = [self.chats_diffdata.get(c["identity"]) for c in chats]
@@ -5759,12 +5987,11 @@ class MergerPage(wx.Panel):
         Handler for clicking to merge contacts from one database to the other,
         either selected or all contacts, depending on button clicked.
         """
-        button = event.EventObject
         db_target, db_source = self.db2, self.db1
         list_source = self.list_contacts
         source = 0
         contacts, contactgroups, indices = [], [], []
-        if button is self.button_merge_allcontacts:
+        if event.Id == self.button_merge_allcontacts.Id:
             for i in range(list_source.ItemCount):
                 data = list_source.GetItemMappedData(i)
                 if "Contact" == data["__type"]:
@@ -5841,7 +6068,7 @@ class MergerPage(wx.Panel):
         if not self.html_report.Shown:
             self.html_report.Show()
             self.html_report.ContainingSizer.Layout()
-        html = ("<body bgcolor='%s'><font color='%s'<b>Scan results:</b>"
+        html = ("<body bgcolor='%s'><font color='%s'><b>Scan results:</b>"
                 "<br /><br />" %
                 (conf.MergeHtmlBackgroundColour, conf.FgColour))
         self.html_report.SetPage(html)
@@ -5894,8 +6121,9 @@ class MergerPage(wx.Panel):
                 self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
             else:
-                self.html_report.SetPage("<body bgcolor='%s'>No new messages."
-                    "</body>" % conf.MergeHtmlBackgroundColour)
+                self.html_report.SetPage("<body bgcolor='%s'><font color='%s'>"
+                    "No new messages.</font></body>" % 
+                    (conf.MergeHtmlBackgroundColour, conf.FgColour))
             self.update_gauge(self.gauge_progress, 100, "Scan complete.")
             wx.Bell()
 
@@ -5930,8 +6158,8 @@ class MergerPage(wx.Panel):
             if not self.html_report.Shown:
                 self.html_report.Show()
                 self.html_report.ContainingSizer.Layout()
-            self.html_report.SetPage("<body bgcolor='%s'><b>Merge progress:"
-                "</b><br />" % conf.MergeHtmlBackgroundColour)
+            self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>Merge progress:"
+                "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour))
             self.page_merge_chats.Enabled = False
             self.page_merge_contacts.Enabled = False
             guibase.status("Merging %s from %s to %s.", info, db1, db2, log=True)
@@ -5965,8 +6193,9 @@ class MergerPage(wx.Panel):
             msg = "%s error.\n\n%s" % (action, 
                   result.get("error_short", result["error"]))
             self.html_report.Freeze()
-            self.html_report.AppendToPage("<br /> <b>Error merging chats:</b>"
-                                          + result["error"])
+            self.html_report.AppendToPage("<br /><br /> <b>Error merging chats:</b>&nbsp;&nbsp;"
+                                          + result["error"].replace("<", "&lt;")
+                                            .replace(" ", "&nbsp;").replace("\n", "<br />"))
             scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
             self.html_report.Scroll(0, scrollpos)
             self.html_report.Thaw()
@@ -6136,6 +6365,26 @@ class MergerPage(wx.Panel):
         self.html_dblabel.SetPage(template.expand(namespace))
         self.html_dblabel.BackgroundColour = wx.NullColour
 
+        if isinstance(self.db1, live.SkypeExport) and not self.db1.export_parsed:
+            self.button_swap.Hide()
+            self.worker_import.work({"action": "parse", "db": self.db1})
+            self.html_report.Show()
+
+            html = ("<body bgcolor='%s'><font color='%s'>Parsing Skype chat history export %s .." %
+                    (conf.MergeHtmlBackgroundColour, conf.FgColour, self.db1))
+            self.html_report.SetPage(html)
+            self.update_gauge(self.gauge_progress, 0)
+            self.gauge_progress.Pulse()
+            self.update_tabheader()
+
+            for i in range(2):
+                db = self.db2 if i else self.db1
+                db.update_fileinfo()
+                label = self.label_all2 if i else self.label_all1
+                label.Label = "%s.\n\nSize %s.\nAnalyzing.." % (
+                              db, util.format_bytes(db.filesize))
+            return
+
         try:
             # Populate the chat comparison list
             chats1 = self.db1.get_conversations()
@@ -6205,13 +6454,16 @@ class MergerPage(wx.Panel):
                     c["last_message_datetime1"] = None
                     c["last_message_datetime2"] = None
                     c["messages1"] = c["messages2"] = c["people"] = None
+                self.compared = compared
             for c in self.compared:
                 for i in range(2):
                     cmap = c2map if i else c1map
                     if c["c%s" % (i + 1)] and c["identity"] in cmap:
                         c["messages%s" % (i + 1)] = \
+                        c["c%s" % (i + 1)]["message_count"] = \
                             cmap[c["identity"]]["message_count"]
                         c["last_message_datetime%s" % (i + 1)] = \
+                        c["c%s" % (i + 1)]["last_message_datetime%s" % (i + 1)] = \
                             cmap[c["identity"]]["last_message_datetime"]
                 people = sorted([p["identity"] for p in c["participants"]])
                 if skypedata.CHATS_TYPE_SINGLE != c["type"]:
@@ -6344,7 +6596,7 @@ class MergerPage(wx.Panel):
             if not self.is_scanned:
                 self.button_scan_all.Enabled = True
                 self.button_merge_all.Enabled = True
-            guibase.status("Opened databases %s and %s.", self.db1, self.db2)
+            guibase.status("Opened %s and %s.", self.db1, self.db2)
             self.page_merge_all.Layout()
             self.Refresh()
             wx.CallAfter(self.update_tabheader)
@@ -6741,7 +6993,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 dom = self._parser.parse(m)
                 length_before = self.STC.Length
                 time_value = m["datetime"].strftime("%H:%M")
-                displayname = m["from_dispname"]
+                displayname = self._db.get_author_name(m)
                 special_tag = dom.find("msgstatus")
                 # Info messages like "/me is thirsty" -> author on same line.
                 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])

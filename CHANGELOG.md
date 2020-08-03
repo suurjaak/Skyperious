@@ -1,8 +1,17 @@
 CHANGELOG
 =========
 
-4.0.1, 2020-07-30
+4.1, 2020-08-03
 ---------------
+- added option to merge from Skype chat history export;
+- added option to rename chats and contacts;
+- added option to delete database;
+- use OS- and user-specific config and data directories where necessary;
+- improved error handling and reporting.
+
+
+4.0.1, 2020-07-30
+-----------------
 - fixed live sync failing on unexpected errors.
 
 

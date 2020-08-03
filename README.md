@@ -1,5 +1,5 @@
-Skyperious 4.0
-==============
+Skyperious
+==========
 
 
 Important Notice
@@ -21,7 +21,7 @@ no longer affect what is visible in the official Skype program.
 ---
 
 
-Skyperious is a Skype database viewer and merger, written in Python.
+Skyperious is a Skype chat history tool, written in Python.
 
 You can open Skype SQLite databases and work with their contents:
 
@@ -65,7 +65,7 @@ You can use keywords to search among specific authors or chats only
 wildcards, exact phrases, grouping, excluding, and either-or queries.
 
 Skyperious can log into Skype online service and download and save new messages
-int the local database file. It can also create a new `main.db` database from 
+into the local database file. It can also create a new `main.db` database from 
 scratch, by downloading all available history.
 
 HTML export can download shared photos and embed them in the resulting HTML,
@@ -76,6 +76,13 @@ Image download is also supported in the command-line interface.
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
 read and copy specific chats and contacts.
+
+Skyperious can also merge chat history exported from Skype into an existing 
+`main.db` database, via 
+Compare and merge -> Select a Skype chat history export archive from your computer.
+Skype export is available in Skype client under 
+Settings -> Messaging -> Export chat history from Skype 7.x; 
+and in Skype web interface under My account -> Export files and chat history.
 
 Skyperious offers a number of options from the
 [command line](https://suurjaak.github.io/Skyperious/help.html#commandline):
@@ -131,7 +138,9 @@ If running from source code, Skyperious needs Python 2.7,
 and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
 The following are also listed in `requirements.txt` for pip:
+* appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
+* ijson (https://pypi.org/project/ijson)
 * dateutil (https://pypi.org/project/python-dateutil)
 * Pillow (https://pypi.org/project/Pillow)
 * pyparsing (https://pypi.org/project/pyparsing)

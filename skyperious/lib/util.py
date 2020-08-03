@@ -3,12 +3,12 @@
 Miscellaneous utility functions.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    27.07.2020
+@modified    30.07.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -427,13 +427,12 @@ def to_unicode(value, encoding=None):
     result = value
     if not isinstance(value, unicode):
         encoding = encoding or locale.getpreferredencoding()
-        if isinstance(value, str):
-            try:
-                result = unicode(value, encoding)
-            except Exception:
-                result = unicode(value, "utf-8", errors="replace")
-        else:
-            result = unicode(str(value), errors="replace")
+        if not isinstance(value, str):
+            try: value = str(value)
+            except Exception: value = repr(value)
+        try: result = unicode(value, encoding)
+        except Exception:
+            result = unicode(value, "utf-8", errors="backslashreplace")
     return result
 
 

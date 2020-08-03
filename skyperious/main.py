@@ -4,12 +4,12 @@ Skyperious main program entrance: launches GUI application or executes command
 line interface, handles logging and status calls.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.07.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -59,7 +59,7 @@ def date(s): return datetime.datetime.strptime(s, "%Y-%m-%d").date()
 
 
 ARGUMENTS = {
-    "description": "%s - Skype SQLite database viewer and merger." % conf.Title,
+    "description": "%s - Skype chat history tool." % conf.Title,
     "arguments": [
         {"args": ["--verbose"], "action": "store_true",
          "help": "print detailed progress messages to stderr"},
@@ -191,6 +191,54 @@ logger = logging.getLogger(__package__)
 window = None # Application main window instance
 
 
+def except_hook(etype, evalue, etrace):
+    """Handler for all unhandled exceptions."""
+    mqueue = getattr(except_hook, "queue", [])
+    setattr(except_hook, "queue", mqueue)
+
+    text = "".join(traceback.format_exception(etype, evalue, etrace)).strip()
+    log = "An unexpected error has occurred:\n\n%s"
+    logger.error(log, text)
+    if not conf.PopupUnexpectedErrors: return
+    conf.UnexpectedErrorCount += 1
+    msg = "An unexpected error has occurred:\n\n%s\n\n" \
+          "See log for full details." % util.format_exc(evalue)
+    mqueue.append(msg)
+
+    def after():
+        if not mqueue: return
+        msg = mqueue[0]
+        dlg = wx.RichMessageDialog(None, msg, conf.Title, wx.OK | wx.ICON_ERROR)
+        if conf.UnexpectedErrorCount > 2:
+            dlg.ShowCheckBox("&Do not pop up further errors")
+        dlg.ShowModal()
+        if dlg.IsCheckBoxChecked():
+            conf.PopupUnexpectedErrors = False
+            del mqueue[:]
+            conf.save()
+        if mqueue: mqueue.pop(0)
+        if mqueue and conf.PopupUnexpectedErrors: wx.CallAfter(after)
+
+    if len(mqueue) < 2: wx.CallAfter(after)
+
+
+def install_thread_excepthook():
+    """
+    Workaround for sys.excepthook not catching threading exceptions.
+
+    @from   https://bugs.python.org/issue1230540
+    """
+    init_old = threading.Thread.__init__
+    def init(self, *args, **kwargs):
+        init_old(self, *args, **kwargs)
+        run_old = self.run
+        def run_with_except_hook(*a, **b):
+            try: run_old(*a, **b)
+            except Exception: sys.excepthook(*sys.exc_info())
+        self.run = run_with_except_hook
+    threading.Thread.__init__ = init
+
+
 def run_merge(filenames, output_filename=None):
     """Merges all Skype databases to a new database."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
@@ -264,7 +312,7 @@ def run_search(filenames, query):
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            logger.info("Searching \"%s\" in %s." % (query, db))
+            logger.info('Searching "%s" in %s.', query, db)
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()
@@ -571,9 +619,14 @@ def run_gui(filenames):
     logger.addHandler(guibase.GUILogHandler())
     logger.setLevel(logging.DEBUG)
 
+    install_thread_excepthook()
+    sys.excepthook = except_hook
+
     # Create application main window
     app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
-    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH) # Avoid dialog buttons in native language
+    # Avoid dialog buttons in native language
+    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH_US, wx.LOCALE_LOAD_DEFAULT)
+    mylocale.AddCatalog("wxstd")
     window = gui.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 

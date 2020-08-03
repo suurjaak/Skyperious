@@ -3,12 +3,12 @@
 Skype database access and message parsing functionality.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.07.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -22,7 +22,6 @@ import os
 import re
 import sqlite3
 import shutil
-import string
 import sys
 import textwrap
 import time
@@ -104,6 +103,7 @@ CONTACT_FIELD_TITLES = {
 }
 ACCOUNT_FIELD_TITLES = {
     "fullname"           : "Full name",
+    "given_displayname"  : "Given display name",
     "skypename"          : "Skype name",
     "mood_text"          : "Mood",
     "phone_mobile"       : "Mobile phone",
@@ -170,6 +170,8 @@ class SkypeDatabase(object):
         """
         self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
+        self.filesize = None
+        self.last_modified = None
         self.backup_created = False
         self.consumers = set() # Registered objects using this database
         self.account = None    # Row from table Accounts
@@ -200,6 +202,22 @@ class SkypeDatabase(object):
     def __str__(self):
         if self and hasattr(self, "filename"):
             return self.filename
+
+
+    def make_title_col(self, table="conversations", alias=None):
+        """Returns SQL expression for selecting chat/contact/account title."""
+        PREFS = ["given_displayname", "fullname", "displayname", "meta_topic",
+                 "skypename", "pstnnumber", "identity"]
+        DEFS = {"chats": "identity", "accounts": "skypename", "contacts": "skypename"}
+        cols = self.get_table_columns(table)
+        colnames = [x["name"].lower() for x in cols]
+        mycols = [x for x in PREFS if x in colnames]
+        if not cols: mycols = DEFS.get(table, [])
+
+        result = ""
+        for n in mycols:
+            result += " WHEN COALESCE(TRIM(%s), '') != '' THEN %s" % (n, n)
+        return "CASE %s ELSE '#' || %s.id END" % (result.strip(), alias or table)
 
 
     def check_integrity(self):
@@ -265,9 +283,9 @@ class SkypeDatabase(object):
     def update_accountinfo(self, log_error=True):
         """Refreshes Skype account information."""
         try:
-            self.account = self.execute("SELECT *, "
-                "COALESCE(fullname, displayname, skypename, '') AS name, "
-                "skypename AS identity FROM accounts LIMIT 1").fetchone()
+            titlecol = self.make_title_col("accounts")
+            self.account = self.execute("SELECT *, %s AS name, "
+                "skypename AS identity FROM accounts LIMIT 1" % titlecol).fetchone()
             self.id = self.account["skypename"]
         except Exception:
             if log_error:
@@ -318,7 +336,7 @@ class SkypeDatabase(object):
             except Exception: pass
 
 
-    def execute(self, sql, params=[], log=True):
+    def execute(self, sql, params=(), log=True):
         """Shorthand for self.connection.execute()."""
         result = None
         if self.connection:
@@ -406,48 +424,55 @@ class SkypeDatabase(object):
         if self.account:
             result.update({"name": self.account.get("name"),
                            "skypename": self.account.get("skypename")})
+        COUNTS = ["Conversations", "Messages", "Contacts"]
+        if full: COUNTS += ["Transfers"]
+        for table in COUNTS:
+            res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
+            label = "chats" if "Conversations" == table else table.lower()
+            result[label] = next(res, {}).get("count")
+
         for k, table in [("chats", "Conversations"), ("messages", "Messages"),
                        ("contacts", "Contacts"), ("transfers", "Transfers")]:
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
             result[k] = next(res, {}).get("count")
 
+        titlecol = self.make_title_col()
         typestr = ", ".join(map(str, MESSAGE_TYPES_BASE))
-        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
-            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
-            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (%s) ORDER BY m.timestamp DESC LIMIT 1" % typestr)
-        msg_last = next(res, None)
-        if msg_last:
-            if msg_last.get("timestamp"):
-                dt = self.stamp_to_date(msg_last["timestamp"])
-                result["lastmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
-            result["lastmessage_from"] = msg_last["from_dispname"]
-            result["lastmessage_skypename"] = msg_last["author"]
-            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_last["chat_type"]
-                     else "chat with %s") % msg_last["chat_title"]
-            result["lastmessage_chat"] = title
-            result["lastmessage_chattype"] = msg_last["chat_type"]
-        if not full:
-            return result
 
-        res = self.execute("SELECT m.*, COALESCE(NULLIF(c.displayname, ''), "
-            "NULLIF(c.meta_topic, '')) AS chat_title, c.type AS chat_type "
-            "FROM Messages m LEFT JOIN Conversations c ON m.convo_id = c.id "
-            "WHERE m.type IN (%s) ORDER BY m.timestamp ASC LIMIT 1"
-            % typestr)
-        msg_first = next(res, None)
-        if msg_first:
-            if msg_first.get("timestamp"):
-                dt = self.stamp_to_date(msg_first["timestamp"])
-                result["firstmessage_dt"] = dt.strftime("%Y-%m-%d %H:%M")
-            result["firstmessage_from"] = msg_first["from_dispname"]
-            result["firstmessage_skypename"] = msg_first["author"]
-            title = ('"%s"' if CHATS_TYPE_SINGLE != msg_first["chat_type"]
-                     else "chat with %s") % msg_first["chat_title"]
-            result["firstmessage_chat"] = title
-            result["firstmessage_chattype"] = msg_first["chat_type"]
+        for i, label in enumerate(["last", "first"]):
+            direction = "ASC" if i else "DESC"
+            res = self.execute("SELECT author, from_dispname, convo_id, timestamp "
+                               "FROM Messages WHERE type IN (%s) "
+                               "ORDER BY timestamp %s LIMIT 1" % (typestr, direction))
+            msg = next(res, None)
+            if msg:
+                chat = next((x for x in self.table_rows.get("conversations", [])
+                             if x["id"] == msg["convo_id"]), None)
+                chat = chat or self.execute(
+                    "SELECT *, %s AS title FROM conversations "
+                    "WHERE id = ?" % titlecol, [msg["convo_id"]]
+                ).fetchone()
+                if msg.get("timestamp"):
+                    dt = self.stamp_to_date(msg["timestamp"])
+                    result["%smessage_dt" % label] = dt.strftime("%Y-%m-%d %H:%M")
+                contact = self.account if msg["author"] == self.id else None
+                contact = contact or self.table_objects.get("contacts", {}).get(msg["author"])
+                if not contact:
+                    cntitlecol = self.make_title_col("contacts")
+                    contact = self.execute(
+                        "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
+                        "%s AS name FROM contacts WHERE identity = ?"
+                    % cntitlecol, [msg["author"]]).fetchone()
+                result["%smessage_from" % label] = self.get_author_name(msg, contact)
+                result["%smessage_skypename" % label] = msg["author"]
+                if chat:
+                    title = ('"%s"' if CHATS_TYPE_SINGLE != chat["type"]
+                             else "chat with %s") % chat["title"]
+                    result["%smessage_chat" % label] = title
+                    result["%smessage_chattype" % label] = chat["type"]
+            if not full: break # for i, label
 
-        for i in range(2):
+        for i in range(2) if full else ():
             row = self.execute("SELECT COUNT(*) AS count FROM Messages "
                 "WHERE author %s= :skypename AND type IN (%s)"
                 % ("!="[i], typestr), result).fetchone()
@@ -483,6 +508,8 @@ class SkypeDatabase(object):
                 sql, params = "SELECT m.* FROM messages m ", {}
                 if additional_sql and " c." in additional_sql:
                     sql += "LEFT JOIN conversations c ON m.convo_id = c.id "
+                if additional_sql and " cn." in additional_sql:
+                    sql += "LEFT JOIN contacts cn ON m.author = cn.skypename "
                 # Take only known and supported types of messages.
                 sql += "WHERE m.type IN (%s)" % ", ".join(
                        map(str, MESSAGE_TYPES_MESSAGE))
@@ -608,12 +635,12 @@ class SkypeDatabase(object):
                           "identity = :identity%s" % i + 
                          (")" if i == len(chatidentities) - 1 else ""))
                 args["identity%s" % i] = identity
+            titlecol = self.make_title_col()
             rows = self.execute(
-                "SELECT *, "
-                "COALESCE(displayname, meta_topic, identity) AS title, "
+                "SELECT *, %s AS title, "
                 "NULL AS created_datetime, NULL AS last_activity_datetime "
                 "FROM conversations %s"
-                "ORDER BY last_activity_timestamp DESC" % where, args
+                "ORDER BY last_activity_timestamp DESC" % (titlecol, where), args
             ).fetchall()
 
             # Chats can refer to older entries, prior to system from Skype 7.
@@ -637,7 +664,7 @@ class SkypeDatabase(object):
             for chat in rows:
                 chat["participants"] = participants.get(chat["id"], [])
                 if authornames:
-                    fs = "fullname displayname skypename pstnnumber".split()
+                    fs = "given_displayname fullname displayname skypename pstnnumber".split()
                     vals = [p["contact"].get(field, None) for field in fs
                             for p in chat["participants"]]
                     match = any(re.search(name, value, re.I | re.U)
@@ -777,12 +804,12 @@ class SkypeDatabase(object):
             return result
 
         if reload or "contacts" not in self.table_rows:
+            titlecol = self.make_title_col("contacts")
             rows = self.execute(
                 "SELECT *, COALESCE(skypename, pstnnumber, '') "
                     "AS identity, "
-                "COALESCE(fullname, displayname, skypename, pstnnumber, '') "
-                "AS name FROM contacts ORDER BY name COLLATE NOCASE"
-            ).fetchall()
+                "%s AS name FROM contacts ORDER BY name COLLATE NOCASE"
+            % titlecol).fetchall()
             self.table_objects["contacts"] = {}
             for c in rows:
                 result.append(c)
@@ -794,21 +821,37 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_contact_name(self, identity):
+    def get_contact_name(self, identity, contact=None):
         """
         Returns the full name for the specified contact, or given identity if
         not set.
 
         @param   identity  skypename or pstnnumber
+        @param   contact   cached Contacts-row, if any
         """
         name = ""
-        self.get_contacts()
         if identity == self.id:
             name = self.account["name"]
-        elif identity in self.table_objects["contacts"]:
-            name = self.table_objects["contacts"][identity]["name"]
+        else:
+            if not contact:
+                self.get_contacts()
+                contact = self.table_objects["contacts"].get(identity)
+            if contact: name = contact["name"]
         name = name or identity
         return name
+
+
+    def get_author_name(self, message, contact=None):
+        """
+        Returns the display name of the message author,
+        contact name if contact available else message from_dispname or author.
+
+        @param   contact   cached Contacts-row, if any
+        """
+        result = self.get_contact_name(message["author"], contact)
+        if result == message["author"] and message.get("from_dispname"):
+            result = message["from_dispname"]
+        return result
 
 
     def get_table_rows(self, table, reload=False):
@@ -946,12 +989,12 @@ class SkypeDatabase(object):
                 self.table_objects["contacts"] = {}
             contact = self.table_objects["contacts"].get(identity)
             if not contact:
+                titlecol = self.make_title_col("contacts")
                 contact = self.execute(
-                    "SELECT *, COALESCE(fullname, displayname, skypename, "
-                                       "pstnnumber, '') AS name, "
+                    "SELECT *, %s AS name, "
                     "COALESCE(skypename, pstnnumber, '') AS identity "
                     "FROM contacts WHERE skypename = :identity "
-                    "OR pstnnumber = :identity",
+                    "OR pstnnumber = :identity" % titlecol,
                     {"identity": identity}
                 ).fetchone()
                 self.table_objects["contacts"][identity] = contact
@@ -978,7 +1021,7 @@ class SkypeDatabase(object):
                     for row in res.fetchall():
                         table_columns.append(row)
                 except sqlite3.DatabaseError:
-                    logger.exception("Error getting %s column data for %s.\n\n%s",
+                    logger.exception("Error getting %s column data for %s.",
                                      table, self.filename)
                 self.tables[table]["columns"] = table_columns
         return table_columns
@@ -1012,7 +1055,10 @@ class SkypeDatabase(object):
         for i, val in enumerate(list_values):
             if "blob" == map_columns[list_columns[i]]["type"].lower() and val:
                 if isinstance(val, unicode):
-                    val = val.encode("latin1")
+                    try:
+                        val = val.encode("latin1")
+                    except Exception:
+                        val = val.encode("utf-8")
                 val = sqlite3.Binary(val)
             result.append(val)
         if is_dict:
@@ -1345,14 +1391,15 @@ class SkypeDatabase(object):
         if log: logger.info("Updating 1 row in table %s, %s.",
                             self.tables[table]["name"], self.filename)
         self.ensure_backup()
-        col_data = [x for x in self.get_table_columns(table) if x["name"] in row]
+        colmap = {x["name"]: x for x in self.get_table_columns(table)}
+        col_data = [colmap[x] for x in row if x in colmap]
         values, where = row.copy(), ""
         setsql = ", ".join("%(name)s = :%(name)s" % x for x in col_data)
         if rowid is not None:
             pk_key = "PK%s" % int(time.time()) # Avoid existing field collision
             where, values[pk_key] = "ROWID = :%s" % pk_key, rowid
         else:
-            for pk in [c["name"] for c in col_data if c["pk"]]:
+            for pk in [n for n, c in colmap.items() if c["pk"]]:
                 pk_key = "PK%s" % int(time.time())
                 values[pk_key] = original_row[pk]
                 where += (" AND " if where else "") + "%s IS :%s" % (pk, pk_key)
@@ -1442,8 +1489,8 @@ class MessageParser(object):
     EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
         (emoticons.EmoticonStrings[m.group(1)], m.group(1))
         if m.group(1) in emoticons.EmoticonStrings
-        and re.match("^%s*[%s]*(\s|$)" % (MessageParser.EMOTICON_RGX.pattern,
-                                          re.escape(".,;:?!'\"")),
+        and re.match(r"^%s*[%s]*(\s|$)" % (self.EMOTICON_RGX.pattern,
+                                           re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
         else m.group(1)
     )
@@ -1567,7 +1614,7 @@ class MessageParser(object):
         """
         body = message["body_xml"] or ""
         get_contact_name = self.db.get_contact_name
-        get_author_name = lambda m: m.get("from_dispname")
+        get_author_name = self.db.get_author_name
         get_quote_name = lambda x: x.get("authorname") or ""
         if options.get("merge"):           # Use skypename in merge: full name
             get_contact_name = lambda x: x # can be different across databases
@@ -1779,7 +1826,7 @@ class MessageParser(object):
                 url = link.get("href")
             elif not url: # Parse link from message contents
                 text = ElementTree.tostring(dom, "utf-8", "text")
-                match = re.search("(https?://[^\s<]+)", text)
+                match = re.search(r"(https?://[^\s<]+)", text)
                 if match: # Make link clickable
                     url = match.group(0)
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
@@ -2103,7 +2150,7 @@ class MessageParser(object):
             for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
             self.stats["counts"][author]["files"] += len(files)
-            size_files = sum([util.try_until(lambda: int(i["filesize"])) or 0
+            size_files = sum([util.try_until(lambda: int(i["filesize"]))[1] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
         elif MESSAGE_TYPE_MESSAGE == message["type"]:

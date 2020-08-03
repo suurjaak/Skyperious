@@ -5,12 +5,12 @@ an external file. Configuration file has simple INI file format,
 and all values are kept in JSON.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.07.2020
+@modified    03.08.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -19,11 +19,13 @@ import json
 import os
 import sys
 
+import appdirs
+
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.0.1"
-VersionDate = "30.07.2020"
+Version = "4.1.dev1"
+VersionDate = "03.08.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -53,9 +55,10 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "SearchResultsChunk", "SharedImageAutoDownload", "StatisticsPlotWidth",
-    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
-    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedImageAutoDownload",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
+    "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -146,6 +149,12 @@ LogEnabled = True
 
 """Whether to log all SQL statements to log window."""
 LogSQL = False
+
+"""Whether to pop up message dialogs for unhandled errors."""
+PopupUnexpectedErrors = True
+
+"""Number of unhandled errors encountered during current runtime."""
+UnexpectedErrorCount = 0
 
 """URLs for download list, changelog, and homepage."""
 DownloadURL  = "https://erki.lap.ee/downloads/Skyperious/"
@@ -350,7 +359,18 @@ WordCloudWordsAuthorMax = 50
 
 def load():
     """Loads FileDirectives from ConfigFile into this module's attributes."""
-    global Defaults
+    global Defaults, VarDirectory, ConfigFile
+
+    configpaths = [ConfigFile]
+    if not Defaults:
+        # Instantiate OS- and user-specific paths
+        try:
+            p = appdirs.user_config_dir(Title, False)
+            configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+        except Exception: pass
+        try: VarDirectory = appdirs.user_data_dir(Title, False)
+        except Exception: pass
+
     section = "*"
     module = sys.modules[__name__]
     VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))
@@ -360,7 +380,10 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        parser.read(ConfigFile)
+        # Try user-specific path first, then path under application folder
+        for path in configpaths[::-1]:
+            if os.path.isfile(path) and parser.read(ConfigFile):
+                break # for path
 
         def parse_value(name):
             try: # parser.get can throw an error if value not found
@@ -383,15 +406,26 @@ def load():
 
 def save():
     """Saves FileDirectives into ConfigFile."""
+    configpaths = [ConfigFile]
+    try:
+        p = appdirs.user_config_dir(Title, False)
+        configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+    except Exception: pass
+
     section = "*"
     module = sys.modules[__name__]
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     parser.add_section(section)
     try:
-        try: os.makedirs(os.path.split(ConfigFile)[0])
-        except Exception: pass
-        f = open(ConfigFile, "wb")
+        for path in configpaths:
+            # Try path under application folder first, then user-specific path
+            try: os.makedirs(os.path.split(path)[0])
+            except Exception: pass
+            try: f = open(path, "wb")
+            except Exception: continue # for path
+            else: break # for path
+
         f.write("# %s %s configuration written on %s.\n" % (Title, Version,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:

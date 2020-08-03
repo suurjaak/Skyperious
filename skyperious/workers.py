@@ -4,12 +4,12 @@ Background workers for potentially long-running tasks like searching and
 diffing.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    28.07.2020
+@modified    02.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -150,7 +150,8 @@ class SearchThread(WorkerThread):
                     wrap_b = lambda x: "**%s**" % x.group(0)
                     output = {"format": "text"}
                 FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
-                logger.info('Searching "%(text)s" in %(table)s (%(db)s).' % search)
+                logger.info('Searching "%s" in %s (%s).',
+                            search["text"], search["table"], search["db"])
 
                 parser = skypedata.MessageParser(search["db"],
                                                  wrapper=wrap_html)
@@ -186,7 +187,7 @@ class SearchThread(WorkerThread):
                         for participant in chat["participants"]:
                             contact = participant["contact"]
                             if contact:
-                                for n in filter(None, [contact["fullname"],
+                                for n in filter(bool, [contact["name"], contact["fullname"],
                                 contact["displayname"], contact["identity"]]):
                                     if self.match_all(n, match_words) \
                                     and contact not in matching_authors:
@@ -226,10 +227,10 @@ class SearchThread(WorkerThread):
                     # Possibly more: country (ISO code, need map), birthday
                     # (base has YYYYMMDD in integer field).
                     match_fields = [
-                        "displayname", "skypename", "province", "city",
-                        "pstnnumber", "phone_home", "phone_office",
-                        "phone_mobile", "homepage", "emails", "about",
-                        "mood_text",
+                        "given_displayname", "displayname", "skypename",
+                        "province", "city", "pstnnumber", "phone_home",
+                        "phone_office", "phone_mobile", "homepage", "emails",
+                        "about", "mood_text",
                     ]
                     template_contact = FACTORY("contact")
                     for contact in contacts:
@@ -331,7 +332,7 @@ class SearchThread(WorkerThread):
                             result_count += 1
                             try: result["output"] += template_row.expand(locals())
                             except Exception:
-                                logger.exception("Error formatting search result for row %s in %s.\n\n%s",
+                                logger.exception("Error formatting search result for row %s in %s.",
                                                  row, search["db"])
                                 count -= 1
                                 result_count -= 1
@@ -389,7 +390,7 @@ class SearchThread(WorkerThread):
                 result["done"] = True
                 result["count"] = result_count
                 self.postback(result)
-                logger.info("Search found %(count)s results." % result)
+                logger.info("Search found %s results.", result["count"])
             except Exception as e:
                 if not result:
                     result = {}
@@ -611,7 +612,6 @@ class MergeThread(WorkerThread):
         error, e = None, None
         db1, db2 = params["db1"], params["db2"]
         chats = params["chats"]
-        chats1_count = len(db1.get_conversations())
         count_messages = 0
         count_participants = 0
         result = {"count": sum(len(x["diff"]["messages"]) for x in chats),
@@ -848,6 +848,45 @@ class LiveThread(WorkerThread):
                 elif "populate" == action["action"]:
                     self._skype.populate(action.get("chats"))
             except Exception as e:
+                result["error"] = traceback.format_exc()
+                result["error_short"] = util.format_exc(e)
+            if not self._is_working: result["stop"] = True
+
+            if not self._drop_results: self.postback(result)
+            self._is_working = False
+
+
+class SkypeArchiveThread(WorkerThread):
+    """
+    Skype export file parser thread, carries out importing to temporary database.
+    """
+
+
+    def __init__(self, callback):
+        """
+        @param   callback  function to call with parse progress
+        """
+        super(SkypeArchiveThread, self).__init__(callback)
+
+
+    def run(self):
+        self._is_running = True
+
+        def progress(**kwargs):
+            if kwargs and not self._drop_results: self.postback(kwargs)
+            return self.is_working 
+
+        while self._is_running:
+            action = self._queue.get()
+            if not action: continue # while self._is_running
+
+            self._is_working, self._drop_results = True, False
+            result = {"action": action["action"], "opts": action, "done": True}
+            try:
+                if "parse" == action["action"]:
+                    action["db"].export_read(progress)
+            except Exception as e:
+                logger.exception("Error parsing Skype export %s.", action["db"].export_path)
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)
             if not self._is_working: result["stop"] = True

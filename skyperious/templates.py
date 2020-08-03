@@ -3,12 +3,12 @@
 HTML and TXT templates for exports and statistics.
 
 ------------------------------------------------------------------------------
-This file is part of Skyperious - a Skype database viewer and merger.
+This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.07.2020
+@modified    03.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1072,7 +1072,7 @@ previous_author = None
 %endif
 <%
 content = parser.parse(m, output={"format": "html", "export": True})
-from_name = m["from_dispname"] if previous_author != m["author"] else ""
+from_name = db.get_author_name(m) if previous_author != m["author"] else ""
 # Info messages like "/me is thirsty" -> author on same line.
 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
@@ -1087,7 +1087,7 @@ author_class = "remote" if m["author"] != db.id else "local"
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
-    <span class="{{author_class}}">{{m["from_dispname"]}}</span>
+    <span class="{{author_class}}">{{db.get_author_name(m)}}</span>
 %endif
       {{!content}}
     </div></td>
@@ -1159,9 +1159,9 @@ previous_day = m["datetime"].date()
 %endif
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
 {{m["datetime"].strftime("%H:%M")}}
-{{m["from_dispname"]}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
+{{db.get_author_name(m)}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %else:
-{{m["datetime"].strftime("%H:%M")}} {{m["from_dispname"]}}:
+{{m["datetime"].strftime("%H:%M")}} {{db.get_author_name(m)}}:
 {{parser.parse(m, output={"format": "text", "wrap": True})}}
 %endif
 
@@ -1765,7 +1765,7 @@ if (skypedata.CHATS_TYPE_SINGLE != chat["type"]):
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{m["from_dispname"]}}{{after}}</font></a>
+    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{search["db"].get_author_name(m)}}{{after}}</font></a>
   </td><td align="right" nowrap>
     &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
   </td>
@@ -1773,7 +1773,7 @@ elif m["author"] == search["db"].id:
 <tr><td></td>
   <td width="100%" valign="top" colspan="2">
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
-    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{m["from_dispname"]}}</font>
+    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{search["db"].get_author_name(m)}}</font>
 %endif
   {{!body}}<br /></td>
 </tr>
@@ -1790,7 +1790,7 @@ if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{m["from_dispname"]}}{{after}}: {{body}}
+{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{search["db"].get_author_name(m)}}{{after}}: {{body}}
 """
 
 
@@ -1893,10 +1893,14 @@ under the MIT License.
 <ul>
   <li>wxPython{{" 4.1.0" if getattr(sys, 'frozen', False) else ""}},
       <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
+  <li>appdirs{{" 1.4.4" if getattr(sys, 'frozen', False) else ""}},
+      <a href="https://pypi.org/project/appdirs"><font color="{{conf.LinkColour}}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4{{" 4.9.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{conf.LinkColour}}">pypi.org/project/beautifulsoup4</font></a></li>
   <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/python-dateutil">
       <font color="{{conf.LinkColour}}">pypi.org/project/python-dateutil</font></a></li>
+  <li>ijson{{" 3.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/ijson">
+      <font color="{{conf.LinkColour}}">pypi.org/project/ijson</font></a></li>
   <li>Pillow{{" 6.2.2" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/Pillow"><font color="{{conf.LinkColour}}">pypi.org/project/Pillow</font></a></li>
   <li>pyparsing{{" 2.4.7" if getattr(sys, 'frozen', False) else ""}},
@@ -1904,7 +1908,7 @@ under the MIT License.
   <li>SkPy{{" 0.9.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/SkPy"><font color="{{conf.LinkColour}}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
-      <a href="https://github.com/dotpy/step"><font color="{{conf.LinkColour}}">github.com/dotpy/step</font></a></li>
+      <a href="https://pypi.org/project/step-template"><font color="{{conf.LinkColour}}">pypi.org/project/step-template</font></a></li>
   <li>XlsxWriter{{" 1.2.9" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{conf.LinkColour}}">
           pypi.org/project/XlsxWriter</font></a></li>
@@ -2266,10 +2270,14 @@ For searching messages from specific chats, add "chat:name", and from specific c
 
 """Database links on merge page."""
 MERGE_DB_LINKS = """<%
-from skyperious import conf
+from skyperious import conf, live
 
 %>
+%if isinstance(db1, live.SkypeExport):
+<font color="{{conf.FgColour}}">From {{db1}} into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+%else:
 <font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+%endif
 """
 
 
@@ -2303,7 +2311,7 @@ from skyperious import conf
 
 """Message template for copying to clipboard."""
 MESSAGE_CLIPBOARD = """
-[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{m["from_dispname"]}}: {{parser.parse(m, output={"format": "text"})}}
+[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{parser.db.get_author_name(m)}}: {{parser.parse(m, output={"format": "text"})}}
 """
 
 
