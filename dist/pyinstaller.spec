@@ -4,7 +4,7 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  29.07.2020
+@modified  03.08.2020
 """
 import os
 import struct
@@ -32,6 +32,7 @@ if DO_WINDOWS:
 a = Analysis(
     [os.path.join(ROOTPATH, "launch.py")],
     excludes=["FixTk", "numpy", "tcl", "tk", "_tkinter", "tkinter", "Tkinter"],
+    hiddenimports=["ijson.backends.python"] # ijson imports backends indirectly
 )
 a.datas += [("conf.py", "skyperious/conf.py", "DATA"), # For configuration docstrings
             ("res/Carlito.ttf", "skyperious/res/Carlito.ttf", "DATA"),

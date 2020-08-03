@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-4.1, 2020-08-02
+4.1, 2020-08-03
 ---------------
 - added option to merge from Skype chat history export;
 - added option to rename chats and contacts;
