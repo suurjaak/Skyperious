@@ -5525,14 +5525,10 @@ class MergerPage(wx.Panel):
         sizer_top.Add(wx.StaticText(parent=panel1, label="&Chat comparison:",
                       name="chats_label"), flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_top.AddStretchSpacer()
-        label_filter = wx.StaticText(panel1, label="Filter ch&ats:")
-        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_chatfilter = self.edit_chatfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in chat list"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_chatfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_chatfilter, edit_chatfilter)
+        edit_chatfilter = self.edit_chatfilter = controls.HintedTextCtrl(
+            panel1, "Filter chats", style=wx.TE_PROCESS_ENTER, size=(75, -1))
+        edit_chatfilter.SetToolTip("Filter items in chat list")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_chatfilter, edit_chatfilter)
         sizer_top.Add(edit_chatfilter, flag=wx.BOTTOM | wx.ALIGN_TOP, border=5)
         sizer_top.AddSpacer(20)
         self.button_merge_chats = wx.Button(panel1, label="Merge &selected")
@@ -5623,14 +5619,10 @@ class MergerPage(wx.Panel):
                             name="contact_list_label")
         sizer_top.Add(lbl, flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_top.AddStretchSpacer()
-        label_filter = wx.StaticText(panel1, label="Filter c&ontacts:")
-        sizer_top.Add(label_filter, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        edit_contactfilter = self.edit_contactfilter = wx.TextCtrl(
-            parent=panel1, size=(75, -1))
-        filter_tooltip = "Filter items in contact lists"
-        label_filter.SetToolTip(filter_tooltip)
-        edit_contactfilter.SetToolTip(filter_tooltip)
-        self.Bind(wx.EVT_TEXT, self.on_change_contactfilter,
+        edit_contactfilter = self.edit_contactfilter = controls.HintedTextCtrl(
+            panel1, "Filter contacts", style=wx.TE_PROCESS_ENTER, size=(90, -1))
+        edit_contactfilter.SetToolTip("Filter items in contact lists")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_contactfilter,
                   edit_contactfilter)
         sizer_top.Add(edit_contactfilter)
 
