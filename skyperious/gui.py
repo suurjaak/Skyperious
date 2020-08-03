@@ -5855,7 +5855,7 @@ class MergerPage(wx.Panel):
                 self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>%s progress:"
                     "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour, action))
                 db1, db2 = self.db1, self.db2
-                chats = list(filter(None, selecteds))
+                chats = filter(bool, selecteds)
                 if self.is_scanned:
                     type = "merge_left"
                     cc = [self.chats_diffdata.get(c["identity"]) for c in chats]
@@ -6454,13 +6454,16 @@ class MergerPage(wx.Panel):
                     c["last_message_datetime1"] = None
                     c["last_message_datetime2"] = None
                     c["messages1"] = c["messages2"] = c["people"] = None
+                self.compared = compared
             for c in self.compared:
                 for i in range(2):
                     cmap = c2map if i else c1map
                     if c["c%s" % (i + 1)] and c["identity"] in cmap:
                         c["messages%s" % (i + 1)] = \
+                        c["c%s" % (i + 1)]["message_count"] = \
                             cmap[c["identity"]]["message_count"]
                         c["last_message_datetime%s" % (i + 1)] = \
+                        c["c%s" % (i + 1)]["last_message_datetime%s" % (i + 1)] = \
                             cmap[c["identity"]]["last_message_datetime"]
                 people = sorted([p["identity"] for p in c["participants"]])
                 if skypedata.CHATS_TYPE_SINGLE != c["type"]:
