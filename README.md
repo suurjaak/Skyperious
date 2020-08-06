@@ -104,10 +104,10 @@ convenience. The installed program can be copied to a USB stick and used
 elsewhere, same goes for the source code. The command line interface only needs
 Python to run.
 
-Skyperious has been tested under Windows 7, Windows Vista, Windows XP and
-Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
-form, it should run wherever Python and the required Python packages are
-installed.
+Skyperious has been tested under Windows 10, Windows 7, Windows Vista,
+Windows XP and Ubuntu Linux, and reported to work under OS X and Windows 8.
+In source code form, it should run wherever Python and the required 
+Python packages are installed.
 
 If running from pip installation, run `skyperious` from the command-line. 
 If running from straight source code, launch `skyperious.sh` where shell 

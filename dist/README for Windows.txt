@@ -98,8 +98,8 @@ need additional installation, Windows installers have been provided for
 convenience. The installed program can be copied to a USB stick and used
 elsewhere.
 
-Skyperious has been tested under Windows 7, Windows Vista, Windows XP, and 
-reported to work under Windows 8.
+Skyperious has been tested under Windows 10, Windows 7, Windows Vista,
+Windows XP, and reported to work under Windows 8.
 
 
 Attribution
