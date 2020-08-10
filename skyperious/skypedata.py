@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.08.2020
+@modified    10.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -287,6 +287,9 @@ class SkypeDatabase(object):
             self.account = self.execute("SELECT *, %s AS name, "
                 "skypename AS identity FROM accounts LIMIT 1" % titlecol).fetchone()
             self.id = self.account["skypename"]
+            tdata = next((x for x in self.tables_list
+                          if "accounts" == x["name"].lower()), None)
+            if tdata and not tdata.get("rows"): tdata["rows"] = 1
         except Exception:
             if log_error:
                 logger.exception("Error getting account information from %s.", self)
@@ -1082,8 +1085,8 @@ class SkypeDatabase(object):
             self.execute(create_sql or self.CREATE_STATEMENTS[table])
             self.connection.commit()
             row = self.execute("SELECT name, sql FROM sqlite_master "
-                                "WHERE type = 'table' "
-                                "AND LOWER(name) = ?", [table]).fetchone()
+                               "WHERE type = 'table' "
+                               "AND LOWER(name) = ?", [table]).fetchone()
             self.tables[table] = row
 
 

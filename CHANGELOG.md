@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+
+4.2, 2020-08-10
+---------------
+- added option to create a blank Skype database;
+- added option to create a database from Skype export.
+
+
 4.1, 2020-08-03
 ---------------
 - added option to merge from Skype chat history export;

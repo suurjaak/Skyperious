@@ -58,8 +58,6 @@ class SkypeLogin(object):
 
     def __init__(self, db=None, progress=None):
         """
-        Logs in to Skype or raises error on failure.
-
         @param   db        existing SkypeDatabase instance if not creating new
         @param   progress  callback function invoked with (action, ?error, ?table, ?count, ?total, ?new, ?updated),
                            returning false if work should stop
@@ -80,13 +78,16 @@ class SkypeLogin(object):
         return bool(self.skype and self.skype.conn.connected)
 
 
-    def login(self, username=None, password=None, token=True):
+    def login(self, username=None, password=None, token=True, init_db=True):
         """
-        Logs in to Skype with given username, can try to use existing tokenfile
-        if available (tokenfiles expire in 24h).
+        Logs in to Skype with given username or raises error on failure.
+        Can try to use existing tokenfile if available (tokenfiles expire in 24h).
+        Creates database if not already created.
 
-        @param   token   whether to use existing tokenfile instead of password
+        @param   token    whether to use existing tokenfile instead of password
+        @param   init_db  whether to create and open Skype database after login
         """
+        if self.db and self.db.id and not self.username: self.username = self.db.id
         if username and (not self.db or not self.db.id): self.username = username
         path = util.safe_filename(self.username)
         if path != self.username: path += "_%x" % hash(self.username)
@@ -110,15 +111,15 @@ class SkypeLogin(object):
                 except Exception: pass
                 raise
             else: break # for kwargs
-        self.init_db()
+        if init_db: self.init_db()
 
 
-    def init_db(self):
+    def init_db(self, filename=None):
         """Creates SQLite database if not already created."""
         if not self.db:
-            path = self.make_db_path(self.username)
-            if not os.path.isfile(path):
-                with open(path, "w") as f: pass
+            path = filename or self.make_db_path(self.username)
+            if not os.path.exists(path):
+                with open(path, "w"): pass
             self.db = skypedata.SkypeDatabase(path, log_error=False)
             self.db.live = self
         for table in self.db.CREATE_STATEMENTS:
@@ -887,18 +888,20 @@ class SkypeExport(skypedata.SkypeDatabase):
     """
 
 
-    def __init__(self, filename):
+    def __init__(self, filename, dbfilename=None):
         self.export_path = filename
         self.export_filesize = os.path.getsize(filename)
         ts = os.path.getmtime(filename)
         self.export_last_modified = datetime.datetime.fromtimestamp(ts)
         self.export_parsed = False
+        self.is_temporary = not dbfilename
 
-        fh, dbpath = tempfile.mkstemp(".db")
-        os.close(fh)
-        super(SkypeExport, self).__init__(dbpath, log_error=False)
+        if self.is_temporary:
+            fh, dbfilename = tempfile.mkstemp(".db")
+            os.close(fh)
+        super(SkypeExport, self).__init__(dbfilename, log_error=False)
         for table in self.CREATE_STATEMENTS: self.create_table(table)
-        
+
 
     def __str__(self):
         return self.export_path
@@ -914,7 +917,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     def close(self):
         """Closes the database, clears memory, and deletes temporary database."""
         super(SkypeExport, self).close()
-        try: os.unlink(self.filename)
+        try: self.is_temporary and os.unlink(self.filename)
         except Exception: pass
 
 
@@ -922,10 +925,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         """Reads in export file and populates database."""
         f, tf = None, None
         try:
-            try:
-                tf = tarfile.open(self.export_path)
-                f = tf.extractfile("messages.json")
-            except Exception: f = open(self.export_path, "rb")
+            f, tf = self.export_open(self.export_path)
         except Exception: raise
         else: self.export_parse(f, progress)
         finally:
@@ -945,6 +945,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         chat, msg, edited_msgs, skip_chat = {}, {}, {}, False
         counts = {"chats": 0, "messages": 0}
         lastcounts = dict(counts)
+        logger.info("Parsing Skype export file %s.", self.export_path)
         while True:
             # Prefix is a dot-separated path of nesting, composed of
             # dictionary keys and "item" for list elements,
@@ -1281,3 +1282,37 @@ class SkypeExport(skypedata.SkypeDatabase):
                 dt = dt.replace(microsecond=int(suf))
             except Exception: pass
         return util.datetime_to_epoch(dt)
+
+
+    @staticmethod
+    def export_open(filename):
+        """Returns (opened JSON file pointer, opened TAR file pointer if any)."""
+        f, tf = None, None
+        try:
+            try:
+                tf = tarfile.open(filename)
+                f = tf.extractfile("messages.json")
+            except Exception: f = open(filename, "rb")
+        except Exception: raise
+        else: return f, tf
+
+
+    @staticmethod
+    def export_get_account(filename):
+        """Returns the Skype account name from export file."""
+        result, f, tf = None, None, None
+        try:
+            f, tf = SkypeExport.export_open(filename)
+        except Exception: raise
+        else:
+            parser = ijson.parse(f)
+            while True:
+                prefix, evt, value = next(parser, (None, None, None))
+                if not prefix and not evt: break # while True
+                if "userId" == prefix:
+                    result = SkypeLogin.id_to_identity(value)
+                    break # while True
+        finally:
+            util.try_until(lambda:  f.close())
+            util.try_until(lambda: tf.close())
+        return result

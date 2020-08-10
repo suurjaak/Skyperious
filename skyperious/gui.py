@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.08.2020
+@modified    10.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -301,6 +301,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
         label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        newlabels = filter(bool, [live.skpy and "from Skype online",
+                                  live.ijson and "from Skype export"])
         BUTTONS_MAIN = [
             ("button_opena", "&Open a database..", images.ButtonOpenA, 
              "Choose a database from your computer to open."),
@@ -309,9 +311,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             ("button_folder", "&Import from folder.", images.ButtonFolder,
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
-            ("button_live", "Create &new database from Skype online.", images.ButtonImport,
-             "Log in to Skype online service "
-             "and download chat history into a new database."),
+            ("button_new", "Create a &new Skype database", images.ButtonImport,
+             "Create a blank database" + (newlabels and ", or " or "") + 
+             ", or ".join(newlabels)),
             ("button_missing", "Remove missing", images.ButtonRemoveMissing,
              "Remove non-existing files from the database list."),
             ("button_type", "Remove by type", images.ButtonRemoveType,
@@ -382,7 +384,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_opena.Bind(wx.EVT_BUTTON,   self.on_open_database)
         self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
         self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
-        self.button_live.Bind(wx.EVT_BUTTON,    self.on_live_login)
+        self.button_new.Bind(wx.EVT_BUTTON,     self.on_new_database)
         self.button_missing.Bind(wx.EVT_BUTTON, self.on_remove_missing)
         self.button_type.Bind(wx.EVT_BUTTON,    self.on_remove_type_menu)
         self.button_clear.Bind(wx.EVT_BUTTON,   self.on_clear_databases)
@@ -404,7 +406,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(self.button_opena,  flag=wx.GROW)
         panel_main.Sizer.Add(self.button_detect, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_folder, flag=wx.GROW)
-        panel_main.Sizer.Add(self.button_live,   flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_new,    flag=wx.GROW)
         panel_main.Sizer.AddStretchSpacer()
         panel_main.Sizer.Add(self.button_missing, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_type,    flag=wx.GROW)
@@ -434,6 +436,21 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         menu_file = wx.Menu()
         menu.Append(menu_file, "&File")
+
+        menu_new = self.menu_new = wx.Menu()
+        menu_file.AppendSubMenu(menu_new, "&New database ..")
+        menu_new_blank = self.menu_new_blank = menu_new.Append(
+            wx.ID_ANY, "&Blank with username",
+            "Create a blank Skype database, populated with username only"
+        )
+        menu_new_live = self.menu_new_live = menu_new.Append(
+            wx.ID_ANY, "From Skype on&line",
+            "Create a new Skype database, by logging in to Skype online service and downloading chat history"
+        ) if live.skpy else None
+        menu_new_export = self.menu_new_export = menu_new.Append(
+            wx.ID_ANY, "From Skype &export",
+            "Create a new Skype database from a Skype chat history export archive"
+        ) if live.ijson else None
 
         menu_open_database = self.menu_open_database = menu_file.Append(
             wx.ID_ANY, "&Open database...\tCtrl-O",
@@ -491,18 +508,23 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         menu_tray.Check(conf.TrayIconEnabled)
         menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
 
-        self.Bind(wx.EVT_MENU, self.on_open_database, menu_open_database)
-        self.Bind(wx.EVT_MENU, self.on_open_options, menu_options)
-        self.Bind(wx.EVT_MENU, self.on_exit, menu_exit)
-        self.Bind(wx.EVT_MENU, self.on_check_update, menu_update)
-        self.Bind(wx.EVT_MENU, self.on_open_feedback, menu_feedback)
-        self.Bind(wx.EVT_MENU, self.on_toggle_iconize, menu_iconize)
-        self.Bind(wx.EVT_MENU, self.on_menu_homepage, menu_homepage)
-        self.Bind(wx.EVT_MENU, self.on_showhide_log, menu_log)
-        self.Bind(wx.EVT_MENU, self.on_showhide_console, menu_console)
-        self.Bind(wx.EVT_MENU, self.on_toggle_trayicon, menu_tray)
+        self.Bind(wx.EVT_MENU, self.on_new_blank,               menu_new_blank)
+        if menu_new_live:
+            self.Bind(wx.EVT_MENU, self.on_new_live,            menu_new_live)
+        if menu_new_export:
+            self.Bind(wx.EVT_MENU, self.on_new_export,          menu_new_export)
+        self.Bind(wx.EVT_MENU, self.on_open_database,           menu_open_database)
+        self.Bind(wx.EVT_MENU, self.on_open_options,            menu_options)
+        self.Bind(wx.EVT_MENU, self.on_exit,                    menu_exit)
+        self.Bind(wx.EVT_MENU, self.on_check_update,            menu_update)
+        self.Bind(wx.EVT_MENU, self.on_open_feedback,           menu_feedback)
+        self.Bind(wx.EVT_MENU, self.on_toggle_iconize,          menu_iconize)
+        self.Bind(wx.EVT_MENU, self.on_menu_homepage,           menu_homepage)
+        self.Bind(wx.EVT_MENU, self.on_showhide_log,            menu_log)
+        self.Bind(wx.EVT_MENU, self.on_showhide_console,        menu_console)
+        self.Bind(wx.EVT_MENU, self.on_toggle_trayicon,         menu_tray)
         self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
-        self.Bind(wx.EVT_MENU, self.on_about, menu_about)
+        self.Bind(wx.EVT_MENU, self.on_about,                   menu_about)
 
 
     def update_check(self):
@@ -1385,7 +1407,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filename2 = item.GetLabel().split(" ", 1).pop()
         elif is_export: # Second menu item: open a Skype export archive from computer
             dialog = wx.FileDialog(
-                parent=self, message="Open", defaultFile="",
+                parent=self, message="Open Skype export archive", defaultFile="",
                 wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
                          "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
                          "All files|*.*",
@@ -1394,7 +1416,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filename2 = dialog.GetPath()
         else: # First menu item: open a file from computer
             dialog = wx.FileDialog(
-                parent=self, message="Open", defaultFile="",
+                parent=self, message="Open Skype database", defaultFile="",
                 wildcard="SQLite database (*.db)|*.db|All files|*.*",
                 style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
             dialog.ShowModal()
@@ -1546,59 +1568,208 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.MinSize = conf.MinWindowSize
 
 
-    def on_live_login(self, event):
-        """
-        Handler for create database from live button, asks for username and
-        password, opens database page and starts syncing data.
-        """
-        dlg = LoginDialog(self, title="Log in to Skype online")
-        dlgresult = dlg.ShowModal()
-        if wx.ID_OK != dlgresult: return
-        user, pw = dlg.Username, dlg.Password
-        if not user or not pw: return
+    def on_new_database(self, event):
+        """Handler for clicking new-button on main screen, opens popup menu."""
+        menu = wx.lib.agw.flatmenu.FlatMenu()
+        item_blank  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                      "&Blank Skype database, populated with username only"))
+        item_live   = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                      "From Skype on&line service, by logging in "
+                                      "and downloading available history"
+        )) if live.skpy else None
+        item_export = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                     "From a Skype &export archive (*.json;*.tar)"
+        )) if live.ijson else None
+        self.Bind(wx.EVT_MENU, self.on_new_blank, item_blank)
+        if item_live:   self.Bind(wx.EVT_MENU, self.on_new_live,   item_live)
+        if item_export: self.Bind(wx.EVT_MENU, self.on_new_export, item_export)
 
-        skype, db, page0 = None, None, None
-        filename = live.SkypeLogin.make_db_path(user)
+        btn = self.button_new
+        sz_btn, pt_btn = btn.Size, btn.Position
+        pt_btn = btn.Parent.ClientToScreen(pt_btn)
+        menu.SetOwnerHeight(sz_btn.y)
+        if menu.Size.width < sz_btn.width:
+            menu.Size = sz_btn.width, menu.Size.height
+        menu.Popup((pt_btn), self)
+
+
+    def on_new_blank(self, event):
+        """
+        Handler for creating a new blank database, asks for username, 
+        populates a new database and opens the database page.
+        """
+        dialog1 = wx.TextEntryDialog(self, "Enter Skype username",
+                                     conf.Title, style=wx.OK | wx.CANCEL)
+        dialog1.CenterOnParent()
+        if wx.ID_OK != dialog1.ShowModal(): return
+        user = dialog1.GetValue().strip()
+        if not user: return
+
+        filename0 = live.SkypeLogin.make_db_path(user)
+        try: os.makedirs(os.path.split(filename0)[0])
+        except Exception: pass
+        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+            defaultDir=os.path.split(filename0)[0],
+            defaultFile=os.path.basename(filename0),
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
+        if wx.ID_OK != dialog2.ShowModal(): return
+
+        wx.YieldIfNeeded() # Allow UI to refresh
+        filename = dialog2.GetPath()
+
         if filename in self.dbs:
             db = self.dbs[filename]
-            page0 = next((k for k, v in self.db_pages.items() if db is v), None)
+            if any(db is v  for v  in self.db_pages    .values()) \
+            or any(db in vv for vv in self.merger_pages.values()):
+                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                     (filename, conf.Title), conf.Title, wx.OK)
+            db.close()
 
-        skype = db.live if db else live.SkypeLogin()
+        busy = controls.BusyPanel(self, "Creating new database..")
+        try:
+            logger.info("Creating new blank database %s for user '%s'.", filename, user)
+            with open(filename, "wb"): pass
+            db = skypedata.SkypeDatabase(filename, log_error=False)
+            for table in db.CREATE_STATEMENTS: db.create_table(table)
+            db.insert_row("accounts", {"skypename": user})
+            db.tables_list = None # Force reload
+            db.update_accountinfo()
+        except Exception:
+            util.try_until(lambda: os.unlink(filename))
+            raise
+        finally: busy.Close()
+
+        self.load_database(filename, db)
+        self.update_database_list(filename)
+        self.load_database_page(filename)
+
+
+    def on_new_live(self, event):
+        """
+        Handler for creating new database from live, asks for username and
+        password, opens database page and starts syncing data.
+        """
+        dialog1 = LoginDialog(self, title="Log in to Skype online")
+        if wx.ID_OK != dialog1.ShowModal(): return
+        user, pw = dialog1.Username, dialog1.Password
+        if not user or not pw: return
+
+        filename0 = live.SkypeLogin.make_db_path(user)
+        try: os.makedirs(os.path.split(filename0)[0])
+        except Exception: pass
+        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+            defaultDir=os.path.split(filename0)[0],
+            defaultFile=os.path.basename(filename0),
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
+        if wx.ID_OK != dialog2.ShowModal(): return
+
+        wx.YieldIfNeeded() # Allow UI to refresh
+        filename = dialog2.GetPath()
+
+        if filename in self.dbs:
+            db = self.dbs[filename]
+            if any(db is v  for v  in self.db_pages    .values()) \
+            or any(db in vv for vv in self.merger_pages.values()):
+                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                     (filename, conf.Title), conf.Title, wx.OK)
+            db.close()
+
+        skype = live.SkypeLogin()
         busy = controls.BusyPanel(self, "Logging in as '%s'." % user)
         self.Refresh()
         try:
-            try:
-                if not skype.is_logged_in(): skype.login(user, pw, token=False)
+            try: skype.login(user, pw, token=False, init_db=False)
             except Exception as e:
                 busy.Close()
                 return wx.MessageBox("Failed to log in as '%s':\n\n%s" % 
                                      (user, util.format_exc(e)),
                                      conf.Title, wx.OK | wx.ICON_ERROR)
 
-
             conf.Login.setdefault(filename, {})["password"] = util.obfuscate(pw)
-            if not skype.db.id:
-                try:
-                    skype.save("accounts", skype.skype.user)
-                    skype.db.update_accountinfo()
-                except Exception:
-                    logger.exception("Error saving account %r.", skype.skype.user)
+            try:
+                logger.info("Creating new Skype database file %s from Skype online "
+                            "for user '%s'.", filename, user)
+                with open(filename, "wb"): pass
+                skype.init_db(filename)
+                skype.save("accounts", skype.skype.user)
+                skype.db.tables_list = None # Force reload
+                skype.db.update_accountinfo()
+            except Exception:
+                logger.exception("Error saving account %r.", skype.skype.user)
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
         self.update_database_list(filename)
-        page = page0 or self.load_database_page(filename)
+        page = self.load_database_page(filename)
         if not page: return
 
-        if page0: page.update_liveinfo()
         if not conf.Login.get(filename, {}).get("store"):
             conf.Login.get(filename, {}).pop("password", None)
         page.notebook.Selection = page.pageorder[page.page_live]        
-        if not page0 and conf.Login[filename].get("auto") \
-        or page.worker_live.is_working():
-            return # Sync launched automatically on page open
+        if not conf.Login.get(filename, {}).get("auto"):
+            page.on_live_result(action="login", opts={"auto": True})
 
-        page.on_live_result(action="login", opts={"auto": True})
+
+    def on_new_export(self, event):
+        """
+        Handler for creating a new blank database from Skype export,
+        opens dialogs for choosing export file and database location.
+        """
+        dialog1 = wx.FileDialog(
+            parent=self, message="Open Skype export archive", defaultFile="",
+            wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
+                     "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
+                     "All files|*.*",
+            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
+        dialog1.ShowModal()
+        efilename = dialog1.GetPath()
+        if not efilename: return
+
+        user = live.SkypeExport.export_get_account(efilename)
+        if not user: return wx.MessageBox("No Skype username found in %s." % efilename, 
+                                          conf.Title, wx.OK | wx.ICON_WARNING)
+
+        filename0 = live.SkypeLogin.make_db_path(user)
+        try: os.makedirs(os.path.split(filename0)[0])
+        except Exception: pass
+        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+            defaultDir=os.path.split(filename0)[0],
+            defaultFile=os.path.basename(filename0),
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
+        if wx.ID_OK != dialog2.ShowModal(): return
+
+        wx.YieldIfNeeded() # Allow UI to refresh
+        filename = dialog2.GetPath()
+
+        if filename in self.dbs:
+            db = self.dbs[filename]
+            if any(db is v  for v  in self.db_pages    .values()) \
+            or any(db in vv for vv in self.merger_pages.values()):
+                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                     (filename, conf.Title), conf.Title, wx.OK)
+            db.close()
+
+        busy = controls.BusyPanel(self, "Creating new database from Skype export..")
+        guibase.status("Creating new database from Skype export.")
+        logger.info("Creating new database %s from Skype export %s, user '%s'.",
+                    filename, efilename, user)
+        try:
+            with open(filename, "wb"): pass
+            db = live.SkypeExport(efilename, filename)
+            db.export_read()
+            db.tables_list = None # Force reload
+            db.update_accountinfo()
+        except Exception:
+            util.try_until(lambda: os.unlink(filename))
+            raise
+        finally: busy.Close()
+
+        self.load_database(filename, db)
+        self.update_database_list(filename)
+        self.load_database_page(filename)
 
 
     def on_open_database(self, event):
@@ -3752,6 +3923,7 @@ class DatabasePage(wx.Panel):
                 dialog = wx.TextEntryDialog(self,
                     "Enter %s date as YYYY-MM-DD, or leave blank to %s:" % (label, extra),
                     "Date range", style=wx.OK | wx.CANCEL)
+                dialog.CenterOnParent()
                 if wx.ID_OK != dialog.ShowModal(): return
 
                 v, dt = dialog.GetValue().strip(), None

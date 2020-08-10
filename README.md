@@ -60,13 +60,21 @@ and exporting, or compared with another database for merging.
 Searching an opened database supports a simple Google-like
 [query syntax](https://suurjaak.github.io/Skyperious/help.html).
 You can use keywords to search among specific authors or chats only
-(`from:john`, `chat:links`), or from certain dates only 
-(`date:2012`, `date:2010..2013-06`). Search supports 
+(`from:john`, `chat:links`), or from certain dates only
+(`date:2012`, `date:2010..2013-06`). Search supports
 wildcards, exact phrases, grouping, excluding, and either-or queries.
 
 Skyperious can log into Skype online service and download and save new messages
-into the local database file. It can also create a new `main.db` database from 
+into the local database file. It can also create a new `main.db` database from
 scratch, by downloading all available history.
+
+Skyperious can read chat history archives exported from Skype, and merge their
+contents into an existing database, or create a new database from their contents.
+
+(Skype export is available in Skype client v8.5 under
+ Settings -> Messaging -> Export chat history from Skype 7.x;
+ and in Skype web interface under My account -> Export files and chat history.
+ The result is a `.tar` archive containing a `messages.json` file.)
 
 HTML export can download shared photos and embed them in the resulting HTML,
 if password for the Skype account has been entered in online-page.
@@ -75,14 +83,9 @@ Image download is also supported in the command-line interface.
 
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
-read and copy specific chats and contacts.
-
-Skyperious can also merge chat history exported from Skype into an existing 
-`main.db` database, via 
-Compare and merge -> Select a Skype chat history export archive from your computer.
-Skype export is available in Skype client under 
-Settings -> Messaging -> Export chat history from Skype 7.x; 
-and in Skype web interface under My account -> Export files and chat history.
+read and copy specific chats and contacts. You can also merge chat history 
+archives exported from Skype, via Compare and merge -> 
+Select a Skype chat history export archive from your computer.
 
 Skyperious offers a number of options from the
 [command line](https://suurjaak.github.io/Skyperious/help.html#commandline):
@@ -93,6 +96,7 @@ Skyperious offers a number of options from the
   merge FILE1 FILE2          merge two or more Skype databases into a new database
   diff FILE1 FILE2           compare chat history in two Skype databases
   gui [FILE]                 launch Skyperious graphical program (default option)
+  -h [option]                show command line help, for option if specified
 ```
 
 Skyperious can be minimized to tray, clicking the tray icon opens 
