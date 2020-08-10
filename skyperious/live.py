@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    02.08.2020
+@modified    10.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -300,7 +300,7 @@ class SkypeLogin(object):
         try:
             participants, newcontacts = [], []
             usernames = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
-                        else set([self.username, chat.userId])
+                        else set([self.skype.user.id, chat.userId])
             for username in usernames:
                 p = dict(is_permanent=1, convo_id=row["id"], identity=username)
                 if isinstance(chat, skpy.SkypeGroupChat) and username == chat.creatorId:
@@ -604,7 +604,7 @@ class SkypeLogin(object):
                 if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
                     # Weird empty conversation, getMsgs raises 404
                     continue # for chat
-                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.username:
+                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.user.id:
                     # Conversation with self?
                     continue # for chat
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
