@@ -1906,6 +1906,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.label_chats.Value = data["chats"]
                 self.label_messages.Value = data["messages"]
             else:
+                idx = self.list_db.FindItem(0, filename)
+                if idx: self.list_db.RefreshRow(idx)
                 wx.CallLater(10, self.update_database_stats, filename)
         else:
             self.label_size.Value = "File does not exist."

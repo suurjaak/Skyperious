@@ -2691,6 +2691,21 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         finally: self.Thaw()
 
 
+    def RefreshRow(self, row):
+        """
+        Refreshes row with specified index from item data.
+        """
+        if row < 0: row = row % self.GetItemCount()
+        if row not in self._data_map or not row and not self._top_row: return
+
+        data = not row and self._top_row or self._data_map[row]
+        for i, col_name in enumerate([c[0] for c in self._columns]):
+            col_value = self._formatters[col_name](data, col_name)
+            self.SetStringItem(row, i, col_value)
+        self.SetItemTextColour(row,       self.ForegroundColour)
+        self.SetItemBackgroundColour(row, self.BackgroundColour)
+
+
     def ResetColumnWidths(self):
         """Resets the stored column widths, triggering a fresh autolayout."""
         self._col_widths.clear()
