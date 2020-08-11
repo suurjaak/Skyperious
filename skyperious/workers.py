@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.08.2020
+@modified    11.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -61,11 +61,11 @@ class WorkerThread(threading.Thread):
         if not self._is_running: self.start()
 
 
-    def stop(self):
+    def stop(self, drop_results=True):
         """Stops the worker thread."""
         self._is_running   = False
         self._is_working   = False
-        self._drop_results = True
+        self._drop_results = drop_results
         self._queue.put(None) # To wake up thread waiting on queue
 
 
@@ -874,7 +874,7 @@ class SkypeArchiveThread(WorkerThread):
 
         def progress(**kwargs):
             if kwargs and not self._drop_results: self.postback(kwargs)
-            return self.is_working 
+            return self._is_working 
 
         while self._is_running:
             action = self._queue.get()

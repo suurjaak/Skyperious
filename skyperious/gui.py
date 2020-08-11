@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.08.2020
+@modified    11.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -180,6 +180,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.worker_detection = \
             workers.DetectDatabaseThread(self.on_detect_databases_callback)
+        self.workers_import = {} # [database path: SkypeArchiveThread, ]
         self.Bind(EVT_DETECTION_WORKER, self.on_detect_databases_result)
         self.Bind(EVT_OPEN_DATABASE, self.on_open_database_event)
 
@@ -1619,12 +1620,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename = dialog2.GetPath()
 
         if filename in self.dbs:
-            db = self.dbs[filename]
-            if any(db is v  for v  in self.db_pages    .values()) \
-            or any(db in vv for vv in self.merger_pages.values()):
-                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
-                                     (filename, conf.Title), conf.Title, wx.OK)
-            db.close()
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                 (filename, conf.Title), conf.Title, wx.OK)
 
         busy = controls.BusyPanel(self, "Creating new database..")
         try:
@@ -1669,12 +1666,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename = dialog2.GetPath()
 
         if filename in self.dbs:
-            db = self.dbs[filename]
-            if any(db is v  for v  in self.db_pages    .values()) \
-            or any(db in vv for vv in self.merger_pages.values()):
-                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
-                                     (filename, conf.Title), conf.Title, wx.OK)
-            db.close()
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                 (filename, conf.Title), conf.Title, wx.OK)
 
         skype = live.SkypeLogin()
         busy = controls.BusyPanel(self, "Logging in as '%s'." % user)
@@ -1718,7 +1711,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         opens dialogs for choosing export file and database location.
         """
         dialog1 = wx.FileDialog(
-            parent=self, message="Open Skype export archive", defaultFile="",
+            parent=self, message="Open Skype export archive",
             wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
                      "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
                      "All files|*.*",
@@ -1744,32 +1737,66 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         wx.YieldIfNeeded() # Allow UI to refresh
         filename = dialog2.GetPath()
 
-        if filename in self.dbs:
-            db = self.dbs[filename]
-            if any(db is v  for v  in self.db_pages    .values()) \
-            or any(db in vv for vv in self.merger_pages.values()):
-                return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
-                                     (filename, conf.Title), conf.Title, wx.OK)
-            db.close()
+        if filename in self.dbs or filename in self.workers_import:
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+                                 (filename, conf.Title), conf.Title, wx.OK)
 
-        busy = controls.BusyPanel(self, "Creating new database from Skype export..")
-        guibase.status("Creating new database from Skype export.")
-        logger.info("Creating new database %s from Skype export %s, user '%s'.",
-                    filename, efilename, user)
+        def on_cancel():
+            result = wx.OK == wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL)
+            if result:
+                worker.stop(drop_results=False)
+                util.try_until(lambda: self.workers_import.pop(filename))
+            return result
+
+        def on_progress(result):
+            if result.get("error") or result.get("stop"):
+                util.try_until(db.close)
+                util.try_until(lambda: os.unlink(filename))
+            if result.get("done"):
+                worker.stop()
+                util.try_until(lambda: self.workers_import.pop(filename))
+
+            def after():
+                if not self: return
+
+                if result.get("error"):
+                    dlg.Destroy()
+                    guibase.status("Error parsing Skype export")
+                    wx.MessageBox("Error parsing Skype export:\n%s" % result["error_short"],
+                                  conf.Title, wx.OK | wx.ICON_ERROR)
+                elif result.get("stop"):
+                    dlg.Destroy()
+                    guibase.status()
+                elif result.get("done"):
+                    dlg.Destroy()
+                    guibase.status()
+                    db.close()
+                    self.update_database_list(filename)
+                    self.load_database_page(filename)
+                else:
+                    t = ", ".join(util.plural(x[:-1], result["counts"][x])
+                                  for x in sorted(result["counts"]))
+                    dlg.Message = "Parsed %s." % t
+
+            wx.CallAfter(after)
+
         try:
             with open(filename, "wb"): pass
             db = live.SkypeExport(efilename, filename)
-            db.export_read()
-            db.tables_list = None # Force reload
-            db.update_accountinfo()
         except Exception:
             util.try_until(lambda: os.unlink(filename))
             raise
-        finally: busy.Close()
 
-        self.load_database(filename, db)
-        self.update_database_list(filename)
-        self.load_database_page(filename)
+        dlg = controls.ProgressWindow(self, "Import progress",
+                                      cancel=on_cancel, agwStyle=wx.ALIGN_CENTER)
+        dlg.Position = [self.Position[i] + a - b for i, (a, b) in enumerate(zip(self.Size, dlg.Size))]
+        dlg.Pulse()
+        guibase.status("Creating new database from Skype export.")
+        logger.info("Creating new database %s from Skype export %s, user '%s'.",
+                    filename, efilename, user)
+        worker = workers.SkypeArchiveThread(on_progress)
+        self.workers_import[filename] = worker
+        worker.work({"action": "parse", "db": db})
 
 
     def on_open_database(self, event):
@@ -1950,7 +1977,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         syncing_pages = {} # {DatabasePage: filename, }
         merging_pages = [] # [MergerPage title, ]
 
-        for page, db in self.db_pages.items():
+        if any(x.is_alive() for x in self.workers_import.values()):
+            if wx.OK != wx.MessageBox(
+                "Import is currently in progress.\n\nExit anyway?",
+                conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
+            ): do_exit = False
+
+        for page, db in self.db_pages.items() if do_exit else ():
             if page and db.live.is_logged_in() and page.worker_live.is_working():
                 syncing_pages[page] = db.filename
         if syncing_pages:
@@ -1984,6 +2017,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
             do_exit = (wx.CANCEL != response)
         if do_exit:
+            for x in self.workers_import.values(): x.stop(drop_results=False)
             for page in self.db_pages:
                 if not page: continue # continue for page, if dead object
                 active_idx = page.notebook.Selection
@@ -2013,6 +2047,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             conf.save()
             try: self.trayicon.Destroy()
             except Exception: pass
+            for x in self.workers_import.values(): x.join()
             sys.exit()
 
 
