@@ -835,7 +835,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.db_filter_timer = None
             if search != self.db_filter: return
             self.list_db.SetFilter(search)
-            self.update_database_count()
+            self.update_database_list()
 
         if self.db_filter_timer: self.db_filter_timer.Stop()
         self.db_filter = search
@@ -1026,7 +1026,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if not data_old: self.list_db.AppendRow(data, [1])
                 result = True
 
-        has_items = self.list_db.GetItemCountFull() > 1
+        has_items = self.list_db.GetItemCount() > 1
         if self.button_clear.Shown != has_items:
             self.button_clear.Show(has_items)
             self.panel_db_main.Layout()
@@ -1037,7 +1037,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def update_database_count(self):
         """Updates database count label."""
         count = self.list_db.GetItemCount() - 1
-        total = len(self.db_filenames)
+        total = self.list_db.GetItemCountFull() - 1
         text = ""
         if total: text = util.plural("file", count)
         if count != total: text += " visible (%s in total)" % total
@@ -1072,11 +1072,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_clear_databases(self, event):
         """Handler for clicking to clear the database list."""
-        # @todo filtreeritud mitte päris kõik
-        if self.list_db.GetItemCount() > 1 and wx.OK == wx.MessageBox(
-            "Are you sure you want to clear the list of all databases?",
+        is_full = self.list_db.GetItemCount() == self.list_db.GetItemCountFull()
+        if self.list_db.GetItemCount() < 2 or wx.OK != wx.MessageBox(
+            "Are you sure you want to clear the list of all%s databases?" %
+            ("" if is_full else " currently shown"),
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ):
+        ): return
+
+        count = self.list_db.GetItemCount() - 1
+        if is_full:
             self.list_db.Populate([])
             del conf.DBFiles[:]
             del conf.LastSelectedFiles[:]
@@ -1085,8 +1089,102 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             while self.history_file.Count:
                 self.history_file.RemoveFileFromHistory(0)
             self.db_filenames.clear()
-            conf.save()
-            self.update_database_list()
+        else:
+            selecteds = range(1, self.list_db.GetItemCount())
+            filenames = list(map(self.list_db.GetItemText, selecteds))
+            self.remove_databases(filenames)
+
+        conf.save()
+        self.update_database_list()
+        guibase.status("Removed %s from database list.", util.plural("database", count))
+
+
+    def on_remove_database(self, event):
+        """Handler for clicking to remove an item from the database list."""
+        filename = self.db_filename
+        if not filename or wx.OK != wx.MessageBox(
+            "Remove %s from database list?" % filename,
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ): return
+
+        self.remove_databases([filename])
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.panel_db_main.Layout()
+        conf.save()
+
+
+    def on_remove_missing(self, event):
+        """Handler to remove nonexistent files from the database list."""
+        selecteds = range(1, self.list_db.GetItemCount())
+        filter_func = lambda i: not os.path.exists(self.list_db.GetItemText(i))
+        selecteds = list(filter(filter_func, selecteds))
+        filenames = list(map(self.list_db.GetItemText, selecteds))
+        if not filenames: return
+
+        self.remove_databases(filenames)
+        conf.save()
+        guibase.status("Removed %s from database list.",
+                       util.plural("non-existing file", filenames))
+
+
+    def on_remove_type(self, event, other=True):
+        """Handler for type selection to remove files from the database list."""
+        selecteds = range(1, self.list_db.GetItemCount())
+        filter_func = lambda i: (
+          other ^ skypedata.is_skype_database(self.list_db.GetItemText(i)))
+        selecteds = list(filter(filter_func, selecteds))
+        filenames = list(map(self.list_db.GetItemText, selecteds))
+        if not filenames: return
+
+        self.remove_databases(filenames)
+        conf.save()
+        t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
+        guibase.status("Removed %s from database list.", t)
+
+
+    def on_delete_database(self, event):
+        """Handler for clicking to delete a database."""
+        filename = self.db_filename
+        if not filename or wx.OK != wx.MessageBox(
+            "Delete %s from disk?" % filename,
+            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        ): return
+
+        if filename in self.dbs:
+            return wx.MessageBox("%s is currently open in %s, cannot delete." %
+                                 (filename, conf.Title), conf.Title, wx.OK)
+
+        try: os.unlink(filename)
+        except Exception as e:
+            logger.exception("Error deleting %s.", filename)
+            return wx.MessageBox("Failed to delete %s:\n\n%s" %
+                                 (filename, util.format_exc(e)),
+                                 conf.Title, wx.OK | wx.ICON_ERROR)
+        self.remove_databases([filename])
+        self.db_filename = None
+        self.list_db.Select(0)
+        self.panel_db_main.Layout()
+        conf.save()
+
+
+    def remove_databases(self, filenames):
+        """Removes given file from database list and all data structures."""
+        for filename in filenames:
+            idx = self.list_db.FindItem(0, filename)
+            if idx: self.list_db.DeleteItem(idx)
+            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
+                if filename in lst: lst.remove(filename)
+            for dct in conf.LastSearchResults, self.db_filenames:
+                dct.pop(filename, None)
+            conf.Login.pop(filename, None)
+
+        # Remove from recent file history
+        historyfiles = [(i, self.history_file.GetHistoryFile(i))
+                        for i in range(self.history_file.Count)]
+        for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
+            if f in filenames: self.history_file.RemoveFileFromHistory(i)
+        self.update_database_list()
 
 
     def on_save_database_as(self, event):
@@ -1122,134 +1220,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             guibase.status("Saved a copy of %s as %s.", original, newpath,
                            log=True)
             self.update_database_list(newpath)
-
-
-    def on_delete_database(self, event):
-        """Handler for clicking to delete a database."""
-        filename = self.db_filename
-        if not filename or wx.OK != wx.MessageBox(
-            "Delete %s from disk?" % filename,
-            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ): return
-
-        if filename in self.dbs:
-            return wx.MessageBox("%s is currently open in %s, cannot delete." %
-                                 (filename, conf.Title), conf.Title, wx.OK)
-
-        try: os.unlink(filename)
-        except Exception as e:
-            logger.exception("Error deleting %s.", filename)
-            return wx.MessageBox("Failed to delete %s:\n\n%s" %
-                                 (filename, util.format_exc(e)),
-                                 conf.Title, wx.OK | wx.ICON_ERROR)
-        
-        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-            if filename in lst: lst.remove(filename)
-        for dct in conf.LastSearchResults, self.db_filenames:
-            dct.pop(filename, None)
-        for i in range(self.list_db.GetItemCount()):
-            if self.list_db.GetItemText(i) == filename:
-                self.list_db.DeleteItem(i)
-                break # break for i in range(self.list_db..
-        conf.Login.pop(filename, None)
-        # Remove from recent file history
-        historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                        for i in range(self.history_file.Count)]
-        for i in [i for i, f in historyfiles if f == filename]:
-            self.history_file.RemoveFileFromHistory(i)
-        self.db_filename = None
-        self.list_db.Select(0)
-        self.update_database_list()
-        self.panel_db_main.Layout()
-        conf.save()
-
-
-    def on_remove_database(self, event):
-        """Handler for clicking to remove an item from the database list."""
-        filename = self.db_filename
-        if not filename or wx.OK != wx.MessageBox(
-            "Remove %s from database list?" % filename,
-            conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
-        ): return
-
-        for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-            if filename in lst: lst.remove(filename)
-        for dct in conf.LastSearchResults, self.db_filenames:
-            dct.pop(filename, None)
-        for i in range(self.list_db.GetItemCount()):
-            if self.list_db.GetItemText(i) == filename:
-                self.list_db.DeleteItem(i)
-                break # break for i in range(self.list_db..
-        conf.Login.pop(filename, None)
-        # Remove from recent file history
-        historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                        for i in range(self.history_file.Count)]
-        for i in [i for i, f in historyfiles if f == filename]:
-            self.history_file.RemoveFileFromHistory(i)
-        self.db_filename = None
-        self.list_db.Select(0)
-        self.update_database_list()
-        self.panel_db_main.Layout()
-        conf.save()
-
-
-    def on_remove_missing(self, event):
-        """Handler to remove nonexistent files from the database list."""
-        selecteds = range(1, self.list_db.GetItemCount())
-        filter_func = lambda i: not os.path.exists(self.list_db.GetItemText(i))
-        selecteds = list(filter(filter_func, selecteds))
-        filenames = list(map(self.list_db.GetItemText, selecteds))
-        for i in range(len(selecteds)):
-            # - i, as item count is getting smaller one by one
-            selected = selecteds[i] - i
-            filename = self.list_db.GetItemText(selected)
-            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-                if filename in lst: lst.remove(filename)
-            for dct in conf.LastSearchResults, self.db_filenames:
-                dct.pop(filename, None)
-            self.list_db.DeleteItem(selected)
-            conf.Login.pop(filename, None)
-        self.update_database_list()
-
-        if not selecteds: return
-        # Remove from recent file history
-        historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                        for i in range(self.history_file.Count)]
-        for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
-            if f in filenames: self.history_file.RemoveFileFromHistory(i)
-        conf.save()
-        guibase.status("Removed %s from database list.",
-                       util.plural("non-existing file", filenames))
-
-
-    def on_remove_type(self, event, other=True):
-        """Handler for type selection to remove files from the database list."""
-        selecteds = range(1, self.list_db.GetItemCount())
-        filter_func = lambda i: (
-          other ^ skypedata.is_skype_database(self.list_db.GetItemText(i)))
-        selecteds = list(filter(filter_func, selecteds))
-        filenames = list(map(self.list_db.GetItemText, selecteds))
-        for i in range(len(selecteds)):
-            # - i, as item count is getting smaller one by one
-            selected = selecteds[i] - i
-            filename = self.list_db.GetItemText(selected)
-            for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
-                if filename in lst: lst.remove(filename)
-            for dct in conf.LastSearchResults, self.db_filenames:
-                dct.pop(filename, None)
-            self.list_db.DeleteItem(selected)
-            conf.Login.pop(filename, None)
-        self.update_database_list()
-
-        if not selecteds: return
-        # Remove from recent file history
-        historyfiles = [(i, self.history_file.GetHistoryFile(i))
-                        for i in range(self.history_file.Count)]
-        for i, f in historyfiles[::-1]: # Work upwards to have unchanged index
-            if f in filenames: self.history_file.RemoveFileFromHistory(i)
-        conf.save()
-        t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
-        guibase.status("Removed %s from database list.", t)
 
 
     def on_showhide_log(self, event):
@@ -1613,7 +1583,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         wx.YieldIfNeeded() # Allow UI to refresh
         filename = dialog2.GetPath()
 
-        if filename in self.dbs:
+        if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
                                  (filename, conf.Title), conf.Title, wx.OK)
 
@@ -1659,7 +1629,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         wx.YieldIfNeeded() # Allow UI to refresh
         filename = dialog2.GetPath()
 
-        if filename in self.dbs:
+        if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
                                  (filename, conf.Title), conf.Title, wx.OK)
 

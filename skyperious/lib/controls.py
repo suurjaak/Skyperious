@@ -2724,7 +2724,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
 
     def GetItemCountFull(self):
         """Returns the full row count, including items hidden by filter."""
-        return len(self._id_rows)
+        return len(self._id_rows) + bool(self._top_row)
 
 
     def GetItemTextFull(self, idx):
