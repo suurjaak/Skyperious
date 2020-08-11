@@ -302,8 +302,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
         label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        newlabels = filter(bool, [live.skpy and "from Skype online",
-                                  live.ijson and "from Skype export"])
+        newextra = ", or populated from a Skype source" if live.skpy or live.ijson else ""
         BUTTONS_MAIN = [
             ("button_opena", "&Open a database..", images.ButtonOpenA, 
              "Choose a database from your computer to open."),
@@ -313,8 +312,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
             ("button_new", "Create a &new Skype database", images.ButtonNew,
-             "Create a blank database" + (newlabels and ", or " or "") + 
-             ", or ".join(newlabels)),
+             "Create a blank database" + newextra),
             ("button_missing", "Remove missing", images.ButtonRemoveMissing,
              "Remove non-existing files from the database list."),
             ("button_type", "Remove by type", images.ButtonRemoveType,
@@ -1571,6 +1569,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_new_database(self, event):
         """Handler for clicking new-button on main screen, opens popup menu."""
+        if not live.skpy and not live.ijson: return self.on_new_blank(event)
         menu = wx.lib.agw.flatmenu.FlatMenu()
         item_blank  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                                       "&Blank Skype database, populated with username only"))
@@ -1599,7 +1598,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for creating a new blank database, asks for username, 
         populates a new database and opens the database page.
         """
-        dialog1 = wx.TextEntryDialog(self, "Enter Skype username",
+        dialog1 = wx.TextEntryDialog(self, "Enter Skype username for new database:",
                                      conf.Title, style=wx.OK | wx.CANCEL)
         dialog1.CenterOnParent()
         if wx.ID_OK != dialog1.ShowModal(): return
@@ -1609,7 +1608,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename0 = live.SkypeLogin.make_db_path(user)
         try: os.makedirs(os.path.split(filename0)[0])
         except Exception: pass
-        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+        dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.split(filename0)[0],
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
@@ -1655,7 +1654,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename0 = live.SkypeLogin.make_db_path(user)
         try: os.makedirs(os.path.split(filename0)[0])
         except Exception: pass
-        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+        dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.split(filename0)[0],
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
@@ -1727,7 +1726,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename0 = live.SkypeLogin.make_db_path(user)
         try: os.makedirs(os.path.split(filename0)[0])
         except Exception: pass
-        dialog2 = wx.FileDialog(parent=self, message="Choose location for new database",
+        dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.split(filename0)[0],
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
