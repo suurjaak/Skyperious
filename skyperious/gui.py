@@ -553,12 +553,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.Iconize(False), self.Show(), self.Raise()
             page = self.page_db_latest
             if not page:
-                if self.db_filename: # Load database focused in dblist
-                    page = self.load_database_page(self.db_filename)
-                elif self.dbs: # Load an open database
-                    page = self.load_database_page(list(self.dbs)[0])
-                elif conf.RecentFiles:
-                    page = self.load_database_page(conf.RecentFiles[0])
+                filename = self.db_filename not in self.workers_import and self.db_filename
+                if not filename: filename = next((x for x in list(self.dbs) + conf.RecentFiles
+                                                  if x not in self.workers_import), None)
+                if filename: page = self.load_database_page(filename)
             if page:
                 page.edit_searchall.Value = self.dialog_search.Value
                 page.on_searchall(None)
@@ -1152,6 +1150,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if filename in self.dbs:
             return wx.MessageBox("%s is currently open in %s, cannot delete." %
                                  (filename, conf.Title), conf.Title, wx.OK)
+        if filename in self.workers_import:
+            return wx.MessageBox("%s is currently being imported to, cannot delete." % 
+                                 filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
         try: os.unlink(filename)
         except Exception as e:
@@ -1194,6 +1195,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 conf.Title, wx.OK | wx.ICON_INFORMATION
             )
             return
+
+        if original in self.workers_import:
+            return wx.MessageBox("%s is currently being imported to, cannot save." % 
+                                 original, conf.Title, wx.OK | wx.ICON_WARNING)
 
         dialog = wx.FileDialog(parent=self, message="Save a copy..",
             defaultDir=os.path.split(original)[0],
@@ -1272,6 +1277,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             nitems = enumerate(event.EventObject.GetMenuItems())
             index = next((i for i, m in nitems if m.GetId() == event.Id), None)
             do_singlefile = index > 0
+
+        if self.db_filename in self.workers_import:
+            return wx.MessageBox("%s is currently being imported to, cannot export." % 
+                                 self.db_filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
         focused_control = self.FindFocus()
         self.button_export.Enabled = False
@@ -1398,6 +1407,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def compare_databases(self, filename1, filename2, is_export=False):
         """Opens the two databases for comparison, if possible."""
         if not filename1 or not filename2: return
+
+        if filename1 in self.workers_import:
+            return wx.MessageBox("%s is currently being imported to, cannot open." % 
+                                 filename1, conf.Title, wx.OK | wx.ICON_WARNING)
+        if filename2 in self.workers_import:
+            return wx.MessageBox("%s is currently being imported to, cannot open." % 
+                                 filename2, conf.Title, wx.OK | wx.ICON_WARNING)
 
         title = "Database comparison"
         db1, db2, page = None, None, None
@@ -2218,6 +2234,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if db and db in self.db_pages.values():
             page = next((x for x in self.db_pages if x and x.db == db), None)
         if not page:
+            if filename in self.workers_import:
+                wx.MessageBox("%s is currently being imported to, cannot open." % 
+                              filename, conf.Title, wx.OK | wx.ICON_WARNING)
+                return
+
             if not db:
                 db = self.load_database(filename)
             if db:
@@ -2232,8 +2253,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if page:
             idx0 = self.list_db.GetFirstSelected()
             idx  = self.list_db.FindItem(0, filename)
-            if idx0 and idx0 != idx: self.list_db.Select(idx0, False)
-            if idx and idx != idx0:
+            if idx0 >= 0 and idx0 != idx: self.list_db.Select(idx0, False)
+            if idx > 0 and idx != idx0:
                 self.list_db.Select(idx, True)
                 self.list_db.EnsureVisible(idx)
             for i in range(self.notebook.GetPageCount()):
