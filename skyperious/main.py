@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.08.2020
+@modified    11.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -807,14 +807,27 @@ class ConsoleWriter(object):
 
     def on_exe_exit(self):
         """atexit handler for compiled binary, keeps window open for a minute."""
-        countdown = 60
-        try:
-            self.write("\n")
-            while countdown:
-                output("\rClosing window in %s.." % countdown, end=" ")
-                time.sleep(1)
+        q = Queue.Queue()
+
+        def waiter():
+            raw_input()
+            q.put(None)
+
+        def ticker():
+            countdown = 60
+            txt = "\rClosing window in %s.. Press ENTER to exit."
+            while countdown > 0 and q.empty():
+                output(txt % countdown, end=" ")
                 countdown -= 1
-        except Exception: pass
+                time.sleep(1)
+            q.put(None)
+
+        self.write("\n\n")
+        for f in waiter, ticker:
+            t = threading.Thread(target=f)
+            t.daemon = True
+            t.start()
+        q.get()
 
 
 
