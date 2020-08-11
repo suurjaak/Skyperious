@@ -3842,6 +3842,8 @@ class DatabasePage(wx.Panel):
         item_date = wx.lib.agw.flatmenu.FlatMenuItem(
             menu, wx.ID_ANY, "Export &date range", subMenu=menu_date)
         item_sel.Enable(len(selecteds))
+        item_all.Enable(bool(self.list_chats.GetItemCount()))
+        item_date.Enable(bool(self.list_chats.GetItemCount()))
 
         item_sel_multi = wx.lib.agw.flatmenu.FlatMenuItem(
             menu_sel, wx.ID_ANY, "Into individual &files")
