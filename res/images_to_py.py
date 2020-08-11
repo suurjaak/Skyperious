@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  30.07.2020
+@modified  11.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -43,8 +43,6 @@ IMAGES = {
         "Small icon for export button on start page.",
     "ButtonHome.png":
         "Large icon for home on start page.",
-    "ButtonImport.png":
-        "Large icon for live import on start page.",
     "ButtonListDatabase.png":
         "Button for databases in database list.",
     "ButtonLogin.png":
@@ -53,6 +51,8 @@ IMAGES = {
         "Small icon for left merge button on merger page.",
     "ButtonMergeLeftMulti.png":
         "Small icon for left merge multi button on merger page.",
+    "ButtonNew.png":
+        "Large icon for new database on start page.",
     "ButtonOpen.png":
         "Button for open file on main page.",
     "ButtonOpenA.png":

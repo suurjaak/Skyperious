@@ -312,7 +312,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             ("button_folder", "&Import from folder.", images.ButtonFolder,
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
-            ("button_new", "Create a &new Skype database", images.ButtonImport,
+            ("button_new", "Create a &new Skype database", images.ButtonNew,
              "Create a blank database" + (newlabels and ", or " or "") + 
              ", or ".join(newlabels)),
             ("button_missing", "Remove missing", images.ButtonRemoveMissing,

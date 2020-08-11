@@ -7,7 +7,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    30.07.2020
+@modified    11.08.2020
 ------------------------------------------------------------------------------
 """
 try:
@@ -664,31 +664,6 @@ ButtonHome = PyEmbeddedImage(
 )
 
 
-"""Large icon for live import on start page."""
-ButtonImport = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAD+0lEQVRYw8WXO2wcVRSGvztz"
-    "57UPxzgQCpOCCFkhkZwQoLCQoUEu4rSWKNykQkJIJg0NshBNCioXtqxUpnHlxlIQHa0RJkZi"
-    "S1wAQqKwhPfBzszOzu5cit2ZnZ3MOuuXMqOrO3Pncf57zrn/fy685EPkDS4tLb0H3LtgW7/u"
-    "7Ow8yw7KvDe73e69tbW1x6VS6Wr2mVIK3+/gum08L6TbBU0TaJqOrutIaWAYEsMwkFIipaTV"
-    "8o4fPXr4FTAeAAAp5dWjoyM8z8N1XYIgQCmFUtBqtWk0Any/g1ICKQ1M08SyLBzHoVBwcBwH"
-    "27axbYtyuTw1yo52fs+q1EmqDd9fPAABCIXq90kbMvliCNp5Zp7rCaHIO0eG+iQT+/v7NJtN"
-    "rl17ncnJKyMgpE30ZysUEJ3fA7VajYWFBY6P/x3tBxFHPMqZd5T0ZwLQ6XQAmJ+f548//8rJ"
-    "AzUAIUgBiXqhGPLECSHQNO0T4Ho8ODc39+329vbQi3fv3OWXg99468b1DIWpofhn83/cHHjz"
-    "8PDwcd4LURQRBAG12jEFW+Pw8Hdc1024AUDXdQxjwAW99T9olUrlhzwSSgAIIUYmo67rTExM"
-    "UCiWePW1aaZeKeK3Qlw3wPPbdLoRQhNouo6UMRAD0zAwTAMpDeY+/Pj+558+fHoSE/49MzPz"
-    "TTy4urr6dXy9vLxMGIY0mx4//fyMmzM3ekzY9PFaIR0VoUsNwzSS2RcKDo5t49gOtmVRLpdP"
-    "DkG32/0uPVipVP5ZX19/srm5mYzt7e1x69ZNlBoQkSJLPtnYR0k70yqIot6Hu7u73L799ggt"
-    "zSw7ERuMMgR9BgBTU1NsbW0xPf3GCCZMsZ+IcljwxR44kQkXFxeH1DC7/tNeyHV7Xx/UpWhB"
-    "LEI5WhiT0ADMGbVgPCAZFhTP0zJnCMHBxsbG97Ozsw9836fdbqP66d/pdC6eiHKOd1dWVh4E"
-    "QUAYhoRhmOiCUgq/1eY/18dttQijEARoUkMaeo+ELBPLMrFME9M0uPPB+/e//OyLp6cqyeKZ"
-    "5pZkQUDD82i2AjqEoAsMQ8e0TGzbxHEcnNDGsW3sro3U9csoSOK4k0m8fEm+vCRMlSUxEDKq"
-    "eGoAURTp4+8qVKYyUinyGayCUf/MDYHv+6XxtjN944LnagCSSqh37/t+cWwP1Ot18/TF6TAh"
-    "9YRqAGzUP3M9UK1W7VOnYooZSVXHMZhqtWqN7YFarebU6/VGqVSaME2TYrE4zANBm5Lr4bY8"
-    "gqiNEgoh6fOA7BOSiWUaGKaJW/cbtVqtMM7mdBK44jjOR8A7URShlEpkOec70a+oEKKXkfF1"
-    "/z7pgQPP834EmkBjFAA71S5g2zbMbYAPtIFEWv8HpI6FnfEHR9MAAAAASUVORK5CYII="
-)
-
-
 """Button for databases in database list."""
 ButtonListDatabase = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAB3RJTUUH3QgQDRcfgk6jPwAA"
@@ -762,6 +737,29 @@ ButtonMergeLeftMulti = PyEmbeddedImage(
     "W8DrNxXgnhX4Pp+VSTWxiSwYzEKsu55o8DV4urvXRMN2CpQFA74PgBVKWVl4tPBPR2MA6Suz"
     "jvX8RSUUouCWZl+J/7m69MyzZYCktVoIyw9KAFavZwE2kALSQKYXbcDsA9RGbQ3ZXokrT6rA"
     "OLApdk1n9kC73eyv+jeLAQn4+/6M/AJo6ded0dcRQQAAAABJRU5ErkJggg=="
+)
+
+
+"""Large icon for new database on start page."""
+ButtonNew = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADgElEQVRYw8WXu2/kRBjAf2PP"
+    "eO3NLjlIA0gUFBQ0KQIUNIcQFOiUChSJ5pBOcEJB6EIkRAMH4iHqNFEUnQR/QOhANHTUgFAE"
+    "0qWioAsSsU38tmco1vuM97LLncVan0a2x/M95zffwv/8E00Pt7a2ngU2HrCuX46Ojn6afSib"
+    "ZlZVtbG3t/dlr9dbm31njCFJSqIoJ44LqgosS2BZNrZtI6VCKYlSCiklUkrSNP57d/fGh8Bi"
+    "BgBIKddOT0+J45goisiyDGMMxkCa5oRhRpKUGCOQUuE4Dp1OB8/z6HY9PM/DdV1ct0O/339k"
+    "nh7r/iNrJi4mZPr+wRsgAGEw9TiSKZWXm2Ddj+eNkRCGpquVFJipFEx4LAyg245AbYQYZlw3"
+    "+K1HYzsGCDM2QjBhiB6kYioSbRThRNiH+Z+t/8tqYB4Hft7f3/9ufX19M0kS8jzHmMEiZVkS"
+    "RdGIDQC2baPUmAWD/T+W4+Pj75sgdC8Dntnd3d2sqoqqqtBa1xAaSJIWRFFGnOSUlUZYAsu2"
+    "kXJoiMJRCuUopFQ8f/Xla+++fePbpUiY5zlhGM4n4XlCnBaURmNLC+Wokffdrofnuniuh9vp"
+    "0O/326kBwyx8ZnOvR9LSLphFscaIoUI9A+hWSDhBP6EbKNhWBIS5EIXGsNfng2mNA2J2r9f3"
+    "Yngm6BENl+XActGYpKC4iGXukYJWQPT53ffxa68fFoJbj328PIh2dnY2syyjKAqKoqAsy3FL"
+    "lub8EyVEaUqhCxBgSQupbBxH4d81sD1Y6OzAcH37zWsfvPPeciAaetoIoiwjjGPO04ySAmyB"
+    "UjZOx8F1nYa18raO43EfMC48M3dWO0WI4aMf38I385U8/elTsMYBNzlYhSq4M9bbaIDW2l6G"
+    "hL4xcGui2KuJOdvTTVFwiH1pBJIk6S3aC4z8zoC/akXDHiSvjdG1PLpgCoIgcJZJwRUh8A9n"
+    "UvBKPf4w/XgVquAyA87OztxlquCzFw6Rjo3TUXQ6Dte/eR2eBP4YvP/tk9957aVXvzg5Obkd"
+    "LBIB3/e9IAjCXq/3kOM4rKysTHMgy+lFMVEak+kcIwxCUnPg4pJRkIS+73cX2QVXgNUwDI83"
+    "Nja+GnZCWut5VSAAhBAIMahIIQS8wQ4wiALw4nNXvwZ+BR4HzoFw3r9jd0L+MyNWb/JnUH+/"
+    "Cjq4wxNACSR1aWbDuf8CgMlR7Y0Q0vUAAAAASUVORK5CYII="
 )
 
 
