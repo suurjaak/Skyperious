@@ -78,7 +78,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.07.2020
+@modified    11.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1137,31 +1137,36 @@ class ProgressWindow(wx.Dialog):
     """
 
     def __init__(self, parent, title, message="", maximum=100, cancel=True,
-                 style=wx.CAPTION | wx.CLOSE_BOX | wx.FRAME_FLOAT_ON_PARENT):
+                 style=wx.CAPTION | wx.CLOSE_BOX | wx.FRAME_FLOAT_ON_PARENT,
+                 agwStyle=wx.ALIGN_LEFT):
+        """
+        @param   message   message shown on top of gauge
+        @param   maximum   gauge maximum value
+        @param   cancel    whether dialog is cancelable and has cancel-button,
+                           optionally a callable returning whether to cancel
+        @param   agwStyle  message alignment flags
+        """
         wx.Dialog.__init__(self, parent=parent, title=title, style=style)
         self._is_cancelled = False
+        self._oncancel = cancel if callable(cancel) else lambda *a, **kw: True
 
-        self.Sizer = wx.BoxSizer(wx.VERTICAL)
-        panel = self._panel = wx.Panel(self)
-        sizer = self._panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer = self.Sizer = wx.BoxSizer(wx.VERTICAL)
 
-        label = self._label_message = wx.StaticText(panel, label=message)
-        sizer.Add(label, border=2*8, flag=wx.LEFT | wx.TOP)
-        gauge = self._gauge = wx.Gauge(panel, range=maximum, size=(300,-1),
-                              style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
-        sizer.Add(gauge, border=2*8,
-                  flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW)
+        label = self._label = wx.StaticText(self, label=message, style=agwStyle)
+        sizer.Add(label, border=2*8, flag=wx.LEFT | wx.TOP | wx.RIGHT | wx.GROW)
+        gauge = self._gauge = wx.Gauge(self, range=maximum, size=(300,-1),
+                                       style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
+        sizer.Add(gauge, border=2*8, flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW)
         gauge.Value = 0
         if cancel:
-            self._button_cancel = wx.Button(self._panel, id=wx.ID_CANCEL)
+            self._button_cancel = wx.Button(self, id=wx.ID_CANCEL)
             sizer.Add(self._button_cancel, border=8,
                       flag=wx.TOP | wx.BOTTOM | wx.ALIGN_CENTER_HORIZONTAL)
-            self.Bind(wx.EVT_BUTTON, self.OnCancel, self._button_cancel)
-            self.Bind(wx.EVT_CLOSE, self.OnCancel)
+            self.Bind(wx.EVT_BUTTON, self._OnCancel, self._button_cancel)
+            self.Bind(wx.EVT_CLOSE,  self._OnCancel)
         else:
             sizer.Add((8, 8))
 
-        self.Sizer.Add(panel, flag=wx.GROW)
         self.Fit()
         self.Layout()
         self.Refresh()
@@ -1175,22 +1180,47 @@ class ProgressWindow(wx.Dialog):
         @return  False if dialog was cancelled by user, True otherwise
         """
         if message is not None:
-            self._label_message.Label = message
+            self._label.Label = message
         self._gauge.Value = value
-        self.Refresh()
+        self.Layout()
         return not self._is_cancelled
 
 
-    def OnCancel(self, event):
-        """
-        Handler for cancelling the dialog, hides the window.
-        """
-        self._is_cancelled = True
-        self.Hide()
+    def Pulse(self, pulse=True):
+        """Sets the progress bar to pulse, or stops pulse."""
+        if pulse: self._gauge.Pulse()
+        else: self._gauge.Value = self._gauge.Value
+
+
+    def GetValue(self):
+        """Returns progress bar value."""
+        return self._gauge.Value
+    def SetValue(self, value):
+        """Sets progress bar value."""
+        self._gauge.Value = value
+    Value = property(GetValue, SetValue)
+
+
+    def GetMessage(self):
+        """Returns message value."""
+        return self._label.Label
+    def SetMessage(self, message):
+        """Sets message value."""
+        self._label.Label = message
+        self.Fit()
+        self.Layout()
+    Message = property(GetMessage, SetMessage)
 
 
     def SetGaugeForegroundColour(self, colour):
         self._gauge.ForegroundColour = colour
+
+
+    def _OnCancel(self, event):
+        """Handler for cancelling the dialog, hides the window."""
+        if not self._oncancel(): return
+        self._is_cancelled = True
+        self.Hide()
 
 
 
