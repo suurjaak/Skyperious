@@ -1228,10 +1228,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.page_log.Show()
             self.notebook.SetSelection(self.notebook.GetPageCount() - 1)
             self.on_change_page(None)
+            self.menu_log.Check(True)
+        elif event and self.notebook.GetPageIndex(self.page_log) != self.notebook.GetSelection():
+            self.notebook.SetSelection(self.notebook.GetPageCount() - 1)
+            self.on_change_page(None)
+            self.menu_log.Check(True)
         else:
             self.page_log.is_hidden = True
             self.notebook.RemovePage(self.notebook.GetPageIndex(self.page_log))
-        self.menu_log.Check(not self.page_log.is_hidden)
+            self.menu_log.Check(False)
 
 
     def on_export_database_menu(self, event):
