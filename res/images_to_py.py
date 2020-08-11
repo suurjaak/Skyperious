@@ -35,6 +35,8 @@ IMAGES = {
         "Small icon for clear list button on start page.",
     "ButtonCompare.png":
         "Small icon for compare databases button on start and merger page.",
+    "ButtonDelete.png":
+        "Small icon for delete database button on start page.",
     "ButtonDetect.png":
         "Large icon for detect databases button on start page.",
     "ButtonFolder.png":
@@ -57,10 +59,6 @@ IMAGES = {
         "Button for open file on main page.",
     "ButtonOpenA.png":
         "Large icon for open database button on start page.",
-    "ButtonRemove.png":
-        "Small icon for remove database button on start page.",
-    "ButtonRemoveMissing.png":
-        "Small icon for remove missing button on start page.",
     "ButtonRemoveType.png":
         "Small icon for remove by type button on start page.",
     "ButtonSaveAs.png":

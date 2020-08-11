@@ -312,17 +312,13 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
             ("button_new", "Create a &new Skype database", images.ButtonNew,
-             "Create a blank database" + newextra),
-            ("button_missing", "Remove missing", images.ButtonRemoveMissing,
-             "Remove non-existing files from the database list."),
-            ("button_type", "Remove by type", images.ButtonRemoveType,
-             "Choose to remove Skype databases, or other SQLite databases."),
-            ("button_clear", "C&lear list", images.ButtonClear,
-             "Clear the current database list."), ]
+             "Create a blank database%s." % newextra),
+            ("button_clear", "&Remove..", images.ButtonClear,
+             "Remove databases from list by option."), ]
         for name, label, img, note in BUTTONS_MAIN:
             button = controls.NoteButton(panel_main, label, note, img.Bitmap)
             setattr(self, name, button)
-        self.button_missing.Hide(); self.button_type.Hide(); self.button_clear.Hide()
+        self.button_clear.Hide()
 
         # Create detail page labels, values and buttons
         label_db = self.label_db = wx.TextCtrl(parent=panel_detail, value="",
@@ -361,7 +357,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
              "Save a copy of the database under another name."),
             ("button_remove", "&Remove", images.ButtonRemoveType,
              "Remove this database from the list."),
-            ("button_delete", "Delete", images.ButtonRemove,
+            ("button_delete", "Delete", images.ButtonDelete,
              "Delete this database from disk."), ]
         for name, label, img, note in BUTTONS_DETAIL:
             button = controls.NoteButton(panel_detail, label, note, img.Bitmap)
@@ -384,9 +380,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
         self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
         self.button_new.Bind(wx.EVT_BUTTON,     self.on_new_database)
-        self.button_missing.Bind(wx.EVT_BUTTON, self.on_remove_missing)
-        self.button_type.Bind(wx.EVT_BUTTON,    self.on_remove_type_menu)
-        self.button_clear.Bind(wx.EVT_BUTTON,   self.on_clear_databases)
+        self.button_clear.Bind(wx.EVT_BUTTON,   self.on_remove_databases)
         self.button_open.Bind(wx.EVT_BUTTON,    self.on_open_current_database)
         self.button_compare.Bind(wx.EVT_BUTTON, self.on_compare_databases)
         self.button_export.Bind(wx.EVT_BUTTON,  self.on_export_database_menu)
@@ -407,8 +401,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(self.button_folder, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_new,    flag=wx.GROW)
         panel_main.Sizer.AddStretchSpacer()
-        panel_main.Sizer.Add(self.button_missing, flag=wx.GROW)
-        panel_main.Sizer.Add(self.button_type,    flag=wx.GROW)
         panel_main.Sizer.Add(self.button_clear,   flag=wx.GROW)
 
         panel_detail.Sizer.Add(label_db, border=10, flag=wx.ALL | wx.GROW)
@@ -1001,8 +993,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         else:
             self.list_db.Select(0)
 
-        self.button_missing.Show(bool(items))
-        self.button_type.Show(bool(items))
         self.button_clear.Show(bool(items))
         self.panel_db_main.Layout()
         self.update_database_count()
@@ -1037,9 +1027,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 result = True
 
         has_items = self.list_db.GetItemCountFull() > 1
-        if self.button_missing.Shown != has_items:
-            self.button_missing.Show(has_items)
-            self.button_type.Show(has_items)
+        if self.button_clear.Shown != has_items:
             self.button_clear.Show(has_items)
             self.panel_db_main.Layout()
         self.update_database_count()
@@ -1056,9 +1044,36 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.label_count.Label = text
 
 
+    def on_remove_databases(self, event):
+        """Handler for clicking to remove databases, opens popup menu."""
+        menu = wx.lib.agw.flatmenu.FlatMenu()
+        item_missing  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                       "Remove &missing files"))
+        item_skype    = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                       "Remove &Skype databases"))
+        item_nonskype = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                       "Remove &non-Skype databases"))
+        item_clear   = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                       "Remove &all"))
+
+        self.Bind(wx.EVT_MENU, self.on_remove_missing,  item_missing)
+        self.Bind(wx.EVT_MENU, functools.partial(self.on_remove_type, other=False), item_skype)
+        self.Bind(wx.EVT_MENU, self.on_remove_type,     item_nonskype)
+        self.Bind(wx.EVT_MENU, self.on_clear_databases, item_clear)
+
+        btn = self.button_clear
+        sz_btn, pt_btn = btn.Size, btn.Position
+        pt_btn = btn.Parent.ClientToScreen(pt_btn)
+        menu.SetOwnerHeight(sz_btn.y)
+        if menu.Size.width < sz_btn.width:
+            menu.Size = sz_btn.width, menu.Size.height
+        menu.Popup((pt_btn), self)
+
+
     def on_clear_databases(self, event):
         """Handler for clicking to clear the database list."""
-        if self.list_db.GetItemCountFull() > 1 and wx.OK == wx.MessageBox(
+        # @todo filtreeritud mitte päris kõik
+        if self.list_db.GetItemCount() > 1 and wx.OK == wx.MessageBox(
             "Are you sure you want to clear the list of all databases?",
             conf.Title, wx.OK | wx.CANCEL | wx.ICON_QUESTION
         ):
@@ -1207,11 +1222,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                        util.plural("non-existing file", filenames))
 
 
-    def on_remove_type(self, event):
+    def on_remove_type(self, event, other=True):
         """Handler for type selection to remove files from the database list."""
-        nitems = enumerate(event.EventObject.GetMenuItems())
-        other = not next((i for i, m in nitems if m.GetId() == event.Id), None)
-
         selecteds = range(1, self.list_db.GetItemCount())
         filter_func = lambda i: (
           other ^ skypedata.is_skype_database(self.list_db.GetItemText(i)))
@@ -1238,23 +1250,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         conf.save()
         t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
         guibase.status("Removed %s from database list.", t)
-
-
-    def on_remove_type_menu(self, event):
-        """Handler to remove files from the database list by type."""
-        menu = wx.lib.agw.flatmenu.FlatMenu()
-        [menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-         "Remove %s databases" % x)) for x in "all other SQLite", "Skype"]
-        for item in menu.GetMenuItems():
-            self.Bind(wx.EVT_MENU, self.on_remove_type, item)
-
-        btn = self.button_type
-        sz_btn, pt_btn = btn.Size, btn.Position
-        pt_btn = btn.Parent.ClientToScreen(pt_btn)
-        menu.SetOwnerHeight(sz_btn.y)
-        if menu.Size.width < sz_btn.width:
-            menu.Size = sz_btn.width, menu.Size.height
-        menu.Popup((pt_btn), self)
 
 
     def on_showhide_log(self, event):

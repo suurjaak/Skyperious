@@ -544,6 +544,23 @@ ButtonCompare = PyEmbeddedImage(
 )
 
 
+"""Small icon for delete database button on start page."""
+ButtonDelete = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+    "ZSBJbWFnZVJlYWR5ccllPAAAAhFJREFUeNpi/P//PwMlgImBQsACY6xiZPQAUi1Q7vF/DAy5"
+    "v4GMH1BFbBBam5GBIRjINALibWH//8+CGwBU3BJRUmL84/v3/zdPn5a8fuqUJdBzJjB5ILuT"
+    "gY3N7fevX++AhvQChbaDxBlhYbCAkTENyErTNjeXVNTWlvr57dvvM/v23Xn96lUsPx9fjqiU"
+    "lN2DGzeuAzVnszIwPATSDFFAvXAD5jMyMvxiYDAGOj0cyHUyd3RU4hEQ4L937dozdg4OhhsX"
+    "L54DOjcdqPkFK8hmHAaA/fwXaBBQwUw9Q0N1BiYm9tvXrt36/v27DiPEK2AgDjUAHgaPENEi"
+    "ChSsVZKSkv7x8SPbradPbwjy8vJ/+/Pn0pffv/VAlvwB4lfo0fgDEpAgyRoFUVFTMWZmsWtP"
+    "n97++PPnxPtv3pxlZ2XlAspt+4crHYAMAJqeLsHL663GxCT15NOnF29//lwIdPJcoMagR9++"
+    "beVhYZEHstt+Q9SiGgD0t/xPBoZUaw4O+e+/fn098/HjeSB/zieg3D+Iy/Kf/PmzFmiREVCz"
+    "I4YBQMW5hlxckjx//7Js/fTpPpBfD1T0HqYQakgd0IAzQDmPH9BEiGyAgw07u+SlX7/ePv/7"
+    "dwdQ49nvQPHvEDm4IUCX1gD5r4De0ENJSNHApPwfkpTfMgPDAhhlD5BSIQNa4CkCxSSW/f9/"
+    "nHHAcyNAgAEAxF3igbzwV7kAAAAASUVORK5CYII="
+)
+
+
 """Large icon for detect databases button on start page."""
 ButtonDetect = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAACIpJ"
@@ -808,36 +825,6 @@ ButtonOpenA = PyEmbeddedImage(
     "NlhiGHJhdyCHADSLa556O/ytGMSqAUCvjnUZ+xhDvR90YciCJtmwCxkAZQAxrHiYuBlUZruf"
     "iP7zJvxtpxj5vqmhhhucSh6nBcNiTqmkvQxizSOj8VlBm3P7woNizm0Hezxc3gjwAdDiW3xM"
     "O2EIUAMbwLH/g/qfxdfI9P0zcP/UhwAAAABJRU5ErkJggg=="
-)
-
-
-"""Small icon for remove database button on start page."""
-ButtonRemove = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
-    "ZSBJbWFnZVJlYWR5ccllPAAAAhFJREFUeNpi/P//PwMlgImBQsACY6xiZPQAUi1Q7vF/DAy5"
-    "v4GMH1BFbBBam5GBIRjINALibWH//8+CGwBU3BJRUmL84/v3/zdPn5a8fuqUJdBzJjB5ILuT"
-    "gY3N7fevX++AhvQChbaDxBlhYbCAkTENyErTNjeXVNTWlvr57dvvM/v23Xn96lUsPx9fjqiU"
-    "lN2DGzeuAzVnszIwPATSDFFAvXAD5jMyMvxiYDAGOj0cyHUyd3RU4hEQ4L937dozdg4OhhsX"
-    "L54DOjcdqPkFK8hmHAaA/fwXaBBQwUw9Q0N1BiYm9tvXrt36/v27DiPEK2AgDjUAHgaPENEi"
-    "ChSsVZKSkv7x8SPbradPbwjy8vJ/+/Pn0pffv/VAlvwB4lfo0fgDEpAgyRoFUVFTMWZmsWtP"
-    "n97++PPnxPtv3pxlZ2XlAspt+4crHYAMAJqeLsHL663GxCT15NOnF29//lwIdPJcoMagR9++"
-    "beVhYZEHstt+Q9SiGgD0t/xPBoZUaw4O+e+/fn098/HjeSB/zieg3D+Iy/Kf/PmzFmiREVCz"
-    "I4YBQMW5hlxckjx//7Js/fTpPpBfD1T0HqYQakgd0IAzQDmPH9BEiGyAgw07u+SlX7/ePv/7"
-    "dwdQ49nvQPHvEDm4IUCX1gD5r4De0ENJSNHApPwfkpTfMgPDAhhlD5BSIQNa4CkCxSSW/f9/"
-    "nHHAcyNAgAEAxF3igbzwV7kAAAAASUVORK5CYII="
-)
-
-
-"""Small icon for remove missing button on start page."""
-ButtonRemoveMissing = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAUFJ"
-    "REFUOI2lkt8qhFEUxX9r7z0mkijlAqUMKbnwPN7CO0yY8BbeyBQayh0Xahokme/bLpiPD6Vh"
-    "1en822vtdfbZ2jtoH0ns8gdkcsx+p51lWf5p7HfaGW9KSbfbHSt7q9UCIAAkVQfjonJweX1e"
-    "v4gG4Y574B5EBGGORwP3oNlofgiMsLiwXK0lvc2IJBklAnCzuoMaBFdz8wCsD/pczMwCsDbo"
-    "k2WSWWKfBOwr3+SsD/oAFXnj4R43w8yQrCZQc2AmJNUCAMKdMhOUIJCsek4tUjJMxtn0DABb"
-    "z88AnE5OYWaYCUOY/+BglFUSm0+PyBwzsT0cUiZkFmSRyITLKCjqApJxe3dDeBCjr3PH42Pv"
-    "HjQmJtBPNVhZWv1az+9IGL4UDF+K7wK9Xu93gU/4dys3m++dmHDSOdzbGYv9jkyOXwHmFJKW"
-    "bHJGnQAAAABJRU5ErkJggg=="
 )
 
 
