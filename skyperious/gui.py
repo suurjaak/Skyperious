@@ -957,9 +957,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
 
     def populate_database_list(self):
-        """
-        Inserts all databases into the list, updates UI buttons.
-        """
+        """Inserts all databases into the list, updates UI buttons."""
         if not self: return
         items, selected_files = [], []
         for filename in conf.DBFiles:
@@ -2225,8 +2223,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.Bind(wx.EVT_LIST_DELETE_ALL_ITEMS,
                           self.on_clear_searchall, page.edit_searchall)
         if page:
-            for i in range(0, self.list_db.GetItemCount()):
-                self.list_db.Select(i, (self.list_db.GetItemText(i) == filename))
+            idx0 = self.list_db.GetFirstSelected()
+            idx  = self.list_db.FindItem(0, filename)
+            if idx0 and idx0 != idx: self.list_db.Select(idx0, False)
+            if idx and idx != idx0:
+                self.list_db.Select(idx, True)
+                self.list_db.EnsureVisible(idx)
             for i in range(self.notebook.GetPageCount()):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)
