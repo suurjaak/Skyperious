@@ -1347,7 +1347,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 guibase.status(errormsg_short or errormsg, log=True)
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
             if db and not db.has_consumers():
-                del self.dbs[db.filename]
+                self.dbs.pop(db.filename, None)
                 db.close()
             if db and not error:
                 util.start_file(files[0] if do_singlefile else export_dir)
@@ -1869,8 +1869,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             logger.exception("Error loading data from %s.", filename)
         if db and not db.has_consumers():
             db.close()
-            if filename in self.dbs:
-                del self.dbs[filename]
+            self.dbs.pop(filename, None)
 
 
     def update_database_detail(self):
@@ -2097,8 +2096,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for db in page_dbs:
             db.unregister_consumer(page)
             if not db.has_consumers():
-                if db.filename in self.dbs:
-                    del self.dbs[db.filename]
+                self.dbs.pop(db.filename, None)
                 db.close()
                 logger.info("Closed database %s.", db.filename)
         # Remove any dangling references
@@ -2158,8 +2156,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def load_database(self, filename, db=None):
         """
-        Tries to load the specified database, if not already open, and returns
-        it.
+        Tries to load the specified database, if not already open,
+        and returns it.
         """
         db0 = self.dbs.get(filename)
         if db0: db = db0
@@ -2187,9 +2185,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         "Not a valid SQLITE database?" % filename,
                         conf.Title, wx.OK | wx.ICON_WARNING)
             if db:
-                logger.info("Opened %s (%s).", db, util.format_bytes(
-                            db.filesize))
-                guibase.status("Reading database file %s.", db)
+                if not db0:
+                    logger.info("Opened %s (%s).", db, util.format_bytes(
+                                db.filesize))
+                    guibase.status("Reading database file %s.", db)
                 self.dbs[filename] = db
                 # Add filename to Recent Files menu and conf, if needed
                 if filename in conf.RecentFiles: # Remove earlier position
@@ -2210,10 +2209,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         @return  database page instance
         """
-        db = None
-        page = None
-        if filename in self.dbs:
-            db = self.dbs[filename]
+        page, db = None, self.dbs.get(filename)
         if db and db in self.db_pages.values():
             page = next((x for x in self.db_pages if x and x.db == db), None)
         if not page:
