@@ -6908,7 +6908,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
 
         pos = self._stc.PositionFromPoint(event.Position)
-        msg_id = msg = None
+        msg_id = msg = msg_idx = None
         pos_msgs = sorted((v, k) for k, v in self._message_positions.items())
         for i, (m_pos, m_id) in enumerate(pos_msgs):
             if m_pos[0] <= pos <= m_pos[1]:
@@ -6921,9 +6921,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 break
         if not msg_id and pos_msgs and pos_msgs[-1][0][-1] < pos:
             msg_id = pos_msgs[-1][1]
-        if msg_id:
-            msg = next((m for m in self._messages_current or []
-                        if msg_id == m["id"]), None)
+        if msg_id: msg_idx, msg = next(((i, m)
+            for i, m in enumerate(self._messages_current or [])
+            if msg_id == m["id"]), None
+        )
         menu = wx.Menu()
         item_selection = wx.MenuItem(menu, -1, "&Copy selection")
         menu.Append(item_selection)
@@ -6947,17 +6948,27 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             menu.Append(item_link)
             menu.Bind(wx.EVT_MENU, on_copyurl, id=item_link.GetId())
         else:
+            opts = dict(current=msg_idx, author=(msg or {}).get("author"))
             def on_copymsg(event):
                 t = step.Template(templates.MESSAGE_CLIPBOARD)
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
+            def on_gotomsg(direction):
+                return lambda e: self.NextFromAuthor(direction=direction, **opts)
             def on_selectall(event): self._stc.SelectAll()
                 
-            item_msg = wx.MenuItem(menu, -1, "C&opy message")
+            item_msg = wx.MenuItem(menu, -1, "Copy &message")
             item_select = wx.MenuItem(menu, -1, "&Select all")
             menu.Append(item_msg), menu.Append(item_select)
-            item_msg.Enable(bool(msg))
-            menu.Bind(wx.EVT_MENU, on_copymsg, id=item_msg.GetId())
-            menu.Bind(wx.EVT_MENU, on_selectall, id=item_select.GetId())
+
+            menu.AppendSeparator()
+            item_prev = wx.MenuItem(menu, -1, "&Previous from same author")
+            item_next = wx.MenuItem(menu, -1, "&Next from same author")
+            menu.Append(item_prev), menu.Append(item_next)
+
+            item_msg.Enabled = item_prev.Enabled = item_next.Enabled = (bool(msg))
+            menu.Bind(wx.EVT_MENU, on_copymsg,     id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_gotomsg(-1), id=item_prev.GetId())
+            menu.Bind(wx.EVT_MENU, on_gotomsg(+1), id=item_next.GetId())
         self.PopupMenu(menu)
 
 
@@ -7398,6 +7409,27 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             messages_current[-1]["datetime"].date() if messages_current else None
         ]
         self.RefreshMessages(center_message_id)
+
+
+    def NextFromAuthor(self, author, current, direction=+1):
+        """
+        Scrolls to message matching specified criteria, if any.
+
+        @param   author     skypename of author to find
+        @param   current    message index in current content to start from
+        @param   direction  positive for forwards, negative for backwards
+        """
+        step = -1 if direction < 0 else +1
+        idx, mm = current + step, self._messages_current
+        msg = mm[idx] if 0 <= idx < len(mm) else None
+        while msg:
+            if msg["author"] == author:
+                return self.FocusMessage(msg["id"])
+            idx += step
+            msg = mm[idx] if 0 <= idx < len(mm) else None
+        label = "previous" if direction < 0 else "next"
+        name = self._db.get_author_name({"author": author})
+        guibase.status("No %s message from %s found in current list.", label, name)
 
 
     def FocusMessage(self, message_id, do_select=True):
