@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    30.07.2020
+@modified    12.08.2020
 """
 import datetime
 import logging
@@ -47,9 +47,8 @@ def status(text="", *args, **kwargs):
                     by default after conf.StatusFlashLength if not given seconds
     @param   log    whether to log the message to main window
     """
-    log, flash = (kwargs.get(x) for x in ("log", "flash"))
     window = wx and wx.GetApp() and wx.GetApp().GetTopWindow()
-    if not window and not log: return
+    if not window and not kwargs.get("log"): return
 
     try: msg = text % args if args else text
     except Exception:
@@ -58,8 +57,8 @@ def status(text="", *args, **kwargs):
             msg = text % args if args else text
         except Exception: msg = text
     msg = re.sub("[\n\r\t]+", " ", msg)
-    if log: logger.info(msg)
-    try: window and window.set_status(msg, timeout=flash)
+    if kwargs.get("log"): logger.info(msg)
+    try: window.set_status(msg, timeout=kwargs.get("flash", True))
     except Exception: pass
 
 
