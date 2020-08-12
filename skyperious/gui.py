@@ -1668,7 +1668,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 skype.db.tables_list = None # Force reload
                 skype.db.update_accountinfo()
             except Exception:
+                util.try_until(lambda: skype.db.close())
+                util.try_until(lambda: os.unlink(filename))
                 logger.exception("Error saving account %r.", skype.skype.user)
+                raise
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
