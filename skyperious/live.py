@@ -64,7 +64,7 @@ class SkypeLogin(object):
         """
         self.db           = db   # SQLite database populated with live data
         self.progress     = progress
-        self.username     = db.id if db else None
+        self.username     = db.username if db else None
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
@@ -87,8 +87,8 @@ class SkypeLogin(object):
         @param   token    whether to use existing tokenfile instead of password
         @param   init_db  whether to create and open Skype database after login
         """
-        if self.db and self.db.id and not self.username: self.username = self.db.id
-        if username and (not self.db or not self.db.id): self.username = username
+        if self.db and self.db.username: self.username = self.db.username
+        if username and not self.username: self.username = username
         path = util.safe_filename(self.username)
         if path != self.username: path += "_%x" % hash(self.username)
         path = self.tokenpath = os.path.join(conf.VarDirectory, "%s.token" % path)
@@ -182,11 +182,12 @@ class SkypeLogin(object):
         Saves the item to SQLite table. Returns true if item with the same 
         content already existed.
 
-        @return   one of SkypeLogin.SAVE
+        @param    parent  chat for messages
+        @return           one of SkypeLogin.SAVE
         """
-        dbitem, table = self.convert(table, item, parent=parent), table.lower()
+        dbitem = self.convert(table, item, parent=parent)
         if dbitem is None: return self.SAVE.SKIP
-        result, dbitem1 = None, dict(dbitem)
+        result, dbitem1, table = None, dict(dbitem), table.lower()
 
         identity = dbitem["skypename"] if table in ("accounts", "contacts") else \
                    dbitem["identity"]  if "chats" == table else dbitem.get("pk_id")
@@ -406,6 +407,8 @@ class SkypeLogin(object):
         if "accounts" == table:
             if item.mood:
                 result.update(mood_text=unicode(item.mood))
+            if re.match(".+@.+", self.username or ""):
+                result.update(liveid_membername=self.username)
 
         elif "chats" == table:
 

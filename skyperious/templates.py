@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    03.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1012,7 +1012,7 @@ dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.account["skypename"]}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
+        <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.username}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
 %if f["filepath"]:
           <a href="{{util.path_to_url(f["filepath"])}}" target="_blank" class="filename">{{f["filepath"]}}</a>
 %else:

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -86,41 +86,42 @@ CHATMSG_TYPE_PICTURE       = 15 # Changed chat picture (type 2)
 CHATMSG_TYPE_SPECIAL2      = 18 # Calls/contacts/transfers (type 30, 39, 51, 68)
 TRANSFER_TYPE_OUTBOUND     =  1 # Transfer sent by partner_handle
 TRANSFER_TYPE_INBOUND      =  2 # Transfer sent to partner_handle
-CONTACT_FIELD_TITLES = {
-    "displayname" : "Display name",
-    "skypename"   : "Skype Name",
-    "province"    : "State/Province",
-    "city"        : "City",
-    "pstnnumber"  : "Phone",
-    "phone_home"  : "Home phone",
-    "phone_office": "Office phone",
-    "phone_mobile": "Mobile phone",
-    "homepage"    : "Website",
-    "emails"      : "Emails",
-    "about"       : "About me",
-    "mood_text"   : "Mood",
-    "country"     : "Country/Region",
-}
-ACCOUNT_FIELD_TITLES = {
-    "fullname"           : "Full name",
-    "given_displayname"  : "Given display name",
-    "skypename"          : "Skype name",
-    "mood_text"          : "Mood",
-    "phone_mobile"       : "Mobile phone",
-    "phone_home"         : "Home phone",
-    "phone_office"       : "Office phone",
-    "emails"             : "E-mails",
-    "country"            : "Country",
-    "province"           : "Province",
-    "city"               : "City",
-    "homepage"           : "Website",
-    "gender"             : "Gender",
-    "birthday"           : "Birth date",
-    "languages"          : "Languages",
-    "nrof_authed_buddies": "Contacts",
-    "about"              : "About me",
-    "skypeout_balance"   : "SkypeOut balance",
-}
+CONTACT_FIELD_TITLES = collections.OrderedDict([
+    ("displayname",  "Display name"),
+    ("skypename",    "Skype Name"),
+    ("province",     "State/Province"),
+    ("city",         "City"),
+    ("pstnnumber",   "Phone"),
+    ("phone_home",   "Home phone"),
+    ("phone_office", "Office phone"),
+    ("phone_mobile", "Mobile phone"),
+    ("homepage",     "Website"),
+    ("emails",       "Emails"),
+    ("about",        "About me"),
+    ("mood_text",    "Mood"),
+    ("country",      "Country/Region"),
+])
+ACCOUNT_FIELD_TITLES = collections.OrderedDict([
+    ("fullname",            "Full name"),
+    ("given_displayname",   "Given display name"),
+    ("skypename",           "Skype name"),
+    ("liveid_membername",   "Skype name alias"),
+    ("mood_text",           "Mood"),
+    ("phone_mobile",        "Mobile phone"),
+    ("phone_home",          "Home phone"),
+    ("phone_office",        "Office phone"),
+    ("emails",              "E-mails"),
+    ("country",             "Country"),
+    ("province",            "Province"),
+    ("city",                "City"),
+    ("homepage",            "Website"),
+    ("gender",              "Gender"),
+    ("birthday",            "Birth date"),
+    ("languages",           "Languages"),
+    ("nrof_authed_buddies", "Contacts"),
+    ("about",               "About me"),
+    ("skypeout_balance",    "SkypeOut balance"),
+])
 AUTHORS_SPECIAL = ["sys"] # Used by Skype for system messages
 
 logger = logging.getLogger(__name__)
@@ -176,6 +177,7 @@ class SkypeDatabase(object):
         self.consumers = set() # Registered objects using this database
         self.account = None    # Row from table Accounts
         self.id = None   # Accounts.skypename
+        self.username = None   # Accounts.liveid_membername or Accounts.skypename
         self.tables = {} # {"name": {"Name":str, "rows": 0, "columns": []}, }
         self.tables_list = None # Ordered list of table items
         self.table_rows = {}    # {"tablename1": [..], }
@@ -207,7 +209,7 @@ class SkypeDatabase(object):
     def make_title_col(self, table="conversations", alias=None):
         """Returns SQL expression for selecting chat/contact/account title."""
         PREFS = ["given_displayname", "fullname", "displayname", "meta_topic",
-                 "skypename", "pstnnumber", "identity"]
+                 "liveid_membername", "skypename", "pstnnumber", "identity"]
         DEFS = {"chats": "identity", "accounts": "skypename", "contacts": "skypename"}
         cols = self.get_table_columns(table)
         colnames = [x["name"].lower() for x in cols]
@@ -287,6 +289,7 @@ class SkypeDatabase(object):
             self.account = self.execute("SELECT *, %s AS name, "
                 "skypename AS identity FROM accounts LIMIT 1" % titlecol).fetchone()
             self.id = self.account["skypename"]
+            self.username = self.account.get("liveid_membername") or self.id
             tdata = next((x for x in self.tables_list
                           if "accounts" == x["name"].lower()), None)
             if tdata and not tdata.get("rows"): tdata["rows"] = 1
@@ -426,7 +429,7 @@ class SkypeDatabase(object):
         result = collections.defaultdict(str)
         if self.account:
             result.update({"name": self.account.get("name"),
-                           "skypename": self.account.get("skypename")})
+                           "skypename": self.id, "username": self.username})
         COUNTS = ["Conversations", "Messages", "Contacts"]
         if full: COUNTS += ["Transfers"]
         for table in COUNTS:
@@ -667,7 +670,8 @@ class SkypeDatabase(object):
             for chat in rows:
                 chat["participants"] = participants.get(chat["id"], [])
                 if authornames:
-                    fs = "given_displayname fullname displayname skypename pstnnumber".split()
+                    fs = "given_displayname fullname displayname " \
+                         "liveid_membername skypename pstnnumber".split()
                     vals = [p["contact"].get(field, None) for field in fs
                             for p in chat["participants"]]
                     match = any(re.search(name, value, re.I | re.U)
@@ -1284,8 +1288,13 @@ class SkypeDatabase(object):
             logger.info("Inserting account \"%s\" into %s.",
                         account["skypename"], self.filename)
             self.ensure_backup()
+            account = dict(account)
+            if not account.get("liveid_membername") \
+            and re.match(".+@.+", account.get("skypename") or ""):
+                account = dict(account, liveid_membername=account["skypename"])
             col_data = self.get_table_columns("accounts")
-            fields = [col["name"] for col in col_data if col["name"] != "id"]
+            fields = [col["name"] for col in col_data
+                      if col["name"] != "id" and col["name"] in account]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
 
@@ -1299,6 +1308,7 @@ class SkypeDatabase(object):
             self.last_modified = datetime.datetime.now()
             self.account = a_filled
             self.id = a_filled["skypename"]
+            self.username = a_filled.get("liveid_membername") or self.id
 
 
     def insert_contacts(self, contacts, source_db):

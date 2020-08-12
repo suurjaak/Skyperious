@@ -1607,7 +1607,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             with open(filename, "wb"): pass
             db = skypedata.SkypeDatabase(filename, log_error=False)
             for table in db.CREATE_STATEMENTS: db.create_table(table)
-            db.insert_row("accounts", {"skypename": user})
+            db.insert_account({"skypename": user})
             db.tables_list = None # Force reload
             db.update_accountinfo()
         except Exception:
@@ -1863,8 +1863,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return
         try:
             stats = db.get_general_statistics(full=False)
-            if "name" in stats and "skypename" in stats:
-                self.label_account.Value = "%(name)s (%(skypename)s)" % stats
+            if "name" in stats and "username" in stats:
+                self.label_account.Value = "%(name)s (%(username)s)" % stats
             text = "%(chats)s" % stats
             if stats.get("lastmessage_chat"):
                 text += ", latest %(lastmessage_chat)s" % stats
@@ -2481,7 +2481,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
 
         button_rename = self.button_rename = \
-            wx.Button(parent=panel_stc1, label="Re&name")
+            wx.Button(parent=panel_stc1, label="Re&name..")
         button_export = self.button_export_chat = \
             wx.Button(parent=panel_stc1, label="&Export messages to file")
         button_rename.SetToolTip(
@@ -2988,7 +2988,7 @@ class DatabasePage(wx.Panel):
         check_store  = self.check_login_store = wx.CheckBox(panel1, label="&Remember password")
         check_auto   = self.check_login_auto  = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
         edit_status  = self.edit_login_status = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
-        button_login = self.button_login      = controls.NoteButton(panel1, label="&Log in as '%s'" % self.db.id, bmp=images.ButtonLogin.Bitmap)
+        button_login = self.button_login      = controls.NoteButton(panel1, label="&Log in as '%s'" % self.db.username, bmp=images.ButtonLogin.Bitmap)
 
         label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
         list_chats = self.list_chats_sync = controls.SortableListView(
@@ -3119,7 +3119,7 @@ class DatabasePage(wx.Panel):
     def update_liveinfo(self):
         """Refreshes account settings in login-page from configuration."""
         opts = conf.Login.get(self.db.filename) or {}
-        self.edit_user.Value = self.db.id if self.db.id else ""
+        self.edit_user.Value = self.db.username if self.db.username else ""
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
@@ -3351,11 +3351,11 @@ class DatabasePage(wx.Panel):
                 for c in self.panel_login.Children:
                     if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Enable()
                 if "error" in result:
-                    logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.id, result["error"])
+                    logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
                     self.button_login.Enable() 
                 else:
-                    self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.id
+                    self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
                     self.button_login.Disable() 
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
@@ -3437,13 +3437,7 @@ class DatabasePage(wx.Panel):
         for x in sizer.Children: ctrls.append(x.Window), sizer.Remove(0)
         for x in ctrls: x.Destroy()
 
-        fields = ["fullname", "given_displayname", "skypename", "mood_text",
-                  "phone_mobile", "phone_home", "phone_office", "emails",
-                  "country", "province", "city", "homepage", "gender",
-                  "birthday", "languages", "nrof_authed_buddies", "about",
-                  "skypeout_balance", ]
-
-        for field in fields:
+        for field in skypedata.ACCOUNT_FIELD_TITLES:
             if not account.get(field): continue # for field
             value = account[field]
             if "emails" == field:

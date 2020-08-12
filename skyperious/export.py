@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    01.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -120,7 +120,7 @@ def export_chats(chats, path, format, db, messages=None, timerange=None, skip=Tr
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared images
-            try: db.live.login(db.id, conf.Login[db.filename]["password"])
+            try: db.live.login(password=conf.Login[db.filename]["password"])
             except Exception: pass
 
         for chat in chats:

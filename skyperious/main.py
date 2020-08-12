@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -435,14 +435,14 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         if not file_existed:
             with open(filepath, "w"): pass
         db = skypedata.SkypeDatabase(filepath)
-        username = db.id or username
+        username = db.username or username
         password = password0 or passwords.get(username)
 
         prompt = "%s does not contain account information, enter Skype username: " % filename
         while not username:
             output(prompt, end="")
             username = raw_input().strip()
-            if username: break # while not db.id
+            if username: break # while not username
 
         if not password and not ask_password \
         and conf.Login.get(filepath, {}).get("password"):
@@ -491,18 +491,18 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date, 
 
     for db in dbs:
 
-        if (ask_password and db.id and conf.SharedImageAutoDownload
+        if (ask_password and db.username and conf.SharedImageAutoDownload
         and format.lower().endswith("html")):
-            password, prompt = "", "Enter Skype password for '%s': " % db.id
+            password, prompt = "", "Enter Skype password for '%s': " % db.username
             while not db.live.is_logged_in():
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore") # possible GetPassWarning
                     while not password:
                         output(prompt, end="") # getpass output can raise errors
                         password = getpass.getpass("", io.BytesIO()).strip()
-                        prompt = "Enter Skype password for '%s': " % db.id
+                        prompt = "Enter Skype password for '%s': " % db.username
 
-                try: db.live.login(db.id, password)
+                try: db.live.login(password=password)
                 except Exception as e:
                     prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
 
