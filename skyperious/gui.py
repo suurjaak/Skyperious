@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -314,7 +314,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             ("button_new", "Create a &new Skype database", images.ButtonNew,
              "Create a blank database%s." % newextra),
             ("button_clear", "&Remove..", images.ButtonClear,
-             "Remove databases from list by option."), ]
+             "Select category to remove from database list."), ]
         for name, label, img, note in BUTTONS_MAIN:
             button = controls.NoteButton(panel_main, label, note, img.Bitmap)
             setattr(self, name, button)
@@ -979,13 +979,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if self.list_db.GetItemText(i) in selected_files:
                     if idx < 0: idx = i
                     self.list_db.Select(i)
-                    self.list_db.SetFocus()
-
-            if idx >= self.list_db.GetCountPerPage():
-                lh = self.list_db.GetUserLineHeight()
-                dy = (idx - self.list_db.GetCountPerPage() / 2) * lh
-                self.list_db.ScrollList(0, dy)
-                self.list_db.Update()
+            self.list_db.EnsureVisible(idx)
+            self.list_db.SetFocus()
         else:
             self.list_db.Select(0)
 
@@ -1170,8 +1165,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def remove_databases(self, filenames):
         """Removes given file from database list and all data structures."""
         for filename in filenames:
-            idx = self.list_db.FindItem(0, filename)
-            if idx: self.list_db.DeleteItem(idx)
+            idx = self.list_db.FindItem(filename)
+            if idx > 0: self.list_db.DeleteItem(idx)
             for lst in conf.DBFiles, conf.RecentFiles, conf.LastSelectedFiles:
                 if filename in lst: lst.remove(filename)
             for dct in conf.LastSearchResults, self.db_filenames:
@@ -1922,8 +1917,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.label_chats.Value = data["chats"]
                 self.label_messages.Value = data["messages"]
             else:
-                idx = self.list_db.FindItem(0, filename)
-                if idx: self.list_db.RefreshRow(idx)
+                idx = self.list_db.FindItem(filename)
+                if idx > 0: self.list_db.RefreshRow(idx)
                 wx.CallLater(10, self.update_database_stats, filename)
         else:
             self.label_size.Value = "File does not exist."
@@ -2252,7 +2247,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                           self.on_clear_searchall, page.edit_searchall)
         if page:
             idx0 = self.list_db.GetFirstSelected()
-            idx  = self.list_db.FindItem(0, filename)
+            idx  = self.list_db.FindItem(filename)
             if idx0 >= 0 and idx0 != idx: self.list_db.Select(idx0, False)
             if idx > 0 and idx != idx0:
                 self.list_db.Select(idx, True)
