@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    10.08.2020
+@modified    12.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -389,6 +389,13 @@ class SkypeLogin(object):
                     result.update(phone_office=phone.number)
                 elif skpy.SkypeContact.Phone.Type.Home == phone.type:
                     result.update(phone_home=phone.number)
+            if item.raw.get("homepage"):
+                result.update(homepage=item.raw["homepage"])
+            if item.raw.get("gender"):
+                try: result.update(gender=int(item.raw["gender"]))
+                except Exception: pass
+            if item.raw.get("emails"):
+                result.update(emails=" ".join(item.raw["emails"]))
 
             if item.avatar and "?" in item.avatar:
                 # https://avatar.skype.com/v1/avatars/username/public?auth_key=1455825688

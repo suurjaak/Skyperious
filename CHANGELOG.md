@@ -2,10 +2,11 @@ CHANGELOG
 =========
 
 
-4.2, 2020-08-10
+4.2, 2020-08-12
 ---------------
 - added option to create a blank Skype database;
-- added option to create a database from Skype export.
+- added option to create a database from Skype export;
+- import account/contact gender, homepage and e-mails from live sync.
 
 
 4.1, 2020-08-03
