@@ -114,6 +114,8 @@ IMAGES = {
         "Toolbar icon for delete button in database table grids.",
     "ToolbarFilter.png":
         "Toolbar icon for filter chat button in chat page.",
+    "ToolbarTimeline.png":
+        "Toolbar icon for timeline button in chat page.",
     "ToolbarInsert.png":
         "Toolbar icon for insert button in database table grids.",
     "ToolbarMaximize.png":
@@ -137,7 +139,8 @@ IMAGES = {
     "TransparentPixel.gif":
         "Transparent 1x1 GIF.",
 }
-HEADER = """%s
+HEADER = """# -*- coding: utf-8 -*-
+%s
 Contains embedded image and icon resources for Skyperious. Auto-generated.
 
 ------------------------------------------------------------------------------

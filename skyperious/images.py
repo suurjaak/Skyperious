@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Contains embedded image and icon resources for Skyperious. Auto-generated.
 
@@ -7,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    11.08.2020
+@modified    13.08.2020
 ------------------------------------------------------------------------------
 """
 try:
@@ -2365,6 +2366,27 @@ ToolbarTabs = PyEmbeddedImage(
     "KMprVVUsz3OuYGBJluU33D7+d65gYEmSpPeiKFgURVzBwJIoikaapiwMQ65gYEkQBBOfv9vt"
     "uIKBpeVy+ZFlGYvjmCsYWJrP54+LxeLzP8HSeGZjN2O3nMHMvgFTmvUJKTInOAAAAABJRU5E"
     "rkJggg=="
+)
+
+
+"""Toolbar icon for timeline button in chat page."""
+ToolbarTimeline = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+    "ZSBJbWFnZVJlYWR5ccllPAAAAtpJREFUeNqkk29IE3EYx5/bflO33d1uc3bbbaUtJNPK3BqR"
+    "yrQhRGkJBYmgvgojLPKFEBX1KqIC39dbDQQJRJLQVxKGiANDTJmRkrS1yDnb3f7c/t31u2Vj"
+    "+aYX/eDD3T2/3/O95/nePYQsy/A/CxGdOoDL2t9PGkKJgE6rO2Q32m6ymwbGsKrd0H5FEbwb"
+    "xQTwC9cwQi6XA0mSABWS91YZKr1abz8xXLNbLQ803gBrZ4VViYe2t0OLCwu+xbm5WSEancUh"
+    "vxJX/yWgIi45axpeUAJleXTsnumg2cKsrawgzmZDDEUxtsrKOkdtbf3G+roQj8XCuJKwCnLY"
+    "AwUJODNlemjQ0qwTnVJbSXNec8nnK+jTWi0YTSZ7T3//AEnTbViAVkEsB5DBAmnpitVmrY4E"
+    "duCM2YWLIfJJoigWFYj9KSkBkmHsjS0trdiH4yoQJYA4FklJTSWMhkxFkkCCEbbC4Tx+v79w"
+    "r8Ank3nzGtxudzabrUIgw0vIyi4MiGUpJPFZGHx3C9xWJwyfewaCIECl2VyoIouTg5EIGBiG"
+    "xQJGBGl5AiTZVXX9qCsOcYDzAIY3pdB++AJcbGsDr9cLvV1dQFFUHpIkwdnUBGebmwELqBBO"
+    "noafWfjy/OPjA0MOV/moFu633wVvVSu4xk9CT3c3vBobK1Sg/HbRdBoSPP8DC0QR97kCIClN"
+    "YyPZ1NPdJ7evPeA8R1rzhw0mUz5ZuRa3IOK25mdmljOZzBayfCr/szdpTJsspy3OOzlJsiKV"
+    "qiBSvBQDVaIYej0+/h5/hWU1y7KgzANGFHg+9sHnkz0ej4OmaWr/nKixKB+JhIYGB0cDgcAE"
+    "QRBbRPEBnU4Her3eyXFcZ29fX2N7R0edhePKlUPfQ6Gdt1NTqyMjI/PBYHAyHo8vJRIJIPYN"
+    "F4VhEUIWjUbjUKvVnNLF3l4Ul/wN972JzdtWNDH8foFSjF6ZqX9McRoTw6R+CTAA9jQ8CY45"
+    "ChEAAAAASUVORK5CYII="
 )
 
 

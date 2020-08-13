@@ -2459,6 +2459,7 @@ class DatabasePage(wx.Panel):
         panel_stc2 = self.panel_stc2 = wx.Panel(parent=splitter_stc)
         sizer_stc1 = panel_stc1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_stc2 = panel_stc2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_stc  = wx.BoxSizer(wx.HORIZONTAL)
 
         sizer_header = wx.BoxSizer(wx.HORIZONTAL)
         label_chat = self.label_chat = wx.StaticText(
@@ -2467,6 +2468,8 @@ class DatabasePage(wx.Panel):
         tb = self.tb_chat = \
             wx.ToolBar(parent=panel_stc1, style=wx.TB_FLAT | wx.TB_NODIVIDER)
         tb.SetToolBitmapSize((24, 24))
+        tb.AddCheckTool(wx.ID_JUMP_TO, "", bitmap1=images.ToolbarTimeline.Bitmap,
+                        shortHelp="Toggle timeline panel  (Alt-P)")
         tb.AddCheckTool(wx.ID_ZOOM_100, "",
                         bitmap1=images.ToolbarMaximize.Bitmap,
                         shortHelp="Maximize chat panel  (Alt-M)")
@@ -2476,6 +2479,7 @@ class DatabasePage(wx.Panel):
         tb.AddCheckTool(wx.ID_MORE, "", bitmap1=images.ToolbarFilter.Bitmap,
                         shortHelp="Toggle filter panel  (Alt-G)")
         tb.Realize()
+        self.Bind(wx.EVT_TOOL, self.on_toggle_timeline, id=wx.ID_JUMP_TO)
         self.Bind(wx.EVT_TOOL, self.on_toggle_maximize, id=wx.ID_ZOOM_100)
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats,    id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
@@ -2498,6 +2502,9 @@ class DatabasePage(wx.Panel):
         sizer_header.Add(button_export, border=5, flag=wx.LEFT |
                          wx.ALIGN_CENTER_VERTICAL)
 
+        timeline = self.list_timeline = ChatContentTimeline(panel_stc1, size=(120, -1))
+        timeline.Hide()
+        self.Bind(wx.EVT_LISTBOX, self.on_select_timeline, timeline)
         stc = self.stc_history = ChatContentSTC(
             parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history")
         stc.SetDatabasePage(self)
@@ -2508,9 +2515,11 @@ class DatabasePage(wx.Panel):
         html_stats.Bind(wx.EVT_SIZE, self.on_size_html_stats)
         html_stats.Hide()
 
+        sizer_stc.Add(timeline, flag=wx.GROW)
+        sizer_stc.Add(stc, proportion=1, flag=wx.GROW)
         sizer_stc1.Add(sizer_header, border=5, flag=wx.GROW | wx.RIGHT |
                        wx.BOTTOM)
-        sizer_stc1.Add(stc, proportion=1, border=5, flag=wx.GROW)
+        sizer_stc1.Add(sizer_stc, proportion=1, border=5, flag=wx.GROW)
         sizer_stc1.Add(html_stats, proportion=1, flag=wx.GROW)
 
         label_filter = \
@@ -3104,6 +3113,7 @@ class DatabasePage(wx.Panel):
             default = step.Template(templates.SEARCH_WELCOME_HTML).expand()
             self.html_searchall.SetDefaultPage(default)
             self.load_tables_data()
+            self.list_timeline.RefreshItems()
             self.populate_chat_statistics()
             util.try_until(lambda: self.grid_table.Table.ClearAttrs())
             util.try_until(lambda: self.grid_sql.Table.ClearAttrs())
@@ -4642,6 +4652,7 @@ class DatabasePage(wx.Panel):
             self.stc_history.SetFilter(self.chat_filter)
             self.stc_history.RefreshMessages()
             self.populate_chat_statistics()
+            self.list_timeline.Populate(self.stc_history.GetMessages())
         finally:
             busy.Close()
         self.tb_chat.EnableTool(wx.ID_MORE, self.chat["message_count"] > 0)
@@ -4722,6 +4733,12 @@ class DatabasePage(wx.Panel):
         self.tb_chat.SetToolShortHelp(wx.ID_ZOOM_100, shorthelp)
 
 
+    def on_toggle_timeline(self, event):
+        """Handler for toggling to show/hide chat timeline."""
+        self.list_timeline.Show(not self.list_timeline.Shown)
+        self.list_timeline.ContainingSizer.Layout()
+
+
     def toggle_filter(self, on):
         """Toggles the chat filter panel on/off."""
         if self.splitter_stc.IsSplit() and not on:
@@ -4734,6 +4751,13 @@ class DatabasePage(wx.Panel):
                                               sashPosition=p)
             list_participants = self.list_participants
             list_participants.SetColumnWidth(0, list_participants.Size.width)
+
+
+    def on_select_timeline(self, event):
+        """Handler for selecting a time in timeline control, focuses message in STC"""
+        msg_id = self.list_timeline.GetMessage(event.Selection)
+        if msg_id is not None:
+            self.stc_history.FocusMessage(msg_id, do_select=False)
 
 
     def show_stats(self, show=True):
@@ -5229,6 +5253,7 @@ class DatabasePage(wx.Panel):
         if busy:
             busy.Close()
         self.panel_chats2.Enabled = True
+        self.list_timeline.Populate(self.stc_history.GetMessages())
         self.populate_chat_statistics()
         if self.html_stats.Shown:
             self.show_stats(True) # To restore scroll position
@@ -6834,6 +6859,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         }
         self.SetWrapMode(True)
         self.SetMarginLeft(10)
+        self.SetMarginWidth(1, 0) # Hide left margin
         self.SetReadOnly(True)
         self.SetStyleSpecs()
 
@@ -7031,6 +7057,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         self.RefreshMessages(), self.ScrollToLine(0)
                         if self._page:
                             self._page.populate_chat_statistics()
+                            self._page.list_timeline.Populate(self.GetMessages())
                     finally:
                         busy.Close()
                 function = filter_range
@@ -8135,6 +8162,99 @@ class SqliteGridBase(wx.grid.GridTableBase):
                 str_value = (rowdata[column_data["name"]] or "").lower()
                 is_unfiltered &= str_value.find(filter_value.lower()) >= 0
         return is_unfiltered
+
+
+
+class ChatContentTimeline(wx.html.SimpleHtmlListBox):
+    """
+    Listbox for showing quick date selection for ChatContentSTC.
+    """
+    ORDINAL_INDICATORS = collections.defaultdict(lambda: "th",
+                         {"01": "st", "02": "nd", "03": "rd"})
+    DATE_FORMATTERS = {
+        "year":  lambda dt: {"label": dt.strftime("%Y")},
+        "month": lambda dt: {"label": dt.strftime("%Y-%m"), "name": dt.strftime("%b")},
+        "day":   lambda dt: {"label": dt.strftime("%Y-%m-%d"), "name": dt.strftime("%a")},
+        "date":  lambda dt: {"label": dt.strftime("%d"),
+                             "ordinal": ChatContentTimeline.ORDINAL_INDICATORS[dt.strftime("%d")]},
+        "hour":  lambda dt: {"label": dt.strftime("%H:00")},
+        "week":  lambda dt: {"label": "week %s" % (
+                 (dt.isocalendar()[1] - dt.replace(day=1).isocalendar()[1] + 1))},
+    }
+    LINE_FORMATS = {
+        "year":  '<font color="%(FgColour)s" size=5>%(label)s</font>',
+        "month": '<font color="%(FgColour)s"><font size=4>&nbsp;%(label)s </font><font size=2>%(name)s</font></font>',
+        "day":   '<font color="%(FgColour)s"><font size=4>%(label)s </font><font size=2>%(name)s</font></font>',
+        "date":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s<sup>%(ordinal)s</sup></font>',
+        "hour":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
+        "week":  '<font color="%(FgColour)s" size=2>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
+    }
+
+
+    def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
+                 size=wx.DefaultSize):
+        super(ChatContentTimeline, self).__init__(parent, id, pos, size)
+        self._items = collections.OrderedDict()
+        self._dates = collections.OrderedDict()
+        self._units  = None
+        ColourManager.Manage(self, "BackgroundColour", "BgColour")
+
+
+    def Populate(self, messages):
+        """Refreshes timeline from message list."""
+        self.Set([])
+        self._dates.clear()
+        if not messages: return
+
+        d1, d2 = messages[0]["datetime"], messages[-1]["datetime"]
+        unit, span = "hour", d2 - d1
+        if   span > datetime.timedelta(days=365*2):  unit = "year"
+        elif span > datetime.timedelta(days= 30*3):  unit = "month"
+        elif span > datetime.timedelta(days=  7*2):  unit = "week"
+        elif span > datetime.timedelta(days=  1*2):  unit = "day"
+
+        if "year" == unit \
+        or "month" == unit and d1.year != d2.year: units = ("year", "month")
+        elif "week" == unit:                       units = ("month", "week")
+        elif "day" == unit:                        units = ("month", "date")
+        elif "hour" == unit:                       units = ("day", "hour")
+        else:                                      units = (unit, )
+
+        self._units = units
+        fmter, labels = self.DATE_FORMATTERS[unit], set()
+        for m in messages:
+            label = str(fmter(m["datetime"]))
+            if label in labels: continue # for m
+            labels.add(label)
+            self._dates.setdefault(m["datetime"], m["id"])
+        self.RefreshItems()
+
+
+    def GetMessage(self, index):
+        """Returns message ID for item at specified index."""
+        idx = self.GetClientData(index)
+        return self._dates.values()[idx]
+
+
+    def RefreshItems(self):
+        """Redraws all current items."""
+        count0, selected0 = self.ItemCount, self.Selection
+        pos0 = self.GetScrollPos(wx.VERTICAL)
+        self.Set([])
+        rootlabels = set()
+        for i, (dt, msg_id) in enumerate(self._dates.items()):
+            for j, unit in enumerate(self._units):
+                datelabel = self.DATE_FORMATTERS[unit](dt)
+                if not j and str(datelabel) in rootlabels: continue # for i, unit
+
+                label = self.LINE_FORMATS[unit] % dict(vars(conf), **datelabel)
+                self.Append(label)
+                self.SetClientData(self.ItemCount - 1, i)
+                if not j: rootlabels.add(str(datelabel))
+        if count0:
+            self.Selection = selected0
+            self.ScrollToRow(pos0)
+        else: self.ScrollToRow(-1)
 
 
 
