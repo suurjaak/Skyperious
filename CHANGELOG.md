@@ -7,6 +7,7 @@ CHANGELOG
 - added option to create a blank Skype database;
 - added option to create a database from Skype export;
 - added option to go to next/previous message from author in chat history;
+- added option to go to next/previous day/week/month in chat history;
 - import account/contact gender, homepage and e-mails from live sync.
 
 

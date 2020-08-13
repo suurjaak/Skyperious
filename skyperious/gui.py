@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.08.2020
+@modified    13.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6952,23 +6952,47 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             def on_copymsg(event):
                 t = step.Template(templates.MESSAGE_CLIPBOARD)
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
-            def on_gotomsg(direction):
+            def on_gotoauthor(direction):
                 return lambda e: self.NextFromAuthor(direction=direction, **opts)
+            def on_gototime(unit, direction):
+                return lambda e: self.NextTime(unit, msg_idx, direction)
             def on_selectall(event): self._stc.SelectAll()
-                
+
             item_msg = wx.MenuItem(menu, -1, "Copy &message")
             item_select = wx.MenuItem(menu, -1, "&Select all")
             menu.Append(item_msg), menu.Append(item_select)
 
-            menu.AppendSeparator()
-            item_prev = wx.MenuItem(menu, -1, "&Previous from same author")
-            item_next = wx.MenuItem(menu, -1, "&Next from same author")
-            menu.Append(item_prev), menu.Append(item_next)
+            menu_goto = wx.Menu()
 
-            item_msg.Enabled = item_prev.Enabled = item_next.Enabled = (bool(msg))
-            menu.Bind(wx.EVT_MENU, on_copymsg,     id=item_msg.GetId())
-            menu.Bind(wx.EVT_MENU, on_gotomsg(-1), id=item_prev.GetId())
-            menu.Bind(wx.EVT_MENU, on_gotomsg(+1), id=item_next.GetId())
+            item_prev = wx.MenuItem(menu_goto, -1, "&Previous from same author")
+            item_next = wx.MenuItem(menu_goto, -1, "&Next from same author")
+            item_prev_day = wx.MenuItem(menu_goto, -1, "Previous &day")
+            item_next_day = wx.MenuItem(menu_goto, -1, "Next d&ay")
+            item_prev_week = wx.MenuItem(menu_goto, -1, "Previous &week")
+            item_next_week = wx.MenuItem(menu_goto, -1, "Next w&eek")
+            item_prev_month = wx.MenuItem(menu_goto, -1, "Previous &month")
+            item_next_month = wx.MenuItem(menu_goto, -1, "Next m&onth")
+
+            item_goto = menu.AppendSubMenu(menu_goto, "&Go to ..")
+            menu_goto.Append(item_prev), menu_goto.Append(item_next)
+            if relativedelta:
+                menu_goto.AppendSeparator()
+                menu_goto.Append(item_prev_day), menu_goto.Append(item_next_day)
+                menu_goto.AppendSeparator()
+                menu_goto.Append(item_prev_week), menu_goto.Append(item_next_week)
+                menu_goto.AppendSeparator()
+                menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
+
+            item_msg.Enabled = item_goto.Enabled = (bool(msg))
+            menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_gotoauthor(-1),        id=item_prev.GetId())
+            menu.Bind(wx.EVT_MENU, on_gotoauthor(+1),        id=item_next.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("day", -1),   id=item_prev_day.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("day", +1),   id=item_next_day.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("week", -1),  id=item_prev_week.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("week", +1),  id=item_next_week.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("month", -1), id=item_prev_month.GetId())
+            menu.Bind(wx.EVT_MENU, on_gototime("month", +1), id=item_next_month.GetId())
         self.PopupMenu(menu)
 
 
@@ -7413,7 +7437,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
     def NextFromAuthor(self, author, current, direction=+1):
         """
-        Scrolls to message matching specified criteria, if any.
+        Scrolls to another message from same author.
 
         @param   author     skypename of author to find
         @param   current    message index in current content to start from
@@ -7430,6 +7454,48 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         label = "previous" if direction < 0 else "next"
         name = self._db.get_author_name({"author": author})
         guibase.status("No %s message from %s found in current list.", label, name)
+
+
+    def NextTime(self, unit, current, direction=+1):
+        """
+        Scrolls to message from next time unit.
+
+        @param   unit       "day" or "week" or "month"
+        @param   current    message index in current content to start from
+        @param   direction  positive for forwards, negative for backwards
+        """
+        step = -1 if direction < 0 else +1
+        idx, mm = current + step, self._messages_current
+        msg0 = mm[current] if 0 <= current < len(mm) else None
+        if not msg0: return
+        if   "month" == unit: delta = step * relativedelta(months=1, day=1)
+        elif "day"   == unit: delta = step * relativedelta(days=1)
+        elif "week"  == unit:
+            kwargs = dict(days=1) if step > 0 else dict(weeks=1)
+            delta = step * relativedelta(weekday=0, **kwargs)
+        else: return
+
+        threshold = msg0["datetime"]
+        threshold = threshold.replace(hour=0, minute=0, second=0, microsecond=0)
+        threshold += delta
+        threshold0 = None
+        msg, prevmsg = mm[idx] if 0 <= idx < len(mm) else None, None
+        while step > 0 and msg:
+            if msg["datetime"] >= threshold: return self.FocusMessage(msg["id"])
+            idx += step
+            msg = mm[idx] if 0 <= idx < len(mm) else None
+        while step < 0 and msg:
+            if msg["datetime"] <= threshold:
+                threshold0 = msg0["datetime"] # Jump to start of previous existing unit
+                threshold0 = threshold0.replace(hour=0, minute=0, second=0, microsecond=0)
+                threshold0 += delta
+            if threshold0 and prevmsg and msg["datetime"] <= threshold0:
+                return self.FocusMessage(prevmsg["id"])
+            prevmsg = msg
+            idx += step
+            msg = mm[idx] if 0 <= idx < len(mm) else None
+        label = "previous" if direction < 0 else "next"
+        guibase.status("No %s %s found in current list.", label, unit)
 
 
     def FocusMessage(self, message_id, do_select=True):
