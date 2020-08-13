@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Simple small script for generating a nicely formatted Python module with
 embedded binary resources and docstrings.
@@ -8,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  11.08.2020
+@modified  13.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
