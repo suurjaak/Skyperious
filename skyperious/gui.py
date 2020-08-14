@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.08.2020
+@modified    14.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2282,6 +2282,7 @@ class DatabasePage(wx.Panel):
         self.db.register_consumer(self)
         self.db_grids = {} # {"tablename": SqliteGridBase, }
         self.memoryfs = memoryfs
+        self.timeline_timer = None # Timeline highlight callback timer
         parent_notebook.InsertPage(1, self, title)
         busy = controls.BusyPanel(self, "Loading \"%s\"." % db.filename)
         self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
@@ -2469,7 +2470,7 @@ class DatabasePage(wx.Panel):
             wx.ToolBar(parent=panel_stc1, style=wx.TB_FLAT | wx.TB_NODIVIDER)
         tb.SetToolBitmapSize((24, 24))
         tb.AddCheckTool(wx.ID_JUMP_TO, "", bitmap1=images.ToolbarTimeline.Bitmap,
-                        shortHelp="Toggle timeline panel  (Alt-P)")
+                        shortHelp="Toggle timeline panel  (Alt-J)")
         tb.AddCheckTool(wx.ID_ZOOM_100, "",
                         bitmap1=images.ToolbarMaximize.Bitmap,
                         shortHelp="Maximize chat panel  (Alt-M)")
@@ -2508,6 +2509,7 @@ class DatabasePage(wx.Panel):
         stc = self.stc_history = ChatContentSTC(
             parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history")
         stc.SetDatabasePage(self)
+        stc.STC.Bind(wx.stc.EVT_STC_UPDATEUI, self.on_scroll_chat_history)
         html_stats = self.html_stats = wx.html.HtmlWindow(parent=panel_stc1)
         html_stats.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                         self.on_click_html_stats)
@@ -4735,8 +4737,12 @@ class DatabasePage(wx.Panel):
 
     def on_toggle_timeline(self, event):
         """Handler for toggling to show/hide chat timeline."""
-        self.list_timeline.Show(not self.list_timeline.Shown)
-        self.list_timeline.ContainingSizer.Layout()
+        self.panel_stc1.Freeze()
+        try:
+            self.list_timeline.Show(not self.list_timeline.Shown)
+            self.list_timeline.ContainingSizer.Layout()
+        finally: self.panel_stc1.Thaw()
+        self.list_timeline.RefreshItems()
 
 
     def toggle_filter(self, on):
@@ -4760,6 +4766,18 @@ class DatabasePage(wx.Panel):
             self.stc_history.FocusMessage(msg_id, do_select=False)
 
 
+    def on_scroll_chat_history(self, event):
+        """Handler for scrolling chat history, updates timeline highlight."""
+        event.Skip()
+        if self.timeline_timer: return
+
+        def do_highlight():
+            if not self: return
+            self.timeline_timer = None
+            self.list_timeline.HighlightRows(self.stc_history.GetVisibleMessages())
+        self.timeline_timer = wx.CallLater(200, do_highlight)
+
+
     def show_stats(self, show=True):
         """Shows or hides the statistics window."""
         html, stc = self.html_stats, self.stc_history
@@ -4767,21 +4785,31 @@ class DatabasePage(wx.Panel):
         focus = False
         for i in [html, stc]:
             focus = focus or (i.Shown and i.FindFocus() == i)
-        if not stc.Shown != show:
-            stc.Show(not show)
-            changed = True
-        if html.Shown != show:
-            html.Show(show)
-            changed = True
-        if changed:
-            stc.ContainingSizer.Layout()
-        if focus: # Switch focus to the other control if previous had focus
-            (html if show else stc).SetFocus()
-        if show:
-            if hasattr(html, "_last_scroll_pos"):
-                html.Scroll(*html._last_scroll_pos)
-            elif html.OpenedAnchor: html.ScrollToAnchor(html.OpenedAnchor)
-        self.tb_chat.ToggleTool(wx.ID_PROPERTIES, show)
+        self.panel_stc1.Freeze()
+        try:
+            if not stc.Shown != show:
+                stc.Show(not show)
+                changed = True
+            if html.Shown != show:
+                html.Show(show)
+                changed = True
+            if changed:
+                if show: self.list_timeline.Hide()
+                elif self.tb_chat.GetToolState(wx.ID_JUMP_TO):
+                    self.list_timeline.Show()
+                self.tb_chat.EnableTool(wx.ID_JUMP_TO, not show)
+                html.ContainingSizer.Layout()
+                stc.ContainingSizer.Layout()
+            if focus: # Switch focus to the other control if previous had focus
+                (html if show else stc).SetFocus()
+            if show:
+                if hasattr(html, "_last_scroll_pos"):
+                    html.Scroll(*html._last_scroll_pos)
+                elif html.OpenedAnchor: html.ScrollToAnchor(html.OpenedAnchor)
+            else:
+                self.list_timeline.RefreshItems()
+            self.tb_chat.ToggleTool(wx.ID_PROPERTIES, show)
+        finally: self.panel_stc1.Thaw()
 
 
     def on_button_reset_grid(self, event):
@@ -6125,10 +6153,9 @@ class MergerPage(wx.Panel):
         """
         Handler for changing text in chat filter box, filters contact lists.
         """
-        lst = self.list_contacts
-        lst.SetFilter(event.String.strip())
-        self.button_merge_contacts.Enabled = lst.SelectedItemCount
-        self.button_merge_allcontacts.Enabled = lst.ItemCount
+        self.list_contacts.SetFilter(event.String.strip())
+        self.button_merge_contacts.Enabled = self.list_contacts.SelectedItemCount
+        self.button_merge_allcontacts.Enabled = self.list_contacts.ItemCount
 
 
     def on_change_list_chats(self, event=None, chat=None):
@@ -6834,7 +6861,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._page = None       # DatabasePage/MergerPage for action callbacks
         self._messages = None   # All retrieved messages (collections.deque)
         self._messages_current = None  # Currently shown (collections.deque)
-        self._message_positions = {} # {msg id: (start index, end index)}
+        self._message_positions = collections.OrderedDict() # {msg id: (start index, end index)}
+        self._message_map = collections.OrderedDict() # {msg ID: {msg}}
         # If set, range is centered around the message with the specified ID
         self._center_message_id =    -1
         # Index of the centered message in _messages
@@ -6934,23 +6962,24 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
 
         pos = self._stc.PositionFromPoint(event.Position)
-        msg_id = msg = msg_idx = None
-        pos_msgs = sorted((v, k) for k, v in self._message_positions.items())
-        for i, (m_pos, m_id) in enumerate(pos_msgs):
+        msg_id = msg = msg_idx = prevmsg_id = None
+        for i, m_id in enumerate(self._message_positions):
+            m_pos = self._message_positions[m_id]
             if m_pos[0] <= pos <= m_pos[1]:
-                msg_id = m_id
-                break
-            elif i and pos_msgs[i-1][0][1] < pos and m_pos[0] > pos:
-                msg_id = pos_msgs[i-1][1]
-                break
+                msg_id, msg_idx = m_id, i
+                break # for i, m_id
+            elif i and self._message_positions[prevmsg_id][1] < pos \
+            and m_pos[0] > pos:
+                msg_id, msg_idx = prevmsg_id, i - 1
+                break # for i, m_id
             elif m_pos[0] > pos:
-                break
-        if not msg_id and pos_msgs and pos_msgs[-1][0][-1] < pos:
-            msg_id = pos_msgs[-1][1]
-        if msg_id: msg_idx, msg = next(((i, m)
-            for i, m in enumerate(self._messages_current or [])
-            if msg_id == m["id"]), None
-        )
+                break # for i, m_id
+            prevmsg_id = m_id
+        if msg_id is None and self._message_positions:
+            m_id = self._messages_current[-1]["id"]
+            if self._message_positions[m_id][1] < pos:
+                msg_id, msg_idx = m_id, len(self._messages_current) - 1
+        msg = self._message_map.get(msg_id)
         menu = wx.Menu()
         item_selection = wx.MenuItem(menu, -1, "&Copy selection")
         menu.Append(item_selection)
@@ -7009,7 +7038,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 menu_goto.AppendSeparator()
                 menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
 
-            item_msg.Enabled = item_goto.Enabled = (bool(msg))
+            item_msg.Enabled = item_goto.Enabled = bool(msg)
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
             menu.Bind(wx.EVT_MENU, on_gotoauthor(-1),        id=item_prev.GetId())
             menu.Bind(wx.EVT_MENU, on_gotoauthor(+1),        id=item_next.GetId())
@@ -7153,6 +7182,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             colourmap = collections.defaultdict(lambda: "remote")
             colourmap[self._db.id] = "local"
             self._message_positions.clear()
+            self._message_map.clear()
             previous_day = None
             count = 0
             focus_message_id = None
@@ -7265,9 +7295,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
                 self._write_element(dom, rgx_highlight)
 
-                # Store message position for FocusMessage()
                 messagepos = (length_before, self.STC.Length - 2)
                 self._message_positions[m["id"]] = messagepos
+                self._message_map[m["id"]] = m
                 if self._center_message_id == m["id"]:
                     focus_message_id = m["id"]
                 if i and not i % conf.MaxHistoryInitialMessages:
@@ -7456,7 +7486,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._messages_current = messages_current
         self._messages = message_range
         self._filter["daterange"] = [
-            messages_current[0]["datetime"].date() if messages_current else None,
+            messages_current[ 0]["datetime"].date() if messages_current else None,
             messages_current[-1]["datetime"].date() if messages_current else None
         ]
         self.RefreshMessages(center_message_id)
@@ -7471,7 +7501,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   direction  positive for forwards, negative for backwards
         """
         step = -1 if direction < 0 else +1
-        idx, mm = current + step, self._messages_current
+        idx, mm = current + step, list(self._messages_current or [])
         msg = mm[idx] if 0 <= idx < len(mm) else None
         while msg:
             if msg["author"] == author:
@@ -7492,7 +7522,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   direction  positive for forwards, negative for backwards
         """
         step = -1 if direction < 0 else +1
-        idx, mm = current + step, self._messages_current
+        idx, mm = current + step, list(self._messages_current or [])
         msg0 = mm[current] if 0 <= current < len(mm) else None
         if not msg0: return
         if   "month" == unit: delta = step * relativedelta(months=1, day=1)
@@ -7560,9 +7590,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         elif not selectedonly:
             curpos = viewport[0]
         if curpos is None: return None, False # No position to check
-            
-        for id, pos in sorted(self._message_positions.items(), key=lambda x: x[1]):
-            if curpos < pos[1]: return id, selected
+
+        for m_id in self._message_positions:
+            if curpos < self._message_positions[m_id][1]: return m_id, selected
         return None, False
 
 
@@ -7603,27 +7633,34 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
         @param   index  list index (negative starts from end)
         """
-        if self._messages_current and index < 0:
-            index += len(self._messages_current)
-        in_len = self._messages_current and index < len(self._messages_current)
-        m = self._messages_current[index] if in_len else None
-        return m
+        if index < 0: index %= len(self._messages_current or [])
+        if index >= len(self._messages_current or []): return None
+        return self._messages_current[index]
 
 
     def GetMessages(self):
         """Returns a list of all the currently shown messages."""
-        result = []
-        if self._messages_current:
-            result = list(self._messages_current)
-        return result
+        return list(self._messages_current or [])
 
 
     def GetRetrievedMessages(self):
         """Returns a list of all retrieved messages."""
-        result = []
-        if self._messages:
-            result = list(self._messages)
-        return result
+        return list(self._messages or [])
+
+
+    def GetVisibleMessages(self):
+        """Returns a list of messages currently visible in viewport."""
+        ids = []
+        linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
+        viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
+                    for x in [0, self.LinesOnScreen()]]
+        for m_id in self._message_positions:
+            m_pos = self._message_positions[m_id]
+            if any(viewport[0] <= x <= viewport[1] for x in m_pos) \
+            or m_pos[0] < viewport[0] and m_pos[1] > viewport[1]:
+                ids.append(m_id)
+            if m_pos[0] > viewport[1]: break # for m_id
+        return map(self._message_map.get, ids)
 
 
     def SetFilter(self, filter_data):
@@ -8189,21 +8226,36 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
         "hour":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
         "week":  '<font color="%(FgColour)s" size=2>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
     }
+    LINE_FORMATS_HIGHLIGHT = {
+        "year":  '<font color="%(FgColour)s" size=5><b>%(label)s</b></font>',
+        "month": '<font color="%(FgColour)s"><font size=4>&nbsp;%(label)s </font><font size=2><b>%(name)s</b></font></font>',
+        "day":   '<font color="%(FgColour)s"><font size=4>%(label)s </font><font size=2><b>%(name)s</b></font></font>',
+        "date":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s<sup>%(ordinal)s</b></sup></font>',
+        "hour":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></font>',
+        "week":  '<font color="%(FgColour)s" size=2>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></font>',
+    }
 
 
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize):
         super(ChatContentTimeline, self).__init__(parent, id, pos, size)
-        self._items = collections.OrderedDict()
-        self._dates = collections.OrderedDict()
-        self._units  = None
+        self._dates = []         # [(datetime, {formatted date data}), ]
+        self._messages = []      # [message ID, ]
+        self._row_units = []     # [formatting unit for row, ]
+        self._highlights = set() # [index of highlighted row, ]
+        self._units = None       # (top unit, ?subunit)
+        self._tracking = True    # Scroll highlights into view
         ColourManager.Manage(self, "BackgroundColour", "BgColour")
+        self.Bind(wx.EVT_LISTBOX, self._OnSelect)
 
 
     def Populate(self, messages):
         """Refreshes timeline from message list."""
         self.Set([])
-        self._dates.clear()
+        del self._dates[:]
+        del self._messages[:]
+        del self._row_units[:]
+        self._highlights.clear()
         if not messages: return
 
         d1, d2 = messages[0]["datetime"], messages[-1]["datetime"]
@@ -8213,48 +8265,133 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
         elif span > datetime.timedelta(days=  7*2):  unit = "week"
         elif span > datetime.timedelta(days=  1*2):  unit = "day"
 
-        if "year" == unit \
-        or "month" == unit and d1.year != d2.year: units = ("year", "month")
-        elif "week" == unit:                       units = ("month", "week")
-        elif "day" == unit:                        units = ("month", "date")
-        elif "hour" == unit:                       units = ("day", "hour")
-        else:                                      units = (unit, )
-
+        if   "year"  == unit \
+        or   "month" == unit and d1.year != d2.year:
+                              units = ("year", "month")
+        elif "week"  == unit: units = ("month", "week")
+        elif "day"   == unit: units = ("month", "date")
+        elif "hour"  == unit: units = ("day", "hour")
+        else:                 units = (unit, )
         self._units = units
-        fmter, labels = self.DATE_FORMATTERS[unit], set()
+
+        ATTRS = set(["month", "day", "hour", "minute", "second", "microsecond"])
+        REPLACES = {"year":  ATTRS, "month": ATTRS - set(["month"]),
+                    "week":  ATTRS - set(["month", "day"]),
+                    "day":   ATTRS - set(["month", "day"]),
+                    "date":  ATTRS - set(["month", "day"]),
+                    "hour":  ATTRS - set(["month", "day", "hour"])}
+        REPLACE_VALUES = collections.defaultdict(int, {"month": 1, "day": 1})
+        uniques = set() # [(date, unit), ]
         for m in messages:
-            label = str(fmter(m["datetime"]))
-            if label in labels: continue # for m
-            labels.add(label)
-            self._dates.setdefault(m["datetime"], m["id"])
+            for unit in units:
+                dt = m["datetime"]
+                dt = dt.replace(**{k: REPLACE_VALUES[k] for k in REPLACES[unit]})
+                if "week" == unit: dt -= datetime.timedelta(days=dt.weekday())
+                if (dt, unit) in uniques: continue # for unit
+
+                self._dates.append((dt, self.DATE_FORMATTERS[unit](dt)))
+                self._messages.append(m["id"])
+                self._row_units.append(unit)
+                uniques.add((dt, unit))
         self.RefreshItems()
 
 
     def GetMessage(self, index):
         """Returns message ID for item at specified index."""
-        idx = self.GetClientData(index)
-        return self._dates.values()[idx]
+        if index < 0: index %= len(self._messages)
+        return self._messages[index] if index < len(self._messages) else None
 
 
     def RefreshItems(self):
         """Redraws all current items."""
-        count0, selected0 = self.ItemCount, self.Selection
-        pos0 = self.GetScrollPos(wx.VERTICAL)
-        self.Set([])
-        rootlabels = set()
-        for i, (dt, msg_id) in enumerate(self._dates.items()):
-            for j, unit in enumerate(self._units):
-                datelabel = self.DATE_FORMATTERS[unit](dt)
-                if not j and str(datelabel) in rootlabels: continue # for i, unit
+        if not self.IsShownOnScreen(): return
 
-                label = self.LINE_FORMATS[unit] % dict(vars(conf), **datelabel)
+        count0, selected0 = self.RowCount, self.Selection
+        pos0 = self.GetScrollPos(wx.VERTICAL)
+        self.Freeze()
+        try:
+            self.Set([])
+            for i, (dt, ddict) in enumerate(self._dates):
+                FORMATS = self.LINE_FORMATS_HIGHLIGHT if i in self._highlights \
+                          else self.LINE_FORMATS
+                label = FORMATS[self._row_units[i]] % dict(vars(conf), **ddict)
                 self.Append(label)
-                self.SetClientData(self.ItemCount - 1, i)
-                if not j: rootlabels.add(str(datelabel))
-        if count0:
-            self.Selection = selected0
-            self.ScrollToRow(pos0)
-        else: self.ScrollToRow(-1)
+            if count0:
+                self.Selection = selected0
+                self.ScrollToRow(pos0)
+            else: self.ScrollToRow(-1)
+        finally: self.Thaw()
+
+
+    def RefreshItem(self, index):
+        """Redraws the specified row."""
+        FORMATS = self.LINE_FORMATS_HIGHLIGHT if index in self._highlights \
+                  else self.LINE_FORMATS
+        ddict = self._dates[index][-1]
+        label = FORMATS[self._row_units[index]] % dict(vars(conf), **ddict)
+        self.SetString(index, label)
+
+
+    def HighlightRows(self, messages):
+        """Highlights the rows that cover message timestamps."""
+        highlights = set()
+        dates, rooti = [a for a, b in self._dates] + [datetime.datetime.max], None
+        for m in messages:
+            for i, dt1 in enumerate(dates[:-1]):
+                if self._row_units[i] != self._units[-1]: rooti = i
+                dt2 = dates[i + 1] if dates[i + 1] != dt1 else dates[i + 2]
+                if dt1 <= m["datetime"] < dt2:
+                    highlights.add(i)
+                    if rooti is not None: highlights.add(rooti)
+                if dates[i + 1] > m["datetime"]: break # for i, dt1
+        if highlights == self._highlights: return
+
+        unhighlight = self._highlights - highlights
+        dohighlight = highlights - self._highlights
+        self._highlights = highlights
+        if not self.IsShownOnScreen(): return
+
+        self.Freeze()
+        try:
+            for i in unhighlight: self.RefreshItem(i)
+            for i in dohighlight: self.RefreshItem(i)
+            if not self._tracking: return
+
+            tracklines = sorted(i for i in highlights # Skip root lines
+                                if self._row_units[i] == self._units[-1])
+            vspan = self.VisibleBegin, self.VisibleEnd
+            # Scroll highlights into view, plus one row of padding
+            if not all(vspan[0] <= i - 1 <= vspan[1] and 
+                       vspan[0] <= i + 1 <= vspan[1] for i in tracklines):
+                if all(vspan[0] < i for i in tracklines): # Downward
+                    self.ScrollRows(tracklines[-1] - vspan[1] + 1)
+                else: self.ScrollToRow(max(0, tracklines[0] - 1))
+        finally: self.Thaw()
+
+
+    def GetVisibleEnd(self):
+        """Returns the index of the last fully visible row."""
+
+        # GetVisibleEnd default implementation is imprecise
+        h, maxh, lineprev = 0, self.Size.Height, self.FirstVisibleLine
+        for line in range(self.FirstVisibleLine, self.RowCount):
+            h += self.OnGetRowHeight(line)
+            if h > maxh: return lineprev
+            lineprev = line
+        return lineprev
+    VisibleEnd = property(GetVisibleEnd)
+
+
+    def GetSelectedTextColour(self, *args, **kwargs):
+        """Override virtual function to force proper highlight colour."""
+        return ColourManager.GetColour(wx.SYS_COLOUR_HIGHLIGHTTEXT)
+
+
+    def _OnSelect(self, event):
+        """Handler for selecting an item, skips scroll on next highlight."""
+        event.Skip()
+        self._tracking = False
+        wx.CallLater(500, lambda: self and setattr(self, "_tracking", True))
 
 
 
