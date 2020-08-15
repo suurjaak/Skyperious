@@ -7561,6 +7561,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
         viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
                     for x in [0, self.LinesOnScreen()]]
+        if viewport[1] < 0: viewport[1] = self.LastPosition
         pos, padding = self._message_positions[message_id], 50
         if not viewport[0] <= pos[0] <= viewport[1]:
             for p in pos[::-1]:
@@ -7583,6 +7584,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
         viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
                     for x in [0, self.LinesOnScreen()]]
+        if viewport[1] < 0: viewport[1] = self.LastPosition
         selection, curpos, selected = self.GetSelection(), None, False
         if selection[0] != selection[1] \
         and any(viewport[0] <= x <= viewport[1] for x in selection):
@@ -7654,6 +7656,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
         viewport = [linetopos(linenumber(self.FirstVisibleLine + x))
                     for x in [0, self.LinesOnScreen()]]
+        if viewport[1] < 0: viewport[1] = self.LastPosition
         for m_id in self._message_positions:
             m_pos = self._message_positions[m_id]
             if any(viewport[0] <= x <= viewport[1] for x in m_pos) \
