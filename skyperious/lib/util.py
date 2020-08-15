@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    30.07.2020
+@modified    15.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -76,6 +76,25 @@ def format_bytes(size, precision=2, max_units=True):
                                  for i, x in enumerate(str(size)[::-1])][::-1])
             formatted += " " + byteunit
     return formatted
+
+
+def format_count(number, maxlen=3):
+    """
+    Returns a formatted count number,
+    e.g. "1.3K" if number is longer than allowed maximum.
+    """
+    result = str(number)
+    if len(result) > maxlen:
+        UNITS = "KMGTPEZY"
+        log = min(len(UNITS) - 1, math.floor(math.log(number, 1000)))
+        result = "%.*f" % (1, number / math.pow(1000, log))
+        result = result.rstrip("0").rstrip(".")
+        if len(result) > maxlen and "." in result:
+            log += 1
+            result = "%.*f" % (1, number / math.pow(1000, log))
+            result = result.rstrip("0").rstrip(".")
+        result += UNITS[int(log) - 1]
+    return result
 
 
 def format_seconds(seconds, insert=""):

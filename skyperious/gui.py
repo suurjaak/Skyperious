@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.08.2020
+@modified    15.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2503,7 +2503,7 @@ class DatabasePage(wx.Panel):
         sizer_header.Add(button_export, border=5, flag=wx.LEFT |
                          wx.ALIGN_CENTER_VERTICAL)
 
-        timeline = self.list_timeline = ChatContentTimeline(panel_stc1, size=(120, -1))
+        timeline = self.list_timeline = ChatContentTimeline(panel_stc1, size=(150, -1))
         timeline.Hide()
         self.Bind(wx.EVT_LISTBOX, self.on_select_timeline, timeline)
         stc = self.stc_history = ChatContentSTC(
@@ -8219,20 +8219,20 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
                  (dt.isocalendar()[1] - dt.replace(day=1).isocalendar()[1] + 1))},
     }
     LINE_FORMATS = {
-        "year":  '<font color="%(FgColour)s" size=5>%(label)s</font>',
-        "month": '<font color="%(FgColour)s"><font size=4>&nbsp;%(label)s </font><font size=2>%(name)s</font></font>',
-        "day":   '<font color="%(FgColour)s"><font size=4>%(label)s </font><font size=2>%(name)s</font></font>',
-        "date":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s<sup>%(ordinal)s</sup></font>',
-        "hour":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
-        "week":  '<font color="%(FgColour)s" size=2>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</font>',
+        "year":  '<font color="%(FgColour)s" size=5><table width="100%%"><tr><td nowrap>%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2>%(name)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2>%(name)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s<sup>%(ordinal)s</sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "hour":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "week":  '<font color="%(FgColour)s" size=2><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
     }
     LINE_FORMATS_HIGHLIGHT = {
-        "year":  '<font color="%(FgColour)s" size=5><b>%(label)s</b></font>',
-        "month": '<font color="%(FgColour)s"><font size=4>&nbsp;%(label)s </font><font size=2><b>%(name)s</b></font></font>',
-        "day":   '<font color="%(FgColour)s"><font size=4>%(label)s </font><font size=2><b>%(name)s</b></font></font>',
-        "date":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s<sup>%(ordinal)s</b></sup></font>',
-        "hour":  '<font color="%(FgColour)s" size=3>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></font>',
-        "week":  '<font color="%(FgColour)s" size=2>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></font>',
+        "year":  '<font color="%(FgColour)s" size=5><table width="100%%"><tr><td nowrap><b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2><b>%(name)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2><b>%(name)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s<sup>%(ordinal)s</b></sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "hour":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "week":  '<font color="%(FgColour)s" size=2><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
     }
 
 
@@ -8281,18 +8281,23 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
                     "date":  ATTRS - set(["month", "day"]),
                     "hour":  ATTRS - set(["month", "day", "hour"])}
         REPLACE_VALUES = collections.defaultdict(int, {"month": 1, "day": 1})
-        uniques = set() # [(date, unit), ]
+        uniques = {} # {(date, unit): {date data}}
         for m in messages:
             for unit in units:
                 dt = m["datetime"]
                 dt = dt.replace(**{k: REPLACE_VALUES[k] for k in REPLACES[unit]})
                 if "week" == unit: dt -= datetime.timedelta(days=dt.weekday())
-                if (dt, unit) in uniques: continue # for unit
+                if (dt, unit) in uniques:
+                    uniques[(dt, unit)]["count"] += 1
+                    continue # for unit
 
-                self._dates.append((dt, self.DATE_FORMATTERS[unit](dt)))
+                ddict = dict(self.DATE_FORMATTERS[unit](dt), count=1)
+                self._dates.append((dt, ddict))
                 self._messages.append(m["id"])
                 self._row_units.append(unit)
-                uniques.add((dt, unit))
+                uniques[(dt, unit)] = ddict
+        for ddict in uniques.values():
+            ddict["count"] = util.format_count(ddict["count"])
         self.RefreshItems()
 
 
