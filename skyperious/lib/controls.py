@@ -9,6 +9,10 @@ Stand-alone GUI components for wx:
 - ColourManager(object):
   Updates managed component colours on Windows system colour change.
 
+- DatePickerCtrl(wx.ComboCtrl):
+  Like wx.adv.DatePickerCtrl, but uses Python dates,
+  and allows specifying date format.
+
 - EntryDialog(wx.Dialog):
   Non-modal text entry dialog with auto-complete dropdown, appears in lower
   right corner.
@@ -78,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.08.2020
+@modified    16.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -92,6 +96,7 @@ import os
 import re
 import sys
 import wx
+import wx.adv
 import wx.html
 import wx.lib.agw.flatnotebook
 import wx.lib.agw.gradientbutton
@@ -517,6 +522,119 @@ class NonModalOKDialog(wx.Dialog):
     def OnClose(self, event):
         self.Close()
         event.Skip()
+
+
+
+class DatePickerCtrl(wx.ComboCtrl):
+    """
+    A control that allows the user to input a date, either into a text box
+    from keyboard, or using a popup calendar control.
+    
+    Like wx.adv.DatePickerCtrl, but uses Python dates,
+    and allows specifying date format.
+    """
+
+    class CalendarPopup(wx.ComboPopup):
+
+        def __init__(self):
+            super(DatePickerCtrl.CalendarPopup, self).__init__()
+
+        def Init(self):
+            """Sets up internal variables. Required override."""
+            self._calendar = None
+
+        def Create(self, parent):
+            """Creates the inner calendar control. Required override."""
+            self._calendar = wx.adv.CalendarCtrl(parent, style=wx.BORDER_RAISED)
+            self._calendar.Bind(wx.adv.EVT_CALENDAR_DAY, self.OnChange)
+            self._calendar.Bind(wx.EVT_KEY_DOWN,         self.OnChange)
+            return True
+
+        def GetControl(self):
+            """Returns the inner calendar control. Required override."""
+            return self._calendar
+
+        def SetStringValue(self, val):
+            """Sets value for the inner calendar control. Required override."""
+            fmt = self.GetComboCtrl().Format
+            self._calendar.SetDate(datetime.datetime.strptime(val, fmt).date())
+
+        def GetStringValue(self):
+            """Returns value from the inner calendar control. Required override."""
+            wxdt = self._calendar.GetDate()
+            dt = datetime.datetime.strptime(wxdt.FormatISODate(), "%Y-%m-%d")
+            return dt.strftime(self.GetComboCtrl().Format)
+
+        def GetAdjustedSize(self, minWidth, prefHeight, maxHeight):
+            """Returns inner calendar control size. Override."""
+            return self._calendar.BestSize
+
+        def OnChange(self, event):
+            """Event handler for inner calendar, closes popup."""
+            event.Skip()
+            self.Dismiss()
+
+
+    def __init__(self, parent, id=wx.ID_ANY, value="", pos=wx.DefaultPosition,
+                 size=wx.DefaultSize, style=0, validator=wx.DefaultValidator,
+                 name=wx.ComboBoxNameStr):
+        super(DatePickerCtrl, self).__init__(parent, id=id, pos=pos, size=size,
+                                             style=style, validator=validator,
+                                             name=name)
+        self._value  = None
+        self._format = "%Y-%m-%d"
+        self._popup  = DatePickerCtrl.CalendarPopup()
+        self._range  = (None, None)
+        self.SetPopupControl(self._popup)
+        if value: self.SetText(value)
+
+
+    def GetFormat(self):
+        """Returns the date format string."""
+        return self._format
+    def SetFormat(self, format):
+        """Sets the date format string."""
+        if self._value is not None:
+            super(DatePickerCtrl, self).SetValue(self._value.strftime(format))
+        self._format = format
+    Format = property(GetFormat, SetFormat)
+
+
+    def GetRange(self):
+        """Returns date range allowed in calendar popup."""
+        return self._range
+    def SetRange(self, from_=None, to_=None):
+        """Sets date range allowed in calendar popup."""
+        if isinstance(from_, (list, set, tuple)): from_, to_ = from_
+        self._range = tuple(x if isinstance(x, datetime.date) else None
+                            for x in (from_, to_))
+        wxrange = tuple(x or wx.DefaultDateTime for x in self._range)
+        self._popup.GetControl().SetDateRange(*wxrange)
+    Range = property(GetRange, SetRange)
+
+
+    def GetValue(self):
+        """Returns current date value."""
+        return self._value
+    def SetValue(self, dt):
+        """Sets current date value."""
+        if isinstance(dt, basestring): return self.SetText(dt)
+        super(DatePickerCtrl, self).SetValue(dt.strftime(self._format))
+        self._value = dt
+    Value = property(GetValue, SetValue)
+
+
+    def GetText(self):
+        """Returns current date value as formatted string."""
+        return super(DatePickerCtrl, self).GetValue()
+    def SetText(self, text):
+        """Sets current date value as string in expected format."""
+        self._value = datetime.datetime.strptime(text, self._format).date()
+        super(DatePickerCtrl, self).SetValue(text)
+    Text = property(GetText, SetText)
+
+
+    Selection = property(wx.ComboCtrl.GetSelection, wx.ComboCtrl.SetSelection)
 
 
 

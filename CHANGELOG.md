@@ -2,13 +2,14 @@ CHANGELOG
 =========
 
 
-4.2, 2020-08-12
+4.2, 2020-08-15
 ---------------
 - added option to create a blank Skype database;
 - added option to create a database from Skype export;
 - added chat history timeline for time period quick-selection;
 - added option to go to next/previous message from author in chat history;
 - added option to go to next/previous day/week/month in chat history;
+- added calendar popup to chat time period filter;
 - import account/contact gender, homepage and e-mails from live sync.
 
 

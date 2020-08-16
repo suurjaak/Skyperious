@@ -2532,9 +2532,10 @@ class DatabasePage(wx.Panel):
         edit_filter.SetToolTip("Find messages containing the exact text")
         label_range = wx.StaticText(
             parent=panel_stc2, label="Show messages from time perio&d:")
-        date1 = self.edit_filterdate1 = wx.TextCtrl(panel_stc2, size=(80, -1))
-        date2 = self.edit_filterdate2 = wx.TextCtrl(panel_stc2, size=(80, -1),
-                                                    style=wx.TE_RIGHT)
+        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
+        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
+        date1.Format = date2.Format = "%Y-%m-%d"
+        date2.SetPopupAnchor(wx.RIGHT)
         date1.SetToolTip("Date in the form YYYY-MM-DD")
         date2.SetToolTip("Date in the form YYYY-MM-DD")
         self.Bind(wx.EVT_TEXT, self.on_change_filterdate, date1)
@@ -5270,6 +5271,7 @@ class DatabasePage(wx.Panel):
             self.chat_filter["daterange"] = dates_range
             self.chat_filter["startdaterange"] = dates_values
         self.range_date.SetRange(*dates_range)
+        self.edit_filterdate1.Range = self.edit_filterdate2.Range = dates_range
         self.range_date.SetValues(*dates_values)
         has_messages = bool(self.stc_history.GetMessage(0))
         self.tb_chat.EnableTool(wx.ID_MORE, has_messages)
@@ -5501,6 +5503,8 @@ class DatabasePage(wx.Panel):
                               self.chat["last_message_datetime"].date()
                               if self.chat["last_message_datetime"] else None ]
                 self.range_date.SetRange(*date_range)
+                self.edit_filterdate1.Range = date_range
+                self.edit_filterdate2.Range = date_range
             guibase.status("Opened Skype database %s.", self.db)
         except Exception as e:
             if self:
