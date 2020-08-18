@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    17.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -99,9 +99,7 @@ class SkypeLogin(object):
         if token and os.path.isfile(path) and os.path.getsize(path):
             kwargslist.insert(0, {"tokenFile": path}) # Try with existing token
         else:
-            try: os.makedirs(conf.VarDirectory)
-            except Exception: pass
-            with open(path, "w"): pass
+            util.create_file(path)
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
@@ -118,8 +116,7 @@ class SkypeLogin(object):
         """Creates SQLite database if not already created."""
         if not self.db:
             path = filename or self.make_db_path(self.username)
-            if not os.path.exists(path):
-                with open(path, "w"): pass
+            if not os.path.exists(path): util.create_file(path)
             self.db = skypedata.SkypeDatabase(path, log_error=False)
             self.db.live = self
         for table in self.db.CREATE_STATEMENTS:
@@ -961,7 +958,9 @@ class SkypeExport(skypedata.SkypeDatabase):
             # dictionary keys and "item" for list elements,
             # e.g. "conversations.item.MessageList.item.content"
             prefix, evt, value = next(parser, (None, None, None))
-            if not prefix and not evt: break # while True
+            if not prefix and not evt:
+                if progress: progress(counts=counts)
+                break # while True
 
             # Dictionary start: ("nested path", "start_map", None)
             if "start_map" == evt:

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    17.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -278,6 +278,15 @@ def start_file(filepath):
     except Exception as e:
         success, error = False, repr(e)
     return success, error
+
+
+def create_file(filepath, mode="w", file=False):
+    """Creates or overwrites the file, making any lacking parent directories."""
+    try: os.makedirs(os.path.split(filepath)[0])
+    except Exception: pass
+    if file: return open(filepath, mode)
+    else:
+        with open(filepath, mode): pass
 
 
 def is_os_64bit():

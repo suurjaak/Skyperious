@@ -1604,7 +1604,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         busy = controls.BusyPanel(self, "Creating new database..")
         try:
             logger.info("Creating new blank database %s for user '%s'.", filename, user)
-            with open(filename, "wb"): pass
+            with open(filename, "w"): pass
             db = skypedata.SkypeDatabase(filename, log_error=False)
             for table in db.CREATE_STATEMENTS: db.create_table(table)
             db.insert_account({"skypename": user})
@@ -1662,7 +1662,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             try:
                 logger.info("Creating new Skype database file %s from Skype online "
                             "for user '%s'.", filename, user)
-                with open(filename, "wb"): pass
+                with open(filename, "w"): pass
                 skype.init_db(filename)
                 skype.save("accounts", skype.skype.user)
                 skype.db.tables_list = None # Force reload
@@ -1762,7 +1762,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(after)
 
         try:
-            with open(filename, "wb"): pass
+            with open(filename, "w"): pass
             db = live.SkypeExport(efilename, filename)
         except Exception:
             util.try_until(lambda: os.unlink(filename))

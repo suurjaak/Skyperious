@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -49,6 +49,7 @@ from . lib import util
 from . import conf
 from . import export
 from . import guibase
+from . import live
 from . import skypedata
 from . import workers
 if is_gui_possible:
@@ -82,9 +83,9 @@ ARGUMENTS = {
                       "workbook with separate sheets" if export.xlsxwriter
                       else
                       "export type: HTML files (default), CSV spreadsheets, "
-                      "text files", },
+                      "text files"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "one or more Skype databases to export", }, 
+              "help": "one or more Skype databases to export"}, 
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to export", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -114,13 +115,13 @@ ARGUMENTS = {
               "default": "message",
               "help": "search in message body (default), in contact "
                       "information, in chat title and participants, or in any "
-                      "database table", },
+                      "database table"},
              {"args": ["QUERY"],
               "help": "search query, with a Google-like syntax, for example: "
                       "\"this OR that chat:links from:john\". More on syntax "
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file(s) to search", },
+              "help": "Skype database file(s) to search"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -133,22 +134,45 @@ ARGUMENTS = {
                       "does not contain account information yet"},
              {"args": ["-p", "--password"], "dest": "password",
               "help": "password for Skype account, if not using stored or prompted"},
-             {"args": ["--store-password"], "dest": "store_password",
-              "action": "store_true", "required": False,
-              "help": "store given password in configuration"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype account password"},
+             {"args": ["--store-password"], "dest": "store_password",
+              "action": "store_true", "required": False,
+              "help": "store given password in configuration"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
               "help": "names of specific authors whose chats to sync",
               "nargs": "+"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file to sync", },
+              "help": "Skype database file to sync, "
+                      "will be created if it does not exist yet"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
+        {"name": "create",
+         "help": "create a new database",
+         "description": "Create a new blank database, or populated from "
+                        "Skype online service, or from a Skype export archive.",
+         "arguments": [
+             {"args": ["-i", "--input"], "dest": "input",
+              "help": "Skype export archive to populate from (*.json;*.tar)"},
+             {"args": ["-u", "--username"], "dest": "username",
+              "help": "Skype username, for a blank database if no password"},
+             {"args": ["-p", "--password"], "dest": "password",
+              "help": "password for populating database from Skype online service"},
+             {"args": ["--ask-password"], "dest": "ask_password",
+              "action": "store_true", "required": False,
+              "help": "prompt for Skype account password"},
+             {"args": ["--store-password"], "dest": "store_password",
+              "action": "store_true", "required": False,
+              "help": "store given password in configuration"},
+             {"args": ["FILE"], "nargs": 1,
+              "help": "Skype database file to create. Overwritten if exists."},
+             {"args": ["--verbose"], "action": "store_true",
+              "help": "print detailed progress messages to stderr"}, ]
+        },
         {"name": "merge", "help": "merge two or more Skype databases "
                                   "into a new database",
          "description": "Merge two or more Skype database files into a new "
@@ -164,8 +188,7 @@ ARGUMENTS = {
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["-o", "--output"], "dest": "output", "required": False,
-              "help": "Final database filename, auto-generated by default"},
-              ]
+              "help": "Final database filename, auto-generated by default"}, ]
         }, 
         {"name": "diff", "help": "compare chat history in two Skype databases",
          "description": "Compare two Skype databases for differences "
@@ -271,9 +294,9 @@ def run_merge(filenames, output_filename=None):
                 if "error" in result:
                     output("Error merging %s:\n\n%s" % (db1, result["error"]))
                     db1 = None # Signal for global break
-                    break # break while True
+                    break # while True
                 if "done" in result:
-                    break # break while True
+                    break # while True
                 if "diff" in result:
                     counts[db1]["chats"] += 1
                     counts[db1]["msgs"] += len(result["diff"]["messages"])
@@ -283,7 +306,7 @@ def run_merge(filenames, output_filename=None):
                 if result.get("output"):
                     logger.info(result["output"])
             if not db1:
-                break # break for db1 in dbs
+                break # for db1
             bar.stop()
             bar.afterword = " Processed %s." % db1
             bar.update(bar.max)
@@ -319,10 +342,10 @@ def run_search(filenames, query):
                 if "error" in result:
                     output("Error searching %s:\n\n%s" %
                           (db, result.get("error_short", result["error"])))
-                    break # break while True
+                    break # while True
                 if "done" in result:
                     logger.info("Finished searching for \"%s\" in %s.", query, db)
-                    break # break while True
+                    break # while True
                 if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
                         output("%s:" % db, end=" ")
@@ -332,7 +355,7 @@ def run_search(filenames, query):
 
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, chatnames=(), authornames=()):
+             store_password=False, chatnames=(), authornames=(), truncate=False):
     """Synchronizes history in specified database from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
@@ -432,8 +455,10 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             output(prompt, end="")
             username = raw_input().strip()
 
-        if not file_existed:
-            with open(filepath, "w"): pass
+        if not file_existed or truncate:
+            if truncate and os.path.exists(filepath):
+                logger.info("Overwriting existing file %s.", filepath)
+            util.create_file(filepath)
         db = skypedata.SkypeDatabase(filepath)
         username = db.username or username
         password = password0 or passwords.get(username)
@@ -450,14 +475,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
 
         prompt = "Enter Skype password for '%s': " % username
         while not db.live.is_logged_in():
-            if ask_password or not password:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore") # possible GetPassWarning
-                    while not password:
-                        output(prompt, end="") # getpass output can raise errors
-                        password = getpass.getpass("", io.BytesIO()).strip()
-                        prompt = "Enter Skype password for '%s': " % username
-
+            if ask_password or not password: password = get_password(username)
             passwords[username] = password
             output("Logging in to Skype as '%s'.." % username, end="")
             try: db.live.login(username, password)
@@ -483,6 +501,73 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         db.close()
     
 
+def run_create(filenames, input=None, username=None, password=None,
+               ask_password=False, store_password=False):
+    """Creates a new database, blank or from a Skype source."""
+    if not input and not username:
+        output("Not enough arguments.")
+        sys.exit(1)
+    if not input and username and (password or ask_password): return run_sync(
+        filenames, username, password, ask_password, store_password, truncate=True
+    )
+
+    filename = os.path.realpath(filenames[0])
+    if not input: # Create blank database, with just account username
+        if os.path.exists(filename):
+            logger.info("Overwriting existing file %s.", filename)
+        util.create_file(filename)
+        logger.info("Creating new blank database %s for user '%s'.", filename, username)
+        db = skypedata.SkypeDatabase(filename, log_error=False)
+        for table in db.CREATE_STATEMENTS: db.create_table(table)
+        db.insert_account({"skypename": username})
+        output("Created blank database %s for user %s." % (filename, username))
+        return
+
+    counts = {}
+    def progress(result=None, **kwargs):
+        result = result or kwargs
+        if "counts" in result:
+            counts.update(result["counts"])
+            t = ", ".join(util.plural(x[:-1], counts[x], sep=",")
+                          for x in sorted(counts))
+            bar.afterword = " Imported %s." % t
+        return True
+
+    username = live.SkypeExport.export_get_account(input)
+    if os.path.exists(filename):
+        logger.info("Overwriting existing file %s.", filename)
+    util.create_file(filename)
+    db = live.SkypeExport(input, filename)
+
+    if ask_password and store_password: password = get_password(username)
+    logger.info("Creating new database %s from Skype export %s, user '%s'.",
+                filename, input, username)
+    output()
+    bar = ProgressBar(pulse=True, interval=0.05)
+    bar.afterword =" Importing %s" % filename
+    bar.start()
+
+    try: db.export_read(progress)
+    except Exception:
+        logger.exception("Error importing Skype export archive %s.", filename)
+        util.try_until(db.close)
+        util.try_until(lambda: os.unlink(filename))
+        raise
+
+    bar.stop()
+    bar.pulse = False
+    bar.update(100)
+    db.close()
+    if password and store_password:
+        conf.Login.setdefault(filename, {})
+        conf.Login[filename].update(store=True, password=util.obfuscate(password))
+        conf.save()
+    sz = util.format_bytes(os.path.getsize(filename))
+    t = " and ".join(util.plural(x[:-1], counts[x], sep=",") for x in sorted(counts))
+    output("\n\nCreated new database %s from Skype export archive %s." % (filename, input))
+    output("Database size %s, username '%s', with %s." % (sz, db.username, t))
+
+
 def run_export(filenames, format, chatnames, authornames, start_date, end_date, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
@@ -493,18 +578,10 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date, 
 
         if (ask_password and db.username and conf.SharedImageAutoDownload
         and format.lower().endswith("html")):
-            password, prompt = "", "Enter Skype password for '%s': " % db.username
             while not db.live.is_logged_in():
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore") # possible GetPassWarning
-                    while not password:
-                        output(prompt, end="") # getpass output can raise errors
-                        password = getpass.getpass("", io.BytesIO()).strip()
-                        prompt = "Enter Skype password for '%s': " % db.username
-
+                password = get_password(db.username)
                 try: db.live.login(password=password)
-                except Exception as e:
-                    prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
+                except Exception as e: output("\n" + util.format_exc(e))
 
             if store_password:
                 conf.Login.setdefault(db.filename, {})
@@ -584,9 +661,9 @@ def run_diff(filename1, filename2):
             if "error" in result:
                 output("Error scanning %s and %s:\n\n%s" %
                       (db1, db2, result["error"]))
-                break # break while True
+                break # while True
             if "done" in result:
-                break # break while True
+                break # while True
             if "chats" in result and result["chats"]:
                 counts[db1]["chats"] += 1
                 msgs = len(result["chats"][0]["diff"]["messages"])
@@ -712,7 +789,11 @@ def run(nogui=False):
         else:
             logger.addHandler(logging.NullHandler())
 
-    if "diff" == arguments.command:
+    if "create" == arguments.command:
+        run_create(arguments.FILE, arguments.input,
+                   arguments.username, arguments.password,
+                   arguments.ask_password, arguments.store_password)
+    elif "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
@@ -950,6 +1031,17 @@ def win32_unicode_argv():
         # Remove Python executable and commands if present
         start = argc.value - len(sys.argv)
         result = [argv[i].encode("utf-8") for i in range(start, argc.value)]
+    return result
+
+
+def get_password(username):
+    """Asks user for password from keyboard input."""
+    result, prompt = "", "Enter Skype password for '%s': " % username
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore") # possible GetPassWarning
+        while not result:
+            output(prompt, end="") # getpass output can raise errors
+            result = getpass.getpass("", io.BytesIO()).strip()
     return result
 
 

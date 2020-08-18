@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1299,7 +1299,7 @@ class SkypeDatabase(object):
             str_vals = ":" + ", :".join(fields)
 
             a_filled = self.fill_missing_fields(account, fields)
-            del a_filled["id"]
+            a_filled.pop("id", None)
             a_filled = self.blobs_to_binary(a_filled, fields, col_data)
             self.execute("INSERT INTO accounts (%s) VALUES (%s)" % (
                 str_cols, str_vals
