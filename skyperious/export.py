@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    17.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -120,7 +120,7 @@ def export_chats(chats, path, format, db, messages=None, timerange=None, skip=Tr
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared images
-            try: db.live.login(password=conf.Login[db.filename]["password"])
+            try: db.live.login(password=util.deobfuscate(conf.Login[db.filename]["password"]))
             except Exception: pass
 
         for chat in chats:
@@ -434,7 +434,7 @@ class xlsx_writer(object):
                                           "align": "left",
                                           "num_format": "yyyy-mm-dd HH:MM", })
 
-    def __init__(self, filename, sheetname=None, autowrap=[]):
+    def __init__(self, filename, sheetname=None, autowrap=()):
         """
         @param   sheetname  title of the first sheet to create, if any
         @param   autowrap   a list of column indices that will get their width
@@ -511,7 +511,7 @@ class xlsx_writer(object):
             self._sheet.freeze_panes(self._row, 0)
 
 
-    def writerow(self, values, style={}, merge_cols=0, autowidth=True):
+    def writerow(self, values, style=None, merge_cols=0, autowidth=True):
         """
         Writes to the current row from first column, steps to next row.
         If current sheet is full, starts a new one.
@@ -537,7 +537,7 @@ class xlsx_writer(object):
         for c, v in enumerate(values):
             writefunc = self._writers[type(v)]
             fmt_name = style if isinstance(style, basestring) \
-                       else style.get(c, self._format)
+                       else (style or {}).get(c, self._format)
             writefunc(self._row, c, v, self._formats[fmt_name])
             if (merge_cols or not autowidth or "wrap" == fmt_name
             or c in self._autowrap):
