@@ -170,7 +170,7 @@ Shared images slideshow in HTML export implemented with jsOnlyLightbox,
 (c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).
 
 Emoticon images in HTML export are property of Skype Limited, (c) 2004-2006,
-released under the [Skype Component License 1.0](res/emoticons/Skype Component License.txt).
+released under the [Skype Component License 1.0](res/emoticons/Skype%20Component%20License.txt).
 
 Default avatar icon from:
   Fancy Avatars, (c) 2009 Brandon Mathis,
