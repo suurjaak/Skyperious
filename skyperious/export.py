@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -289,6 +289,10 @@ def export_chat_template(chat, filename, db, messages):
                     contact["avatar_raw_large"] = raw_large
                 contact["rank"] = partics.get(author, {}).get("rank")
                 namespace["participants"].append(contact)
+
+            timeline, units = parser.get_timeline_stats()
+            namespace["timeline"], namespace["timeline_units"] = timeline, units
+
 
         tmpfile.flush(), tmpfile.seek(0)
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), "")

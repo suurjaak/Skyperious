@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    12.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -579,7 +579,7 @@ class SkypeLogin(object):
             try: self.save("accounts", self.skype.user)
             except Exception:
                 logger.exception("Error saving account %r.", self.skype.user)
-        cstr = "%s " % util.plural("chat", chats, with_items=False) if chats else ""
+        cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
         if not chats: self.populate_contacts()

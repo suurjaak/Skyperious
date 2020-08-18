@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1347,8 +1347,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 busy.Close()
             if not error:
                 guibase.status("Exported %s and %s from %s as %s "
-                               "under %s.", util.plural("chat", count),
-                               util.plural("message", message_count), db.filename,
+                               "under %s.", util.plural("chat", count, sep=","),
+                               util.plural("message", message_count, sep=","), db.filename,
                                extname.upper(), export_dir, log=True)
             elif errormsg:
                 guibase.status(errormsg_short or errormsg, log=True)
@@ -1755,7 +1755,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     self.update_database_list(filename)
                     self.load_database_page(filename)
                 else:
-                    t = ", ".join(util.plural(x[:-1], result["counts"][x])
+                    t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
                                   for x in sorted(result["counts"]))
                     dlg.Message = "Parsed %s." % t
 
@@ -3224,8 +3224,8 @@ class DatabasePage(wx.Panel):
 
         selchats = [chats[i] for i in dlg.GetSelections()]
         slabel = "Updating %s (%s) from Skype online service.." % (
-                 util.plural("chat", selchats), ", ".join(x["title"] for x in selchats))
-        plabel = "Updating %s from Skype online service.." % util.plural("chat", selchats)
+                 util.plural("chat", selchats, sep=","), ", ".join(x["title"] for x in selchats))
+        plabel = "Updating %s from Skype online service.." % util.plural("chat", selchats, sep=",")
         self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
         self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
         self.label_sync_progress.Label = plabel
@@ -3314,9 +3314,9 @@ class DatabasePage(wx.Panel):
                         if self.worker_live.is_working(): self.gauge_sync.Pulse()
                         if "chats" == result["table"]:
                             slabel = "Synchronized %s%s: %s in total%s." % (
-                                util.plural("chat", result["count"]) if result["count"] else "chats",
+                                util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
                                 " (%s new)" % result["new"] if result["new"] else "",
-                                util.plural("new message", result["message_count_new"]),
+                                util.plural("new message", result["message_count_new"], sep=","),
                                 ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                             )
                             self.chats = self.db.get_conversations(reload=True, log=False)
@@ -3834,7 +3834,7 @@ class DatabasePage(wx.Panel):
                     messages=messages, skip=False, progress=progressfunc)
                 files, count, message_count = result
                 guibase.status("Exported %s to %s.",
-                               util.plural("message", message_count), filepath, log=True)
+                               util.plural("message", message_count, sep=","), filepath, log=True)
                 try: util.start_file(filepath)
                 except Exception:
                     logger.exception("Error starting %s.", filepath)
@@ -4010,8 +4010,8 @@ class DatabasePage(wx.Panel):
             busy.Close()
             if not errormsg:
                 guibase.status("Exported %s and %s from %s as %s under %s.",
-                               util.plural("chat", count), 
-                               util.plural("message", message_count), self.db,
+                               util.plural("chat", count, sep=","), 
+                               util.plural("message", message_count, sep=","), self.db,
                                extname.upper(), dirname, log=True)
                 util.start_file(files[0] if do_singlefile else dirname)
             else:
@@ -4057,7 +4057,7 @@ class DatabasePage(wx.Panel):
                         self.db, messages=messages, progress=progressfunc)
                     files, count, message_count = result
                     guibase.status("Exported %s to %s.",
-                                   util.plural("message", message_count), filepath, log=True)
+                                   util.plural("message", message_count, sep=","), filepath, log=True)
                     util.start_file(filepath)
                 else:
                     wx.MessageBox("Current filter leaves no data to export.",
@@ -4655,7 +4655,7 @@ class DatabasePage(wx.Panel):
             self.stc_history.SetFilter(self.chat_filter)
             self.stc_history.RefreshMessages()
             self.populate_chat_statistics()
-            self.list_timeline.Populate(self.stc_history.GetMessages())
+            self.list_timeline.Populate(*self.stc_history.GetTimelineData())
         finally:
             busy.Close()
         self.tb_chat.EnableTool(wx.ID_MORE, self.chat["message_count"] > 0)
@@ -5283,7 +5283,7 @@ class DatabasePage(wx.Panel):
         if busy:
             busy.Close()
         self.panel_chats2.Enabled = True
-        self.list_timeline.Populate(self.stc_history.GetMessages())
+        self.list_timeline.Populate(*self.stc_history.GetTimelineData())
         self.populate_chat_statistics()
         if self.html_stats.Shown:
             self.show_stats(True) # To restore scroll position
@@ -5941,7 +5941,7 @@ class MergerPage(wx.Panel):
                 result = export.export_chats([self.chat], dirname, filename,
                     self.db1, messages=messages, progress=progressfunc)
                 files, count, message_count = result
-                guibase.status("Exported %s to %s.", util.plural("message", message_count),
+                guibase.status("Exported %s to %s.", util.plural("message", message_count, sep=","),
                                filepath, log=True)
                 util.start_file(filepath)
             except Exception:
@@ -5991,7 +5991,7 @@ class MergerPage(wx.Panel):
         def after(result):
             if "counts" in result:
 
-                t = ", ".join(util.plural(x[:-1], result["counts"][x])
+                t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
                               for x in sorted(result["counts"]))
                 self.label_gauge.Label = "Parsed %s." % t
                 self.panel_gauge.Layout()
@@ -6006,7 +6006,7 @@ class MergerPage(wx.Panel):
             elif "done" in result:
                 stats = self.db1.get_general_statistics()
                 text = "<br /><br />Parsed %s, %s and %s." % tuple(
-                    util.plural(x[:-1], stats[x]) for x in ("chats", "contacts", "messages")
+                    util.plural(x[:-1], stats[x], sep=",") for x in ("chats", "contacts", "messages")
                 )
                 self.html_report.AppendToPage(text)
                 scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
@@ -6084,7 +6084,7 @@ class MergerPage(wx.Panel):
             selected = self.list_chats.GetNextSelected(selected)
         if selecteds:
             action = "Merge" if self.is_scanned else "Scan and merge"
-            info = util.plural("selected chat", selecteds)
+            info = util.plural("selected chat", selecteds, sep=",")
             message = ("%s differences in %s\n\nfrom %s\n\ninto %s?" %
                        (action, info, self.db1, self.db2))
             if wx.OK == wx.MessageBox(message, conf.Title,
@@ -6219,7 +6219,7 @@ class MergerPage(wx.Panel):
                 if messages:
                     self.button_merge_chat.Note = (
                         "Copy %s to the database on the right." % 
-                        util.plural("chat message", messages))
+                        util.plural("chat message", messages, sep=","))
                     self.button_merge_chat.ContainingSizer.Layout()
                 idx = -conf.MaxHistoryInitialMessages
                 self.stc_diff1.Populate(c, self.db1, messages, from_index=idx)
@@ -6269,10 +6269,10 @@ class MergerPage(wx.Panel):
                 contacts.append(contacts_source[new])
         text_add = ""
         if contacts:
-            text_add += util.plural("contact", contacts)
+            text_add += util.plural("contact", contacts, sep=",")
         if contactgroups:
             text_add += (" and " if contacts else "") \
-                       + util.plural("contact group", contactgroups)
+                       + util.plural("contact group", contactgroups, sep=",")
         if (contacts or contactgroups) and wx.OK == wx.MessageBox(
                 "Copy %s\n\nfrom %s\n\ninto %s?" %
                 (text_add, self.db1, self.db2),
@@ -6342,7 +6342,7 @@ class MergerPage(wx.Panel):
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
             msg = "Scan %d%% complete (%s of %s)." % \
-                  (percent, cindex + 1, util.plural("conversation", ccount))
+                  (percent, cindex + 1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
         if "done" in result:
             self.is_scanning = False
@@ -6354,8 +6354,8 @@ class MergerPage(wx.Panel):
             if self.chats_diffdata:
                 count_msgs = util.plural(
                     "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()))
-                count_chats = util.plural("chat", self.chats_diffdata)
+                                   for d in self.chats_diffdata.values()), sep=",")
+                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
                 noteinfo = "%s from %s" % (count_msgs, count_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
@@ -6384,8 +6384,8 @@ class MergerPage(wx.Panel):
         if self.is_scanned:
             count_msgs = util.plural(
                 "message", sum(len(d["diff"]["messages"])
-                               for d in self.chats_diffdata.values()))
-            count_chats = util.plural("chat", self.chats_diffdata)
+                               for d in self.chats_diffdata.values()), sep=",")
+            count_chats = util.plural("chat", self.chats_diffdata, sep=",")
             info = "%s in %s" % (count_msgs, count_chats)
             message = "Copy %s\n\nfrom %s\n\ninto %s?" % (info, db1, db2)
             type = "merge_left"
@@ -6428,7 +6428,7 @@ class MergerPage(wx.Panel):
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
             msg = "%s %d%% complete (%s of %s)." % (action, percent,
-                  cindex+1, util.plural("conversation", ccount))
+                  cindex+1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
             for chat in result.get("chats", []):
                 if chat["identity"] in self.chats_diffdata:
@@ -6479,8 +6479,8 @@ class MergerPage(wx.Panel):
             if self.is_scanned and self.chats_diffdata:
                 count_msgs = util.plural(
                     "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()))
-                count_chats = util.plural("chat", self.chats_diffdata)
+                                   for d in self.chats_diffdata.values()), sep=",")
+                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
                 noteinfo = "%s from %s" % (count_msgs, count_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
@@ -6535,7 +6535,7 @@ class MergerPage(wx.Panel):
             if new_chat:
                 info += "new chat with "
             if messages:
-                parts.append(util.plural("%smessage" % newstr, messages))
+                parts.append(util.plural("%smessage" % newstr, messages, sep=","))
             if participants:
                 # Add to contacts those that are new
                 cc2 = [db1.id, db2.id] + \
@@ -6543,9 +6543,9 @@ class MergerPage(wx.Panel):
                 contacts2 = [i["contact"] for i in participants
                     if "id" in i["contact"] and i["identity"] not in cc2]
                 if contacts2:
-                    parts.append(util.plural("new contact", contacts2))
+                    parts.append(util.plural("new contact", contacts2, sep=","))
                 parts.append(util.plural("%sparticipant" % newstr,
-                                         participants))
+                                         participants, sep=","))
             for i in parts:
                 info += ("" if i == parts[0] else (
                          " and " if i == parts[-1] else ", ")) + i
@@ -6818,14 +6818,14 @@ class MergerPage(wx.Panel):
                         else datetime_first.strftime("%Y-%m-%d %H:%M:%S")
                     datetext_last = "" if not datetime_last \
                         else datetime_last.strftime("%Y-%m-%d %H:%M:%S")
-                    contacttext = util.plural("contact", contacts)
+                    contacttext = util.plural("contact", contacts, sep=",")
                     if condiff:
                         contacttext += " (%d not present on the %s)" % (
                                        len(condiff), ["right", "left"][i])
                     label.Label += "%s.\n%s.\n%s.\nFirst message at %s.\n" \
                                    "Last message at %s." % (
-                                   util.plural("conversation", chats),
-                                   util.plural("message", count_messages), 
+                                   util.plural("conversation", chats, sep=","),
+                                   util.plural("message", count_messages, sep=","), 
                                    contacttext, datetext_first, datetext_last)
         except Exception as e:
             # Database access can easily fail if the user closes the tab before
@@ -7090,7 +7090,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         self.RefreshMessages(), self.ScrollToLine(0)
                         if self._page:
                             self._page.populate_chat_statistics()
-                            self._page.list_timeline.Populate(self.GetMessages())
+                            self._page.list_timeline.Populate(*self.GetTimelineData())
                     finally:
                         busy.Close()
                 function = filter_range
@@ -7228,7 +7228,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     self._append_text(
                         m2["datetime"].strftime("%d.%m.%Y"), "bold")
                 self._append_text("  (%s).  " % util.plural(
-                                  "message", self._messages_current))
+                                  "message", self._messages_current, sep=","))
             if self._chat["message_count"]:
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
@@ -7240,9 +7240,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     for unit, count in [("day", 7), ("week", 2), ("day", 30),
                     ("month", 3), ("month", 6), ("year", 1), ("year", 2)]:
                         date_from = date_until - relativedelta(
-                            **{util.plural(unit, with_items=False): count})
+                            **{util.plural(unit, numbers=False): count})
                         if date_from >= date_first and date_from <= date_last:
-                            title = util.plural(unit, count)
+                            title = util.plural(unit, count, sep=",")
                             from_items.append((title, [date_from, date_last]))
                     if date_until - relativedelta(years=2) > date_first:
                         # Warning: possible mis-showing here if chat < 4 years.
@@ -7699,6 +7699,13 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         Returns the statistics collected during last Populate(), or {}.
         """
         return self._parser.get_collected_stats() if self._parser else {}
+
+
+    def GetTimelineData(self):
+        """
+        Returns the timeline collected during last Populate(), or {}.
+        """
+        return self._parser.get_timeline_stats() if self._parser else {}
 
 
     def ClearAll(self):
@@ -8213,31 +8220,19 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
     """
     Listbox for showing quick date selection for ChatContentSTC.
     """
-    ORDINAL_INDICATORS = collections.defaultdict(lambda: "th",
-                         {"01": "st", "02": "nd", "03": "rd"})
-    DATE_FORMATTERS = {
-        "year":  lambda dt: {"label": dt.strftime("%Y")},
-        "month": lambda dt: {"label": dt.strftime("%Y-%m"), "name": dt.strftime("%b")},
-        "day":   lambda dt: {"label": dt.strftime("%Y-%m-%d"), "name": dt.strftime("%a")},
-        "date":  lambda dt: {"label": dt.strftime("%d"),
-                             "ordinal": ChatContentTimeline.ORDINAL_INDICATORS[dt.strftime("%d")]},
-        "hour":  lambda dt: {"label": dt.strftime("%H:00")},
-        "week":  lambda dt: {"label": "week %s" % (
-                 (dt.isocalendar()[1] - dt.replace(day=1).isocalendar()[1] + 1))},
-    }
     LINE_FORMATS = {
         "year":  '<font color="%(FgColour)s" size=5><table width="100%%"><tr><td nowrap>%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2>%(name)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2>%(name)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s<sup>%(ordinal)s</sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2>%(label2)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2>%(label2)s</font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s<sup>%(label2)s</sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
         "hour":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
         "week":  '<font color="%(FgColour)s" size=2><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;%(label)s</td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
     }
     LINE_FORMATS_HIGHLIGHT = {
         "year":  '<font color="%(FgColour)s" size=5><table width="100%%"><tr><td nowrap><b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2><b>%(name)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2><b>%(name)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
-        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s<sup>%(ordinal)s</b></sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "month": '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>&nbsp;%(label)s </font><font size=2><b>%(label2)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "day":   '<font color="%(FgColour)s"><table width="100%%"><tr><td nowrap><font size=4>%(label)s </font><font size=2><b>%(label2)s</b></font></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
+        "date":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s<sup>%(label2)s</b></sup></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
         "hour":  '<font color="%(FgColour)s" size=3><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
         "week":  '<font color="%(FgColour)s" size=2><table width="100%%"><tr><td nowrap>&nbsp;&nbsp;&nbsp;&nbsp;<b>%(label)s</b></td><td align="right"><font color="%(DisabledColour)s" size=1>%(count)s</font></td></tr></table></font>',
     }
@@ -8246,72 +8241,33 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize):
         super(ChatContentTimeline, self).__init__(parent, id, pos, size)
-        self._dates = []         # [(datetime, {formatted date data}), ]
-        self._messages = []      # [message ID, ]
-        self._row_units = []     # [formatting unit for row, ]
+        self._timeline = []      # [{dt, label, unit, message, ?label2}, ]
+        self._units = ()         # (top unit, ?subunit)
         self._highlights = set() # [index of highlighted row, ]
-        self._units = None       # (top unit, ?subunit)
         self._tracking = True    # Scroll highlights into view
         ColourManager.Manage(self, "BackgroundColour", "BgColour")
         self.Bind(wx.EVT_LISTBOX, self._OnSelect)
 
 
-    def Populate(self, messages):
-        """Refreshes timeline from message list."""
+    def Populate(self, timeline, units):
+        """
+        Populates timeline from parser stats.
+
+        @param   timeline  [{dt, label, unit, messages, ?label2}]
+        """
         self.Set([])
-        del self._dates[:]
-        del self._messages[:]
-        del self._row_units[:]
         self._highlights.clear()
-        if not messages: return
-
-        d1, d2 = messages[0]["datetime"], messages[-1]["datetime"]
-        unit, span = "hour", d2 - d1
-        if   span > datetime.timedelta(days=365*2):  unit = "year"
-        elif span > datetime.timedelta(days= 30*3):  unit = "month"
-        elif span > datetime.timedelta(days=  7*2):  unit = "week"
-        elif span > datetime.timedelta(days=  1*2):  unit = "day"
-
-        if   "year"  == unit \
-        or   "month" == unit and d1.year != d2.year:
-                              units = ("year", "month")
-        elif "week"  == unit: units = ("month", "week")
-        elif "day"   == unit: units = ("month", "date")
-        elif "hour"  == unit: units = ("day", "hour")
-        else:                 units = (unit, )
-        self._units = units
-
-        ATTRS = set(["month", "day", "hour", "minute", "second", "microsecond"])
-        REPLACES = {"year":  ATTRS, "month": ATTRS - set(["month"]),
-                    "week":  ATTRS - set(["month", "day"]),
-                    "day":   ATTRS - set(["month", "day"]),
-                    "date":  ATTRS - set(["month", "day"]),
-                    "hour":  ATTRS - set(["month", "day", "hour"])}
-        REPLACE_VALUES = collections.defaultdict(int, {"month": 1, "day": 1})
-        uniques = {} # {(date, unit): {date data}}
-        for m in messages:
-            for unit in units:
-                dt = m["datetime"]
-                dt = dt.replace(**{k: REPLACE_VALUES[k] for k in REPLACES[unit]})
-                if "week" == unit: dt -= datetime.timedelta(days=dt.weekday())
-                if (dt, unit) in uniques:
-                    uniques[(dt, unit)]["count"] += 1
-                    continue # for unit
-
-                ddict = dict(self.DATE_FORMATTERS[unit](dt), count=1)
-                self._dates.append((dt, ddict))
-                self._messages.append(m["id"])
-                self._row_units.append(unit)
-                uniques[(dt, unit)] = ddict
-        for ddict in uniques.values():
-            ddict["count"] = util.format_count(ddict["count"])
+        self._timeline[:] = [dict(x, message=x["messages"][0]) for x in timeline]
+        self._units       = units
+        for x in self._timeline: x.pop("messages")
         self.RefreshItems()
 
 
     def GetMessage(self, index):
         """Returns message ID for item at specified index."""
-        if index < 0: index %= len(self._messages)
-        return self._messages[index] if index < len(self._messages) else None
+        if index < 0: index %= len(self._timeline)
+        if index >= len(self._timeline): return None
+        return self._timeline[index]["message"]
 
 
     def RefreshItems(self):
@@ -8323,10 +8279,10 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
         self.Freeze()
         try:
             self.Set([])
-            for i, (dt, ddict) in enumerate(self._dates):
+            for i, ddict in enumerate(self._timeline):
                 FORMATS = self.LINE_FORMATS_HIGHLIGHT if i in self._highlights \
                           else self.LINE_FORMATS
-                label = FORMATS[self._row_units[i]] % dict(vars(conf), **ddict)
+                label = FORMATS[ddict["unit"]] % dict(vars(conf), **ddict)
                 self.Append(label)
             if count0:
                 self.Selection = selected0
@@ -8339,18 +8295,18 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
         """Redraws the specified row."""
         FORMATS = self.LINE_FORMATS_HIGHLIGHT if index in self._highlights \
                   else self.LINE_FORMATS
-        ddict = self._dates[index][-1]
-        label = FORMATS[self._row_units[index]] % dict(vars(conf), **ddict)
+        ddict = self._timeline[index]
+        label = FORMATS[ddict["unit"]] % dict(vars(conf), **ddict)
         self.SetString(index, label)
 
 
     def HighlightRows(self, messages):
         """Highlights the rows that cover message timestamps."""
-        highlights = set()
-        dates, rooti = [a for a, b in self._dates] + [datetime.datetime.max], None
+        highlights, rooti = set(), None
+        dates = [x["dt"] for x in self._timeline] + [datetime.datetime.max]
         for m in messages:
             for i, dt1 in enumerate(dates[:-1]):
-                if self._row_units[i] != self._units[-1]: rooti = i
+                if self._timeline[i]["unit"] != self._units[-1]: rooti = i
                 dt2 = dates[i + 1] if dates[i + 1] != dt1 else dates[i + 2]
                 if dt1 <= m["datetime"] < dt2:
                     highlights.add(i)
@@ -8369,8 +8325,9 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
             for i in dohighlight: self.RefreshItem(i)
             if not self._tracking: return
 
-            tracklines = sorted(i for i in highlights # Skip root lines
-                                if self._row_units[i] == self._units[-1])
+            # Skip root lines, as they can have more children than fits in view
+            tracklines = sorted(i for i in highlights
+                                if self._timeline[i]["unit"] == self._units[-1])
             vspan = self.VisibleBegin, self.VisibleEnd
             # Scroll highlights into view, plus one row of padding
             if not all(vspan[0] <= i - 1 <= vspan[1] and 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    12.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -126,9 +126,15 @@ from skyperious.lib.vendor import step
       text-decoration: underline;
       font-weight: bold;
     }
-    #header_center a.statistics {
-      float: right;
-      margin-right: 10px;
+    #header_center table.links {
+      table-layout: fixed;
+      width: 100%;
+    }
+    #header_center table.links td:nth-child(2) {
+      text-align: center;
+    }
+    #header_center table.links td:last-child {
+      text-align: right;
     }
     #header_right {
       width: 100%;
@@ -427,6 +433,88 @@ from skyperious.lib.vendor import step
     #transfers .filename {
       color: blue;
     }
+    #timeline {
+      position: fixed;
+      top: 0px;
+      bottom: 0px;
+      left: calc(50% - 425px - 150px);
+      width: 140px;
+      background: white;
+      padding: 5px;
+      display: none;
+    }
+    #timeline h3 {
+      color: #3399FF;
+      margin: 0;
+      padding: 5px 0;
+    }
+    #timeline a.toggle {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+    }
+    #timeline ul {
+      height: calc(100% - 28px);
+      list-style-type: none;
+      margin: 0;
+      padding: 1px;
+      position: relative;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #timeline ul li {
+      font-size: 15px;
+      line-height: 25px;
+    }
+    #timeline ul li a {
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: black;
+      display: block;
+      padding: 5px;
+    }
+    #timeline ul li a:hover {
+      border-color: black;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    #timeline ul li .name {
+      font-size: 12px;
+    }
+    #timeline ul li.highlight .name {
+      font-weight: bold;
+    }
+    #timeline ul li.month a {
+      padding-left: 10px;
+    }
+    #timeline ul li.week a {
+      font-size:    10px;
+      padding-left: 20px;
+    }
+    #timeline ul li.day,
+    #timeline ul li.date a {
+      padding-left: 15px;
+    }
+    #timeline ul li.hour a {
+      padding-left: 25px;
+    }
+    #timeline ul li .count {
+      font-size: 9px;
+    }
+    #timeline ul li.year .date {
+      font-size: 18px;
+    }
+    #timeline ul li .count {
+      float: right;
+      font-size: 8px;
+      opacity: 0.4;
+    }
+    #timeline ul li.hour .date {
+      font-size: 10px;
+    }
+    #timeline ul li.day .date {
+      font-size: 11px;
+    }
     span.shared_image {
       background: black;
       border-radius: 5px;
@@ -483,6 +571,13 @@ from skyperious.lib.vendor import step
     var HIGHLIGHT_STYLES = 10;
     var style_counter = 0;
     var hilite_counter = 0;
+    var MESSAGE_TIMELINES = {{! reduce(lambda a, b: ([a.setdefault(m, []).append(str(b["datestr"])) for m in b["messages"]], a)[-1], timeline, {}) }}; // {message ID: [timeline ID, ]}
+    var timeline_loaded = [];   // [li, ]
+    var messages_loaded = [];   // [tr, ]
+    var scroll_highlights = {}; // {message ID: highlight}
+    var scroll_timer = null;    // setTimeout ID
+    var scroll_timeline = true; // Whether to scroll timeline on scrolling messages
+    var scroll_history = [window.scrollY, window.scrollY]; // Last scroll positions
 
     function toggle_element(id, id_hide) {
       var el = document.getElementById(id);
@@ -656,12 +751,111 @@ from skyperious.lib.vendor import step
       return false;
     };
 
+    /** Attaches scroll observer to message rows. */
+    var init_timeline = function() {
+      var items = Array.prototype.slice.call(document.querySelectorAll("#timeline ul li"));
+      var items2 = timeline_loaded ? items.filter(function(x) { return timeline_loaded.indexOf(x) < 0; }) : items;
+      items2.forEach(function(x) { x.addEventListener("click", on_click_timeline); });
+      (timeline_loaded || []).push.apply(timeline_loaded, items);
+
+      var rows = Array.prototype.slice.call(document.querySelectorAll("#content_table tr"));
+      var rows2 = messages_loaded ? rows.filter(function(x) { return messages_loaded.indexOf(x) < 0; }) : rows;
+      rows2.forEach(scroll_observer.observe.bind(scroll_observer));
+      if (!messages_loaded) return;
+
+      messages_loaded.push.apply(messages_loaded, rows2);
+      window.setTimeout(init_timeline, 500);
+    };
+
+    /** Highlights timeline for messages in view. */
+    var highlight_timeline = function() {
+      scroll_timer = null;
+
+      var on = {}, off = {}; // {"timeline:xyz": true}
+      var msg_ids = Object.keys(scroll_highlights);
+      for (var i = 0; i < msg_ids.length; i++) {
+        var msg_id = msg_ids[i], into_view = scroll_highlights[msg_id];
+        if (!into_view) delete scroll_highlights[msg_id];
+        var timeline_ids = MESSAGE_TIMELINES[msg_id];
+        if (!timeline_ids) continue; // for i
+        for (var j = 0; j < timeline_ids.length; j++) {
+          (into_view ? on : off)["timeline:" + timeline_ids[j]] = true;
+        };
+      };
+      Object.keys(on).forEach(function(x) { delete off[x]; });
+      var elems_off = Object.keys(off).map(document.getElementById.bind(document)).filter(Boolean),
+          elems_on  = Object.keys(on ).map(document.getElementById.bind(document)).filter(Boolean);
+      elems_off.forEach(function(x) { x.classList.remove("highlight"); });
+      elems_on. forEach(function(x) { x.classList.add   ("highlight"); });
+      if (!scroll_timeline || !elems_on.length) return;
+
+      var leafelems_on  = elems_on .filter(function(x) { return !x.classList.contains("root"); });
+      var leafelems_off = elems_off.filter(function(x) { return !x.classList.contains("root"); });
+      if (!leafelems_on.length) leafelems_on = elems_on;
+      if (!leafelems_on.length) return;
+      var container = elems_on[0].parentElement,
+          viewport  = [container.scrollTop, container.scrollTop + container.clientHeight],
+          downward  = scroll_history[1] > scroll_history[0],
+          anchor    = leafelems_on[downward ? leafelems_on.length - 1 : 0];
+      anchor = (downward ? anchor.nextElementSibling : anchor.previousElementSibling) || anchor;
+      if (anchor.classList.contains("root")) {
+        var anchor2 = downward ? anchor.nextElementSibling : anchor.previousElementSibling;
+        if (anchor2 && !anchor2.classList.contains("root")) anchor = anchor2;
+      };
+      if (anchor.offsetTop >= viewport[0] && anchor.offsetTop + anchor.offsetHeight <= viewport[1]) return;
+      container.scrollTop = Math.max(0, anchor.offsetTop - (downward ? container.clientHeight - anchor.offsetHeight : 0));
+    };
+
+    /** Cancels scrolling timeline on ensuring messages-viewport change. */
+    var on_click_timeline = function() {
+      scroll_timeline = false;
+      window.setTimeout(function() { scroll_timeline = true; }, 500);
+      return true;
+    };
+
+    /** Queues scrolled messages for highlighting timeline. */
+    var on_scroll_messages = function(entries) {
+      scroll_history = [scroll_history[1], window.scrollY];
+      entries.forEach(function(entry) {
+        var msg_id = entry.target.id.replace("message:", "");
+        if (msg_id) scroll_highlights[msg_id] = entry.isIntersecting;
+      });
+      scroll_timer = scroll_timer || window.setTimeout(highlight_timeline, 50);
+    };
+
+    if (window.IntersectionObserver) {
+      var scroll_options = {"root": document.querySelector("#content_table"), "threshold": [0, 1]};
+      var scroll_observer = new IntersectionObserver(on_scroll_messages, scroll_options);
+      window.setTimeout(init_timeline, 500);
+      document.addEventListener("load", function() { messages_loaded = null, timeline_loaded = null; });
+    };
+
 %if any(x["success"] for x in stats["shared_images"].values()):
     {{!templates.LIGHTBOX_JS}}
 %endif
   </script>
 </head>
 <body>
+<div id="timeline">
+<h3>Timeline</h3>
+<a title="Click to hide timeline" href="javascript:;" class="toggle" onclick="return toggle_element('timeline')">x</a>
+<ul>
+%for entry in timeline:
+  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ entry["datestr"] }}">
+    <a href="#message:{{ entry["messages"][0] }}" title="{{ entry["datestr"] }} : {{ util.plural("message", entry["messages"], sep=",") }}">
+%if entry["unit"] in ("month", "date"):
+      <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
+%elif "day" == entry["unit"]:
+      <span class="date">{{ entry["label"] }}<sup>{{ entry["ordinal"] }}</sup></span>
+%else:
+      <span class="date name">{{ entry["label"] }}</span>
+%endif
+      <span class="count">{{ util.format_count(entry["count"]) }}</span>
+    </a>
+  </li>
+%endfor
+</ul>
+</div>
 <table id="body_table">
 <tr><td>
   <table id="header_table">
@@ -684,7 +878,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
     </td>
     <td id="header_center">
       <div id="header">{{chat["title_long"]}}.</div><br />
-      Showing {{util.plural("message", message_count)}}
+      Showing {{util.plural("message", message_count, sep=",")}}
 %if date1 and date2:
       from <b>{{date1}}</b> to <b>{{date2}}</b>.<br />
 %else:
@@ -695,14 +889,25 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 %else:
       Chat has
 %endif
-      <b>{{util.plural("message", chat["message_count"] or 0)}}</b> in total.<br />
+      <b>{{util.plural("message", chat["message_count"] or 0, sep=",")}}</b> in total.<br />
       Source: <b>{{db.filename}}</b>.<br /><br />
+
+      <table class="links"><tr>
+        <td>
 %if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
-        <a title="Click to show/hide participants" href="javascript:;" onclick="return toggle_element('participants', 'statistics')">Participants</a>
+          <a title="Click to show/hide participants" href="javascript:;" onclick="return toggle_element('participants', 'statistics')">Participants</a>
 %endif
+        </td><td>
+%if timeline:
+          <a title="Click to show/hide timeline" href="javascript:;" onclick="return toggle_element('timeline')">Timeline</a>
+%endif
+        </td><td>
 %if stats and (stats["counts"] or stats["info_items"]):
         <a title="Click to show/hide statistics and wordcloud" class="statistics" href="javascript:;" onclick="return toggle_element('statistics', 'participants')">Statistics</a>
 %endif
+        </td>
+      </tr></table>
+
     </td>
     <td id="header_right">
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
@@ -832,7 +1037,7 @@ if "byte" == label:
 elif "callduration" == label:
   text_total = util.format_seconds(total)
 else:
-  text_total = util.plural(label, total)
+  text_total = util.plural(label, total, sep=",")
 %>
           <tr title="{{util.round_float(percent)}}% of {{text_total}} in total" class="{{label}}"><td>
             <table class="plot_row {{type}}"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table>
@@ -842,11 +1047,11 @@ else:
 %for type, label, count, total in stat_rows:
 <%
 if "byte" == label:
-  text, title = util.format_bytes(count), util.plural(label, count)
+  text = util.format_bytes(count)
 elif "callduration" == label:
-  text, title = util.format_seconds(count, "call"), util.plural("second", count)
+  text = util.format_seconds(count, "call")
 else:
-  text = title = util.plural(label, count)
+  text = util.plural(label, count, sep=",")
 %>
           <div class="{{label}}" title="{{count}}">{{text}}</div>
 %endfor
@@ -1018,7 +1223,7 @@ f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %else:
           <span class="filename">{{f["filename"]}}</span>
 %endif
-        </td><td title="{{util.plural("byte", int(f["filesize"]))}}">
+        </td><td title="{{util.plural("byte", int(f["filesize"]), sep=",")}}">
           {{util.format_bytes(int(f["filesize"]))}}
         </td><td class="timestamp" title="{{f_datetime_title}}">
           {{f_datetime}}
@@ -1082,8 +1287,8 @@ emot_start = '<span class="emoticon '
 shift_row = emot_start in content and (("<br />" not in content and len(text_plain) < 140) or content.index(emot_start) < 140)
 author_class = "remote" if m["author"] != db.id else "local"
 %>
-  <tr{{!' class="shifted"' if shift_row else ""}}>
-    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}" id="message:{{m["id"]}}">{{from_name if not is_info else ""}}</td>
+  <tr id="message:{{m["id"]}}"{{!' class="shifted"' if shift_row else ""}}>
+    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}">{{from_name if not is_info else ""}}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
@@ -1124,8 +1329,8 @@ from skyperious import conf, skypedata
 from skyperious.lib import util
 
 %>History of Skype {{chat["title_long_lc"]}}.
-Showing {{util.plural("message", message_count)}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
-Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0)}} in total.
+Showing {{util.plural("message", message_count, sep=",")}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
+Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0, sep=",")}} in total.
 Source: {{db.filename}}.
 Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
 -------------------------------------------------------------------------------
@@ -1236,7 +1441,7 @@ from skyperious.lib import util
         <td>
             <div class="header">{{title}}</div><br />
             Source: <b>{{db_filename}}</b>.<br />
-            <b>{{row_count}}</b> {{util.plural("row", row_count, with_items=False)}} in results.<br />
+            <b>{{row_count}}</b> {{util.plural("row", row_count, numbers=False, sep=",")}} in results.<br />
 %if sql:
             <b>SQL:</b> {{sql}}
 %endif
@@ -1430,7 +1635,7 @@ if "byte" == label:
 elif "callduration" == label:
   text_cell3 = util.format_seconds(count, "call")
 else:
-  text_cell3 = util.plural(label, count)
+  text_cell3 = util.plural(label, count, sep=",")
 %>
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
         <td bgcolor="{{colormap[type]}}" width="{{int(round(ratio * conf.StatisticsPlotWidth))}}" align="center">
@@ -2339,9 +2544,9 @@ if hasattr(start, "strftime"):
         datetitle = "%s .. %s, %s days" % (start.strftime("%Y-%m-%d"), date2.strftime("%Y-%m-%d"), interval.days)
     else:
         datetitle = start.strftime("%Y-%m-%d")
-    title = "%s: %s" % (datetitle, util.plural("message", val))
+    title = "%s: %s" % (datetitle, util.plural("message", val, sep=","))
 else:
-    title = "%02d. hour: %s" % (start, util.plural("message", val))
+    title = "%02d. hour: %s" % (start, util.plural("message", val, sep=","))
 %>
   <g class="svg_hover_group">
 %if start in links:

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    15.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -127,22 +127,35 @@ def format_exc(e):
     return result
 
 
-def plural(word, items=None, with_items=True):
+def plural(word, items=None, numbers=True, single="1", sep="", pref="", suf=""):
     """
     Returns the word as 'count words', or '1 word' if count is 1,
     or 'words' if count omitted.
 
-    @param   items       item collection or count,
-                         or None to get just the plural of the word
-             with_items  if False, count is omitted from final result
+    @param   items      item collection or count,
+                        or None to get just the plural of the word
+             numbers    if False, count is omitted from final result
+             single     prefix to use for word if count is 1, e.g. "a"
+             sep        thousand-separator to use for count
+             pref       prefix to prepend to count, e.g. "~150"
+             suf        suffix to append to count, e.g. "150+"
     """
-    count = items or 0
-    if hasattr(items, "__len__"):
-        count = len(items)
-    result = word + ("" if 1 == count else "s")
-    if with_items and items is not None:
-        result = "%s %s" % (count, result)
-    return result
+    count   = len(items) if hasattr(items, "__len__") else items or 0
+    isupper = word[-1:].isupper()
+    suffix = "es" if word and "day" != word.lower() and word[-1:].lower() in "xyz" \
+             else "s" if word else ""
+    if isupper: suffix = suffix.upper()
+    if count != 1 and "es" == suffix and "y" == word[-1:].lower():
+        word = word[:-1] + ("I" if isupper else "i")
+    result = word + ("" if 1 == count else suffix)
+    if numbers and items is not None:
+        fmtcount = single if 1 == count else "".join([
+            x + ("," if i and not i % 3 else "")
+            for i, x in enumerate(str(count)[::-1])][::-1
+        ]) if sep else str(count)
+        fmtcount = pref + fmtcount + suf
+        result = "%s %s" % (single if 1 == count else fmtcount, result)
+    return result.strip()
 
 
 def xor(text, key):

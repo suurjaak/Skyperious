@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.08.2020
+@modified    17.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1523,7 +1523,23 @@ class MessageParser(object):
     """Number of bins in statistics days histogram."""
     HISTOGRAM_DAY_BINS = 10
 
-    """Convenience class for earliest messages in histogram bins."""
+    """Ordinal indicators for history timeline days."""
+    ORDINAL_INDICATORS = collections.defaultdict(lambda: "th",
+                         {"01": "st", "02": "nd", "03": "rd"})
+
+    """Functions returning data dicts for history timeline."""
+    TIMELINE_FORMATTERS = {
+        "year":  lambda dt: {"label": dt.strftime("%Y")},
+        "month": lambda dt: {"label": dt.strftime("%Y-%m"),    "label2": dt.strftime("%b")},
+        "day":   lambda dt: {"label": dt.strftime("%Y-%m-%d"), "label2": dt.strftime("%a")},
+        "date":  lambda dt: {"label": dt.strftime("%d"),
+                             "label2": MessageParser.ORDINAL_INDICATORS[dt.strftime("%d")]},
+        "hour":  lambda dt: {"label": dt.strftime("%H:00")},
+        "week":  lambda dt: {"label": "week %s" % (
+                 (dt.isocalendar()[1] - dt.replace(day=1).isocalendar()[1] + 1))},
+    }
+
+    """Convenience class for message data for histogram and timeline."""
     MessageStamp = collections.namedtuple("MessageStamp", "date id")
 
 
@@ -1557,7 +1573,7 @@ class MessageParser(object):
                 "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
                 "hists": {}, # Author histogram data {author: {"hours", ..} }
-                "workhist": {}, # {"hours": {0: {author: count}}, "days": ..}}
+                "workhist": {}, # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
                 "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
                 "shared_images": {}} # {message_id: {url, datetime, author, author_name}, }
 
@@ -1597,7 +1613,7 @@ class MessageParser(object):
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
-            self.stats and self.collect_message_stats(message, dom)
+            self.stats and self.collect_message_stats(message, dom, is_html)
             if is_html: # Create a copy, HTML will mutate dom
                 dom = copy.deepcopy(dom)
                 rgx_highlight and self.highlight_text(dom, rgx_highlight)
@@ -2098,7 +2114,7 @@ class MessageParser(object):
         dictionary[key] += (inter if dictionary[key] else "") + text
 
 
-    def collect_message_stats(self, message, dom):
+    def collect_message_stats(self, message, dom, is_html=False):
         """Adds message statistics to accumulating data."""
         author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
@@ -2135,7 +2151,8 @@ class MessageParser(object):
             self.stats["workhist"][name][key][author] += 1
             histobin = self.stats["workhist"][name + "-firsts"][author]
             if histobin[key] > stamp: histobin[key] = stamp
-            
+        self.stats["workhist"].setdefault("stamps", []).append(stamp)
+
         len_msg = len(self.stats["last_message"])
         if MESSAGE_TYPE_SMS == message["type"]:
             self.stats["smses"] += 1
@@ -2345,6 +2362,62 @@ class MessageParser(object):
                 stats["wordcounts"][w][author] = c
 
         return stats
+
+
+    def get_timeline_stats(self):
+        """
+        Returns timeline structure from parsed messages, as (timeline, units),
+        where timeline is [{dt, label, count, messages, ?label2})]
+        and units is (top unit, ?subunit).
+        """
+        timeline, units = [], ()
+        if not self.stats or not self.stats["workhist"].get("stamps"):
+            return timeline, units
+
+        d1, d2 = (self.stats["workhist"]["stamps"][i].date for i in (0, -1))
+        unit, span = "hour", d2 - d1
+        if   span > datetime.timedelta(days=365*2):  unit = "year"
+        elif span > datetime.timedelta(days= 30*3):  unit = "month"
+        elif span > datetime.timedelta(days=  7*2):  unit = "week"
+        elif span > datetime.timedelta(days=  1*2):  unit = "day"
+
+        if   "year"  == unit \
+        or   "month" == unit and d1.year != d2.year:
+                              units = ("year", "month")
+        elif "week"  == unit: units = ("month", "week")
+        elif "day"   == unit: units = ("month", "date")
+        elif "hour"  == unit: units = ("day", "hour")
+        else:                 units = (unit, )
+
+        STRFMTS = {"year": "%Y", "month": "%Y-%m", "week": "%Y-%m ",
+                   "date": "%Y-%m-%d", "day": "%Y-%m-%d", "hour": "%Y-%m-%d %H:00"}
+        ATTRS = set(["month", "day", "hour", "minute", "second", "microsecond"])
+        REPLACES = {"year":  ATTRS, "month": ATTRS - set(["month"]),
+                    "week":  ATTRS - set(["month", "day"]),
+                    "day":   ATTRS - set(["month", "day"]),
+                    "date":  ATTRS - set(["month", "day"]),
+                    "hour":  ATTRS - set(["month", "day", "hour"])}
+        REPLACE_VALUES = collections.defaultdict(int, {"month": 1, "day": 1})
+        uniques = {} # {(date, unit): {date data}}
+        for m in self.stats["workhist"]["stamps"]:
+            for unit in units:
+                dt = m.date
+                dt = dt.replace(**{k: REPLACE_VALUES[k] for k in REPLACES[unit]})
+                if "week" == unit: dt -= datetime.timedelta(days=dt.weekday())
+                if (dt, unit) in uniques:
+                    uniques[(dt, unit)]["messages"].append(m.id)
+                    continue # for unit
+
+                ddict = self.TIMELINE_FORMATTERS[unit](dt)
+                ddict.update(dt=dt, messages=[m.id], unit=unit,
+                             datestr=dt.strftime(STRFMTS[unit]))
+                if "week" == unit: ddict["datestr"] += ddict["label"]
+                timeline.append(ddict)
+                uniques[(dt, unit)] = ddict
+        for ddict in timeline:
+            ddict["count"] = util.format_count(len(ddict["messages"]))
+        self.stats["workhist"].pop("stamps") # Clear memory
+        return timeline, units
 
 
 
