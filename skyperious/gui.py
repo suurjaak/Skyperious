@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.08.2020
+@modified    18.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2992,26 +2992,25 @@ class DatabasePage(wx.Panel):
         panel_sync1 = wx.Panel(splitter_sync)
         panel_sync2 = wx.Panel(splitter_sync)
 
-        label_login = wx.StaticText(panel1, label="Log in to Skype online account")
-        label_user = wx.StaticText(panel1, label="Username:")
-        edit_user  = self.edit_user = wx.TextCtrl(panel1)
-        label_pw = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
-        edit_pw  = self.edit_pw = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
-        check_store  = self.check_login_store = wx.CheckBox(panel1, label="&Remember password")
-        check_auto   = self.check_login_auto  = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
-        edit_status  = self.edit_login_status = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
-        button_login = self.button_login      = controls.NoteButton(panel1, label="&Log in as '%s'" % self.db.username, bmp=images.ButtonLogin.Bitmap)
+        label_login  = wx.StaticText(panel1, label="Log in to Skype online account")
+        label_user   = wx.StaticText(panel1, label="Username:")
+        edit_user    = wx.TextCtrl(panel1)
+        label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
+        edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
+        check_store  = wx.CheckBox(panel1, label="&Remember password")
+        check_auto   = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
+        edit_status  = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
+        button_login = controls.NoteButton(panel1, bmp=images.ButtonLogin.Bitmap)
+        label_info   = wx.StaticText(panel1)
 
         label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
-        list_chats = self.list_chats_sync = controls.SortableListView(
-            parent=panel_sync1, style=wx.LC_REPORT)
-        gauge = self.gauge_sync = wx.Gauge(panel_sync2, size=(300, 15),
-                                           style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
-        label_progress   = self.label_sync_progress = wx.StaticText(panel_sync2)
-        edit_sync_status = self.edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
-        button_sync      = self.button_sync      = controls.NoteButton(panel_sync2, label="S&ynchronize history in local database", bmp=images.ButtonMergeLeftMulti.Bitmap)
-        button_sync_sel  = self.button_sync_sel  = controls.NoteButton(panel_sync2, label="Synchronize selec&ted chats", bmp=images.ButtonMergeLeft.Bitmap)
-        button_sync_stop = self.button_sync_stop = controls.NoteButton(panel_sync2, label="Stop synchronizing", bmp=images.ButtonStop.Bitmap)
+        list_chats = controls.SortableListView(parent=panel_sync1, style=wx.LC_REPORT)
+        gauge = wx.Gauge(panel_sync2, size=(300, 15), style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
+        label_progress   = wx.StaticText(panel_sync2)
+        edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
+        button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
+        button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
 
         ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
         ColourManager.Manage(panel2, "BackgroundColour", "BgColour")
@@ -3020,14 +3019,22 @@ class DatabasePage(wx.Panel):
         label_login.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
         check_store.ToolTip = "Store password for this database locally"
-        check_auto.ToolTip  = "Update database from Skype online service automatically on opening this database next time"
+        check_auto.ToolTip  = "Update database from Skype online service " \
+                              "automatically on opening this database next time"
         check_auto.Disable()
         ColourManager.Manage(edit_status, "ForegroundColour", "DisabledColour")
         ColourManager.Manage(edit_status, "BackgroundColour", "BgColour")
         edit_status.SetEditable(False)
         ColourManager.Manage(button_login, "BackgroundColour", "BgColour")
-        button_login.Note = "After login, local database can be updated from Skype online service.\n" \
-                            "Additionally, HTML export can download and include shared images."
+        button_login.Label = "&Log in as '%s'" % self.db.username
+        button_login.Note = "After login, local database can be updated from " \
+                            "Skype online service.\nAdditionally, HTML export " \
+                            "can download and include shared images."
+        ColourManager.Manage(label_info, "ForegroundColour", "DisabledColour")
+        label_info.Label = "Skype login can sometimes experience failure "\
+                           "for no discernible reason.\n" \
+                           "If login fails, try again later."
+        label_info.Hide()
 
         label_sync.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                                   wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
@@ -3046,8 +3053,11 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
-        button_sync.Note = "Query Skype online services for new messages and save them in local database."
+        button_sync.Label = "S&ynchronize history in local database"
+        button_sync.Note  = "Query Skype online services for new messages and save them in local database."
+        button_sync_sel.Label = "Synchronize selec&ted chats"
         button_sync_sel.Note  = "Select specific chats to synchronize in local database."
+        button_sync_stop.Label = "Stop synchronizing"
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
         if not live.skpy:
@@ -3063,6 +3073,21 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
+
+        self.edit_user           = edit_user
+        self.edit_pw             = edit_pw
+        self.check_login_store   = check_store
+        self.check_login_auto    = check_auto
+        self.edit_login_status   = edit_status
+        self.button_login        = button_login
+        self.label_login_fail    = label_info
+        self.list_chats_sync     = list_chats
+        self.gauge_sync          = gauge
+        self.label_sync_progress = label_progress
+        self.edit_sync_status    = edit_sync_status
+        self.button_sync         = button_sync
+        self.button_sync_sel     = button_sync_sel
+        self.button_sync_stop    = button_sync_stop
 
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -3085,6 +3110,7 @@ class DatabasePage(wx.Panel):
         sizer1.Add(sizer_login,  border=20, flag=wx.TOP | wx.GROW)
         sizer1.Add(edit_status,  border=10, flag=wx.TOP | wx.LEFT | wx.RIGHT | wx.GROW)
         sizer1.Add(button_login, border=5,  flag=wx.ALL | wx.GROW)
+        sizer1.Add(label_info,   border=15, flag=wx.ALL | wx.GROW)
 
         sizer2.Add(label_sync, border=5, flag=wx.ALL | wx.GROW)
 
@@ -3367,9 +3393,12 @@ class DatabasePage(wx.Panel):
                     logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
                     self.button_login.Enable() 
+                    self.label_login_fail.Show()
+                    self.label_login_fail.ContainingSizer.Layout()
                 else:
                     self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
                     self.button_login.Disable() 
+                    self.label_login_fail.Hide()
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
                     if result.get("opts", {}).get("auto"): wx.CallAfter(self.on_live_sync)
