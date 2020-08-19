@@ -296,7 +296,7 @@ def export_chat_template(chat, filename, db, messages):
 
         tmpfile.flush(), tmpfile.seek(0)
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), "")
-        with util.create_file(filename, file=True) as f:
+        with util.create_file(filename, handle=True) as f:
             t = templates.CHAT_HTML if is_html else templates.CHAT_TXT
             step.Template(t, strip=False, escape=is_html).stream(f, namespace)
         count = bool(namespace["message_count"])
@@ -323,7 +323,7 @@ def export_chat_csv(chat, filename, db, messages):
     # csv.excel.delimiter default "," is not actually used by Excel.
     # Default linefeed "\r\n" would cause another "\r" to be written.
     dialect.delimiter, dialect.lineterminator = ";", "\r"
-    with util.create_file(filename, "wb", True) as f:
+    with util.create_file(filename, "wb", handle=True) as f:
         writer = csv.writer(f, dialect)
         writer.writerow(["Time", "Author", "Message"])
         for m in messages:
@@ -359,7 +359,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
     is_sql  = filename.lower().endswith(".sql")
     is_xlsx = filename.lower().endswith(".xlsx")
     try:
-        with util.create_file(filename, file=True) as f:
+        with util.create_file(filename, handle=True) as f:
             columns = [c["name"] for c in grid.Table.columns]
 
             if is_csv or is_xlsx:

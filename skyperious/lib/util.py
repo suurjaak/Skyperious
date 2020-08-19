@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    18.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -280,11 +280,16 @@ def start_file(filepath):
     return success, error
 
 
-def create_file(filepath, mode="w", file=False):
-    """Creates or overwrites the file, making any lacking parent directories."""
+def create_file(filepath, mode="w", handle=False):
+    """
+    Creates or overwrites the file, making any lacking parent directories.
+
+    @param   mode    file creation mode, relevant if returning file handle
+    @param   handle  whether to return open file handle
+    """
     try: os.makedirs(os.path.split(filepath)[0])
     except Exception: pass
-    if file: return open(filepath, mode)
+    if handle: return open(filepath, mode)
     else:
         with open(filepath, mode): pass
 

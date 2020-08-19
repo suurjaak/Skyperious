@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    18.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -112,12 +112,12 @@ class SkypeLogin(object):
         if init_db: self.init_db()
 
 
-    def init_db(self, filename=None):
+    def init_db(self, filename=None, truncate=False):
         """Creates SQLite database if not already created."""
         if not self.db:
             path = filename or self.make_db_path(self.username)
-            if not os.path.exists(path): util.create_file(path)
-            self.db = skypedata.SkypeDatabase(path, log_error=False)
+            truncate = truncate or not os.path.exists(path)
+            self.db = skypedata.SkypeDatabase(path, truncate=truncate)
             self.db.live = self
         for table in self.db.CREATE_STATEMENTS:
             if table not in self.db.tables: self.db.create_table(table)
@@ -906,7 +906,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         if self.is_temporary:
             fh, dbfilename = tempfile.mkstemp(".db")
             os.close(fh)
-        super(SkypeExport, self).__init__(dbfilename, log_error=False)
+        super(SkypeExport, self).__init__(dbfilename, truncate=not self.is_temporary)
         for table in self.CREATE_STATEMENTS: self.create_table(table)
 
 

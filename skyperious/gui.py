@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1604,8 +1604,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         busy = controls.BusyPanel(self, "Creating new database..")
         try:
             logger.info("Creating new blank database %s for user '%s'.", filename, user)
-            with open(filename, "w"): pass
-            db = skypedata.SkypeDatabase(filename, log_error=False)
+            db = skypedata.SkypeDatabase(filename, truncate=True)
             for table in db.CREATE_STATEMENTS: db.create_table(table)
             db.insert_account({"skypename": user})
             db.tables_list = None # Force reload
@@ -1662,8 +1661,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             try:
                 logger.info("Creating new Skype database file %s from Skype online "
                             "for user '%s'.", filename, user)
-                with open(filename, "w"): pass
-                skype.init_db(filename)
+                skype.init_db(filename, truncate=True)
                 skype.save("accounts", skype.skype.user)
                 skype.db.tables_list = None # Force reload
                 skype.db.update_accountinfo()
@@ -1762,7 +1760,6 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(after)
 
         try:
-            with open(filename, "w"): pass
             db = live.SkypeExport(efilename, filename)
         except Exception:
             util.try_until(lambda: os.unlink(filename))

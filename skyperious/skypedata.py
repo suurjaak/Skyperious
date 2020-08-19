@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -162,12 +162,13 @@ class SkypeDatabase(object):
     }
 
 
-    def __init__(self, filename, log_error=True):
+    def __init__(self, filename, log_error=True, truncate=False):
         """
         Initializes a new Skype database object from the file.
 
         @param   log_error  if False, exceptions on opening the database
                             are not written to log (written by default)
+        @param   truncate   create or overwrite file before opening
         """
         self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
@@ -182,8 +183,11 @@ class SkypeDatabase(object):
         self.tables_list = None # Ordered list of table items
         self.table_rows = {}    # {"tablename1": [..], }
         self.table_objects = {} # {"tablename1": {id1: {rowdata1}, }, }
-        self.update_fileinfo()
         try:
+            if truncate and os.path.exists(self.filename):
+                logger.info("Overwriting existing file %s.", self.filename)
+            if truncate: util.create_file(self.filename)
+            self.update_fileinfo()
             self.connection = sqlite3.connect(self.filename,
                                               check_same_thread=False)
             self.connection.row_factory = self.row_factory
@@ -193,11 +197,11 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception:
-            if log_error: logger.exception("Error opening database %s.", filename)
+            if log_error: logger.exception("Error opening database %s.", self.filename)
             self.close()
             raise
         from . import live # Avoid circular import
-        self.update_accountinfo(log_error)
+        if not truncate: self.update_accountinfo(log_error=log_error)
         self.live = live.SkypeLogin(self)
 
 
@@ -238,7 +242,7 @@ class SkypeDatabase(object):
         @return  a list of encountered errors, if any
         """
         result = []
-        with open(filename, "w") as _: pass # Truncate file
+        with open(filename, "w"): pass # Truncate file
         self.execute("ATTACH DATABASE ? AS new", (filename, ))
         # Create structure for all tables
         for t in (x for x in self.tables_list or [] if x.get("sql")):
@@ -1613,7 +1617,7 @@ class MessageParser(object):
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
-            self.stats and self.collect_message_stats(message, dom, is_html)
+            self.stats and self.collect_message_stats(message, dom)
             if is_html: # Create a copy, HTML will mutate dom
                 dom = copy.deepcopy(dom)
                 rgx_highlight and self.highlight_text(dom, rgx_highlight)
@@ -2114,7 +2118,7 @@ class MessageParser(object):
         dictionary[key] += (inter if dictionary[key] else "") + text
 
 
-    def collect_message_stats(self, message, dom, is_html=False):
+    def collect_message_stats(self, message, dom):
         """Adds message statistics to accumulating data."""
         author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]

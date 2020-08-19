@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -455,11 +455,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             output(prompt, end="")
             username = raw_input().strip()
 
-        if not file_existed or truncate:
-            if truncate and os.path.exists(filepath):
-                logger.info("Overwriting existing file %s.", filepath)
-            util.create_file(filepath)
-        db = skypedata.SkypeDatabase(filepath)
+        db = skypedata.SkypeDatabase(filepath, truncate=not file_existed or truncate)
         username = db.username or username
         password = password0 or passwords.get(username)
 
@@ -513,11 +509,8 @@ def run_create(filenames, input=None, username=None, password=None,
 
     filename = os.path.realpath(filenames[0])
     if not input: # Create blank database, with just account username
-        if os.path.exists(filename):
-            logger.info("Overwriting existing file %s.", filename)
-        util.create_file(filename)
         logger.info("Creating new blank database %s for user '%s'.", filename, username)
-        db = skypedata.SkypeDatabase(filename, log_error=False)
+        db = skypedata.SkypeDatabase(filename, truncate=True)
         for table in db.CREATE_STATEMENTS: db.create_table(table)
         db.insert_account({"skypename": username})
         output("Created blank database %s for user %s." % (filename, username))
@@ -534,9 +527,6 @@ def run_create(filenames, input=None, username=None, password=None,
         return True
 
     username = live.SkypeExport.export_get_account(input)
-    if os.path.exists(filename):
-        logger.info("Overwriting existing file %s.", filename)
-    util.create_file(filename)
     db = live.SkypeExport(input, filename)
 
     if ask_password and store_password: password = get_password(username)
