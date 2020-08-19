@@ -4707,7 +4707,7 @@ class DatabasePage(wx.Panel):
                 if identity in reselecteds:
                     c = self.list_participants.GetItem(i)
                     c.Check(True)
-                    self.list_participants.SetItem(i, c)
+                    self.list_participants.SetItem(c)
             self.list_participants.Refresh()
         participants = []
         for i in range(self.list_participants.GetItemCount()):

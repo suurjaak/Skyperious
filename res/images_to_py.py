@@ -9,14 +9,12 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  13.08.2020
+@modified  19.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
 import datetime
 import os
-import shutil
-import wx.tools.img2py
 
 """Target Python script to write."""
 TARGET = os.path.join("..", "skyperious", "images.py")
@@ -178,7 +176,7 @@ def create_py(target):
         Q3, iconstr.replace("'", "").replace("[", "").replace("]", "")
     ))
     for filename, desc in APPICONS:
-        name, extension = os.path.splitext(filename)
+        name = os.path.splitext(filename)[0]
         f.write("\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
         data = base64.b64encode(open(filename, "rb").read())
         while data:
@@ -186,7 +184,7 @@ def create_py(target):
             data = data[72:]
         f.write(")\n")
     for filename, desc in sorted(IMAGES.items()):
-        name, extension = os.path.splitext(filename)
+        name = os.path.splitext(filename)[0]
         f.write("\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
         data = base64.b64encode(open(filename, "rb").read())
         while data:

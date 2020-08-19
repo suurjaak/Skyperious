@@ -82,10 +82,9 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    16.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
-import ast
 import collections
 import copy
 import datetime

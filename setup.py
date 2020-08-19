@@ -8,11 +8,9 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    03.08.2020
+@modified    19.08.2020
 ------------------------------------------------------------------------------
 """
-import glob
-import os
 import setuptools
 
 from skyperious import conf
