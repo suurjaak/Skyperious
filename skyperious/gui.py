@@ -12,6 +12,7 @@ Released under the MIT License.
 ------------------------------------------------------------------------------
 """
 import ast
+import calendar
 import collections
 import copy
 import datetime
@@ -7044,28 +7045,56 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             def on_copymsg(event):
                 t = step.Template(templates.MESSAGE_CLIPBOARD)
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
+            def on_selectall(event): self._stc.SelectAll()
+            def on_filter_date(period):
+                def do_filter(event):
+                    dt = msg["datetime"].date()
+                    if   "day"   == period: daterange = [dt, dt]
+                    elif "week"  == period:
+                        daterange = [dt - datetime.timedelta(days=dt.weekday()),
+                                     dt + datetime.timedelta(days=6-dt.weekday())]
+                    elif "month" == period:
+                        maxd = calendar.monthrange(dt.year, dt.month)[1]
+                        daterange = [datetime.date(dt.year, dt.month, 1),
+                                     datetime.date(dt.year, dt.month, maxd)]
+                    elif "year"  == period:
+                        daterange = [datetime.date(dt.year,  1,  1),
+                                     datetime.date(dt.year, 12, 31)]
+                    self.ApplyFilter(daterange=daterange, text="")
+                return do_filter
             def on_gotoauthor(direction):
                 return lambda e: self.NextFromAuthor(direction=direction, **opts)
             def on_gototime(unit, direction):
                 return lambda e: self.NextTime(unit, msg_idx, direction)
-            def on_selectall(event): self._stc.SelectAll()
 
             item_msg = wx.MenuItem(menu, -1, "Copy &message")
-            item_select = wx.MenuItem(menu, -1, "&Select all")
+            item_select = wx.MenuItem(menu, -1, "Select &all")
             menu.Append(item_msg), menu.Append(item_select)
+            menu.AppendSeparator()
+
+            menu_filter = wx.Menu()
+            item_day   = wx.MenuItem(menu_filter, -1, "Same &day")
+            item_week  = wx.MenuItem(menu_filter, -1, "Same &week")
+            item_month = wx.MenuItem(menu_filter, -1, "Same &month")
+            item_year  = wx.MenuItem(menu_filter, -1, "Same &year")
+            item_filter = menu.AppendSubMenu(menu_filter, "&Filter by date..")
+            menu_filter.Append(item_day)
+            menu_filter.Append(item_week)
+            menu_filter.Append(item_month)
+            menu_filter.Append(item_year)
 
             menu_goto = wx.Menu()
 
             item_prev = wx.MenuItem(menu_goto, -1, "&Previous from same author")
             item_next = wx.MenuItem(menu_goto, -1, "&Next from same author")
-            item_prev_day = wx.MenuItem(menu_goto, -1, "Previous &day")
-            item_next_day = wx.MenuItem(menu_goto, -1, "Next d&ay")
-            item_prev_week = wx.MenuItem(menu_goto, -1, "Previous &week")
-            item_next_week = wx.MenuItem(menu_goto, -1, "Next w&eek")
+            item_prev_day   = wx.MenuItem(menu_goto, -1, "Previous &day")
+            item_next_day   = wx.MenuItem(menu_goto, -1, "Next d&ay")
+            item_prev_week  = wx.MenuItem(menu_goto, -1, "Previous &week")
+            item_next_week  = wx.MenuItem(menu_goto, -1, "Next w&eek")
             item_prev_month = wx.MenuItem(menu_goto, -1, "Previous &month")
             item_next_month = wx.MenuItem(menu_goto, -1, "Next m&onth")
 
-            item_goto = menu.AppendSubMenu(menu_goto, "&Go to ..")
+            item_goto = menu.AppendSubMenu(menu_goto, "&Go to..")
             menu_goto.Append(item_prev), menu_goto.Append(item_next)
             if relativedelta:
                 menu_goto.AppendSeparator()
@@ -7075,8 +7104,13 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 menu_goto.AppendSeparator()
                 menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
 
-            item_msg.Enabled = item_goto.Enabled = bool(msg)
+            item_msg.Enabled = item_filter.Enabled = item_goto.Enabled = bool(msg)
+            menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_filter_date("day"),    id=item_day.GetId())
+            menu.Bind(wx.EVT_MENU, on_filter_date("week"),   id=item_week.GetId())
+            menu.Bind(wx.EVT_MENU, on_filter_date("month"),  id=item_month.GetId())
+            menu.Bind(wx.EVT_MENU, on_filter_date("year"),   id=item_year.GetId())
             menu.Bind(wx.EVT_MENU, on_gotoauthor(-1),        id=item_prev.GetId())
             menu.Bind(wx.EVT_MENU, on_gotoauthor(+1),        id=item_next.GetId())
             menu.Bind(wx.EVT_MENU, on_gototime("day", -1),   id=item_prev_day.GetId())
@@ -7098,7 +7132,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         if stc.GetStyleAt(event.Position) in styles_link:
             # Go back and forth from position and get URL range.
             url, url_range = self.GetUrlAtPosition(event.Position)
-            function, params = None, []
+            function, args, kwargs = None, [], {}
             if url_range[0] in self._filelinks:
                 def start_file(url):
                     if os.path.exists(url):
@@ -7107,36 +7141,19 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                         messageBox("The file \"%s\" cannot be found "
                                    "on this computer." % url,
                                    conf.Title, wx.OK | wx.ICON_INFORMATION)
-                function, params = start_file, [self._filelinks[url_range[0]]]
+                function, args = start_file, [self._filelinks[url_range[0]]]
             elif url_range[0] in self._datelinks:
-                def filter_range(label, daterange):
-                    busy = controls.BusyPanel(self._page or self.Parent,
-                                              "Filtering messages.")
-                    try:
-                        self._datelink_last = label
-                        if self._page:
-                            self._page.chat_filter["daterange"] = daterange
-                            self._page.range_date.SetValues(*daterange)
-                        newfilter = self.Filter
-                        newfilter["daterange"] = daterange
-                        self.Filter = newfilter
-                        self.RefreshMessages(), self.ScrollToLine(0)
-                        if self._page:
-                            self._page.populate_chat_statistics()
-                            self._page.list_timeline.Populate(*self.GetTimelineData())
-                    finally:
-                        busy.Close()
-                function = filter_range
-                params = [url, self._datelinks[url_range[0]]]
+                function = self.ApplyFilter
+                kwargs = dict(daterange=self._datelinks[url_range[0]], datelabel=url)
             elif url_range[0] in self._urllinks:
                 url = self._urllinks[url_range[0]]
-                function, params = webbrowser.open, [url]
+                function, args = webbrowser.open, [url]
             elif url:
-                function, params = webbrowser.open, [url]
+                function, args = webbrowser.open, [url]
             if function:
                 # Calling function here immediately will cause STC to lose
                 # MouseUp, resulting in autoselect mode from click position.
-                wx.CallLater(100, function, *params)
+                wx.CallLater(100, function, *args, **kwargs)
         event.StopPropagation()
 
 
@@ -7157,11 +7174,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             # retrieve more messages from earlier (messages are retrieved
             # starting from latest).
             if not self._messages[0]["datetime"] \
-            or self._messages[0]["datetime"].date() \
-            >= self._filter["daterange"][0]:
+            or self._messages[0]["datetime"].date() >= self._filter["daterange"][0]:
                 m_iter = self._db.get_messages(self._chat,
-                    ascending=False,
-                    timestamp_from=self._messages[0]["timestamp"]
+                    ascending=False, timestamp_from=self._messages[0]["timestamp"]
                 )
                 while m_iter:
                     try:
@@ -7725,6 +7740,49 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         "participants": [skypename1, ]}
         """
     )
+
+
+    def ApplyFilter(self, daterange=None, text=None, participants=None,
+                    datelabel=None):
+        """
+        Sets and applies filter for the current chat.
+
+        @param   daterange     [date1, date2] or None to skip
+        @param   text          search string or None to skip
+        @param   participants  [identity, ] or None to skip
+        @param   datelabel     datelinks label like "1 year", if any
+        """
+        myfilter = dict(daterange=daterange, text=text, participants=participants)
+        myfilter = {k: v for k, v in myfilter.items() if v is not None}
+        if not myfilter or util.cmp_dicts(myfilter, self._filter): return
+
+        busy = controls.BusyPanel(self._page or self.Parent,
+                                  "Filtering messages.")
+        try:
+            self._datelink_last = datelabel
+            if self._page:
+                if daterange:
+                    self._page.range_date.SetValues(*daterange)
+                    self._page.chat_filter["daterange"] = daterange
+                if text is not None:
+                    self._page.edit_filtertext.Value = text
+                    self._page.chat_filter["text"]   = text
+                if participants:
+                    plist = self._page.list_participants
+                    for i in range(plist.GetItemCount()):
+                        identity = plist.GetItemData(i)["identity"]
+                        c = plist.GetItem(i)
+                        c.Check(identity in participants)
+                        plist.SetItem(c)
+                    plist.Refresh()
+                    self._page.chat_filter["participants"] = participants
+            self.Filter = dict(self.Filter, **myfilter)
+            self.RefreshMessages(), self.ScrollToLine(0)
+            if self._page:
+                self._page.populate_chat_statistics()
+                self._page.list_timeline.Populate(*self.GetTimelineData())
+        finally:
+            busy.Close()
 
 
     def GetStatisticsData(self):
