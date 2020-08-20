@@ -132,8 +132,11 @@ Mac/Linux/other: install Python, wxPython, pip, and run
 The pip installation will add the `skyperious` command to path.
 For more thorough instructions, see [INSTALL.md](INSTALL.md).
 
-Skyperious has a Vagrantfile, see
-[dist/README for Vagrant.md](dist/README for Vagrant.md).
+Skyperious has a [dist/Dockerfile](dist/Dockerfile), see
+[dist/README for Docker.md](dist/README%20for%20Docker.md).
+
+Skyperious has a [dist/Vagrantfile](dist/Vagrantfile), see
+[dist/README for Vagrant.md](dist/README%20for%20Vagrant.md).
 
 
 Source Dependencies
