@@ -7047,6 +7047,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
                 guibase.status("Copied message #%s to clipboard." % msg["id"])
             def on_selectall(event): self._stc.SelectAll()
+            def on_search(event):
+                self.SetSearchBarVisible()
+                self._edit.SetFocus()
+                self._edit.SelectAll()
             def on_filter_date(period):
                 def do_filter(event):
                     dt = msg["datetime"].date()
@@ -7072,6 +7076,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             item_select = wx.MenuItem(menu, -1, "Select &all")
             menu.Append(item_msg), menu.Append(item_select)
             menu.AppendSeparator()
+
+            item_search = wx.MenuItem(menu, -1, "&Search..")
+            menu.Append(item_search)
 
             menu_filter = wx.Menu()
             item_day   = wx.MenuItem(menu_filter, -1, "Same &day")
@@ -7108,6 +7115,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             item_msg.Enabled = item_filter.Enabled = item_goto.Enabled = bool(msg)
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_search,                id=item_search.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("day"),    id=item_day.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("week"),   id=item_week.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("month"),  id=item_month.GetId())
