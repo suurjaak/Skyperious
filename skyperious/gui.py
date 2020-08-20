@@ -7045,6 +7045,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             def on_copymsg(event):
                 t = step.Template(templates.MESSAGE_CLIPBOARD)
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
+                guibase.status("Copied message #%s to clipboard." % msg["id"])
             def on_selectall(event): self._stc.SelectAll()
             def on_filter_date(period):
                 def do_filter(event):
