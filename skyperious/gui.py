@@ -6931,7 +6931,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
         self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
         self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
-        self._stc.Bind(wx.EVT_CONTEXT_MENU, lambda e: None)
+        self._stc.Bind(wx.EVT_CONTEXT_MENU, self.OnMenu)
         self._stc.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
         # Hide caret
         self.SetCaretForeground(conf.BgColour), self.SetCaretWidth(0)
@@ -6999,9 +6999,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 d = wx.TextDataObject(text)
                 wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
 
-        pos = self._stc.PositionFromPoint(event.Position)
+        is_click = isinstance(event, wx.MouseEvent)
+        pos = self._stc.PositionFromPoint(event.Position) if is_click else -1
         msg_id = msg = msg_idx = prevmsg_id = None
-        for i, m_id in enumerate(self._message_positions):
+        for i, m_id in enumerate(self._message_positions) if pos >= 0 else []:
             m_pos = self._message_positions[m_id]
             if m_pos[0] <= pos <= m_pos[1]:
                 msg_id, msg_idx = m_id, i
@@ -7013,9 +7014,14 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             elif m_pos[0] > pos:
                 break # for i, m_id
             prevmsg_id = m_id
+        if msg_id is None and not is_click:
+            # Context menu event, pick focused or first visible message
+            msg_id, _ = self.GetFocusedMessage()
+            if msg_id is not None:
+                msg_idx = self._message_map.keys().index(msg_id)
         if msg_id is None and self._message_positions:
             m_id = self._messages_current[-1]["id"]
-            if self._message_positions[m_id][1] < pos:
+            if pos >= 0 and self._message_positions[m_id][1] < pos:
                 msg_id, msg_idx = m_id, len(self._messages_current) - 1
         msg = self._message_map.get(msg_id)
         menu = wx.Menu()
@@ -7024,6 +7030,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         menu.Bind(wx.EVT_MENU, lambda e: clipboardize(self._stc.SelectedText),
                   id=item_selection.GetId())
         item_selection.Enable(bool(self._stc.SelectedText))
+
         styles_link = [self._styles["link"], self._styles["boldlink"]]
         if msg and self._stc.GetStyleAt(pos) in styles_link:
             # Right-clicked a link inside a message
