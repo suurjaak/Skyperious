@@ -9,9 +9,9 @@ Pre-requisites:
 Clone this project and get it running:
 
 ```
-   git clone https://github.com/suurjaak/Skyperious
-   cd Skyperious/packaging
-   vagrant up
+    git clone https://github.com/suurjaak/Skyperious
+    cd Skyperious/dist
+    vagrant up
 ```
 
 A `vagrant up` will do the following:
