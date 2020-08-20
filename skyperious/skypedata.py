@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.08.2020
+@modified    20.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2425,17 +2425,17 @@ class MessageParser(object):
 
 
 
-def is_skype_database(filename, path=None):
+def is_skype_database(filename, path=None, log_error=True):
     """Returns whether the file looks to be a Skype database file."""
     result, conn = False, None
     try:
         filename = os.path.join(path, filename) if path else filename
         conn = sqlite3.connect(filename)
-        [conn.execute("SELECT id FROM %s LIMIT 1" % x)
-         for x in "Accounts", "Conversations", "Messages"]
+        for x in "Accounts", "Conversations", "Messages":
+            conn.execute("SELECT id FROM %s LIMIT 1" % x)
         result = True
     except Exception:
-        logger.exception("Error checking database %s.", filename)
+        if log_error: logger.exception("Error checking file %s.", filename)
     finally:
         conn and conn.close()
 
@@ -2503,7 +2503,7 @@ def detect_databases(progress):
         results = []
         for f in files:
             if progress and not progress(): break # for f
-            if is_skype_database(f, root):
+            if is_skype_database(f, root, log_error=False):
                 results.append(os.path.realpath(os.path.join(root, f)))
         if results: yield results
 

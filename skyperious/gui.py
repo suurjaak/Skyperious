@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.08.2020
+@modified    20.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1123,7 +1123,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Handler for type selection to remove files from the database list."""
         selecteds = range(1, self.list_db.GetItemCount())
         filter_func = lambda i: (
-          other ^ skypedata.is_skype_database(self.list_db.GetItemText(i)))
+          other ^ skypedata.is_skype_database(self.list_db.GetItemText(i), log_error=False))
         selecteds = list(filter(filter_func, selecteds))
         filenames = list(map(self.list_db.GetItemText, selecteds))
         if not filenames: return
