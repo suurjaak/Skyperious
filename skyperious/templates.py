@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    17.08.2020
+@modified    21.08.2020
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import base64, datetime, imghdr, os, pyparsing, re, string, sys, urllib, wx
+#import base64, datetime, imghdr, logging, os, pyparsing, re, string, sys, urllib, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -1253,11 +1253,21 @@ for chunk in message_buffer:
 """
 
 
-"""HTML chat history export template for the messages part."""
+"""
+HTML chat history export template for the messages part.
+
+@param   db              SkypeDatabase instance
+@param   chat            chat data dictionary
+@param   messages        message iterator
+@param   parser          MessageParser instance
+@param   ?images_folder  path to save images under, if not embedding
+"""
 CHAT_MESSAGES_HTML = """<%
 from skyperious import skypedata
 from skyperious.lib import util
 
+output = {"format": "html", "export": True}
+if isdef("images_folder") and images_folder: output["images_folder"] = images_folder
 previous_day, previous_author = None, None
 %>
 %for m in messages:
@@ -1276,7 +1286,7 @@ previous_author = None
   </tr>
 %endif
 <%
-content = parser.parse(m, output={"format": "html", "export": True})
+content = parser.parse(m, output=output)
 from_name = db.get_author_name(m) if previous_author != m["author"] else ""
 # Info messages like "/me is thirsty" -> author on same line.
 is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
@@ -1311,14 +1321,44 @@ previous_author = m["author"]
 %endfor
 """
 
-"""HTML chat history export template for shared image message body."""
-CHAT_MESSAGE_IMAGE = """<%
-import base64, imghdr
 
-filetype = imghdr.what("", image)
+"""
+HTML chat history export template for shared image message body.
+
+@param   image           raw image binary
+@param   author          author skypename
+@param   author_name     author display name
+@param   datetime        message datetime
+@param   message_id      message ID
+@param   ?filename       image filename, if any
+@param   ?images_folder  path to save images under, if not embedding
+"""
+CHAT_MESSAGE_IMAGE = """<%
+import base64, imghdr, logging, os
+from skyperious import conf
+from skyperious.lib import util
+
+filetype = imghdr.what("", image) or "image"
 caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message_id, datetime.strftime("%Y-%m-%d %H:%M")]))
+title = "Click to enlarge."
+if isdef("filename") and filename:
+    caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
+if isdef("images_folder") and images_folder:
+    basename = isdef("filename") and filename or "%s.%s" % (message_id, filetype)
+    basename = util.safe_filename(basename)
+    filepath = util.unique_path(os.path.join(images_folder, basename))
+    url = "%s/%s" % (os.path.split(images_folder)[1], os.path.split(filepath)[1])
+    try:
+        with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
+    except Exception:
+        logger = logging.getLogger(conf.Title.lower())
+        logger.exception("Error saving export image %s.", filepath)
+else:
+    url = "data:image/%s;base64,%s" % (escape(filetype), base64.b64encode(image))
 %>
-<span class="shared_image"><img src="data:image/{{filetype}};base64,{{!base64.b64encode(image)}}" title="Click to enlarge." alt="Click to enlarge." data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" /></span>
+<span class="shared_image">
+  <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" />
+</span>
 """
 
 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.08.2020
+@modified    21.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1302,73 +1302,75 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
 
-        if wx.ID_OK == self.dialog_savefile.ShowModal():
-            db, files, count, message_count = None, [], 0, 0
-            error, errormsg, errormsg_short = False, None, None
+        if wx.ID_OK != self.dialog_savefile.ShowModal():
+            self.button_export.Enabled = True
+            if focused_control: focused_control.SetFocus()
+            return
 
-            db = self.load_database(self.db_filename)
-            dirname = os.path.dirname(self.dialog_savefile.GetPath())
-            if not db:
+        db, files, count, message_count, images_folder = None, [], 0, 0, False
+        error, errormsg, errormsg_short = False, None, None
+
+        db = self.load_database(self.db_filename)
+        path = self.dialog_savefile.GetPath()
+        if not db:
+            error = True
+        elif "conversations" not in db.tables:
+            error = True
+            errormsg = "Cannot export %s. Not a valid Skype database?" % db
+        if not error and not do_singlefile:
+            format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
+            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(self.db_filename)
+            if db.account: formatargs.update(db.account)
+            folder = util.safe_filename(conf.ExportDbTemplate % formatargs)
+            export_dir = util.unique_path(os.path.join(os.path.dirname(path), folder))
+            try:
+                os.mkdir(export_dir)
+            except Exception as e:
+                errormsg_short = "Failed to create directory %s: %s" % (
+                                 export_dir, util.format_exc(e))
+                errormsg = "Failed to create directory %s:\n\n%s" % \
+                           (export_dir, traceback.format_exc())
                 error = True
-            elif "conversations" not in db.tables:
+        elif not error:
+            format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
+
+
+        if not error:
+            chats = db.get_conversations()
+            busy = controls.BusyPanel(
+                self, 'Exporting all chats from "%s"\nas %s under %s.' %
+                (db.filename, format.upper(), path))
+            wx.SafeYield() # Allow UI to refresh
+            try:
+                db.get_conversations_stats(chats)
+                progressfunc = lambda *args: wx.SafeYield()
+                opts = dict(multi=True, progress=progressfunc)
+                if images_folder: opts["images_folder"] = True
+                result = export.export_chats(chats, path, format, db, opts)
+                files, count, message_count = result
+            except Exception as e:
+                errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
+                errormsg = "Error exporting chats:\n\n%s" % traceback.format_exc()
                 error = True
-                errormsg = "Cannot export %s. Not a valid Skype database?" % db
-            if not error and not do_singlefile:
-                extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-                format = extname
-                formatargs = collections.defaultdict(str)
-                formatargs["skypename"] = os.path.basename(self.db_filename)
-                if db.account: formatargs.update(db.account)
-                folder = util.safe_filename(conf.ExportDbTemplate % formatargs)
-                export_dir = util.unique_path(os.path.join(dirname, folder))
-                try:
-                    os.mkdir(export_dir)
-                except Exception as e:
-                    errormsg_short = "Failed to create directory %s: %s" % (
-                                     export_dir, util.format_exc(e))
-                    errormsg = "Failed to create directory %s:\n\n%s" % \
-                               (export_dir, traceback.format_exc())
-                    error = True
-            elif not error:
-                index = self.dialog_savefile.FilterIndex
-                extname = export.CHAT_EXTS_SINGLEFILE[index]
-                format = os.path.basename(self.dialog_savefile.GetPath())
-                export_dir = dirname
-
-
-            if not error:
-                chats = db.get_conversations()
-                busy = controls.BusyPanel(
-                    self, 'Exporting all chats from "%s"\nas %s under %s.' %
-                    (db.filename, extname.upper(), export_dir))
-                wx.SafeYield() # Allow UI to refresh
-                try:
-                    db.get_conversations_stats(chats)
-                    progressfunc = lambda *args: wx.SafeYield()
-                    result = export.export_chats(chats, export_dir, format, db,
-                                                 progress=progressfunc)
-                    files, count, message_count = result
-                except Exception as e:
-                    errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
-                    errormsg = "Error exporting chats:\n\n%s" % traceback.format_exc()
-                    error = True
-                busy.Close()
-            if not error:
-                guibase.status("Exported %s and %s from %s as %s "
-                               "under %s.", util.plural("chat", count, sep=","),
-                               util.plural("message", message_count, sep=","), db.filename,
-                               extname.upper(), export_dir, log=True)
-            elif errormsg:
-                guibase.status(errormsg_short or errormsg, log=True)
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            if db and not db.has_consumers():
-                self.dbs.pop(db.filename, None)
-                db.close()
-            if db and not error:
-                util.start_file(files[0] if do_singlefile else export_dir)
+            busy.Close()
+        if not error:
+            guibase.status("Exported %s and %s from %s as %s under %s.",
+                           util.plural("chat", count, sep=","),
+                           util.plural("message", message_count, sep=","),
+                           db.filename, format.upper(), path, log=True)
+        elif errormsg:
+            guibase.status(errormsg_short or errormsg, log=True)
+            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+        if db and not db.has_consumers():
+            self.dbs.pop(db.filename, None)
+            db.close()
+        if db and not error:
+            util.start_file(files[0] if do_singlefile else path)
         self.button_export.Enabled = True
         if focused_control: focused_control.SetFocus()
-            
+
 
     def on_compare_menu(self, event):
         """
@@ -3849,38 +3851,36 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-        if wx.ID_OK == self.dialog_savefile.ShowModal():
-            filepath = self.dialog_savefile.GetPath()
-            dirname = os.path.dirname(filepath)
-            filename = os.path.basename(filepath)
-            extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            if not filename.lower().endswith(".%s" % extname):
-                filename += ".%s" % extname
-                filepath = os.path.join(dirname, filename)
-            busy = controls.BusyPanel(
-                self, 'Exporting "%s".' % self.chat["title"]
-            )
-            guibase.status("Exporting to %s.", filepath)
-            try:
-                messages = self.stc_history.GetMessages()
-                progressfunc = lambda *args: wx.SafeYield()
-                result = export.export_chats([self.chat], dirname, filename, self.db,
-                    messages=messages, skip=False, progress=progressfunc)
-                files, count, message_count = result
-                guibase.status("Exported %s to %s.",
-                               util.plural("message", message_count, sep=","), filepath, log=True)
-                try: util.start_file(filepath)
-                except Exception:
-                    logger.exception("Error starting %s.", filepath)
+        if wx.ID_OK != self.dialog_savefile.ShowModal(): return
+
+        filepath = self.dialog_savefile.GetPath()
+        format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
+        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if not filepath.lower().endswith(".%s" % format):
+            filepath += ".%s" % format
+        busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
+        guibase.status("Exporting to %s.", filepath)
+        try:
+            messages = self.stc_history.GetMessages()
+            progressfunc = lambda *args: wx.SafeYield()
+            opts = dict(progress=progressfunc, noskip=True, messages=messages)
+            if images_folder: opts["images_folder"] = True
+            result = export.export_chats([self.chat], filepath, format, self.db, opts)
+            files, count, message_count = result
+            guibase.status("Exported %s to %s.",
+                           util.plural("message", message_count, sep=","), filepath, log=True)
+            try: util.start_file(filepath)
             except Exception:
-                logger.exception("Error saving %s.", filepath)
-                guibase.status("Error saving %s.", filepath)
-                errormsg = "Error saving %s:\n\n%s" % \
-                           (filepath, traceback.format_exc())
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(util.try_ignore, os.unlink, filepath)
-            finally:
-                busy.Close()
+                logger.exception("Error starting %s.", filepath)
+        except Exception:
+            logger.exception("Error saving %s.", filepath)
+            guibase.status("Error saving %s.", filepath)
+            errormsg = "Error saving %s:\n\n%s" % \
+                       (filepath, traceback.format_exc())
+            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+            wx.CallAfter(util.try_ignore, os.unlink, filepath)
+        finally:
+            busy.Close()
 
 
     def on_export_chats_menu(self, event):
@@ -4018,39 +4018,42 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.Message = "Save chats file"
             self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-        if chats and wx.ID_OK == self.dialog_savefile.ShowModal():
-            dirname = os.path.dirname(self.dialog_savefile.GetPath())
-            if do_singlefile:
-                index = self.dialog_savefile.FilterIndex
-                extname = export.CHAT_EXTS_SINGLEFILE[index]
-                format = os.path.basename(self.dialog_savefile.GetPath())
-            else:
-                extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-                format = extname
+        if not chats or wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-            msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
-                  ("all " if do_all else "", self.db.filename, extname.upper(), dirname)
-            busy = controls.BusyPanel(self, msg)
-            guibase.status(msg, log=True)
-            files, count, message_count, errormsg, errormsg_short = [], 0, 0, None, None
-            try:
-                progressfunc = lambda *args: wx.SafeYield()
-                files, count, message_count = export.export_chats(chats, dirname,
-                    format, self.db, timerange=timerange, skip=do_all, progress=progressfunc)
-            except Exception as e:
-                errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
-                errormsg = "Error exporting chats:\n\n%s" % \
-                           traceback.format_exc()
-            busy.Close()
-            if not errormsg:
-                guibase.status("Exported %s and %s from %s as %s under %s.",
-                               util.plural("chat", count, sep=","), 
-                               util.plural("message", message_count, sep=","), self.db,
-                               extname.upper(), dirname, log=True)
-                util.start_file(files[0] if do_singlefile else dirname)
-            else:
-                guibase.status(errormsg_short or errormsg)
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+        path, images_folder = self.dialog_savefile.GetPath(), False
+        if do_singlefile:
+            format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
+        else:
+            path = os.path.dirname(path)
+            format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
+            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+
+        msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
+              ("all " if do_all else "", self.db.filename, format.upper(), path)
+        busy = controls.BusyPanel(self, msg)
+        guibase.status(msg, log=True)
+        files, count, message_count, errormsg, errormsg_short = [], 0, 0, None, None
+        try:
+            progressfunc = lambda *args: wx.SafeYield()
+            opts = dict(multi=True, progress=progressfunc, timerange=timerange,
+                        noskip=not do_all)
+            if images_folder: opts["images_folder"] = True
+            result = export.export_chats(chats, path, format, self.db, opts)
+            files, count, message_count = result
+        except Exception as e:
+            errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
+            errormsg = "Error exporting chats:\n\n%s" % \
+                       traceback.format_exc()
+        busy.Close()
+        if not errormsg:
+            guibase.status("Exported %s and %s from %s as %s under %s.",
+                           util.plural("chat", count, sep=","), 
+                           util.plural("message", message_count, sep=","), self.db,
+                           format.upper(), path, log=True)
+            util.start_file(files[0] if do_singlefile else path)
+        else:
+            guibase.status(errormsg_short or errormsg)
+            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
 
 
     def on_filterexport_chat(self, event):
@@ -4064,46 +4067,47 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-        if wx.ID_OK == self.dialog_savefile.ShowModal():
-            filepath = self.dialog_savefile.GetPath()
-            filename = os.path.basename(filepath)
-            dirname = os.path.dirname(filepath)
-            extname = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            if not filename.lower().endswith(".%s" % extname):
-                filename += ".%s" % extname
-                filepath = os.path.join(dirname, extname)
+        if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-            busy = controls.BusyPanel(self,
-                   "Filtering and exporting \"%s\"." % self.chat["title"])
-            try:
-                filter_new = self.build_filter()
-                filter_backup = self.stc_history.GetFilter()
-                self.stc_history.SetFilter(filter_new)
-                self.stc_history.RetrieveMessagesIfNeeded()
-                messages_all = self.stc_history.GetRetrievedMessages()
-                messages = [m for m in messages_all
-                            if not self.stc_history.IsMessageFilteredOut(m)]
-                self.stc_history.SetFilter(filter_backup)
-                if messages:
-                    guibase.status("Filtering and exporting to %s.", filepath, log=True)
-                    progressfunc = lambda *args: wx.SafeYield()
-                    result = export.export_chats([self.chat], dirname, filename,
-                        self.db, messages=messages, progress=progressfunc)
-                    files, count, message_count = result
-                    guibase.status("Exported %s to %s.",
-                                   util.plural("message", message_count, sep=","), filepath, log=True)
-                    util.start_file(filepath)
-                else:
-                    wx.MessageBox("Current filter leaves no data to export.",
-                                  conf.Title, wx.OK | wx.ICON_INFORMATION)
-            except Exception as e:
-                guibase.status("Error saving %s: %s", filepath, util.format_exc(e))
-                logger.exception("Error saving %s.", filepath)
-                errormsg = "Error saving %s:\n\n%s" % \
-                           (filepath, traceback.format_exc())
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            finally:
-                busy.Close()
+        filepath = self.dialog_savefile.GetPath()
+        format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
+        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if not filepath.lower().endswith(".%s" % format):
+            filepath += ".%s" % format
+
+        busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' % 
+                                  self.chat["title"])
+        try:
+            filter_new = self.build_filter()
+            filter_backup = self.stc_history.GetFilter()
+            self.stc_history.SetFilter(filter_new)
+            self.stc_history.RetrieveMessagesIfNeeded()
+            messages_all = self.stc_history.GetRetrievedMessages()
+            messages = [m for m in messages_all
+                        if not self.stc_history.IsMessageFilteredOut(m)]
+            self.stc_history.SetFilter(filter_backup)
+            if messages:
+                guibase.status("Filtering and exporting to %s.", filepath, log=True)
+                progressfunc = lambda *args: wx.SafeYield()
+                opts = dict(messages=messages, progress=progressfunc)
+                if images_folder: opts["images_folder"] = True
+                result = export.export_chats([self.chat], filepath, format, self.db, opts)
+                files, count, message_count = result
+                guibase.status("Exported %s to %s.",
+                               util.plural("message", message_count, sep=","),
+                               filepath, log=True)
+                util.start_file(filepath)
+            else:
+                wx.MessageBox("Current filter leaves no data to export.",
+                              conf.Title, wx.OK | wx.ICON_INFORMATION)
+        except Exception as e:
+            guibase.status("Error saving %s: %s", filepath, util.format_exc(e))
+            logger.exception("Error saving %s.", filepath)
+            errormsg = "Error saving %s:\n\n%s" % \
+                       (filepath, traceback.format_exc())
+            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+        finally:
+            busy.Close()
 
 
     def on_size_html_stats(self, event):
@@ -4887,9 +4891,9 @@ class DatabasePage(wx.Panel):
                 filename = self.dialog_savefile.GetPath()
                 exts = export.TABLE_EXTS if grid_source is self.grid_table \
                        else export.QUERY_EXTS
-                extname = exts[self.dialog_savefile.FilterIndex]
-                if not filename.lower().endswith(".%s" % extname):
-                    filename += ".%s" % extname
+                format = exts[self.dialog_savefile.FilterIndex]
+                if not filename.lower().endswith(".%s" % format):
+                    filename += ".%s" % format
                 busy = controls.BusyPanel(self, "Exporting \"%s\"." % filename)
                 guibase.status("Exporting \"%s\".", filename)
                 try:
@@ -5957,35 +5961,33 @@ class MergerPage(wx.Panel):
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         dialog.Wildcard = export.CHAT_WILDCARD
-        if wx.ID_OK == dialog.ShowModal():
-            filepath = dialog.GetPath()
-            dirname = os.path.dirname(filepath)
-            filename = os.path.basename(filepath)
-            extname = export.CHAT_EXTS[dialog.FilterIndex]
-            if not filename.lower().endswith(".%s" % extname):
-                filename += ".%s" % extname
-                filepath = os.path.join(dirname, filename)
-            busy = controls.BusyPanel(
-                self, "Exporting \"%s\"." % self.chat["title"]
-            )
-            guibase.status("Exporting to %s.", filepath, log=True)
-            try:
-                messages = self.db1.message_iterator(self.chat_diff["messages"])
-                progressfunc = lambda *args: wx.SafeYield()
-                result = export.export_chats([self.chat], dirname, filename,
-                    self.db1, messages=messages, progress=progressfunc)
-                files, count, message_count = result
-                guibase.status("Exported %s to %s.", util.plural("message", message_count, sep=","),
-                               filepath, log=True)
-                util.start_file(filepath)
-            except Exception:
-                guibase.status("Error saving %s.", filepath)
-                logger.exception("Error saving %s.", filepath)
-                errormsg = "Error saving %s:\n\n%s" % \
-                           (filepath, traceback.format_exc())
-                wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-            finally:
-                busy.Close()
+        if wx.ID_OK != dialog.ShowModal(): return
+
+        filepath = dialog.GetPath()
+        format = export.CHAT_EXTS[dialog.FilterIndex]
+        images_folder = "html" == format and dialog.FilterIndex
+        if not filepath.lower().endswith(".%s" % format):
+            filepath += ".%s" % format
+        busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
+        guibase.status("Exporting to %s.", filepath, log=True)
+        try:
+            messages = self.db1.message_iterator(self.chat_diff["messages"])
+            opts = dict(messages=messages, progress=lambda *args: wx.SafeYield())
+            if images_folder: opts["images_folder"] = True
+            result = export.export_chats([self.chat], filepath, format, self.db1, opts)
+            files, count, message_count = result
+            guibase.status("Exported %s to %s.",
+                           util.plural("message", message_count, sep=","),
+                           filepath, log=True)
+            util.start_file(filepath)
+        except Exception:
+            guibase.status("Error saving %s.", filepath)
+            logger.exception("Error saving %s.", filepath)
+            errormsg = "Error saving %s:\n\n%s" % \
+                       (filepath, traceback.format_exc())
+            wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
+        finally:
+            busy.Close()
 
 
     def on_click_htmldiff(self, event):

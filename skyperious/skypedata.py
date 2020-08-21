@@ -1575,7 +1575,7 @@ class MessageParser(object):
                 "hists": {}, # Author histogram data {author: {"hours", ..} }
                 "workhist": {}, # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
                 "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
-                "shared_images": {}} # {message_id: {url, datetime, author, author_name}, }
+                "shared_images": {}} # {message_id: {url, datetime, author, author_name, ?filename}, }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1849,7 +1849,12 @@ class MessageParser(object):
 
         # Photo/video sharing: take image link, if any
         if any(dom.getiterator("URIObject")):
-            url = dom.find("URIObject").get("uri")
+            url, filename = dom.find("URIObject").get("uri"), None
+            nametag = next(dom.getiterator("OriginalName"), None)
+            if nametag is not None: filename = nametag.get("v")
+            if not filename:
+                metatag = next(dom.getiterator("meta"), None)
+                if metatag is not None: filename = metatag.get("originalName")
             link = next(dom.getiterator("a"), None)
             if not url and link:
                 url = link.get("href")
@@ -1862,9 +1867,11 @@ class MessageParser(object):
                     text2 = text.replace(url, a.encode("utf-8"))
                     dom = self.make_xml(text2, message) or dom
             if url and self.stats:
-                self.stats["shared_images"][message["id"]] = dict(url=url,
-                    author_name=get_author_name(message), author=message["author"],
-                    success=False, datetime=message["datetime"])
+                data = dict(url=url, author_name=get_author_name(message),
+                            author=message["author"], success=False,
+                            datetime=message["datetime"])
+                if filename: data.update(filename=filename)
+                self.stats["shared_images"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 

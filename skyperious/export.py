@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    20.08.2020
+@modified    21.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -48,10 +48,12 @@ except Exception: # Fall back to a simple mono-spaced calculation if no PIL
 
 """FileDialog wildcard strings, matching extensions lists and default names."""
 XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|" if xlsxwriter else ""
-CHAT_WILDCARD = ("HTML document (*.html)|*.html|Text document (*.txt)|*.txt|"
+CHAT_WILDCARD = ("HTML document (*.html)|*.html|"
+                 "HTML document with images in subfolder (*.html)|*.html|"
+                 "Text document (*.txt)|*.txt|"
                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-CHAT_EXTS = ["html", "txt", "xlsx", "csv"] if xlsxwriter \
-            else ["html", "txt", "csv"]
+CHAT_EXTS = ["html", "html", "txt", "xlsx", "csv"] if xlsxwriter \
+            else ["html", "html", "txt", "csv"]
 CHAT_WILDCARD_SINGLEFILE = "Excel workbook (*.xlsx)|*.xlsx" # Cannot end with |
 CHAT_EXTS_SINGLEFILE = ["xlsx"]
 
@@ -69,66 +71,65 @@ QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
 logger = logging.getLogger(__name__)
 
 
-def export_chats(chats, path, format, db, messages=None, timerange=None, skip=True, progress=None):
+def export_chats(chats, path, format, db, opts=None):
     """
     Exports the specified chats from the database under path.
 
-    @param   chats      list of chat dicts, as returned from SkypeDatabase
-    @param   path       full path of directory where to save
-    @param   format     export format (html|txt|xlsx|csv|filename.ext).
-                        If format is filename.ext, a single file is created:
-                        for single chat exports and multi chat XLSX exports
-                        (for multi-file exports, filenames are named by chats).
-    @param   db         SkypeDatabase instance
-    @param   messages   list messages to export if not querying all
-    @param   timerange  additional arguments for filtering messages, as
-                        (from_timestamp or None, to_timestamp or None)
-    @param   skip       whether to skip chats with no messages
-    @param   progress   function called before exporting each chat, with the
-                        number of messages exported so far
-    @return             (list of exported filenames, number of chats exported,
-                         number of messages exported)
+    @param   chats             list of chat dicts, as returned from SkypeDatabase
+    @param   path              export filename, or export directory if opts.multi
+    @param   format            export format (html|txt|xlsx|csv)
+    @param   db                SkypeDatabase instance
+    @param   opts              export options dictionary
+               ?multi          whether exporting multiple files under path
+               ?images_folder  whether to save images to subfolder in HTML export
+               ?timerange      additional arguments for filtering messages, as
+                               (from_timestamp or None, to_timestamp or None)
+               ?messages       list messages to export if not querying all
+               ?noskip         whether to not skip chats with no messages
+               ?progress       function called before exporting each chat,
+                               with the number of messages exported so far
     """
     files, count, message_count = [], 0, 0
+    format, opts = format.lower(), opts or {}
     def make_filename(chat):
-        if len(format) > 4: # Filename already given in format
-            filename = os.path.join(path, format)
-        else:
+        filename = path
+        if opts.get("multi"):
             args = collections.defaultdict(str); args.update(chat)
             filename = "%s.%s" % (conf.ExportChatTemplate % args, format)
             filename = os.path.join(path, util.safe_filename(filename))
             filename = util.unique_path(filename)
         return filename
+
     guibase.status("Exporting %s from %s %sto %s.",
                    util.plural("chat", chats), db.filename,
-                   "" if len(format) > 4 else "as %s " % format.upper(),
-                   format if len(format) > 4 else path, log=True)
+                   "as %s " % format.upper(), path, log=True)
 
-    if format.lower().endswith(".xlsx"):
+    if "xlsx" == format and not opts.get("multi"):
         filename = make_filename(chats[0])
-        count, message_count = export_chats_xlsx(chats, filename, db, messages,
-                                                 timerange, skip, progress)
+        count, message_count = export_chats_xlsx(chats, filename, db, opts)
         files.append(filename)
     else:
-        if not os.path.exists(path):
-            os.makedirs(path)
-        export_func = (export_chats_xlsx if format.lower().endswith("xlsx")
-                       else export_chat_csv if format.lower().endswith("csv")
-                       else export_chat_template)
+        filedir = path if opts.get("multi") else os.path.dirname(path)
+        if not os.path.exists(filedir): util.try_ignore(os.makedirs, filedir)
+        export_func = (export_chats_xlsx if "xlsx" == format else 
+                       export_chat_csv   if "csv"  == format else
+                       export_chat_template)
 
-        if format.lower().endswith("html") and conf.SharedImageAutoDownload \
+        if "html" == format and conf.SharedImageAutoDownload \
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared images
-            try: db.live.login(password=util.deobfuscate(conf.Login[db.filename]["password"]))
-            except Exception: pass
+            pwd = util.deobfuscate(conf.Login[db.filename]["password"])
+            util.try_ignore(db.live.login, password=pwd)
 
+        noskip, messages, timerange, progress = (opts.get(x)
+            for x in ("noskip", "messages", "timerange", "progress"))
         for chat in chats:
             do_skip = False
             timestamp_from, timestamp_to = timerange or (None, None)
 
-            if skip and not messages and any(x is not None for x in timerange or ()) \
-            and chat["message_count"]:
+            if not noskip and not messages and chat["message_count"] \
+            and any(x is not None for x in timerange or ()):
                 messages = db.get_messages(chat, use_cache=False,
                     timestamp_from=timestamp_from, timestamp_to=timestamp_to
                 )
@@ -136,7 +137,7 @@ def export_chats(chats, path, format, db, messages=None, timerange=None, skip=Tr
                 if not msg: do_skip, messages = True, None
                 else: messages = itertools.chain([msg], messages)
 
-            if do_skip or skip and not messages and not chat["message_count"]:
+            if do_skip or not noskip and not messages and not chat["message_count"]:
                 logger.info("Skipping exporting %s: no messages.",
                             chat["title_long_lc"])
                 if progress: progress(message_count)
@@ -148,38 +149,41 @@ def export_chats(chats, path, format, db, messages=None, timerange=None, skip=Tr
             msgs = messages or db.get_messages(chat, use_cache=False,
                 timestamp_from=timestamp_from, timestamp_to=timestamp_to
             )
-            chatarg = [chat] if "xlsx" == format.lower() else chat
-            chat_count, chat_message_count = export_func(chatarg, filename, db, msgs)
-            count += chat_count
-            message_count += chat_message_count
+            chatarg = [chat] if "xlsx" == format else chat
+            c_count, c_message_count = export_func(chatarg, filename, db, msgs, opts)
+            count, message_count = count + c_count, message_count + c_message_count
             files.append(filename)
     return files, count, message_count
 
 
-def export_chats_xlsx(chats, filename, db, messages=None, timerange=None, skip=True, progress=None):
+def export_chats_xlsx(chats, filename, db, messages=None, opts=None):
     """
     Exports the chats to a single XLSX file with chats on separate worksheets.
 
-    @param   chats      list of chat data dicts, as returned from SkypeDatabase
-    @param   filename   full path and filename of resulting file
-    @param   db         SkypeDatabase instance
-    @param   messages   list of messages to export if a single chat
-    @param   timerange  additional arguments for filtering messages, as
-                        (timestamp_from or None, timestamp_to or None)
-    @param   skip       whether to skip chats with no messages
-    @param   progress   function called before exporting each chat, with the
-                        number of messages exported so far
-    @return             (number of chats exported, number of messages exported)
+    @param   chats         list of chat dicts, as returned from SkypeDatabase
+    @param   path          export filename, or export directory if opts.multi
+    @param   format        export format (html|txt|xlsx|csv)
+    @param   db            SkypeDatabase instance
+    @param   messages      list messages to export if not querying all
+    @param   opts          export options dictionary
+               ?timerange  additional arguments for filtering messages, as
+                           (from_timestamp or None, to_timestamp or None)
+               ?noskip     whether to not skip chats with no messages
+               ?progress   function called before exporting each chat,
+                           with the number of messages exported so far
+    @return                (number of chats exported, number of messages exported)
     """
     count, message_count, style = 0, 0, {0: "timestamp", 2: "wrap", 3: "hidden"}
+    noskip, timerange, progress = ((opts or {}).get(x)
+                                   for x in ("noskip", "timerange", "progress"))
 
     writer = xlsx_writer(filename, autowrap=[2])
     for chat in chats:
         chat_message_count, do_skip = 0, False
         timestamp_from, timestamp_to = timerange or (None, None)
 
-        if skip and not messages and any(x is not None for x in timerange or ()) \
-        and chat["message_count"]:
+        if not noskip and not messages and chat["message_count"] \
+        and any(x is not None for x in timerange or ()):
             messages = db.get_messages(chat, use_cache=False,
                 timestamp_from=timestamp_from, timestamp_to=timestamp_to
             )
@@ -187,7 +191,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, timerange=None, skip=T
             if not msg: do_skip, messages = True, None
             else: messages = itertools.chain([msg], messages)
 
-        if do_skip or skip and not messages and not chat["message_count"]:
+        if do_skip or not noskip and not messages and not chat["message_count"]:
             logger.info("Skipping exporting %s: no messages.",
                         chat["title_long_lc"])
             continue # for chat
@@ -205,8 +209,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, timerange=None, skip=T
         )
         for m in msgs:
             text = parser.parse(m, output={"format": "text"})
-            try:
-                text = text.decode("utf-8")
+            try: text = text.decode("utf-8")
             except UnicodeError: pass
             values = [m["datetime"], db.get_author_name(m), text, m["author"]]
             style[1] = "local" if db.id == m["author"] else "remote"
@@ -218,7 +221,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, timerange=None, skip=T
     return count, message_count
 
 
-def export_chat_template(chat, filename, db, messages):
+def export_chat_template(chat, filename, db, messages, opts=None):
     """
     Exports the chat messages to file using templates.
 
@@ -227,15 +230,22 @@ def export_chat_template(chat, filename, db, messages):
                        .html|.txt determines file format
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
+    @param   opts      export options dictionary, as {"images_folder": true}
+                       if saving images to subfolder in HTML export
     @return            (number of chats exported, number of messages exported)
     """
-    count, message_count = 0, 0
+    count, message_count, opts = 0, 0, opts or {}
     tmpfile, tmpname = None, None # Temporary file for exported messages
     try:
-        is_html = filename.lower().endswith(".html")
+        is_html  = filename.lower().endswith(".html")
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
         namespace = {"db": db, "chat": chat, "messages": messages,
                      "parser": parser}
+        if opts.get("images_folder"):
+            filedir, basename = os.path.split(filename)
+            basename = os.path.splitext(basename)[0]
+            imagedir = os.path.join(filedir, "%s_files" % basename)
+            namespace["images_folder"] = imagedir
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
         # statistics will be available for the main file after parsing.
@@ -307,7 +317,7 @@ def export_chat_template(chat, filename, db, messages):
     return count, message_count
 
 
-def export_chat_csv(chat, filename, db, messages):
+def export_chat_csv(chat, filename, db, messages, opts=None):
     """
     Exports the chat messages to a CSV data file.
 

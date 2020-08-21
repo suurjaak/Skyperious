@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.08.2020
+@modified    21.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -95,6 +95,10 @@ ARGUMENTS = {
               "help": "date to export messages from, as YYYY-MM-DD", "type": date},
              {"args": ["-e", "--end"], "dest": "end_date", "required": False,
               "help": "date to export messages until, as YYYY-MM-DD", "type": date},
+             {"args": ["--images-folder"], "dest": "images_folder",
+              "action": "store_true", "required": False,
+              "help": "save images into a subfolder in HTML export "
+                      "instead of embedding into HTML"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
@@ -558,7 +562,8 @@ def run_create(filenames, input=None, username=None, password=None,
     output("Database size %s, username '%s', with %s." % (sz, db.username, t))
 
 
-def run_export(filenames, format, chatnames, authornames, start_date, end_date, ask_password, store_password):
+def run_export(filenames, format, chatnames, authornames, start_date, end_date,
+               images_folder, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
@@ -566,8 +571,8 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date, 
 
     for db in dbs:
 
-        if (ask_password and db.username and conf.SharedImageAutoDownload
-        and format.lower().endswith("html")):
+        if ask_password and db.username and conf.SharedImageAutoDownload \
+        and "html" == format:
             while not db.live.is_logged_in():
                 password = get_password(db.username)
                 try: db.live.login(password=password)
@@ -584,19 +589,17 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date, 
         basename = util.safe_filename(conf.ExportDbTemplate % formatargs)
         dbstr = "from %s " % db if len(dbs) != 1 else ""
         if is_xlsx_single:
-            export_dir = os.getcwd()
-            filename = util.unique_path("%s.xlsx" % basename)
+            path = os.path.join(os.getcwd(), "%s.xlsx" % basename)
         else:
-            export_dir = util.unique_path(os.path.join(os.getcwd(), basename))
-            filename = format
-        target = filename if is_xlsx_single else export_dir
+            path = os.path.join(os.getcwd(), basename)
+        path = util.unique_path(path)
         try:
             extras = [("", chatnames)] if chatnames else []
             extras += [(" with authors", authornames)] if authornames else []
             output("Exporting%s%s as %s %sto %s." % 
                   (" chats" if extras else "",
                    ",".join("%s like %s" % (x, y) for x, y in extras),
-                   format[:4].upper(), dbstr, target))
+                   format[:4].upper(), dbstr, path))
             chats = sorted(db.get_conversations(chatnames, authornames),
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
@@ -605,23 +608,24 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date, 
             pulse = any(x is not None for x in timerange)
             bar = ProgressBar(max=bar_total, afterword=bartext, pulse=pulse)
             bar.start()
-            result = export.export_chats(chats, export_dir, filename, db,
-                                         timerange=timerange, progress=bar.update)
+            opts = dict(progress=bar.update, timerange=timerange)
+            if images_folder: opts["images_folder"] = True
+            result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
             if count:
                 bar.afterword = " Exported %s from %s to %s. " % (
-                    util.plural("message", message_count), db, target)
+                    util.plural("message", message_count), db, path)
                 bar.update(bar_total)
                 output()
                 logger.info("Exported %s and %s %sto %s as %s.",
                             util.plural("chat", count),
                             util.plural("message", message_count),
-                            dbstr, target, format)
+                            dbstr, path, format[:4].upper())
             else:
                 output("\nNo messages to export%s." %
                       ("" if len(dbs) == 1 else " from %s" % db))
-                os.unlink(filename) if is_xlsx_single else os.rmdir(export_dir)
+                util.try_ignore((os.unlink if is_xlsx_single else os.rmdir), path)
         except Exception as e:
             output("Error exporting chats: %s\n\n%s" % 
                   (e, traceback.format_exc()))
@@ -789,7 +793,7 @@ def run(nogui=False):
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author,
-                   arguments.start_date, arguments.end_date,
+                   arguments.start_date, arguments.end_date, arguments.images_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
