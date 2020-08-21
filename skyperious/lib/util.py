@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    19.08.2020
+@modified    20.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -205,23 +205,25 @@ def cmp_dicts(dict1, dict2):
     return result
 
 
-def try_until(func, count=1, sleep=0.5):
+def try_ignore(func, *args, **kwargs):
     """
-    Tries to execute the specified function a number of times.
+    Tries to execute the specified function with positional and keyword
+    arguments, catching any exceptions.
 
-    @param    func   callable to execute
-    @param    count  number of times to try (default 1)
-    @param    sleep  seconds to sleep after failed attempts, if any
-                     (default 0.5)
-    @return          (True, func_result) if success else (False, None)
+    @param    func    callable to execute
+    @param   __count  special keyword argument, number of times to try
+    @param   __sleep  special keyword argument, seconds to sleep before
+                      further tries (default 0.5)
+    @return           (func result, True) if success else (None, False)
     """
-    result, func_result, tries = False, None, 0
+    func_result, result, tries = False, None, 0
+    count, sleep = kwargs.pop("__count", 1), kwargs.pop("__sleep", 0.5)
     while tries < count:
         tries += 1
-        try: result, func_result = True, func()
+        try: result, func_result = True, func(*args, **kwargs)
         except Exception:
             time.sleep(sleep) if tries < count and sleep else None
-    return result, func_result
+    return func_result, result
 
 
 def to_int(value):

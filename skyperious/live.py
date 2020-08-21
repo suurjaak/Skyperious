@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    19.08.2020
+@modified    20.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -936,9 +936,9 @@ class SkypeExport(skypedata.SkypeDatabase):
         except Exception: raise
         else: self.export_parse(f, progress)
         finally:
-            util.try_until(lambda:  f.close())
-            util.try_until(lambda: tf.close())
-            util.try_until(self.clear_cache)
+            util.try_ignore(f and f.close)
+            util.try_ignore(tf and tf.close)
+            util.try_ignore(self.clear_cache)
             self.export_parsed = True
 
 
@@ -1322,6 +1322,6 @@ class SkypeExport(skypedata.SkypeDatabase):
                     result = SkypeLogin.id_to_identity(value)
                     break # while True
         finally:
-            util.try_until(lambda:  f.close())
-            util.try_until(lambda: tf.close())
+            util.try_ignore(f and f.close)
+            util.try_ignore(tf and tf.close)
         return result

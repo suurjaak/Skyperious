@@ -1618,7 +1618,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             db.tables_list = None # Force reload
             db.update_accountinfo()
         except Exception:
-            util.try_until(lambda: os.unlink(filename))
+            util.try_ignore(os.unlink, filename)
             raise
         finally: busy.Close()
 
@@ -1674,8 +1674,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 skype.db.tables_list = None # Force reload
                 skype.db.update_accountinfo()
             except Exception:
-                util.try_until(lambda: skype.db.close())
-                util.try_until(lambda: os.unlink(filename))
+                util.try_ignore(skype.db and skype.db.close)
+                util.try_ignore(os.unlink, filename)
                 logger.exception("Error saving account %r.", skype.skype.user)
                 raise
         finally: busy.Close()
@@ -1732,16 +1732,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             result = wx.OK == wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL)
             if result:
                 worker.stop(drop_results=False)
-                util.try_until(lambda: self.workers_import.pop(filename))
+                self.workers_import.pop(filename, None)
             return result
 
         def on_progress(result):
             if result.get("error") or result.get("stop"):
-                util.try_until(db.close)
-                util.try_until(lambda: os.unlink(filename))
+                util.try_ignore(lambda: db.close())
+                util.try_ignore(os.unlink, filename)
             if result.get("done"):
                 worker.stop()
-                util.try_until(lambda: self.workers_import.pop(filename))
+                self.workers_import.pop(filename, None)
 
             def after():
                 if not self: return
@@ -1770,7 +1770,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         try:
             db = live.SkypeExport(efilename, filename)
         except Exception:
-            util.try_until(lambda: os.unlink(filename))
+            util.try_ignore(os.unlink, filename)
             raise
 
         dlg = controls.ProgressWindow(self, "Import progress",
@@ -3149,8 +3149,8 @@ class DatabasePage(wx.Panel):
             self.load_tables_data()
             self.list_timeline.RefreshItems()
             self.populate_chat_statistics()
-            util.try_until(lambda: self.grid_table.Table.ClearAttrs())
-            util.try_until(lambda: self.grid_sql.Table.ClearAttrs())
+            util.try_ignore(lambda: self.grid_table.Table.ClearAttrs())
+            util.try_ignore(lambda: self.grid_sql.Table.ClearAttrs())
 
             for lst in (self.list_chats, self.list_chats_sync, self.list_participants):
                 for i in range(lst.GetItemCount()):
@@ -3878,7 +3878,7 @@ class DatabasePage(wx.Panel):
                 errormsg = "Error saving %s:\n\n%s" % \
                            (filepath, traceback.format_exc())
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                wx.CallAfter(util.try_until, lambda: os.unlink(filepath))
+                wx.CallAfter(util.try_ignore, os.unlink, filepath)
             finally:
                 busy.Close()
 

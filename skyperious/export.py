@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    18.08.2020
+@modified    20.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -302,8 +302,8 @@ def export_chat_template(chat, filename, db, messages):
         count = bool(namespace["message_count"])
         message_count = namespace["message_count"]
     finally:
-        if tmpfile: util.try_until(tmpfile.close)
-        if tmpname: util.try_until(lambda: os.unlink(tmpname))
+        if tmpfile: util.try_ignore(tmpfile.close)
+        if tmpname: util.try_ignore(os.unlink, tmpname)
     return count, message_count
 
 
@@ -414,7 +414,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
 
             result = True
     finally:
-        if f: util.try_until(f.close)
+        if f: util.try_ignore(f.close)
     return result
 
 

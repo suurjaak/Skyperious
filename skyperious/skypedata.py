@@ -329,10 +329,7 @@ class SkypeDatabase(object):
     def close(self):
         """Closes the database and frees all allocated data."""
         if hasattr(self, "connection"):
-            try:
-                self.connection.close()
-            except Exception:
-                pass
+            util.try_ignore(self.connection.close)
             del self.connection
             self.connection = None
         for attr in ["tables", "tables_list", "table_rows", "table_objects"]:
@@ -342,8 +339,7 @@ class SkypeDatabase(object):
 
         # Remove live login tokenfile if not storing password
         if not conf.Login.get(self.filename, {}).get("store"):
-            try: os.unlink(self.live.tokenpath)
-            except Exception: pass
+            util.try_ignore(os.unlink, self.live.tokenpath)
 
 
     def execute(self, sql, params=(), log=True):
@@ -2184,7 +2180,7 @@ class MessageParser(object):
             for f in files: f["__message_id"] = message["id"]
             self.stats["transfers"].extend(files)
             self.stats["counts"][author]["files"] += len(files)
-            size_files = sum([util.try_until(lambda: int(i["filesize"]))[1] or 0
+            size_files = sum([util.try_ignore(lambda: int(i["filesize"]))[0] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
         elif MESSAGE_TYPE_MESSAGE == message["type"]:
