@@ -329,7 +329,7 @@ class SkypeDatabase(object):
     def close(self):
         """Closes the database and frees all allocated data."""
         if hasattr(self, "connection"):
-            util.try_ignore(self.connection.close)
+            util.try_ignore(self.connection and self.connection.close)
             del self.connection
             self.connection = None
         for attr in ["tables", "tables_list", "table_rows", "table_objects"]:
