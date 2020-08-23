@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7580,7 +7580,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             msg = mm[idx] if 0 <= idx < len(mm) else None
         label = "previous" if direction < 0 else "next"
         name = self._db.get_author_name({"author": author})
-        guibase.status("No %s message from %s found in current list.", label, name)
+        guibase.status("No %s message from %s found in current view.", label, name)
 
 
     def NextTime(self, unit, current, direction=+1):
@@ -7622,7 +7622,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             idx += step
             msg = mm[idx] if 0 <= idx < len(mm) else None
         label = "previous" if direction < 0 else "next"
-        guibase.status("No %s %s found in current list.", label, unit)
+        guibase.status("No %s %s found in current view.", label, unit)
 
 
     def FocusMessage(self, message_id, do_select=True):

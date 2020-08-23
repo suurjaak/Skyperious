@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    21.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -25,7 +25,25 @@ SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 """Replacer callback for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
 
-"""HTML chat history export template."""
+
+"""
+HTML chat history export template.
+
+@param   chat               chat data dictionary
+@param   date1              first message datetime
+@param   date2              last message datetime
+@param   db                 SkypeDatabase instance
+@param   chat_picture_size  (w, h) or None
+@param   chat_picture_raw   image raw binary or None
+@param   emoticons_used     {type: {author: count}}
+@param   message_buffer     buffer-like object to yield messages content
+@param   message_count      total message count
+@param   parser             MessageParser instance
+@param   participants       [{contact row.., rank, ?avatar_raw_small, ?avatar_raw_large}]
+@param   stats              SkypeDatabase.get_collected_stats()
+@param   timeline           [{dt, label, count, messages, ?label2}, ]
+@param   timeline_units     (topunit, ?subunit)
+"""
 CHAT_HTML = """<%
 import base64, datetime
 from skyperious import conf, emoticons, images, skypedata, templates
@@ -978,7 +996,7 @@ links = dict((i, "#message:%s" % x)
 maxkey, maxval = max(items, key=lambda x: x[1])
 interval = items[1][0] - items[0][0]
 svgdata = {"data": items, "links": links, "maxval": maxval,
-	       "colour": conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize}
+	         "colour": conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize}
 %>
         peak {{util.plural("message", maxval)}}<br />
 {{!step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata)}}
@@ -1362,7 +1380,17 @@ else:
 """
 
 
-"""TXT chat history export template."""
+
+"""
+TXT chat history export template.
+
+@param   chat               chat data dictionary
+@param   date1              first message datetime
+@param   date2              last message datetime
+@param   db                 SkypeDatabase instance
+@param   message_buffer     buffer-like object to yield messages content
+@param   message_count      total message count
+"""
 CHAT_TXT = """<%
 import datetime
 from skyperious import conf, skypedata
@@ -1382,7 +1410,13 @@ for chunk in message_buffer:
 """
 
 
-"""TXT chat history export template for the messages part."""
+"""
+TXT chat history export template for the messages part.
+
+@param   db                 SkypeDatabase instance
+@param   messages           iterator yielding messages
+@param   parser             MessageParser instance
+"""
 CHAT_MESSAGES_TXT = """<%
 from skyperious import skypedata
 from skyperious.lib import util
@@ -1414,7 +1448,16 @@ previous_day = m["datetime"].date()
 """
 
 
-"""HTML data grid export template."""
+"""
+HTML data grid export template.
+
+@param   db            SkypeDatabase instance
+@param   title         export title
+@param   columns       [name, ]
+@param   row_count     total number of rows
+@param   rows          iterator yielding rows
+@param   sql           SQL query, if any
+"""
 GRID_HTML = """<%
 import datetime
 from skyperious import conf, images
@@ -1480,7 +1523,7 @@ from skyperious.lib import util
         <td class="header_left"></td>
         <td>
             <div class="header">{{title}}</div><br />
-            Source: <b>{{db_filename}}</b>.<br />
+            Source: <b>{{db.filename}}</b>.<br />
             <b>{{row_count}}</b> {{util.plural("row", row_count, numbers=False, sep=",")}} in results.<br />
 %if sql:
             <b>SQL:</b> {{sql}}
@@ -1509,7 +1552,17 @@ from skyperious.lib import util
 """
 
 
-"""TXT SQL insert statements export template."""
+"""
+TXT SQL insert statements export template.
+
+@param   db            SkypeDatabase instance
+@param   title         export title
+@param   columns       [name, ]
+@param   rows          iterator yielding rows
+@param   sql           SQL query, if any
+@param   table         table name, if any
+@param   ?create_sql   CREATE TABLE SQL, if any
+"""
 SQL_TXT = """<%
 import datetime, re, string
 from skyperious import conf
@@ -1518,7 +1571,7 @@ UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.prin
 RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
 str_cols = ", ".join(columns)
 %>-- {{title}}.
--- Source: {{db_filename}}.
+-- Source: {{db.filename}}.
 -- Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
 %if sql:
 -- SQL: {{sql}}
@@ -1559,7 +1612,20 @@ INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
 
 
 
-"""HTML statistics template, for use with HtmlWindow."""
+"""
+HTML statistics template, for use with HtmlWindow.
+
+@param   db               SkypeDatabase instance
+@param   participants     [{contact data}, ]
+@param   chat             chat data dictionary
+@param   sort_by          the field stats are currently sorted by
+@param   stats            SkypeDatabase.get_collected_stats()
+@param   images           {histogram type: memoryfs filename}
+@param   authorimages     {identity: {image type: memoryfs filename}}
+@param   imagemaps        {histogram type: [(rect, href)]}
+@param   authorimagemaps  {identity: {histogram type: [(rect, href)]}}
+@param   expand           {clouds: bool, emoticons, shared_images}
+"""
 STATS_HTML = """<%
 import urllib
 from skyperious import conf, emoticons, skypedata
@@ -1889,7 +1955,16 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 """
 
 
-"""HTML template for search result row for a matched chat, HTML table row."""
+"""
+HTML template for search result row for a matched chat, HTML table row.
+
+@param   chat              chat data dictionary
+@param   result_count      total number of results
+@param   pattern_replace   re.RegexObject to find matching text
+@param   matching_authors  [{contact data}, ]
+@param   title_matches     whether chat was matched by title
+@param   wrap_b            function(text) returning <b>text</b>
+"""
 SEARCH_ROW_CHAT_HTML = """<%
 import re
 from skyperious import conf
@@ -1924,7 +1999,16 @@ identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace
 """
 
 
-"""TXT template for search result row for a matched chat."""
+"""
+TXT template for search result row for a matched chat.
+
+@param   chat              chat data dictionary
+@param   result_count      total number of results so far
+@param   pattern_replace   re.RegexObject to find matching text
+@param   matching_authors  [{contact data}, ]
+@param   title_matches     whether chat was matched by title
+@param   wrap_b            function(text) returning **text**
+"""
 SEARCH_ROW_CHAT_TXT = """<%
 import re
 from skyperious import conf
@@ -1951,7 +2035,16 @@ identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace
 """
 
 
-"""HTML template for search result row of a matched contact, HTML table row."""
+"""
+HTML template for search result row of a matched contact, HTML table row.
+
+@param   count             index of current match
+@param   result_count      total number of results so far
+@param   fields_filled     {field: highlighted value}
+@param   match_fields      [contact field, ]
+@param   pattern_replace   re.RegexObject to find matching text
+@param   wrap_b            function(text) returning <b>text</b>
+"""
 SEARCH_ROW_CONTACT_HTML = """<%
 from skyperious import conf, skypedata
 
@@ -1975,7 +2068,16 @@ from skyperious import conf, skypedata
 """
 
 
-"""TXT template for search result row of a matched contact."""
+"""
+TXT template for search result row of a matched contact.
+
+@param   count             index of current match
+@param   result_count      total number of results so far
+@param   fields_filled     {field: highlighted value}
+@param   match_fields      [contact field, ]
+@param   pattern_replace   re.RegexObject to find matching text
+@param   wrap_b            function(text) returning **text**
+"""
 SEARCH_ROW_CONTACT_TXT = """<%
 from skyperious import conf, skypedata
 
@@ -1991,7 +2093,15 @@ from skyperious import conf, skypedata
 """
 
 
-"""HTML template for search result of chat messages, HTML table row."""
+"""
+HTML template for search result of chat messages, HTML table row.
+
+@param   chat              chata data dictionary
+@param   m                 message data dictionary
+@param   count             index of current match
+@param   result_count      total number of results so far
+@param   search            {db}
+"""
 SEARCH_ROW_MESSAGE_HTML = """<%
 from skyperious import conf, skypedata
 
@@ -2025,7 +2135,13 @@ elif m["author"] == search["db"].id:
 """
 
 
-"""TXT template for search result item for chat messages."""
+"""
+TXT template for search result item for chat messages.
+
+@param   chat              chata data dictionary
+@param   m                 message data dictionary
+@param   search            {db}
+"""
 SEARCH_ROW_MESSAGE_TXT = """<%
 from skyperious import conf, skypedata
 
@@ -2039,7 +2155,12 @@ elif m["author"] == search["db"].id:
 """
 
 
-"""HTML template for search results header, start of HTML table."""
+"""
+HTML template for search results header, start of HTML table.
+
+@param   text      search query
+@param   fromtext  search domain label like "all tables"
+"""
 SEARCH_HEADER_HTML = """<%
 from skyperious import conf
 
@@ -2053,7 +2174,11 @@ Results for "{{text}}" from {{fromtext}}:
 """
 
 
-"""HTML template for table search results header, start of HTML table."""
+"""
+HTML template for table search results header, start of HTML table.
+
+@param   table  table data dictionary {name, columns: [{name, }]}
+"""
 SEARCH_ROW_TABLE_HEADER_HTML = """
 <br /><br /><b><a name="{{table["name"]}}">Table {{table["name"]}}:</b></b><br />
 <table border="1" cellpadding="4" cellspacing="0" width="1000">
@@ -2066,7 +2191,11 @@ SEARCH_ROW_TABLE_HEADER_HTML = """
 """
 
 
-"""TXT template for table search results header."""
+"""
+TXT template for table search results header.
+
+@param   table  table data dictionary {name, columns: [{name, }]}
+"""
 SEARCH_ROW_TABLE_HEADER_TXT = """
 Table {{table["name"]}}:
 %for col in ["#"] + table["columns"]:
@@ -2075,7 +2204,14 @@ Table {{table["name"]}}:
 """
 
 
-"""HTML template for search result of DB table row, HTML table row."""
+"""
+HTML template for search result of DB table row, HTML table row.
+
+@param   count             number of results so far
+@param   table             table data dictionary {name, columns: [{name, }]}
+@param   pattern_replace   re.RegexObject to find matching text
+@param   wrap_b            function(text) returning <b>text</b>
+"""
 SEARCH_ROW_TABLE_HTML = """<%
 import re
 from skyperious import conf, templates
@@ -2095,7 +2231,14 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 """
 
 
-"""TXT template for search result of DB table row."""
+"""
+TXT template for search result of DB table row.
+
+@param   count             number of results so far
+@param   table             table data dictionary {name, columns: [{name, }]}
+@param   pattern_replace   re.RegexObject to find matching text
+@param   wrap_b            function(text) returning **text**
+"""
 SEARCH_ROW_TABLE_TXT = """<%
 import re
 from skyperious import conf, templates
@@ -2513,7 +2656,12 @@ For searching messages from specific chats, add "chat:name", and from specific c
 """
 
 
-"""Database links on merge page."""
+"""
+Database links on merge page.
+
+@param   db1  SkypeDatabase instance
+@param   db2  SkypeDatabase instance
+"""
 MERGE_DB_LINKS = """<%
 from skyperious import conf, live
 
@@ -2526,7 +2674,11 @@ from skyperious import conf, live
 """
 
 
-"""HTML template for quote elements in message body."""
+"""
+HTML template for quote elements in message body.
+
+@param   export  whether content is for HTML export
+"""
 MESSAGE_QUOTE = """
 %if export:
 <table class="quote"><tr>
@@ -2545,7 +2697,11 @@ from skyperious import conf
 """
 
 
-"""Chat row in database diff results list."""
+"""
+Chat row in database diff results list.
+
+@param   chat  chat data dictionary
+"""
 DIFF_RESULT_ITEM = """<%
 from skyperious import conf
 
@@ -2554,15 +2710,25 @@ from skyperious import conf
 """
 
 
-"""Message template for copying to clipboard."""
+"""
+Message template for copying to clipboard.
+
+@param   m       message data dictionary
+@param   parser  MessageParser instance
+"""
 MESSAGE_CLIPBOARD = """
 [{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{parser.db.get_author_name(m)}}: {{parser.parse(m, output={"format": "text"})}}
 """
 
 
 """
-Histogram SVG from [(interval, value), ] data.
-Expects parameters: data, links, rectsize, colour, maxval.
+Histogram SVG for message statistics.
+
+@param   data      [(index or datetime, value), ]
+@param   links     {index: href, }
+@param   rectsize  histogram single bar size (w, h)
+@param   colour    histogram colour
+@param   maxval    histogram maximum value
 """
 HISTOGRAM_SVG = """<%
 import datetime

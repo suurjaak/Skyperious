@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    21.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -402,14 +402,13 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                 writer.close() if is_xlsx else 0
             else:
                 namespace = {
-                    "db_filename": db.filename,
-                    "title":       title,
-                    "columns":     columns,
-                    "row_count":   grid.NumberRows,
-                    "rows":        grid.Table.GetRowIterator(),
-                    "sql":         sql_query,
-                    "table":       table,
-                    "app":         conf.Title,
+                    "db":        db,
+                    "title":     title,
+                    "columns":   columns,
+                    "row_count": grid.NumberRows,
+                    "rows":      grid.Table.GetRowIterator(),
+                    "sql":       sql_query,
+                    "table":     table,
                 }
                 if is_sql and table:
                     # Add CREATE TABLE statement.

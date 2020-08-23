@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2374,7 +2374,7 @@ class MessageParser(object):
     def get_timeline_stats(self):
         """
         Returns timeline structure from parsed messages, as (timeline, units),
-        where timeline is [{dt, label, count, messages, ?label2})]
+        where timeline is [{dt, label, count, messages, ?label2}, ]
         and units is (top unit, ?subunit).
         """
         timeline, units = [], ()
