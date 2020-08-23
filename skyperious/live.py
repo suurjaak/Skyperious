@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    20.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -1226,6 +1226,8 @@ class SkypeExport(skypedata.SkypeDatabase):
                 # where ts_ms is the timestamp of the original message.
                 # Message may also start with "Edited previous message: ".
                 STRIP_PREFIX = "Edited previous message: "
+                if msg["body_xml"].startswith(STRIP_PREFIX):
+                    msg["body_xml"] = msg["body_xml"][len(STRIP_PREFIX):]
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
                 tag = bs.find("e_m")
                 ts_ms = int(tag.get("ts_ms"))
@@ -1233,10 +1235,8 @@ class SkypeExport(skypedata.SkypeDatabase):
                 msg["edited_by"] = msg["author"]
                 msg["timestamp"] = ts_ms / 1000
                 msg["timestamp__ms"] = ts_ms
-                if msg["body_xml"].startswith(STRIP_PREFIX):
-                    msg["body_xml"] = msg["body_xml"][len(STRIP_PREFIX):]
                 tag.unwrap() # Remove tag from soup
-                if not bs.encode(): msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
+                if not bs.encode().strip(): msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
             except Exception:
                 if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
 
