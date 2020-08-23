@@ -1746,11 +1746,13 @@ class MessageParser(object):
                 b.text = c["name"] if isinstance(c, dict) else c
                 b.tail = "" if i < len(contacts) - 1 else "."
         elif MESSAGE_TYPE_TOPIC == message["type"]:
-            if dom.text:
-                dom.text = "Changed the conversation topic to \"%s\"." \
-                           % dom.text
-                if not dom.text.endswith("."):
-                    dom.text += "."
+            text = dom.text
+            # Newer message format has content like
+            # <pictureupdate><eventtime>1498740806804</eventtime>..
+            dom.clear()
+            if text:
+                dom.text = 'Changed the conversation topic to "%s".' % text
+                if not dom.text.endswith("."): dom.text += "."
             else:
                 dom.text = "Changed the conversation picture."
         elif message["type"] in (MESSAGE_TYPE_CALL, MESSAGE_TYPE_CALL_END):
