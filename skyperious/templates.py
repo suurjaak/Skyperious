@@ -868,7 +868,7 @@ from skyperious.lib.vendor import step
 %else:
       <span class="date name">{{ entry["label"] }}</span>
 %endif
-      <span class="count">{{ util.format_count(entry["count"]) }}</span>
+      <span class="count">{{ (entry["count"])}}</span>
     </a>
   </li>
 %endfor
