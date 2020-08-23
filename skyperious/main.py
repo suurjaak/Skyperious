@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.08.2020
+@modified    23.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -86,6 +86,9 @@ ARGUMENTS = {
                       "text files"},
              {"args": ["FILE"], "nargs": "+",
               "help": "one or more Skype databases to export"}, 
+             {"args": ["-o", "--output"], "dest": "output_dir",
+              "metavar": "DIR", "required": False,
+              "help": "Output directory if not current directory"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to export", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -562,12 +565,13 @@ def run_create(filenames, input=None, username=None, password=None,
     output("Database size %s, username '%s', with %s." % (sz, db.username, t))
 
 
-def run_export(filenames, format, chatnames, authornames, start_date, end_date,
-               images_folder, ask_password, store_password):
+def run_export(filenames, format, output_dir, chatnames, authornames,
+               start_date, end_date, images_folder, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
     timerange = map(util.datetime_to_epoch, (start_date, end_date))
+    output_dir = output_dir or os.getcwd()
 
     for db in dbs:
 
@@ -589,9 +593,9 @@ def run_export(filenames, format, chatnames, authornames, start_date, end_date,
         basename = util.safe_filename(conf.ExportDbTemplate % formatargs)
         dbstr = "from %s " % db if len(dbs) != 1 else ""
         if is_xlsx_single:
-            path = os.path.join(os.getcwd(), "%s.xlsx" % basename)
+            path = os.path.join(output_dir, "%s.xlsx" % basename)
         else:
-            path = os.path.join(os.getcwd(), basename)
+            path = os.path.join(output_dir, basename)
         path = util.unique_path(path)
         try:
             extras = [("", chatnames)] if chatnames else []
@@ -792,8 +796,9 @@ def run(nogui=False):
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.chat, arguments.author,
-                   arguments.start_date, arguments.end_date, arguments.images_folder,
+        run_export(arguments.FILE, arguments.type, arguments.output,
+                   arguments.chat, arguments.author, arguments.start_date,
+                   arguments.end_date, arguments.images_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)
