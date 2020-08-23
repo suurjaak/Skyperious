@@ -5,12 +5,11 @@ Pre-requisites:
 
 - [Docker](https://www.docker.com/)
 
-Get Skyperious with `git clone https://github.com/suurjaak/Skyperious`,
-or download and unpack a source distribution.
-
-Change directory into Skyperious/dist, build and run the Docker image:
+Download the [Dockerfile](Dockerfile) for Skyperious,
+build and run the Docker image:
 
 ```
+    wget https://raw.githubusercontent.com/suurjaak/Skyperious/master/dist/Dockerfile
     docker build . -t skyperious
 
     xhost +
@@ -20,7 +19,7 @@ Change directory into Skyperious/dist, build and run the Docker image:
 `docker build . -t skyperious` will prepare an Ubuntu 18.04 Docker image
 and install Skyperious and its dependencies within the container.
 
-`xhost +` will allow the image to access the X Window System display.
+`xhost +` will allow the container to access the X Window System display.
 
 Add `sudo` before docker commands if not running as root user.
 
@@ -31,4 +30,4 @@ Host filesystem is made available under /mnt/host.
 
 ---
 
-Docker support initially provided by [Atila Romero](https://github.com/atilaromero).
+Initial Docker support provided by [Atila Romero](https://github.com/atilaromero).

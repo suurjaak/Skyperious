@@ -19,7 +19,6 @@ FROM ubuntu:18.04
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       apt-utils \
-      locales \
       locales-all \
       python2.7 \
       python-pip \
@@ -37,10 +36,9 @@ ENV LC_ALL   en_US.UTF-8
 ENV LANG     en_US.UTF-8
 ENV LANGUAGE en_US.UTF-8
 
-RUN wget \
-      https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04/wxPython-4.1.0-cp27-cp27mu-linux_x86_64.whl \
-    && pip install wxPython-4.1.0-cp27-cp27mu-linux_x86_64.whl \
-    && rm wxPython-4.1.0-cp27-cp27mu-linux_x86_64.whl
+RUN pip install -U -f --no-cache-dir \
+    https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 \
+    wxPython
 
 RUN pip install skyperious
 
