@@ -170,6 +170,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             message="Choose a directory where to search for databases",
             defaultPath=os.getcwd(),
             style=wx.DD_DIR_MUST_EXIST | wx.RESIZE_BORDER)
+        self.dialog_openfile = wx.FileDialog(
+            parent=self, message="Open database",
+            defaultDir=os.getcwd(), defaultFile="",
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
+            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
+        self.dialog_openexport = wx.FileDialog(
+            parent=self, message="Open Skype export archive",
+            defaultDir=os.getcwd(), defaultFile="",
+            wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
+                     "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
+                     "All files|*.*",
+            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
         self.dialog_savefile = wx.FileDialog(
             parent=self, defaultDir=os.getcwd(), defaultFile="",
             style=wx.FD_SAVE | wx.RESIZE_BORDER)
@@ -1387,21 +1399,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if i > has_export and item:
             filename2 = item.GetLabel().split(" ", 1).pop()
         elif is_export: # Second menu item: open a Skype export archive from computer
-            dialog = wx.FileDialog(
-                parent=self, message="Open Skype export archive", defaultFile="",
-                wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
-                         "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
-                         "All files|*.*",
-                style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
-            dialog.ShowModal()
-            filename2 = dialog.GetPath()
+            if wx.ID_OK == self.dialog_openexport.ShowModal():
+                filename2 = self.dialog_openexport.GetPath()
         else: # First menu item: open a file from computer
-            dialog = wx.FileDialog(
-                parent=self, message="Open Skype database", defaultFile="",
-                wildcard="SQLite database (*.db)|*.db|All files|*.*",
-                style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
-            dialog.ShowModal()
-            filename2 = dialog.GetPath()
+            if wx.ID_OK == self.dialog_openfile.ShowModal():
+                filename2 = self.dialog_openfile.GetPath()
         if filename1 == filename2:
             wx.MessageBox("Cannot compare %s with itself." % (filename1),
                           conf.Title, wx.OK | wx.ICON_WARNING)
@@ -1699,12 +1701,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for creating a new blank database from Skype export,
         opens dialogs for choosing export file and database location.
         """
-        dialog1 = wx.FileDialog(
-            parent=self, message="Open Skype export archive",
-            wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
-                     "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
-                     "All files|*.*",
-            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
+        dialog1 = self.dialog_openexport
         dialog1.ShowModal()
         efilename = dialog1.GetPath()
         if not efilename: return
@@ -1792,13 +1789,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for open database menu or button, displays a file dialog and
         loads the chosen database.
         """
-        dialog = wx.FileDialog(
-            parent=self, message="Open", defaultFile="",
-            wildcard="SQLite database (*.db)|*.db|All files|*.*",
-            style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER
-        )
-        if wx.ID_OK == dialog.ShowModal():
-            filename = dialog.GetPath()
+        if wx.ID_OK == self.dialog_openfile.ShowModal():
+            filename = self.dialog_openfile.GetPath()
             if filename:
                 self.update_database_list(filename)
                 self.load_database_page(filename)
@@ -2378,9 +2370,7 @@ class DatabasePage(wx.Panel):
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
         self.dialog_savefile = wx.FileDialog(
-            parent=self,
-            defaultDir=os.getcwd(),
-            defaultFile="",
+            parent=self, defaultDir=os.getcwd(), defaultFile="",
             style=wx.FD_SAVE | wx.RESIZE_BORDER)
 
         self.TopLevelParent.page_db_latest = self
