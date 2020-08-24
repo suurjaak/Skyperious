@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    23.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1365,7 +1365,7 @@ if isdef("images_folder") and images_folder:
     basename = isdef("filename") and filename or "%s.%s" % (message_id, filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(images_folder, basename))
-    url = "%s/%s" % (os.path.split(images_folder)[1], os.path.split(filepath)[1])
+    url = "%s/%s" % (os.path.basename(images_folder), os.path.basename(filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
     except Exception:

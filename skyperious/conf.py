@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.2.dev39"
-VersionDate = "23.08.2020"
+Version = "4.2.dev40"
+VersionDate = "24.08.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -420,7 +420,7 @@ def save():
     try:
         for path in configpaths:
             # Try path under application folder first, then user-specific path
-            try: os.makedirs(os.path.split(path)[0])
+            try: os.makedirs(os.path.dirname(path))
             except Exception: pass
             try: f = open(path, "wb")
             except Exception: continue # for path

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -276,7 +276,7 @@ def run_merge(filenames, output_filename=None):
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
 
-    name, ext = os.path.splitext(os.path.split(db_base.filename)[-1])
+    name, ext = os.path.splitext(os.path.basename(db_base.filename))
     now = datetime.datetime.now().strftime("%Y%m%d")
     if not output_filename:
         output_filename = util.unique_path("%s.merged.%s%s" %  (name, now, ext))

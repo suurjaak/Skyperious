@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    20.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -289,7 +289,7 @@ def create_file(filepath, mode="w", handle=False):
     @param   mode    file creation mode, relevant if returning file handle
     @param   handle  whether to return open file handle
     """
-    try: os.makedirs(os.path.split(filepath)[0])
+    try: os.makedirs(os.path.dirname(filepath))
     except Exception: pass
     if handle: return open(filepath, mode)
     else:

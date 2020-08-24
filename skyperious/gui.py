@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1216,7 +1216,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                  original, conf.Title, wx.OK | wx.ICON_WARNING)
 
         dialog = wx.FileDialog(parent=self, message="Save a copy..",
-            defaultDir=os.path.split(original)[0],
+            defaultDir=os.path.dirname(original),
             defaultFile=os.path.basename(original),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
@@ -1597,10 +1597,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not user: return
 
         filename0 = live.SkypeLogin.make_db_path(user)
-        try: os.makedirs(os.path.split(filename0)[0])
-        except Exception: pass
+        util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
-            defaultDir=os.path.split(filename0)[0],
+            defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
@@ -1642,10 +1641,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not user or not pw: return
 
         filename0 = live.SkypeLogin.make_db_path(user)
-        try: os.makedirs(os.path.split(filename0)[0])
-        except Exception: pass
+        util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
-            defaultDir=os.path.split(filename0)[0],
+            defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
@@ -1711,10 +1709,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                           conf.Title, wx.OK | wx.ICON_WARNING)
 
         filename0 = live.SkypeLogin.make_db_path(user)
-        try: os.makedirs(os.path.split(filename0)[0])
-        except Exception: pass
+        util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
-            defaultDir=os.path.split(filename0)[0],
+            defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )

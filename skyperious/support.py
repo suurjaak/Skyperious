@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    20.08.2020
+@modified    24.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -117,7 +117,7 @@ def download_and_install(url):
     try:
         is_cancelled = False
         parent = wx.GetApp().TopWindow
-        filename, tmp_dir = os.path.split(url)[-1], tempfile.mkdtemp()
+        filename, tmp_dir = os.path.basename(url), tempfile.mkdtemp()
         dlg_progress = \
             controls.ProgressWindow(parent, "Downloading %s" % filename)
         dlg_progress.SetGaugeForegroundColour(conf.GaugeColour)
