@@ -1218,6 +1218,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog = wx.FileDialog(parent=self, message="Save a copy..",
             defaultDir=os.path.dirname(original),
             defaultFile=os.path.basename(original),
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         if wx.ID_OK != dialog.ShowModal(): return
@@ -1601,6 +1602,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         if wx.ID_OK != dialog2.ShowModal(): return
@@ -1645,6 +1647,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         if wx.ID_OK != dialog2.ShowModal(): return
@@ -1713,6 +1716,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
             defaultFile=os.path.basename(filename0),
+            wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         if wx.ID_OK != dialog2.ShowModal(): return
@@ -3433,11 +3437,10 @@ class DatabasePage(wx.Panel):
                 self.dialog_savefile.Directory = directory
                 self.dialog_savefile.Filename = "%s (recovered)" % base
                 self.dialog_savefile.Message = "Save recovered data as"
-                self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db"
+                self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db|All files|*.*"
                 self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
                 if wx.ID_OK == self.dialog_savefile.ShowModal():
                     newfile = self.dialog_savefile.GetPath()
-                    if not newfile.lower().endswith(".db"): newfile += ".db"
                     if newfile != self.db.filename:
                         guibase.status("Recovering data from %s to %s.",
                                        self.db.filename, newfile)
