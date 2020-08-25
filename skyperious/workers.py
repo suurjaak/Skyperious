@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    11.08.2020
+@modified    25.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -691,12 +691,11 @@ class MergeThread(WorkerThread):
         c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
         c1m_diff = [] # [(id, datetime), ] messages different in chat 1
 
-        if not c["messages1"]:
-            messages1, messages2 = [], [] # Left side empty, skip all messages
-        elif not c["messages2"]:
-            messages1, messages2 = [], [] # Right side empty, take whole left
-            messages_all = db1.get_messages(c["c1"], use_cache=False)
-            c1m_diff = [(m["id"], m["datetime"]) for m in messages_all]
+        if not c["messages1"]:   # Left side empty, skip all messages
+            pass
+        elif not c["messages2"]: # Right side empty, take entire left
+            messages1 = db1.get_messages(c["c1"], use_cache=False)
+            c1m_diff = [(m["id"], m["datetime"]) for m in messages1]
         else:
             messages1 = db1.get_messages(c["c1"], use_cache=False)
             messages2 = db2.get_messages(c["c2"], use_cache=False)
@@ -704,89 +703,63 @@ class MergeThread(WorkerThread):
             parser2 = skypedata.MessageParser(db2)
             parse_options = {"format": "text", "merge": True}
 
-            m1map = {} # {remote_id: [(id, datetime), ], }
-            m2map = {} # {remote_id: [(id, datetime), ], }
-            m1_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
-            m2_no_remote_ids = [] # [(id, datetime), ] with a NULL remote_id
-            m1bodymap = {} # {author+type+body: [(id, datetime), ], }
-            m2bodymap = {} # {author+type+body: [(id, datetime), ], }
-            difftexts = {} # {(id, datetime): text, }
+            m2buckets = {} # {datetime.date: {(author, body): [(id, datetime), ]}}
 
-            # Assemble maps by remote_id and create diff texts. remote_id is
-            # not unique and can easily have duplicates.
-            things = [(messages1, m1map, m1_no_remote_ids, m1bodymap, parser1),
-                      (messages2, m2map, m2_no_remote_ids, m2bodymap, parser2)]
-            for messages, idmap, noidmap, bodymap, parser in things:
-                for i, m in enumerate(messages):
-                    # Avoid keeping whole messages in memory, can run out.
-                    m_cache = (m["id"], m.get("datetime"))
-                    if m["remote_id"]:
-                        if m["remote_id"] not in idmap:
-                            idmap[m["remote_id"]] = []
-                        idmap[m["remote_id"]].append(m_cache)
-                    else:
-                        noidmap.append(m_cache)
-                    # In these messages, parsed body can differ even though
-                    # message is the same: contact names are taken from current
-                    # database values. Using raw values instead.
-                    if m["type"] in self.MESSAGE_TYPES_IGNORE_BODY:
-                        t = m["identities"] or ""
-                        if skypedata.MESSAGE_TYPE_LEAVE == m["type"]:
-                            t = m["author"]
-                    else:
-                        t = parser.parse(m, output=parse_options)
-                    t = t if isinstance(t, str) else t.encode("utf-8")
-                    author = (m["author"] or "").encode("utf-8")
-                    difftext = "%s-%s-%s" % (author, m["type"], t)
-                    difftexts[m_cache]  = difftext
-                    if difftext not in bodymap: bodymap[difftext] = []
-                    bodymap[difftext].append(m_cache)
-                    if i and not i % self.REFRESH_COUNT:
-                        self.yield_ui()
-                    if postback: postback["index"] += 1
-                    if postback and i and not i % self.POSTBACK_COUNT:
-                        self.postback(postback)
+            # Assemble all chat message contents from db2
+            for i, m in enumerate(messages2):
+                if not m.get("datetime"): continue # for i, m
 
-            # Compare assembled remote_id maps between databases and see if
-            # there are no messages with matching body in the other database.
-            remote_id_messages = [(r, j) for r, i in m1map.items() for j in i]
-            for i, (remote_id, m) in enumerate(remote_id_messages):
-                if remote_id in m2map:
-                    is_match = lambda x: (difftexts[m] == difftexts[x])
-                    if not any(filter(is_match, m2map[remote_id])):
-                        c1m_diff.append(m) # Nothing with same remote_id+body
-                else:
-                    c1m_diff.append(m)
+                mkey = (m["id"], m["datetime"])
+                t = util.to_unicode(parser2.parse(m, output=parse_options), "utf-8")
+                ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
+                bucket = m2buckets.setdefault(m["datetime"].date(), {})
+                bucket.setdefault(ckey, []).append(mkey)
+                if i and not i % self.REFRESH_COUNT:
+                    self.yield_ui()
+                if postback: postback["index"] += 1
+                if postback and i and not i % self.POSTBACK_COUNT:
+                    self.postback(postback)
+
+            # For every chat message in db1, see if there is a match in db2
+            DELTAS = [datetime.timedelta(days=x) for x in range(-1, 2)]
+            for i, m in enumerate(messages1):
+                if not m.get("datetime"): continue # for i, m
+
+                t = util.to_unicode(parser1.parse(m, output=parse_options), "utf-8")
+                ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
+
+                potentials, mdate = [], m["datetime"].date()
+                for delta in DELTAS:
+                    # Look for matching messages within -1/+1 day interval
+                    potentials += m2buckets.get(mdate+delta, {}).get(ckey, [])
+                if not any(self.match_time(m["datetime"], x[1], 180) for x in potentials):
+                    c1m_diff.append((m["id"], m["datetime"]))
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
 
-            # For messages with no remote_id-s, compare by author-type-body key
-            # and see if there are no matching messages close in time.
-            for i, m in enumerate(m1_no_remote_ids):
-                potential_matches = m2bodymap.get(difftexts[m], [])
-                if not [m2 for m2 in potential_matches
-                        if self.match_time(m[1], m2[1], 180)]:
-                    c1m_diff.append(m)
-                if i and not i % self.REFRESH_COUNT:
-                    self.yield_ui()
-
-        message_ids1 = [m[0] for m in sorted(c1m_diff, key=lambda x: x[1])]
-        result = { "messages": message_ids1, "participants": c1p_diff }
+        message_ids1 = [x[0] for x in sorted(c1m_diff, key=lambda x: x[1])]
+        result = {"messages": message_ids1, "participants": c1p_diff}
         return result
 
 
-    def match_time(self, d1, d2, leeway_seconds=0):
-        """Whether datetimes might be same but from different timezones."""
-        result = False
-        d1, d2 = (d1, d2) if d1 and d2 and (d1 < d2) else (d2, d1)
-        delta = d2 - d1 if d1 and d2 else datetime.timedelta()
+    def match_time(self, d1, d2, slack=0):
+        """
+        Returns whether datetimes might be same but from different timezones:
+        comparison ignores hours within a single-day interval.
+
+        @param   slack  seconds of slack between timestamp minutes
+        """
+        if not d1 or not d2: return False
+        d1, d2 = (d1, d2) if d1 < d2 else (d2, d1)
+        delta = d2 - d1
         if util.timedelta_seconds(delta) > 24 * 3600:
-            delta = datetime.timedelta() # Skip if not even within same day
+            return False # Skip if not even within same day
+            
+        result = False
         for hour in range(int(util.timedelta_seconds(delta) / 3600) + 1):
             d1plus = d1 + datetime.timedelta(hours=hour)
-            result = util.timedelta_seconds(d2 - d1plus) < leeway_seconds
-            if result:
-                break # break for hour in range(..
+            result = util.timedelta_seconds(d2 - d1plus) < slack
+            if result: break # for hour
         return result
 
 
