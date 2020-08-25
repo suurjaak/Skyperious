@@ -12,7 +12,8 @@ CHANGELOG
 - added option to go to next/previous day/week/month in chat history;
 - added option to filter chat history by day/week/month/year of clicked message;
 - added calendar popup to chat time period filter;
-- import account/contact gender, homepage and e-mails from live sync.
+- import account/contact gender, homepage and e-mails from live sync;
+- upgraded skpy from 0.9.1 to 0.10.
 
 
 4.1, 2020-08-03
