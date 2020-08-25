@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.08.2020
+@modified    25.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1597,7 +1597,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         user = dialog1.GetValue().strip()
         if not user: return
 
-        filename0 = live.SkypeLogin.make_db_path(user)
+        filename0 = live.make_db_path(user)
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
@@ -1642,7 +1642,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         user, pw = dialog1.Username, dialog1.Password
         if not user or not pw: return
 
-        filename0 = live.SkypeLogin.make_db_path(user)
+        filename0 = live.make_db_path(user)
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
@@ -1711,7 +1711,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not user: return wx.MessageBox("No Skype username found in %s." % efilename, 
                                           conf.Title, wx.OK | wx.ICON_WARNING)
 
-        filename0 = live.SkypeLogin.make_db_path(user)
+        filename0 = live.make_db_path(user)
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.08.2020
+@modified    25.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -70,7 +70,7 @@ class SkypeLogin(object):
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
         self.populated    = False
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
-        self.msg_stamps   = {} # {remote_id: last timestamp}
+        self.msg_stamps   = {} # {remote_id: last timestamp__ms}
 
 
     def is_logged_in(self):
@@ -115,7 +115,7 @@ class SkypeLogin(object):
     def init_db(self, filename=None, truncate=False):
         """Creates SQLite database if not already created."""
         if not self.db:
-            path = filename or self.make_db_path(self.username)
+            path = filename or make_db_path(self.username)
             truncate = truncate or not os.path.exists(path)
             self.db = skypedata.SkypeDatabase(path, truncate=truncate)
             self.db.live = self
@@ -221,10 +221,10 @@ class SkypeLogin(object):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
-                if dbitem["timestamp"] < self.msg_stamps[dbitem["remote_id"]]:
+                if dbitem["timestamp__ms"] <= self.msg_stamps[dbitem["remote_id"]]:
                     dbitem.pop("body_xml") # We have a later more valid content
-                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp"], self.msg_stamps[dbitem["remote_id"]])
-                if dbitem["timestamp"] > dbitem0["timestamp"]:
+                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"], self.msg_stamps[dbitem["remote_id"]])
+                if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
                     dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp")})
                 result, dbitem1 = self.SAVE.SKIP, dict(dbitem)
 
@@ -238,14 +238,15 @@ class SkypeLogin(object):
 
         if "messages" == table and "remote_id" in dbitem1 \
         and dbitem1["remote_id"] not in self.msg_stamps:
-            self.msg_stamps[dbitem1["remote_id"]] = dbitem1["timestamp"]
+            self.msg_stamps[dbitem1["remote_id"]] = dbitem1["timestamp__ms"]
 
         if identity is not None:
             cacheitem = dict(dbitem)
             if "messages" == table: # Retain certain fields only, sparing memory
-                cacheitem = dict((k, dbitem[k]) for k in 
-                    ("id", "guid", "pk_id", "remote_id", "convo_id", "timestamp")
-                if k in dbitem)
+                cacheitem = dict((k, dbitem[k]) for k in (
+                    "id", "guid", "pk_id", "remote_id", "convo_id",
+                    "timestamp", "timestamp__ms"
+                ) if k in dbitem)
             self.cache[table][identity] = cacheitem
             if "accounts" == table:
                 self.cache["contacts"][identity] = cacheitem # For name lookup
@@ -255,7 +256,7 @@ class SkypeLogin(object):
             self.insert_chats(item, dbitem, dbitem0)
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat):
             # See if older-style chat entry is present
-            identity0 = self.id_to_identity(item.id)
+            identity0 = id_to_identity(item.id)
             chat0 = self.cache["chats"].get(identity0) if identity0 != item.id else None
             if chat0:
                 result = self.SAVE.NOCHANGE
@@ -373,7 +374,7 @@ class SkypeLogin(object):
                 name = unicode(item.name)
                 result.update(displayname=name, fullname=name)
             if item.birthday:
-                result.update(birthday=self.date_to_integer(item.birthday))
+                result.update(birthday=date_to_integer(item.birthday))
             if item.location and item.location.country:
                 result.update(country=item.location.country)
             if item.location and item.location.region:
@@ -450,7 +451,7 @@ class SkypeLogin(object):
         elif "messages" == table:
 
             ts = util.datetime_to_epoch(item.time)
-            pk_id, guid = self.make_message_ids(item.id)
+            pk_id, guid = make_message_ids(item.id)
             result.update(is_permanent=1, timestamp=int(ts), author=item.userId,
                           pk_id=pk_id, guid=guid,
                           from_dispname=self.get_contact_name(item.userId),
@@ -473,7 +474,8 @@ class SkypeLogin(object):
                 # SkypeTextMsg(id='1594466183791', type='RichText', time=datetime.datetime(2020, 7, 11, 11, 16, 16, 392000), clientId='16811922854185209745', userId='username', chatId='8:username', content='<ss type="hi">(wave)</ss>')
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_MESSAGE,
-                             type=skypedata.MESSAGE_TYPE_MESSAGE)
+                              type=skypedata.MESSAGE_TYPE_MESSAGE)
+                process_message_edit(result)
 
             elif isinstance(item, skpy.SkypeCallMsg):
                 # SkypeCallMsg(id='1593784617947', type='Event/Call', time=datetime.datetime(2020, 7, 3, 13, 56, 57, 949000), clientId='3666747505059875266', userId='username', chatId='8:username', content='<partlist type="ended" alt="" callId="1593784540478"><part identity="8:username"><name>Display Name</name><duration>84.82</duration></part><part identity="8:username2"><name>Display Name 2</name><duration>84.82</duration></part></partlist>', state=SkypeCallMsg.State.Ended, userIds=['username', '8:username2'], userNames=['Display Name', 'Display Name 2'])
@@ -543,7 +545,7 @@ class SkypeLogin(object):
                 try:
                     tag = BeautifulSoup and BeautifulSoup(item.content, "html.parser").find("initiator")
                     if tag and tag.text:
-                        author = self.id_to_identity(tag.text)
+                        author = id_to_identity(tag.text)
                         result.update(author=author)
                         result.update(from_dispname=self.get_contact_name(author))
                 except Exception:
@@ -596,7 +598,7 @@ class SkypeLogin(object):
             return
         if not self.cache: self.build_cache()
 
-        identities = map(self.identity_to_id, chats or ())
+        identities = map(identity_to_id, chats or ())
         getter = lambda c: self.request(self.skype.chats.chat, c, __raise=False)
         selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
 
@@ -762,15 +764,6 @@ class SkypeLogin(object):
         except Exception: pass
 
 
-    @staticmethod
-    def date_to_integer(date):
-        """Returns datetime.date as integer YYYYMMDD, or None if date is None."""
-        result = None
-        if isinstance(date, datetime.date):
-            result = 10000 * date.year + 100 * date.month + date.day
-        return result
-
-
     def get_contact_name(self, identity):
         """Returns contact displayname or fullname or identity."""
         result = None
@@ -779,63 +772,6 @@ class SkypeLogin(object):
             result = contact.get("displayname") or contact.get("fullname")
         result = result or identity
         return result
-
-
-    @staticmethod
-    def id_to_identity(chatid):
-        """
-        Returns conversation or contact identity in Skype database;
-        "username" from "8:username" for single chats,
-        or "#username1/$username2;123456abcdef"
-        from "19:I3VzZXJuYW1lMS8kdXNlcm5hbWUyOzEyMzQ1NmFiY2RlZg==@p2p.thread.skype"
-        for older peer-to-peer group chats,
-        or "19:xyz@thread.skype" for newer group chats.
-        """
-        result = chatid
-        if result and not result.endswith("@thread.skype"):
-            result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
-            if result.endswith("@p2p.thread.skype"):
-                result = result[:-len("@p2p.thread.skype")]
-                try: result = base64.b64decode(result)
-                except Exception: pass
-        return result
-
-
-    @staticmethod
-    def identity_to_id(identity):
-        """
-        Returns conversation or contact ID in Skype live;
-        "8:username" from "username" for single chats,
-        or "19:I3VzZXJuYW1lMS8kdXNlcm5hbWUyOzEyMzQ1NmFiY2RlZg==@p2p.thread.skype"
-        from "#username1/$username2;123456abcdef"
-        for older peer-to-peer group chats,
-        or "19:xyz@thread.skype" as-is for newer group chats.
-        """
-        result = identity
-        if result and not result.endswith("@thread.skype"):
-            if result.startswith("#"):
-                result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
-            elif not result.endswith("thread.skype"):
-                result = "8:%s" % result
-        return result
-
-
-    @staticmethod
-    def make_db_path(username):
-        """Returns the default database path for username."""
-        base = util.safe_filename(username)
-        if base != username: base += "_%x" % hash(username)
-        return os.path.join(conf.VarDirectory, "%s.main.db" % base)
-
-
-    @staticmethod
-    def make_message_ids(msg_id):
-        """Returns (pk_id, guid) for message ID."""
-        try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else hash(msg_id)
-        except Exception: pk_id = hash(msg_id) # Ensure fit into INTEGER-column
-        guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
-        guid *= 32 / len(guid)
-        return (pk_id, guid)
 
 
 
@@ -1006,8 +942,7 @@ class SkypeExport(skypedata.SkypeDatabase):
             # Dictionary value: ("nested path.key name", "data type", value)
             else:
                 if "userId" == prefix:
-                    account = dict(skypename=self.live.id_to_identity(value),
-                                   is_permanent=1)
+                    account = dict(skypename=id_to_identity(value), is_permanent=1)
                     self.insert_row("accounts", account)
                     self.update_accountinfo()
 
@@ -1028,7 +963,7 @@ class SkypeExport(skypedata.SkypeDatabase):
 
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
-                    for identity in map(self.live.id_to_identity, json.loads(value)):
+                    for identity in map(id_to_identity, json.loads(value)):
                         if identity not in self.table_objects["contacts"] and identity != self.id:
                             contact = dict(skypename=identity, is_permanent=1)
                             contact["id"] = self.insert_row("contacts", contact)
@@ -1039,12 +974,12 @@ class SkypeExport(skypedata.SkypeDatabase):
 
                 elif "conversations.item.MessageList.item.id" == prefix:
                     if skip_chat: continue # while True
-                    pk_id, guid = self.live.make_message_ids(value)
+                    pk_id, guid = make_message_ids(value)
                     msg.update(pk_id=pk_id, guid=guid)
 
                 elif "conversations.item.MessageList.item.from" == prefix:
                     if skip_chat: continue # while True
-                    msg["author"] = self.live.id_to_identity(value)
+                    msg["author"] = id_to_identity(value)
 
                 elif "conversations.item.MessageList.item.displayName" == prefix:
                     if value: msg["from_dispname"] = value
@@ -1149,7 +1084,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                        type=skypedata.MESSAGE_TYPE_TOPIC)
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
-                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                initiator = id_to_identity(bs.find("initiator").text)
                 if initiator: msg["author"] = initiator
                 msg["body_xml"] = bs.find("value").text
             except Exception:
@@ -1162,9 +1097,9 @@ class SkypeExport(skypedata.SkypeDatabase):
                        type=skypedata.MESSAGE_TYPE_PARTICIPANTS)
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
-                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                initiator = id_to_identity(bs.find("initiator").text)
                 if initiator: msg["author"] = initiator
-                msg["identities"] = self.live.id_to_identity(bs.find("target").text)
+                msg["identities"] = id_to_identity(bs.find("target").text)
             except Exception:
                 if BeautifulSoup: logger.warn("Error parsing identities from %s.", msg, exc_info=True)
 
@@ -1173,8 +1108,8 @@ class SkypeExport(skypedata.SkypeDatabase):
 
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
-                initiator = self.live.id_to_identity(bs.find("initiator").text)
-                target = self.live.id_to_identity(bs.find("target").text)
+                initiator = id_to_identity(bs.find("initiator").text)
+                target = id_to_identity(bs.find("target").text)
                 if initiator: msg["author"] = initiator
                 if msg["author"] == target:
                     msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_LEAVE,
@@ -1197,7 +1132,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                        type=skypedata.MESSAGE_TYPE_TOPIC)
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
-                initiator = self.live.id_to_identity(bs.find("initiator").text)
+                initiator = id_to_identity(bs.find("initiator").text)
                 if initiator: msg["author"] = initiator
             except Exception:
                 if BeautifulSoup: logger.warn("Error parsing author from %s.", msg, exc_info=True)
@@ -1218,27 +1153,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         and "edited_timestamp" not in msg:
             return None # Can be blank messages, especially from serverside
 
-        if "<e_m " in msg.get("body_xml"):
-            # <e_m ts="1526383416" ts_ms="1526383417250" a="skypename" t="61"/>
-
-            try:
-                # Edited messages can be in form "new content<e_m ..>",
-                # where ts_ms is the timestamp of the original message.
-                # Message may also start with "Edited previous message: ".
-                STRIP_PREFIX = "Edited previous message: "
-                if msg["body_xml"].startswith(STRIP_PREFIX):
-                    msg["body_xml"] = msg["body_xml"][len(STRIP_PREFIX):]
-                bs = BeautifulSoup(msg["body_xml"], "html.parser")
-                tag = bs.find("e_m")
-                ts_ms = int(tag.get("ts_ms"))
-                msg["edited_timestamp"] = msg["timestamp"]
-                msg["edited_by"] = msg["author"]
-                msg["timestamp"] = ts_ms / 1000
-                msg["timestamp__ms"] = ts_ms
-                tag.unwrap() # Remove tag from soup
-                if not bs.encode().strip(): msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
-            except Exception:
-                if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
+        process_message_edit(msg)
 
         if (msg["author"], msg["timestamp__ms"]) in edited_msgs:
             # Take pk_id and guid from earlier message
@@ -1319,9 +1234,97 @@ class SkypeExport(skypedata.SkypeDatabase):
                 prefix, evt, value = next(parser, (None, None, None))
                 if not prefix and not evt: break # while True
                 if "userId" == prefix:
-                    result = SkypeLogin.id_to_identity(value)
+                    result = id_to_identity(value)
                     break # while True
         finally:
             util.try_ignore(f and f.close)
             util.try_ignore(tf and tf.close)
         return result
+
+
+
+def date_to_integer(date):
+    """Returns datetime.date as integer YYYYMMDD, or None if date is None."""
+    result = None
+    if isinstance(date, datetime.date):
+        result = 10000 * date.year + 100 * date.month + date.day
+    return result
+
+
+def id_to_identity(chatid):
+    """
+    Returns conversation or contact identity in Skype database;
+    "username" from "8:username" for single chats,
+    or "#username1/$username2;123456abcdef"
+    from "19:I3VzZXJuYW1lMS8kdXNlcm5hbWUyOzEyMzQ1NmFiY2RlZg==@p2p.thread.skype"
+    for older peer-to-peer group chats,
+    or "19:xyz@thread.skype" for newer group chats.
+    """
+    result = chatid
+    if result and not result.endswith("@thread.skype"):
+        result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
+        if result.endswith("@p2p.thread.skype"):
+            result = result[:-len("@p2p.thread.skype")]
+            try: result = base64.b64decode(result)
+            except Exception: pass
+    return result
+
+
+def identity_to_id(identity):
+    """
+    Returns conversation or contact ID in Skype live;
+    "8:username" from "username" for single chats,
+    or "19:I3VzZXJuYW1lMS8kdXNlcm5hbWUyOzEyMzQ1NmFiY2RlZg==@p2p.thread.skype"
+    from "#username1/$username2;123456abcdef"
+    for older peer-to-peer group chats,
+    or "19:xyz@thread.skype" as-is for newer group chats.
+    """
+    result = identity
+    if result and not result.endswith("@thread.skype"):
+        if result.startswith("#"):
+            result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
+        elif not result.endswith("thread.skype"):
+            result = "8:%s" % result
+    return result
+
+
+def make_db_path(username):
+    """Returns the default database path for username."""
+    base = util.safe_filename(username)
+    if base != username: base += "_%x" % hash(username)
+    return os.path.join(conf.VarDirectory, "%s.main.db" % base)
+
+
+def make_message_ids(msg_id):
+    """Returns (pk_id, guid) for message ID."""
+    try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else hash(msg_id)
+    except Exception: pk_id = hash(msg_id) # Ensure fit into INTEGER-column
+    guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
+    guid *= 32 / len(guid)
+    return (pk_id, guid)
+
+
+def process_message_edit(msg):
+    """Strips edited-tag from body and updates fields if edit in content."""
+    if not msg or "<e_m" not in (msg.get("body_xml") or ""): return
+
+    # <e_m ts="1526383416" ts_ms="1526383417250" a="skypename" t="61"/>
+    try:
+        # Edited messages can be in form "new content<e_m ..>",
+        # where ts_ms is the timestamp of the original message.
+        # Message may also start with "Edited previous message: <e_m ..".
+        STRIP_PREFIX = "Edited previous message: "
+        if msg["body_xml"].startswith(STRIP_PREFIX):
+            msg["body_xml"] = msg["body_xml"][len(STRIP_PREFIX):]
+        bs = BeautifulSoup(msg["body_xml"], "html.parser")
+        tag = bs.find("e_m")
+        ts_ms = int(tag.get("ts_ms"))
+        msg["edited_timestamp"] = msg["timestamp"]
+        msg["edited_by"] = msg["author"]
+        msg["timestamp"] = ts_ms / 1000
+        msg["timestamp__ms"] = ts_ms
+        tag.unwrap() # Remove tag from soup
+        if not bs.encode().strip():
+            msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
+    except Exception:
+        if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)

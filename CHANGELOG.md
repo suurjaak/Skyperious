@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-4.2, 2020-08-20
+4.2, 2020-08-25
 ---------------
 - added option to create a blank Skype database;
 - added option to create a database from Skype export;
@@ -13,6 +13,7 @@ CHANGELOG
 - added option to filter chat history by day/week/month/year of clicked message;
 - added calendar popup to chat time period filter;
 - import account/contact gender, homepage and e-mails from live sync;
+- improved message parsing from Skype live and export;
 - upgraded skpy from 0.9.1 to 0.10.
 
 
