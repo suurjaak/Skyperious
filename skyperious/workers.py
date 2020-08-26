@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    25.08.2020
+@modified    26.08.2020
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -212,7 +212,7 @@ class SearchThread(WorkerThread):
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
                     if not self._is_working:
-                        break # break for chat in chats
+                        break # for chat
                 if result["output"] and not self._drop_results:
                     result["count"] = result_count
                     self.postback(result)
@@ -260,7 +260,7 @@ class SearchThread(WorkerThread):
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
                         if not self._is_working:
-                            break # break for contact in contacts
+                            break # for contact
                 if result["output"] and not self._drop_results:
                     result["count"] = result_count
                     self.postback(result)
@@ -300,7 +300,7 @@ class SearchThread(WorkerThread):
                                       "search": search, "count": 0}
                         if not self._is_working or (is_html
                         and count >= conf.MaxSearchMessages):
-                            break # break for m in messages
+                            break # for m
 
                 infotext = search["table"]
                 if self._is_working and "all tables" == search["table"]:
@@ -348,7 +348,7 @@ class SearchThread(WorkerThread):
                                           "search": search, "count": 0}
                             if not self._is_working or (is_html
                             and result_count >= conf.MaxSearchTableRows):
-                                break # break while row
+                                break # while row
                             row = rows.fetchone()
                         if not self._drop_results:
                             if is_html:
@@ -361,7 +361,7 @@ class SearchThread(WorkerThread):
                                     util.plural("result", count), countsuf)
                         if not self._is_working or (is_html
                         and result_count >= conf.MaxSearchTableRows):
-                            break # break for table in search["db"]..
+                            break # for table
                     single_table = ("," not in infotext)
                     infotext = "table%s: %s" % \
                                ("" if single_table else "s", infotext)
@@ -475,7 +475,7 @@ class MergeThread(WorkerThread):
                             if k not in ["output", "chats", "params"])
             diff = self.get_chat_diff_left(chat, db1, db2, postback)
             if not self._is_working:
-                break # break for index, chat in enumerate(compared)
+                break # for index, chat
             if diff["messages"] \
             or (chat["message_count"] and diff["participants"]):
                 new_chat = not chat["c2"]
@@ -545,7 +545,7 @@ class MergeThread(WorkerThread):
                                 if k not in ["output", "chats", "params"])
                 diff = self.get_chat_diff_left(chat, db1, db2, postback)
                 if not self._is_working:
-                    break # break for index, chat in enumerate(compared)
+                    break # for index, chat
                 if diff["messages"] \
                 or (chat["message_count"] and diff["participants"]):
                     chat1 = chat["c1"]
@@ -621,7 +621,7 @@ class MergeThread(WorkerThread):
         try:
             for index, chat_data in enumerate(chats):
                 if not self._is_working:
-                    break # break for i, chat_data in enumerate(chats)
+                    break # for index, chat_data
                 chat1 = chat_data["chat"]["c1"]
                 chat2 = chat_data["chat"]["c2"]
                 messages = chat_data["diff"]["messages"]
@@ -714,6 +714,8 @@ class MergeThread(WorkerThread):
                 ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
                 bucket = m2buckets.setdefault(m["datetime"].date(), {})
                 bucket.setdefault(ckey, []).append(mkey)
+                if not self._is_working:
+                    break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
                 if postback: postback["index"] += 1
@@ -734,6 +736,8 @@ class MergeThread(WorkerThread):
                     potentials += m2buckets.get(mdate+delta, {}).get(ckey, [])
                 if not any(self.match_time(m["datetime"], x[1], 180) for x in potentials):
                     c1m_diff.append((m["id"], m["datetime"]))
+                if not self._is_working:
+                    break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
 
@@ -785,7 +789,7 @@ class DetectDatabaseThread(WorkerThread):
                     self.postback(result)
                 all_filenames.update(filenames)
                 if not self._is_working:
-                    break # break for filename in skypedata.detect_data...
+                    break # for filenames
 
             result = {"done": True, "count": len(all_filenames)}
             self.postback(result)

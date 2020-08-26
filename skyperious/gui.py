@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.08.2020
+@modified    26.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2092,7 +2092,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if page in self.db_pages:
                 del self.db_pages[page]
             page_dbs = [page.db]
-            logger.info("Closed database tab for %s.", page.db)
+            guibase.status("Closed database tab for %s.", page.db, log=True)
             conf.save()
         else:
             if page.is_merging:
@@ -2103,13 +2103,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if wx.CANCEL == response:
                     return event.Veto()
 
+            page.worker_merge.stop()
+            page.worker_import.stop()
+            if page.worker_merge.is_alive(): page.worker_merge.join()
+            if page.worker_import.is_alive(): page.worker_import.join()
             if page in self.merger_pages:
                 del self.merger_pages[page]
             page_dbs = [page.db1, page.db2]
-            page.worker_merge.stop()
-            page.worker_import.stop()
-            logger.info("Closed comparison tab for %s and %s.",
-                        page.db1, page.db2)
+            guibase.status("Closed comparison tab for %s and %s.",
+                           page.db1, page.db2, log=True)
 
         # Close databases, if not used in any other page
         for db in page_dbs:
@@ -5998,6 +6000,7 @@ class MergerPage(wx.Panel):
 
     def on_worker_merge_result(self, event):
         """Handler for worker_merge result callback, updates UI and texts."""
+        if not self: return
         if event.result.get("type") in ["merge_left", "diff_merge_left"]:
             self.on_merge_all_result(event)
         elif "diff_left" == event.result.get("type"):
@@ -6006,8 +6009,7 @@ class MergerPage(wx.Panel):
 
     def on_worker_merge_callback(self, result):
         """Callback function for MergeThread, posts the data to self."""
-        if self: # Check if instance is still valid (i.e. not destroyed by wx)
-            wx.PostEvent(self, WorkerEvent(result=result))
+        if self: wx.PostEvent(self, WorkerEvent(result=result))
 
 
     def on_worker_import_callback(self, result):
@@ -6015,6 +6017,8 @@ class MergerPage(wx.Panel):
         if not self: return
 
         def after(result):
+            if not self: return
+
             if "counts" in result:
 
                 t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
