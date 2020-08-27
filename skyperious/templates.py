@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.08.2020
+@modified    27.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -2671,6 +2671,23 @@ from skyperious import conf, live
 %else:
 <font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
 %endif
+"""
+
+
+"""Information text shown if Skype online login fails."""
+LOGIN_FAIL_INFO = """<%
+from skyperious import conf
+
+%>
+<body text="{{ conf.DisabledColour }}" bgcolor="{{ conf.BgColour }}" link="{{ conf.LinkColour }}">
+Skype online login is not very reliable. It can experience temporary failures,
+and might not work for all accounts.
+<br /><br />
+If you are getting a "Profile accrual is required" error,
+setting an e-mail address as your primary Skype alias
+at <a href="https://account.live.com">account.live.com</a> 
+may solve the problem, under Security -> More security options -> Sign-in options.
+</font>
 """
 
 

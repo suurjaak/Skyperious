@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.08.2020
+@modified    27.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3001,7 +3001,7 @@ class DatabasePage(wx.Panel):
         check_auto   = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
         edit_status  = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
         button_login = controls.NoteButton(panel1, bmp=images.ButtonLogin.Bitmap)
-        label_info   = wx.StaticText(panel1)
+        label_info   = wx.html.HtmlWindow(panel1)
 
         label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
         list_chats = controls.SortableListView(parent=panel_sync1, style=wx.LC_REPORT)
@@ -3030,10 +3030,8 @@ class DatabasePage(wx.Panel):
         button_login.Note = "After login, local database can be updated from " \
                             "Skype online service.\nAdditionally, HTML export " \
                             "can download and include shared images."
-        ColourManager.Manage(label_info, "ForegroundColour", "DisabledColour")
-        label_info.Label = "Skype login can sometimes experience failure "\
-                           "for no discernible reason.\n" \
-                           "If login fails, try again later."
+        label_info.SetFonts(normal_face=self.Font.FaceName, fixed_face=self.Font.FaceName, sizes=[8] * 7)
+        label_info.SetPage(step.Template(templates.LOGIN_FAIL_INFO).expand())
         label_info.Hide()
 
         label_sync.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
@@ -3073,6 +3071,8 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
+        label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,
+                        lambda e: webbrowser.open(e.GetLinkInfo().Href))
 
         self.edit_user           = edit_user
         self.edit_pw             = edit_pw
@@ -3110,7 +3110,7 @@ class DatabasePage(wx.Panel):
         sizer1.Add(sizer_login,  border=20, flag=wx.TOP | wx.GROW)
         sizer1.Add(edit_status,  border=10, flag=wx.TOP | wx.LEFT | wx.RIGHT | wx.GROW)
         sizer1.Add(button_login, border=5,  flag=wx.ALL | wx.GROW)
-        sizer1.Add(label_info,   border=15, flag=wx.ALL | wx.GROW)
+        sizer1.Add(label_info,   border=15, flag=wx.ALL | wx.GROW, proportion=1)
 
         sizer2.Add(label_sync, border=5, flag=wx.ALL | wx.GROW)
 
@@ -3139,6 +3139,7 @@ class DatabasePage(wx.Panel):
             self.label_html.SetPage(step.Template(templates.SEARCH_HELP_SHORT).expand())
             self.label_html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_BTNFACE)
             self.label_html.ForegroundColour = ColourManager.GetColour(wx.SYS_COLOUR_BTNTEXT)
+            self.label_login_fail.SetPage(step.Template(templates.LOGIN_FAIL_INFO).expand())
             default = step.Template(templates.SEARCH_WELCOME_HTML).expand()
             self.html_searchall.SetDefaultPage(default)
             self.load_tables_data()
