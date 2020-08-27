@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    24.08.2020
+@modified    27.08.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -24,8 +24,10 @@ import urllib
 import urllib2
 import urlparse
 import wx
+import wx.adv
 
 from . lib import controls
+from . lib.controls import ColourManager
 from . lib import util
 from . lib import wx_accel
 
@@ -268,11 +270,13 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             label="Opinions, ideas for improvement, problems?")
         label_info = self.label_info = wx.StaticText(panel,
             label="For reply, include a contact e-mail.")
-        label_info.ForegroundColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT)
+        ColourManager.Manage(label_info, "ForegroundColour", wx.SYS_COLOUR_HIGHLIGHT)
 
         edit = self.edit_text = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
 
         bmp = self.bmp = wx.StaticBitmap(panel, size=self.THUMB_SIZE)
+        bmp.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+        bmp.ToolTip = "Click to show full size preview"
         self.button_ok = wx.Button(panel, label="&Confirm")
         self.button_ok.ToolTip = "Confirm message before sending"
         self.button_cancel = wx.Button(panel, label="Cancel", id=wx.ID_CANCEL)
@@ -292,21 +296,20 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
         sizer_buttons.Add(self.button_ok, border=5, flag=wx.RIGHT)
         sizer_buttons.Add(self.button_cancel)
 
-        sizer_imagectrls.Add(self.button_saveimage, border=8,
-                             flag=wx.BOTTOM | wx.ALIGN_RIGHT)
-        sizer_imagectrls.Add(self.cb_fullscreen, border=20, flag=wx.BOTTOM)
+        sizer_imagectrls.Add(self.button_saveimage, border=8,  flag=wx.BOTTOM)
+        sizer_imagectrls.Add(self.cb_fullscreen,    border=20, flag=wx.BOTTOM)
 
         sizer_controls.Add(sizer_buttons)
         sizer_controls.AddStretchSpacer()
-        sizer_controls.Add(sizer_imagectrls, flag=wx.ALIGN_RIGHT)
+        sizer_controls.Add(sizer_imagectrls)
         sizer_controls.Add(self.cb_bmp, border=5, flag=wx.TOP)
 
         sizer_upper.Add(label, flag=wx.GROW)
         sizer_upper.AddStretchSpacer()
         sizer_upper.Add(label_info)
+        sizer_lower.Add(bmp, border=10, flag=wx.RIGHT)
         sizer_lower.AddStretchSpacer()
         sizer_lower.Add(sizer_controls, flag=wx.GROW)
-        sizer_lower.Add(bmp)
 
         sizer.Add(sizer_upper, border=8, flag=wx.GROW | wx.ALL)
         sizer.Add(edit, proportion=2, border=8,
@@ -315,12 +318,13 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
                   wx.BOTTOM | wx.GROW)
         self.Sizer.Add(panel, proportion=1, flag=wx.GROW)
 
-        self.Bind(wx.EVT_CHECKBOX, self.OnToggleFullScreen, self.cb_fullscreen)
-        self.Bind(wx.EVT_CHECKBOX, self.OnToggleScreenshot, self.cb_bmp)
-        self.Bind(wx.EVT_BUTTON,   self.OnSend,             self.button_ok)
-        self.Bind(wx.EVT_BUTTON,   self.OnCancel,           self.button_cancel)
-        self.Bind(wx.EVT_BUTTON,   self.OnSaveImage,        self.button_saveimage)
-        self.Bind(wx.EVT_CLOSE,    self.OnCancel)
+        self.Bind(wx.EVT_CHECKBOX,  self.OnToggleFullScreen, self.cb_fullscreen)
+        self.Bind(wx.EVT_CHECKBOX,  self.OnToggleScreenshot, self.cb_bmp)
+        self.Bind(wx.EVT_BUTTON,    self.OnSend,             self.button_ok)
+        self.Bind(wx.EVT_BUTTON,    self.OnCancel,           self.button_cancel)
+        self.Bind(wx.EVT_BUTTON,    self.OnSaveImage,        self.button_saveimage)
+        bmp.Bind (wx.EVT_LEFT_DOWN, self.OnClickScreenshot)
+        self.Bind(wx.EVT_CLOSE,     self.OnCancel)
 
         self.SetScreenshot(None)
         self.Fit()
@@ -373,6 +377,13 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
     def OnToggleFullScreen(self, event):
         """Handler for toggling screenshot size from fullscreen to window."""
         self.SetScreenshot(take_screenshot(self.cb_fullscreen.Value))
+
+
+    def OnClickScreenshot(self, event):
+        """Handler for clicking the screenshot, shows the image in a splash screen."""
+        a = wx.GetApp()
+        wx.adv.SplashScreen(self.screenshot, wx.adv.SPLASH_CENTRE_ON_SCREEN,
+                            milliseconds=0, parent=a.TopWindow, style=wx.BORDER_NONE)
 
 
     def OnSend(self, event):
