@@ -45,13 +45,13 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import base64, datetime
+import base64, datetime, urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
 from skyperious.lib.vendor import step
 
 %>
-<!DOCTYPE HTML><html>
+<!DOCTYPE HTML><html lang="">
 <head>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="Author" content="{{conf.Title}}">
@@ -797,7 +797,7 @@ from skyperious.lib.vendor import step
         var timeline_ids = MESSAGE_TIMELINES[msg_id];
         if (!timeline_ids) continue; // for i
         for (var j = 0; j < timeline_ids.length; j++) {
-          (into_view ? on : off)["timeline:" + timeline_ids[j]] = true;
+          (into_view ? on : off)["timeline:" + encodeURIComponent(timeline_ids[j])] = true;
         };
       };
       Object.keys(on).forEach(function(x) { delete off[x]; });
@@ -859,7 +859,7 @@ from skyperious.lib.vendor import step
 <a title="Click to hide timeline" href="javascript:;" class="toggle" onclick="return toggle_element('timeline')">x</a>
 <ul>
 %for entry in timeline:
-  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ entry["datestr"] }}">
+  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.quote(entry["datestr"]) }}">
     <a href="#message:{{ entry["messages"][0] }}" title="{{ entry["datestr"] }} : {{ util.plural("message", entry["messages"], sep=",") }}">
 %if entry["unit"] in ("month", "date"):
       <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
@@ -1469,7 +1469,7 @@ import datetime
 from skyperious import conf, images
 from skyperious.lib import util
 
-%><!DOCTYPE HTML><html>
+%><!DOCTYPE HTML><html lang="">
 <head>
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
     <meta name="Author" content="{{conf.Title}}">
