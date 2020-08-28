@@ -452,14 +452,16 @@ from skyperious.lib.vendor import step
       color: blue;
     }
     #timeline {
+      background: white;
+      display: none;
       position: fixed;
       top: 0px;
       bottom: 0px;
-      left: calc(50% - 425px - 150px);
+      left: 0px; /* Fallback if no support for max() */
+      left: max(0px, 50% - 425px - 150px);
       width: 140px;
-      background: white;
       padding: 5px;
-      display: none;
+      z-index: 1;
     }
     #timeline h3 {
       color: #3399FF;
@@ -590,8 +592,6 @@ from skyperious.lib.vendor import step
     var style_counter = 0;
     var hilite_counter = 0;
     var MESSAGE_TIMELINES = {{! reduce(lambda a, b: ([a.setdefault(m, []).append(str(b["datestr"])) for m in b["messages"]], a)[-1], timeline, {}) }}; // {message ID: [timeline ID, ]}
-    var timeline_loaded = [];   // [li, ]
-    var messages_loaded = [];   // [tr, ]
     var scroll_highlights = {}; // {message ID: highlight}
     var scroll_timer = null;    // setTimeout ID
     var scroll_timeline = true; // Whether to scroll timeline on scrolling messages
@@ -772,17 +772,10 @@ from skyperious.lib.vendor import step
     /** Attaches scroll observer to message rows. */
     var init_timeline = function() {
       var items = Array.prototype.slice.call(document.querySelectorAll("#timeline ul li"));
-      var items2 = timeline_loaded ? items.filter(function(x) { return timeline_loaded.indexOf(x) < 0; }) : items;
-      items2.forEach(function(x) { x.addEventListener("click", on_click_timeline); });
-      (timeline_loaded || []).push.apply(timeline_loaded, items);
+      items.forEach(function(x) { x.addEventListener("click", on_click_timeline); });
 
       var rows = Array.prototype.slice.call(document.querySelectorAll("#content_table tr"));
-      var rows2 = messages_loaded ? rows.filter(function(x) { return messages_loaded.indexOf(x) < 0; }) : rows;
-      rows2.forEach(scroll_observer.observe.bind(scroll_observer));
-      if (!messages_loaded) return;
-
-      messages_loaded.push.apply(messages_loaded, rows2);
-      window.setTimeout(init_timeline, 500);
+      rows.forEach(scroll_observer.observe.bind(scroll_observer));
     };
 
     /** Highlights timeline for messages in view. */
@@ -805,7 +798,8 @@ from skyperious.lib.vendor import step
           elems_on  = Object.keys(on ).map(document.getElementById.bind(document)).filter(Boolean);
       elems_off.forEach(function(x) { x.classList.remove("highlight"); });
       elems_on. forEach(function(x) { x.classList.add   ("highlight"); });
-      if (!scroll_timeline || !elems_on.length) return;
+      if (!scroll_timeline || !elems_on.length || !document.getElementById("timeline") ||
+          "none" == document.getElementById("timeline").style.display) return;
 
       var leafelems_on  = elems_on .filter(function(x) { return !x.classList.contains("root"); });
       var leafelems_off = elems_off.filter(function(x) { return !x.classList.contains("root"); });
@@ -834,18 +828,20 @@ from skyperious.lib.vendor import step
     /** Queues scrolled messages for highlighting timeline. */
     var on_scroll_messages = function(entries) {
       scroll_history = [scroll_history[1], window.scrollY];
+      if (!document.getElementById("timeline") ||
+          "none" == document.getElementById("timeline").style.display) return;
+
       entries.forEach(function(entry) {
         var msg_id = entry.target.id.replace("message:", "");
         if (msg_id) scroll_highlights[msg_id] = entry.isIntersecting;
       });
-      scroll_timer = scroll_timer || window.setTimeout(highlight_timeline, 50);
+      scroll_timer = scroll_timer || window.setTimeout(highlight_timeline, 100);
     };
 
     if (window.IntersectionObserver) {
       var scroll_options = {"root": document.querySelector("#content_table"), "threshold": [0, 1]};
       var scroll_observer = new IntersectionObserver(on_scroll_messages, scroll_options);
-      window.setTimeout(init_timeline, 500);
-      document.addEventListener("load", function() { messages_loaded = null, timeline_loaded = null; });
+      document.addEventListener("DOMContentLoaded", init_timeline);
     };
 
 %if any(x["success"] for x in stats["shared_images"].values()):
