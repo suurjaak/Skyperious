@@ -1352,7 +1352,7 @@ HTML chat history export template for shared image message body.
 @param   ?images_folder  path to save images under, if not embedding
 """
 CHAT_MESSAGE_IMAGE = """<%
-import base64, imghdr, logging, os
+import base64, imghdr, logging, os, urllib
 from skyperious import conf
 from skyperious.lib import util
 
@@ -1365,7 +1365,7 @@ if isdef("images_folder") and images_folder:
     basename = isdef("filename") and filename or "%s.%s" % (message_id, filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(images_folder, basename))
-    url = "%s/%s" % (os.path.basename(images_folder), os.path.basename(filepath))
+    url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (images_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
     except Exception:
@@ -1375,7 +1375,13 @@ else:
     url = "data:image/%s;base64,%s" % (escape(filetype), base64.b64encode(image))
 %>
 <span class="shared_image">
+%if isdef("images_folder") and images_folder:
+  <a href="{{url}}" target="_blank" onclick="return false">
+%endif
   <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" />
+%if isdef("images_folder") and images_folder:
+  </a>
+%endif
 </span>
 """
 

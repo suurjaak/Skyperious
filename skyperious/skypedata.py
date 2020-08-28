@@ -1968,7 +1968,7 @@ class MessageParser(object):
             if raw:
                 shared_image["success"] = True
                 ns = dict(shared_image, image=raw, message_id=message["id"])
-                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns)
+                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns, **output)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
