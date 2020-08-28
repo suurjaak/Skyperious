@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.08.2020
+@modified    28.08.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3199,6 +3199,7 @@ class DatabasePage(wx.Panel):
         if chat:
             self.notebook.Selection = self.pageorder[self.page_chats]
             self.load_chat(chat)
+            self.stc_history.SetFocus()
 
 
     def on_live_login(self, event=None, auto=False):
@@ -4668,7 +4669,7 @@ class DatabasePage(wx.Panel):
         focus_message_id, selected = self.stc_history.GetFocusedMessage()
         self.on_filter_chat(event, new_filter)
         if focus_message_id is not None:
-            self.stc_history.FocusMessage(focus_message_id, do_select=selected)
+            self.stc_history.FocusMessage(focus_message_id, select=selected)
 
 
     def on_filter_chat(self, event, new_filter=None):
@@ -4796,7 +4797,7 @@ class DatabasePage(wx.Panel):
         """Handler for selecting a time in timeline control, focuses message in STC"""
         msg_id = self.list_timeline.GetMessage(event.Selection)
         if msg_id is not None:
-            self.stc_history.FocusMessage(msg_id, do_select=False)
+            self.stc_history.FocusMessage(msg_id, select=False)
 
 
     def on_blur_timeline(self, event):
@@ -5182,6 +5183,7 @@ class DatabasePage(wx.Panel):
         messages into the message log.
         """
         self.load_chat(self.list_chats.GetItemMappedData(event.Index))
+        self.stc_history.SetFocus()
 
 
     def load_chat(self, chat, center_message_id=None):
@@ -7142,8 +7144,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
     def OnUrl(self, event):
         """
-        Handler for clicking a link in chat history, opens the link in system
-        browser.
+        Handler for clicking a link in chat history, opens URLs in system
+        browser, starts file links, and handles internal links.
         """
         stc = event.EventObject
         styles_link = [self._styles["link"], self._styles["boldlink"]]
@@ -7166,6 +7168,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             elif url_range[0] in self._urllinks:
                 url = self._urllinks[url_range[0]]
                 function, args = webbrowser.open, [url]
+            elif "Scroll back more." == url:
+                function = self.RetrieveMoreMessages
             elif url:
                 function, args = webbrowser.open, [url]
             if function:
@@ -7192,8 +7196,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             # starting from latest).
             if not self._messages[0]["datetime"] \
             or self._messages[0]["datetime"].date() >= self._filter["daterange"][0]:
-                mm, kws = [], dict(timestamp_from=self._messages[0]["timestamp"])
-                for m in self._db.get_messages(self._chat, ascending=False, **kws):
+                mm, kws = [], dict(timestamp_from=self._messages[0]["timestamp"],
+                                   ascending=False, use_cache=False)
+                for m in self._db.get_messages(self._chat, **kws):
                     mm.append(m)
                     if m["datetime"].date() < self._filter["daterange"][0]:
                         break # for m
@@ -7206,6 +7211,45 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 ascending=True, use_cache=False,
                 timestamp_from=self._messages[-1]["timestamp"]
             ))
+
+
+    def RetrieveMoreMessages(self, count=None):
+        """
+        Retrieves another N messages starting from current first.
+
+        @param   count  maximum number of more messages to retrieve,
+                        defaults to conf.MaxHistoryInitialMessages / 2
+        """
+        if count is None: count = max(1, conf.MaxHistoryInitialMessages / 2)
+        if not count: return
+
+        center_id, stamp_from = None, None
+        if self._messages:
+            center_id  = self._messages_current[0]["id"]
+            stamp_from = self._messages[0]["timestamp"]
+        elif any(self._filter.get("daterange") or []):
+            stamp_from = util.datetime_to_epoch(self._filter["daterange"][0])
+        if stamp_from is None: return
+
+        mm, kws = [], dict(timestamp_from=stamp_from,
+                           ascending=False, use_cache=False)
+        busy = controls.BusyPanel(self._page or self.Parent,
+                                  "Retrieving more messages.")
+        try:
+            for i, m in enumerate(self._db.get_messages(self._chat, **kws)):
+                mm.append(m)
+                if i + 1 >= count: break # for i, m
+            self._messages[:0] = mm[::-1] # Insert ascending at front
+            self._center_message_id = self._center_message_index = None
+            if self._messages:
+                rng = [self._messages[x]["datetime"].date() for x in (0, -1)]
+                self._filter["daterange"] = rng
+                if self._page:
+                    self._page.range_date.SetValues(*rng)
+                    self._page.chat_filter["daterange"] = rng
+            self.RefreshMessages()
+        finally: busy.Close()
+        if center_id is not None: self.FocusMessage(center_id, select=False)
 
 
     def RefreshMessages(self, center_message_id=None):
@@ -7270,7 +7314,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
                 self._messages_current.append(m)
 
-            # Add date and count information, links like "6 months"
+            # Add date and count information, "Scroll back more", and links like "6 months"
             self._append_text("\n")
             if self._messages_current:
                 m1, m2 = self._messages_current[0], self._messages_current[-1]
@@ -7280,8 +7324,13 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     self._append_text(" to ")
                     self._append_text(
                         m2["datetime"].strftime("%d.%m.%Y"), "bold")
-                self._append_text("  (%s).  " % util.plural(
+                self._append_text("  (%s). " % util.plural(
                                   "message", self._messages_current, sep=","))
+
+            if self._chat["message_count"] and (not self._messages 
+            or self._messages[0]["datetime"] > self._chat["first_message_datetime"]):
+                self._append_text("Scroll back more.", "link")
+
             if self._chat["message_count"]:
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
@@ -7597,7 +7646,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         guibase.status("No %s %s found in current view.", label, unit)
 
 
-    def FocusMessage(self, message_id, do_select=True):
+    def FocusMessage(self, message_id, select=True):
         """Selects and scrolls the specified message into view."""
         if message_id not in self._message_positions: return
         linetopos, linenumber = self.PositionFromLine, self.DocLineFromVisible
@@ -7612,7 +7661,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self.EnsureCaretVisible()
                 padding = -padding
             self.STC.SetSelection(p, p)
-        if do_select: self.STC.SetSelection(*pos)
+        if select: self.STC.SetSelection(*pos)
 
 
     def GetFocusedMessage(self, selectedonly=False):
@@ -7651,7 +7700,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         set([p["identity"] for p in self._chat["participants"]])):
             # Last condition is to check if participants filter is applied.
             result = True
-        elif ("daterange" in self._filter
+        elif (all(self._filter.get("daterange") or [0])
         and not (self._filter["daterange"][0] <= message["datetime"].date()
         <= self._filter["daterange"][1])):
             result = True
