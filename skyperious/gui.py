@@ -585,7 +585,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                         if self.notebook.GetSelection() != i:
                             self.notebook.SetSelection(i)
                             self.update_notebook_header()
-                        break # break for i in range(self.notebook.GetPage..
+                        break # for i
             else:
                 wx.MessageBox("No database to search from.", conf.Title)
 
@@ -1456,7 +1456,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)
                     self.update_notebook_header()
-                    break # break for i in range(self.notebook..
+                    break # for i
 
 
     def on_compare_databases(self, event):
@@ -2001,7 +2001,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if do_exit:
             for x in self.workers_import.values(): x.stop(drop_results=False)
             for page in self.db_pages:
-                if not page: continue # continue for page, if dead object
+                if not page: continue # for page, if dead object
                 active_idx = page.notebook.Selection
                 if active_idx:
                     conf.LastActivePage[page.db.filename] = active_idx
@@ -2261,7 +2261,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if self.notebook.GetPage(i) == page:
                     self.notebook.SetSelection(i)
                     self.update_notebook_header()
-                    break # break for i in range(self.notebook..)
+                    break # for i
         return page
 
 
@@ -2936,7 +2936,7 @@ class DatabasePage(wx.Panel):
         for name, label in zip(names, labels):
             if not name and not label:
                 sizer_file.AddSpacer(20), sizer_file.AddSpacer(20)
-                continue # continue for i, (name, label) in enumerate(..
+                continue # for name, label
             labeltext = wx.StaticText(parent=panel2, label="%s:" % label)
             ColourManager.Manage(labeltext, "ForegroundColour", "DisabledColour")
             valuetext = wx.TextCtrl(parent=panel2, value="Analyzing..",
@@ -4404,7 +4404,7 @@ class DatabasePage(wx.Panel):
                             y = cell_coords.y / (pxls[1] or 15)
                             x, y = 0, y - pagesize / 2
                             grid.Scroll(x, y)
-                            break # break for i in range(self.grid_table..
+                            break # for i
         elif href.startswith("page:"):
             # Go to database subpage
             page = href[5:]
@@ -5014,7 +5014,7 @@ class DatabasePage(wx.Panel):
                 errormsg = 'Error saving table %s in "%s":\n\n%s' % (
                            grid.table, self.db, traceback.format_exc())
                 wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
-                break # break for grid
+                break # for grid
         return result
 
 
@@ -5047,7 +5047,7 @@ class DatabasePage(wx.Panel):
                 title = self.title + suffix
                 if self.parent_notebook.GetPageText(i) != title:
                     self.parent_notebook.SetPageText(i, title)
-                break # break for i in range(self.parent_notebook..
+                break # for i
 
 
     def on_commit_table(self, event):
@@ -5993,7 +5993,7 @@ class MergerPage(wx.Panel):
         for c in self.compared:
             if c["identity"] == href:
                 chat = c
-                break # break for c in self.compared
+                break # for c
         if chat and self.page_merge_chats.Enabled:
             self.on_change_list_chats(chat=chat)
             self.notebook.SetSelection(self.pageorder[self.page_merge_chats])
@@ -6532,7 +6532,7 @@ class MergerPage(wx.Panel):
             for c in gauge.Parent.Children:
                 if isinstance(c, wx.StaticText):
                     c.Label = message
-                    break # break for c in gauge..
+                    break # for c
             gauge.Parent.Sizer.Layout()
             if not gauge.Parent.Shown:
                 gauge.Parent.Show()
@@ -6894,14 +6894,14 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._chat = None       # Currently shown chat
         self._db = None         # Database for currently shown messages
         self._page = None       # DatabasePage/MergerPage for action callbacks
-        self._messages = None   # All retrieved messages (collections.deque)
-        self._messages_current = None  # Currently shown (collections.deque)
+        self._messages = None   # List of all retrieved messages
+        self._messages_current = None  # List of currently shown messages
         self._message_positions = collections.OrderedDict() # {msg id: (start index, end index)}
         self._message_map = collections.OrderedDict() # {msg ID: {msg}}
         # If set, range is centered around the message with the specified ID
-        self._center_message_id =    -1
+        self._center_message_id =    None
         # Index of the centered message in _messages
-        self._center_message_index = -1
+        self._center_message_index = None
         self._urllinks  = {} # {link start position: url}
         self._filelinks = {} # {link start position: file path}
         self._datelinks = {} # {link start position: two dates, }
@@ -7108,13 +7108,12 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
             item_goto = menu.AppendSubMenu(menu_goto, "&Go to..")
             menu_goto.Append(item_prev), menu_goto.Append(item_next)
-            if relativedelta:
-                menu_goto.AppendSeparator()
-                menu_goto.Append(item_prev_day), menu_goto.Append(item_next_day)
-                menu_goto.AppendSeparator()
-                menu_goto.Append(item_prev_week), menu_goto.Append(item_next_week)
-                menu_goto.AppendSeparator()
-                menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
+            menu_goto.AppendSeparator()
+            menu_goto.Append(item_prev_day), menu_goto.Append(item_next_day)
+            menu_goto.AppendSeparator()
+            menu_goto.Append(item_prev_week), menu_goto.Append(item_next_week)
+            menu_goto.AppendSeparator()
+            menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
 
             item_msg.Enabled = item_filter.Enabled = item_goto.Enabled = bool(msg)
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
@@ -7180,7 +7179,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         Retrieves more messages if needed, for example if current filter
         specifies a larger date range than currently available.
         """
-
         if not self._messages_current and "daterange" in self._filter \
         and self._filter["daterange"][0]:
             # If date filtering was just applied, check if we need to
@@ -7188,32 +7186,20 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             # starting from latest).
             if not self._messages[0]["datetime"] \
             or self._messages[0]["datetime"].date() >= self._filter["daterange"][0]:
-                m_iter = self._db.get_messages(self._chat,
-                    ascending=False, timestamp_from=self._messages[0]["timestamp"]
-                )
-                while m_iter:
-                    try:
-                        m = m_iter.next()
-                        self._messages.appendleft(m)
-                        if m["datetime"].date() < self._filter["daterange"][0]:
-                            m_iter = None
-                    except StopIteration:
-                        m_iter = None
+                mm, kws = [], dict(timestamp_from=self._messages[0]["timestamp"])
+                for m in self._db.get_messages(self._chat, ascending=False, **kws):
+                    mm.append(m)
+                    if m["datetime"].date() < self._filter["daterange"][0]:
+                        break # for m
+                self._messages[:0] = mm[::-1] # Insert ascending at front
         last_dt = self._chat.get("last_message_datetime")
-        if self._messages and last_dt \
-        and self._messages[-1]["datetime"] < last_dt:
+        if self._messages and last_dt and self._messages[-1]["datetime"] < last_dt:
             # Last message timestamp is earlier than chat's last message
             # timestamp: new messages have arrived
-            m_iter = self._db.get_messages(self._chat,
+            self._messages.extend(self._db.get_messages(self._chat,
                 ascending=True, use_cache=False,
                 timestamp_from=self._messages[-1]["timestamp"]
-            )
-            while m_iter:
-                try:
-                    m = m_iter.next()
-                    self._messages.append(m)
-                except StopIteration:
-                    m_iter = None
+            ))
 
 
     def RefreshMessages(self, center_message_id=None):
@@ -7258,23 +7244,23 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             rgx_highlight = re.compile(
                 "(%s)" % re.escape(self._filter["text"]), re.I
             ) if ("text" in self._filter and self._filter["text"]) else None
-            self._messages_current = collections.deque()
+            self._messages_current = []
 
             # Assemble messages to show
             for m in self._messages:
                 count += 1
                 if self.IsMessageFilteredOut(m):
-                    continue
-                if self._center_message_index >= 0 \
+                    continue # for m
+                if self._center_message_index is not None \
                 and count < self._center_message_index \
                 - conf.MaxHistoryInitialMessages / 2:
                     # Skip messages before the range centered around a message
-                    continue
-                if self._center_message_index >= 0 \
+                    continue # for m
+                if self._center_message_index is not None \
                 and count > self._center_message_index \
                 + conf.MaxHistoryInitialMessages / 2:
                     # Skip messages after the range centered around a message
-                    break # break for m in self._messages
+                    break # for m
 
                 self._messages_current.append(m)
 
@@ -7369,8 +7355,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     wx.YieldIfNeeded() # To have responsive GUI
 
             # Reset the centered message data, as filtering should override it
-            self._center_message_index = -1
-            self._center_message_id = -1
+            self._center_message_index = None
+            self._center_message_id = None
             if focus_message_id:
                 self.FocusMessage(focus_message_id)
             else:
@@ -7507,44 +7493,27 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         """
         self.ClearAll()
         self.Refresh()
-        self._center_message_index = -1
-        self._center_message_id = -1
+        self._center_message_index = None
+        self._center_message_id = None
 
-        if messages is not None:
-            messages_current = collections.deque(messages)
-            message_range = list(messages)
-            if from_index is not None:
-                messages_current = collections.deque(messages[from_index:])
+        if messages is None:
+            mm, center_message_i = [], None
+            for i, m in enumerate(db.get_messages(chat, ascending=False)):
+                mm.append(m)
+                if m["id"] == center_message_id:
+                    self._center_message_id = center_message_id
+                    center_message_i = i
+
+                if self._center_message_id is not None:
+                    if i + 1 - center_message_i >= conf.MaxHistoryInitialMessages / 2:
+                        break # for i, m
+                elif i + 1 >= conf.MaxHistoryInitialMessages: break # for i, m
+
+            messages_current, message_range = mm[::-1], mm[::-1] # Set ascending
+            if center_message_i is not None:
+                self._center_message_index = len(mm) - center_message_i-1
         else:
-            m_iter = db.get_messages(chat, ascending=False)
-
-            i = 0
-            message_show_limit = conf.MaxHistoryInitialMessages
-            messages_current = collections.deque()
-            try:
-                iterate = (i < message_show_limit)
-                while iterate:
-                    m = m_iter.next()
-                    if m:
-                        i += 1
-                        messages_current.appendleft(m)
-                        if m["id"] == center_message_id:
-                            self._center_message_index = len(messages_current)
-                            self._center_message_id = center_message_id
-                    else:
-                        break # break while iterate
-                    if center_message_id:
-                        c = self._center_message_index + message_show_limit / 2
-                        iterate = ((self._center_message_index < 0) or
-                                   (len(messages_current) < c))
-                    else:
-                        iterate = (i < message_show_limit)
-            except StopIteration:
-                m_iter = None
-            message_range = copy.copy(messages_current)
-            if self._center_message_index >= 0:
-                self._center_message_index = \
-                    len(messages_current) - self._center_message_index
+            messages_current, message_range = messages[from_index or 0:], messages[:]
 
         self._chat = chat
         self._db = db
@@ -7566,7 +7535,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   direction  positive for forwards, negative for backwards
         """
         step = -1 if direction < 0 else +1
-        idx, mm = current + step, list(self._messages_current or [])
+        idx, mm = current + step, self._messages_current or []
         msg = mm[idx] if 0 <= idx < len(mm) else None
         while msg:
             if msg["author"] == author:
@@ -7586,36 +7555,38 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   current    message index in current content to start from
         @param   direction  positive for forwards, negative for backwards
         """
+        if unit not in ("day", "week", "month"): return
         step = -1 if direction < 0 else +1
-        idx, mm = current + step, list(self._messages_current or [])
+        idx, mm = current + step, self._messages_current or []
         msg0 = mm[current] if 0 <= current < len(mm) else None
         if not msg0: return
-        if   "month" == unit: delta = step * relativedelta(months=1, day=1)
-        elif "day"   == unit: delta = step * relativedelta(days=1)
-        elif "week"  == unit:
-            kwargs = dict(days=1) if step > 0 else dict(weeks=1)
-            delta = step * relativedelta(weekday=0, **kwargs)
-        else: return
 
-        threshold = msg0["datetime"]
-        threshold = threshold.replace(hour=0, minute=0, second=0, microsecond=0)
-        threshold += delta
-        threshold0 = None
-        msg, prevmsg = mm[idx] if 0 <= idx < len(mm) else None, None
+        def make_threshold(dt, step):
+            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            if   "day"   == unit:
+                result = dt + step * datetime.timedelta(days=1)
+            elif "week"  == unit:
+                dtmon = dt - datetime.timedelta(days=dt.weekday())
+                result = dtmon + step * datetime.timedelta(days=7)
+            elif "month" == unit:
+                delta = datetime.timedelta(days=32 if step > 0 else 1)
+                result = (dt.replace(day=1) + step * delta).replace(day=1)
+            return result
+
+        threshold, shifted = make_threshold(msg0["datetime"], step), False
+        msg, prevmsg = (mm[idx] if 0 <= idx < len(mm) else None), None
         while step > 0 and msg:
             if msg["datetime"] >= threshold: return self.FocusMessage(msg["id"])
             idx += step
             msg = mm[idx] if 0 <= idx < len(mm) else None
         while step < 0 and msg:
-            if msg["datetime"] <= threshold:
-                threshold0 = msg0["datetime"] # Jump to start of previous existing unit
-                threshold0 = threshold0.replace(hour=0, minute=0, second=0, microsecond=0)
-                threshold0 += delta
-            if threshold0 and prevmsg and msg["datetime"] <= threshold0:
+            if msg["datetime"] < threshold and prevmsg:
                 return self.FocusMessage(prevmsg["id"])
-            prevmsg = msg
+            if msg["datetime"] < threshold and not shifted:
+                # Lacks immediate previous unit, reorient threshold
+                threshold, shifted = make_threshold(msg["datetime"], step=0), True
             idx += step
-            msg = mm[idx] if 0 <= idx < len(mm) else None
+            msg, prevmsg = (mm[idx] if 0 <= idx < len(mm) else None), msg
         label = "previous" if direction < 0 else "next"
         guibase.status("No %s %s found in current view.", label, unit)
 
