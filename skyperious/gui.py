@@ -7245,6 +7245,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     self._page.range_date.SetValues(*rng)
                     self._page.chat_filter["daterange"] = rng
             self.RefreshMessages()
+            if self._page:
+                self._page.populate_chat_statistics()
+                self._page.list_timeline.Populate(*self.GetTimelineData())
         finally: busy.Close()
         if center_id is not None: self.FocusMessage(center_id, select=False)
 
