@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.08.2020
+@modified    28.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -70,9 +70,7 @@ MESSAGE_TYPE_SHARE_VIDEO  =  70 # Video sharing
 MESSAGE_TYPE_BIRTHDAY     = 110 # Birthday notification
 MESSAGE_TYPE_SHARE_PHOTO  = 201 # Photo sharing
 MESSAGE_TYPE_SHARE_VIDEO2 = 253 # Video sharing
-MESSAGE_TYPES_BASE = (2, 4, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
-MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
-MESSAGE_TYPES_STATS = (2, 4, 10, 12, 13, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201)
+MESSAGE_TYPES_MESSAGE = (2, 4, 8, 9, 10, 12, 13, 30, 39, 50, 51, 53, 60, 61, 63, 64, 68, 70, 201, 253)
 CHATMSG_TYPE_PARTICIPANTS  =  1 # Added participants to chat (type 10)
 CHATMSG_TYPE_PARTICIPANTS2 =  2 # Added participants to chat; or file transfer notice (type 10, 100)
 CHATMSG_TYPE_MESSAGE       =  3 # Ordinary message (type 61)
@@ -443,7 +441,7 @@ class SkypeDatabase(object):
             result[k] = next(res, {}).get("count")
 
         titlecol = self.make_title_col()
-        typestr = ", ".join(map(str, MESSAGE_TYPES_BASE))
+        typestr = ", ".join(map(str, MESSAGE_TYPES_MESSAGE))
 
         for i, label in enumerate(["last", "first"]):
             direction = "ASC" if i else "DESC"
@@ -748,7 +746,7 @@ class SkypeDatabase(object):
                    "NULL AS first_message_datetime, "
                    "NULL AS last_message_datetime "
                    "FROM messages WHERE type IN (%s)%s GROUP BY convo_id" 
-                   % (", ".join(map(str, MESSAGE_TYPES_STATS)), and_str))
+                   % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
         for chat in chats:
