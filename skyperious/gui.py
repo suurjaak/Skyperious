@@ -2506,6 +2506,7 @@ class DatabasePage(wx.Panel):
         timeline = self.list_timeline = ChatContentTimeline(panel_stc1, size=(150, -1))
         timeline.Hide()
         self.Bind(wx.EVT_LISTBOX, self.on_select_timeline, timeline)
+        timeline.Bind(wx.EVT_KILL_FOCUS, self.on_blur_timeline)
         stc = self.stc_history = ChatContentSTC(
             parent=panel_stc1, style=wx.BORDER_STATIC, name="chat_history")
         stc.SetDatabasePage(self)
@@ -4796,6 +4797,11 @@ class DatabasePage(wx.Panel):
         msg_id = self.list_timeline.GetMessage(event.Selection)
         if msg_id is not None:
             self.stc_history.FocusMessage(msg_id, do_select=False)
+
+
+    def on_blur_timeline(self, event):
+        """Handler for clicking out of timeline, clears selection (distracting)."""
+        self.list_timeline.SetSelection(-1)
 
 
     def on_scroll_chat_history(self, event):
