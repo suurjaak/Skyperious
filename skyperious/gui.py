@@ -1861,11 +1861,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             stats = db.get_general_statistics(full=False)
             if "name" in stats and "username" in stats:
                 self.label_account.Value = "%(name)s (%(username)s)" % stats
-            text = "%(chats)s" % stats
+            text = util.plural("chat", stats["chats"], sep=",")
             if stats.get("lastmessage_chat"):
                 text += ", latest %(lastmessage_chat)s" % stats
             self.label_chats.Value = text
-            text = "%(messages)s" % stats
+            text = util.plural("message", stats["messages"], sep=",")
             if stats.get("lastmessage_dt"):
                 text += ", last at %(lastmessage_dt)s" % stats
             self.label_messages.Value = text
@@ -3544,6 +3544,7 @@ class DatabasePage(wx.Panel):
 
     def update_info_page(self, reload=True):
         """Updates the Information page with current data."""
+        self.button_refresh_fileinfo.Enabled = False
         if reload:
             self.db.clear_cache()
             self.db.update_fileinfo()
@@ -3557,13 +3558,13 @@ class DatabasePage(wx.Panel):
             stats = self.db.get_general_statistics()
         except Exception: pass
         if stats:
-            self.edit_info_chats.Value = "%(chats)s" % stats
-            self.edit_info_contacts.Value = "%(contacts)s" % stats
-            self.edit_info_messages.Value = "%(messages)s" % stats
-            self.edit_info_transfers.Value = "%(transfers)s" % stats
+            self.edit_info_chats.Value     = '{:,}'.format(stats["chats"])
+            self.edit_info_contacts.Value  = '{:,}'.format(stats["contacts"])
+            self.edit_info_messages.Value  = '{:,}'.format(stats["messages"])
+            self.edit_info_transfers.Value = '{:,}'.format(stats["transfers"])
         if "messages_from" in stats:
-            self.edit_info_messages.Value += " (%s sent and %s received)" % \
-                (stats.get("messages_from"), stats.get("messages_to"))
+            self.edit_info_messages.Value += " ({:,} sent and {:,} received)".format(
+                stats.get("messages_from") or 0, stats.get("messages_to") or 0)
         text = ""
         if "lastmessage_dt" in stats:
             text = "%(lastmessage_dt)s %(lastmessage_from)s" % stats
