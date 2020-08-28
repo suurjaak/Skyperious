@@ -149,7 +149,6 @@ The following are also listed in `requirements.txt` for pip:
 * appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
 * ijson (https://pypi.org/project/ijson)
-* dateutil (https://pypi.org/project/python-dateutil)
 * Pillow (https://pypi.org/project/Pillow)
 * pyparsing (https://pypi.org/project/pyparsing)
 * SkPy (https://pypi.org/project/SkPy)

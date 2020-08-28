@@ -47,10 +47,6 @@ import wx.lib.newevent
 import wx.lib.scrolledpanel
 import wx.stc
 
-# Core functionality can work without this
-try: from dateutil.relativedelta import relativedelta
-except ImportError: relativedelta = None
-
 from . lib import controls
 from . lib.controls import ColourManager
 from . lib import util
@@ -5301,7 +5297,7 @@ class DatabasePage(wx.Panel):
         if self.stc_history.GetMessage(0):
             values = [self.stc_history.GetMessage(0)["datetime"],
                       self.stc_history.GetMessage(-1)["datetime"]]
-            dates_values = tuple(i.date() for i in values)
+            dates_values = [i.date() for i in values]
             if not any(filter(None, dates_range)):
                 dts = "first_message_datetime", "last_message_datetime"
                 dates_range = [chat[n].date() if chat[n] else None for n in dts]
@@ -7338,25 +7334,20 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 date_until = datetime.date.today()
                 dates_filter = self._filter.get("daterange")
                 from_items = [] # [(title, [date_first, date_last])]
-                if relativedelta:
-                    for unit, count in [("day", 7), ("week", 2), ("day", 30),
-                    ("month", 3), ("month", 6), ("year", 1), ("year", 2)]:
-                        date_from = date_until - relativedelta(
-                            **{util.plural(unit, numbers=False): count})
-                        if date_from >= date_first and date_from <= date_last:
-                            title = util.plural(unit, count, sep=",")
-                            from_items.append((title, [date_from, date_last]))
-                    if date_until - relativedelta(years=2) > date_first:
-                        # Warning: possible mis-showing here if chat < 4 years.
-                        title = "2 to 4 years"
-                        daterange = [date_until - relativedelta(years=4),
-                                     date_until - relativedelta(years=2)]
-                        from_items.append((title, daterange))
-                    if date_until - relativedelta(years=4) > date_first:
-                        title = "4 years and older"
-                        daterange = [date_first,
-                                     date_until - relativedelta(years=4)]
-                        from_items.append((title, daterange))
+
+                for unit, count in [("day", 7), ("week", 2), ("day", 30),
+                ("month", 3), ("month", 6), ("year", 1), ("year", 2)]:
+                    date_from = util.date_shift(date_until, unit, -count)
+                    if date_from >= date_first and date_from <= date_last:
+                        title = util.plural(unit, count, sep=",")
+                        from_items.append((title, [date_from, date_last]))
+                date_2y = util.date_shift(date_until, "year", -2)
+                date_4y = util.date_shift(date_until, "year", -4)
+                if  date_2y > date_first and date_4y > date_first:
+                    from_items.append(("2 to 4 years", [date_4y, date_2y]))
+                if date_4y > date_first:
+                    from_items.append(("4 years and older", [date_first, date_4y]))
+
                 daterange = [date_first, date_last]
                 from_items.append(("From the beginning", daterange))
                 for i, (title, daterange) in enumerate(from_items):

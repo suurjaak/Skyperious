@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    27.08.2020
+@modified    28.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -2285,8 +2285,6 @@ under the MIT License.
       <a href="https://pypi.org/project/appdirs"><font color="{{conf.LinkColour}}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4{{" 4.9.1" if getattr(sys, 'frozen', False) else ""}},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{conf.LinkColour}}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>dateutil{{" 2.8.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/python-dateutil">
-      <font color="{{conf.LinkColour}}">pypi.org/project/python-dateutil</font></a></li>
   <li>ijson{{" 3.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/ijson">
       <font color="{{conf.LinkColour}}">pypi.org/project/ijson</font></a></li>
   <li>Pillow{{" 6.2.2" if getattr(sys, 'frozen', False) else ""}},

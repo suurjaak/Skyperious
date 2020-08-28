@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    24.08.2020
+@modified    28.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -186,6 +186,33 @@ def datetime_to_epoch(dt):
         if isinstance(dt, datetime.datetime):
             x += dt.microsecond / 1e6
         if x >= 0: result = x if x % 1 else int(x)
+    return result
+
+
+def date_shift(dt, unit, count):
+    """
+    Returns date shifted by specified number of units.
+
+    @param   dt     datetime.datetime or datetime.date
+    @param   unit   "day" or "week" or "month" or "year"
+    @param   count  number of units to shift, negative for going back
+    """
+    if not count or unit not in ("day", "week", "month", "year"): return dt
+
+    if "day" == unit:
+        result = dt + count * datetime.timedelta(days=1)
+    elif "week"  == unit:
+        result = dt + count * datetime.timedelta(days=7)
+    elif "month" == unit:
+        year, month = dt.year, dt.month + count
+        if not (0 < month <= 12): year, month = year + month / 12, month % 12
+        day = min(dt.day, calendar.monthrange(year, month)[1])
+        result = dt.replace(year=year, month=month, day=day)
+    elif "year"  == unit:
+        year, month = dt.year + count, dt.month
+        day = min(dt.day, calendar.monthrange(year, month)[1])
+        result = dt.replace(year=year, month=month, day=day)
+
     return result
 
 

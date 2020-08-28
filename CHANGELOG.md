@@ -16,6 +16,7 @@ CHANGELOG
 - import account/contact gender, homepage and e-mails from live sync;
 - improved message parsing from Skype live and export;
 - upgraded skpy from 0.9.1 to 0.10.
+- dropped dateutil dependency.
 
 
 4.1, 2020-08-03

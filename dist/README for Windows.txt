@@ -117,7 +117,6 @@ Skyperious has been built using the following open-source software:
 - wxPython 4.1.0 (http://www.wxpython.org)
 - appdirs 1.4.4 (https://pypi.org/project/appdirs)
 - beautifulsoup4 4.9.1 (https://pypi.org/project/beautifulsoup4)
-- dateutil 2.8.1, (http://pypi.python.org/pypi/python-dateutil)
 - ijson 3.1 (https://pypi.org/project/ijson)
 - Pillow 6.2.2 (https://pypi.org/project/Pillow)
 - pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
