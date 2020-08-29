@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    23.08.2020
+@modified    29.08.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -265,7 +265,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                      if stats.get("enddate") else "",
             "emoticons_used": [x for x in stats["emoticons"]
                                if hasattr(emoticons, x)],
-            "message_count":  stats.get("messages", 0),
+            "message_count":  stats.get("total", 0),
         })
 
         if is_html:

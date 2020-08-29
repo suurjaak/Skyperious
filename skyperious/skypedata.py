@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.08.2020
+@modified    29.08.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1559,19 +1559,20 @@ class MessageParser(object):
         if stats:
             self.stats = {
                 "smses": 0, "transfers": [], "calls": 0, "messages": 0,
-                "counts": {}, "total": 0, "startdate": None, "enddate": None,
+                "total": 0, "startdate": None, "enddate": None,
+                "counts": {},     # {author: {messages, chars, files, bytes, ..}}
                 "wordclouds": {}, # Per-author
-                "wordcloud": [], # [(word, count, size), ]
+                "wordcloud": [],  # [(word, count, size), ]
                 "wordcounts": {}, # {word: {author: count, }, }
-                "links": {}, # {author: [link, ], }
+                "links": {},      # {author: [link, ], }
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
                 "authors": set(), # Authors encountered in parsed messages
                 "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
-                "hists": {}, # Author histogram data {author: {"hours", ..} }
-                "workhist": {}, # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
+                "hists": {},     # Author histogram data {author: {"hours", ..} }
+                "workhist": {},  # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
                 "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
                 "shared_images": {}} # {message_id: {url, datetime, author, author_name, ?filename}, }
 
