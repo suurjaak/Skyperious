@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-4.2, 2020-08-28
+4.2, 2020-08-29
 ---------------
 - added option to create a blank Skype database;
 - added option to create a database from Skype export;

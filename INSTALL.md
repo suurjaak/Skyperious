@@ -25,7 +25,7 @@ or, to run from source code:
 * run `skyperious`
 
 
-### Ubuntu/Debian ###
+### Linux ###
 
 Easiest to get wxPython installed for the graphical interface, is to use one of
 the prepared wheels available at https://extras.wxpython.org/wxPython4/extras/linux.

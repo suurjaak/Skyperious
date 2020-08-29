@@ -26,7 +26,7 @@ Add `sudo` before docker commands if not running as root user.
 Add `--mount src="path to host directory",target=/etc/skyperious` after `docker run`
 to retain Skyperious configuration in a host directory between runs.
 
-Host filesystem is made available under /mnt/host.
+Host filesystem is made available under `/mnt/host`.
 
 ---
 
