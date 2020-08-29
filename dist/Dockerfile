@@ -29,8 +29,7 @@ RUN apt-get update \
       python-wxgtk3.0 \
       dbus-x11 \
       libsdl2-2.0 \
-      libxtst6 \
-      wget
+      libxtst6
 
 ENV LC_ALL   en_US.UTF-8
 ENV LANG     en_US.UTF-8
