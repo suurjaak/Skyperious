@@ -58,12 +58,6 @@ Skyperious has a [Dockerfile](Dockerfile), see
 [dist/README for Docker.md](dist/README%20for%20Docker.md).
 
 
-### Vagrant ###
-
-Skyperious has a [Vagrantfile](Vagrantfile), see
-[dist/README for Vagrant.md](dist/README%20for%20Vagrant.md).
-
-
 ### General remarks ###
 
 If running from source code, Skyperious needs Python 2.7.
