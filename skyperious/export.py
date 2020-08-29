@@ -106,7 +106,7 @@ def export_chats(chats, path, format, db, opts=None):
 
     if "xlsx" == format and not opts.get("multi"):
         filename = make_filename(chats[0])
-        count, message_count = export_chats_xlsx(chats, filename, db, opts)
+        count, message_count = export_chats_xlsx(chats, filename, db, opts=opts)
         files.append(filename)
     else:
         filedir = path if opts.get("multi") else os.path.dirname(path)
