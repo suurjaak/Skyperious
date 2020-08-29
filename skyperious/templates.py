@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    28.08.2020
+@modified    29.08.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -54,7 +54,7 @@ from skyperious.lib.vendor import step
 <!DOCTYPE HTML><html lang="">
 <head>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-  <meta name="Author" content="{{conf.Title}}">
+  <meta name="generator" content="{{conf.Title}} {{conf.Version}}" />
   <title>Skype {{chat["title_long_lc"]}}</title>
   <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{!images.Icon16x16_8bit.data}}"/>
   <style>
@@ -1468,7 +1468,7 @@ from skyperious.lib import util
 %><!DOCTYPE HTML><html lang="">
 <head>
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
-    <meta name="Author" content="{{conf.Title}}">
+    <meta name="generator" content="{{conf.Title}} {{conf.Version}}" />
     <title>{{title}}</title>
     <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{!images.Icon16x16_8bit.data}}"/>
     <style>
