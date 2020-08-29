@@ -576,5 +576,6 @@ class xlsx_writer(object):
                 sheet.set_column(c, c, w, self._formats[None])
             sheet.set_column(c + 1, 50, cell_format=self._formats[None])
         self._workbook.set_properties({"comments": "Exported with %s on %s." %
-            (conf.Title, datetime.datetime.now().strftime("%d.%m.%Y %H:%M"))})
+            (conf.Title, datetime.datetime.now().strftime("%d.%m.%Y %H:%M")),
+            "author": "%s %s" % (conf.Title, conf.Version)})
         self._workbook.close()
