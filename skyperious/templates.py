@@ -782,7 +782,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
       rows.forEach(scroll_observer.observe.bind(scroll_observer));
     };
 
-    /** Highlights timeline for messages in view. */
+    /** Highlights timeline for messages in view, scrolls to highlights. */
     var highlight_timeline = function() {
       scroll_timer = null;
 
@@ -802,8 +802,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
           elems_on  = Object.keys(on ).map(document.getElementById.bind(document)).filter(Boolean);
       elems_off.forEach(function(x) { x.classList.remove("highlight"); });
       elems_on. forEach(function(x) { x.classList.add   ("highlight"); });
-      if (!scroll_timeline || !elems_on.length || !document.getElementById("timeline") ||
-          "none" == document.getElementById("timeline").style.display) return;
+      if (!scroll_timeline || !elems_on.length) return;
 
       var leafelems_on  = elems_on .filter(function(x) { return !x.classList.contains("root"); });
       var leafelems_off = elems_off.filter(function(x) { return !x.classList.contains("root"); });
@@ -832,8 +831,9 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
     /** Queues scrolled messages for highlighting timeline. */
     var on_scroll_messages = function(entries) {
       scroll_history = [scroll_history[1], window.scrollY];
-      if (!document.getElementById("timeline") ||
-          "none" == document.getElementById("timeline").style.display) return;
+      if (scroll_timeline !== false)
+        scroll_timeline = ("none" != document.getElementById("timeline").style.display) ? true : null;
+      if (scroll_timeline === null) return;
 
       entries.forEach(function(entry) {
         var msg_id = entry.target.id.replace("message:", "");
