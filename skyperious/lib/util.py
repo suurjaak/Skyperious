@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    28.08.2020
+@modified    29.08.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -49,7 +49,8 @@ def safedivf(a, b):
 
 def safe_filename(filename):
     """Returns the filename with characters like \:*?"<>| removed."""
-    return re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
+    result = re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
+    return re.sub("\s+", " ", result)
 
 
 def format_bytes(size, precision=2, max_units=True):
