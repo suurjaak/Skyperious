@@ -4,7 +4,7 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  03.08.2020
+@modified  29.08.2020
 """
 import os
 import struct
@@ -21,16 +21,19 @@ import conf
 DO_DEBUG_VERSION = False
 DO_WINDOWS = ("nt" == os.name)
 
-def do_64bit():
-    return (struct.calcsize("P") * 8 == 64)
+def do_64bit(): return (struct.calcsize("P") * 8 == 64)
 
 
 app_file = "skyperious_%s%s" % (conf.Version, "_x64" if do_64bit() else "")
+entrypoint = os.path.join(ROOTPATH, "launch.py")
 if DO_WINDOWS:
     app_file += ".exe"
 
+with open(entrypoint, "w") as f:
+    f.write("from skyperious import main; main.run()")
+
 a = Analysis(
-    [os.path.join(ROOTPATH, "launch.py")],
+    [entrypoint],
     excludes=["FixTk", "numpy", "tcl", "tk", "_tkinter", "tkinter", "Tkinter"],
     hiddenimports=["ijson.backends.python"] # ijson imports backends indirectly
 )
@@ -58,3 +61,6 @@ exe = EXE(
     icon=os.path.join(APPPATH, "..", "res", "Icon.ico"),
     console=False, # Use the Windows subsystem executable instead of the console one
 )
+
+try: os.remove(entrypoint)
+except Exception: pass
