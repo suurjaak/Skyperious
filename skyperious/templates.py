@@ -14,7 +14,7 @@ Released under the MIT License.
 import re
 
 # Modules imported inside templates:
-#import base64, datetime, imghdr, logging, os, pyparsing, re, string, sys, urllib, wx
+#import collections, base64, datetime, imghdr, json, logging, os, pyparsing, re, string, sys, urllib, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -45,7 +45,7 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import base64, datetime, urllib
+import base64, collections, datetime, json, urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
 from skyperious.lib.vendor import step
@@ -588,10 +588,14 @@ from skyperious.lib.vendor import step
 %endif
   </style>
   <script>
+<%
+MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.index(b)) for m in b["messages"]], a)[-1], timeline, {})
+%>
     var HIGHLIGHT_STYLES = 10;
+    var TIMELINES = {{! json.dumps([x["datestr"] for x in timeline]) }};
+    var MESSAGE_TIMELINES = {{! json.dumps(collections.OrderedDict(sorted(MESSAGE_TIMELINES.items()))) }}; // {message ID: [timeline index, ]}
     var style_counter = 0;
     var hilite_counter = 0;
-    var MESSAGE_TIMELINES = {{! reduce(lambda a, b: ([a.setdefault(m, []).append(str(b["datestr"])) for m in b["messages"]], a)[-1], timeline, {}) }}; // {message ID: [timeline ID, ]}
     var scroll_highlights = {}; // {message ID: highlight}
     var scroll_timer = null;    // setTimeout ID
     var scroll_timeline = true; // Whether to scroll timeline on scrolling messages
@@ -787,10 +791,10 @@ from skyperious.lib.vendor import step
       for (var i = 0; i < msg_ids.length; i++) {
         var msg_id = msg_ids[i], into_view = scroll_highlights[msg_id];
         if (!into_view) delete scroll_highlights[msg_id];
-        var timeline_ids = MESSAGE_TIMELINES[msg_id];
-        if (!timeline_ids) continue; // for i
-        for (var j = 0; j < timeline_ids.length; j++) {
-          (into_view ? on : off)["timeline:" + encodeURIComponent(timeline_ids[j])] = true;
+        var timeline_idxs = MESSAGE_TIMELINES[msg_id];
+        if (!timeline_idxs) continue; // for i
+        for (var j = 0; j < timeline_idxs.length; j++) {
+          (into_view ? on : off)["timeline:" + encodeURIComponent(TIMELINES[timeline_idxs[j]])] = true;
         };
       };
       Object.keys(on).forEach(function(x) { delete off[x]; });
