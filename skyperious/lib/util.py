@@ -143,7 +143,8 @@ def plural(word, items=None, numbers=True, single="1", sep="", pref="", suf=""):
     """
     count   = len(items) if hasattr(items, "__len__") else items or 0
     isupper = word[-1:].isupper()
-    suffix = "es" if word and "day" != word.lower() and word[-1:].lower() in "xyz" \
+    suffix = "es" if word and word[-1:].lower() in "xyz" \
+             and not word[-2:].lower().endswith("ay") \
              else "s" if word else ""
     if isupper: suffix = suffix.upper()
     if count != 1 and "es" == suffix and "y" == word[-1:].lower():
