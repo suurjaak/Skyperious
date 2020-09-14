@@ -1,1 +1,1 @@
-@start pythonw -m "skyperious.main" %*
+@start pythonw -m skyperious %*
