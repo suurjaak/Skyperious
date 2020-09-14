@@ -396,9 +396,7 @@ def load():
                 value = value_raw
             return value, True
 
-        for name in FileDirectives:
-            [setattr(module, name, v) for v, s in [parse_value(name)] if s]
-        for name in OptionalFileDirectives:
+        for name in FileDirectives + OptionalFileDirectives:
             [setattr(module, name, v) for v, s in [parse_value(name)] if s]
     except Exception:
         pass # Fail silently
