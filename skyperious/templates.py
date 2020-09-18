@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    29.08.2020
+@modified    18.09.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1511,14 +1511,14 @@ from skyperious.lib import util
             padding: 5px;
             border: 1px solid #C0C0C0;
         }
-        a, a.visited { color: conf.ExportLinkColour; text-decoration: none; }
+        a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; }
         a:hover, a.visited:hover { text-decoration: underline; }
         .footer {
           text-align: center;
           padding-bottom: 10px;
           color: #666;
         }
-        .header { font-size: 1.1em; font-weight: bold; color: conf.ExportLinkColour; }
+        .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
         td { text-align: left; vertical-align: top; }
     </style>
 </head>
