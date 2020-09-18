@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.08.2020
+@modified    18.09.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7589,6 +7589,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         msg = mm[idx] if 0 <= idx < len(mm) else None
         while msg:
             if msg["author"] == author:
+                guibase.status()
                 return self.FocusMessage(msg["id"])
             idx += step
             msg = mm[idx] if 0 <= idx < len(mm) else None
@@ -7606,6 +7607,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   direction  positive for forwards, negative for backwards
         """
         if unit not in ("day", "week", "month"): return
+        guibase.status()
         step = -1 if direction < 0 else +1
         idx, mm = current + step, self._messages_current or []
         msg0 = mm[current] if 0 <= current < len(mm) else None
