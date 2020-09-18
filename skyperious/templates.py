@@ -72,6 +72,7 @@ from skyperious.lib.vendor import step
       font-family: {{conf.HistoryFontName}};
       font-size: 11px;
       background: {{conf.HistoryBackgroundColour}};
+      color: black;
       margin: 0 10px 0 10px;
     }
     #body_table {
@@ -565,6 +566,38 @@ from skyperious.lib.vendor import step
     span.gray {
       color: #999;
     }
+    body.darkmode {
+      background: black;
+      color: white;
+    }
+    body.darkmode #timeline,
+    body.darkmode #body_table > tbody > tr > td {
+      background: #1E2224;
+    }
+    body.darkmode #timeline ul li a {
+      color: white;
+    }
+    body.darkmode #header,
+    body.darkmode #timeline h3,
+    body.darkmode .wordcloud span,
+    body.darkmode a, body.darkmode a.visited,
+    body.darkmode #transfers .filename,
+    body.darkmode .toggle_plusminus,
+    body.darkmode #shared_images table td:not(:first-child) a {
+      color: #80FF74;
+    }
+    body.darkmode #stats_data > tbody > tr > td:nth-child(3),
+    body.darkmode #emoticons table.emoticon_rows td:nth-child(3) {
+      color: #2D928B;
+    }
+    a#darkmode {
+      color: black;
+      display: inline-block;
+      text-decoration: none;
+    }
+    body.darkmode a#darkmode {
+      color: white;
+    }
 %if emoticons_used:
     span.emoticon {
       margin-top: 1px;
@@ -612,6 +645,11 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
           el_hide.style.display = "none";
         }
       }
+      return false;
+    }
+
+    function toggle_darkmode() {
+      document.body.classList.toggle("darkmode");
       return false;
     }
 
@@ -898,10 +936,16 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
       <div id="header">{{chat["title_long"]}}.</div><br />
       Showing {{util.plural("message", message_count, sep=",")}}
 %if date1 and date2:
-      from <b>{{date1}}</b> to <b>{{date2}}</b>.<br />
+      from <b>{{date1}}</b> to <b>{{date2}}</b>.
 %else:
-.<br />
+.
 %endif
+<% 
+# &#x1F313; first quarter moon symbol
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+%>
+<a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+<br />
 %if chat["created_datetime"]:
       Chat created on <b>{{chat["created_datetime"].strftime("%d.%m.%Y")}}</b>,
 %else:
@@ -1479,6 +1523,7 @@ from skyperious.lib import util
         * { font-family: {{conf.HistoryFontName}}; font-size: 11px; }
         body {
             background: {{conf.HistoryBackgroundColour}};
+            color: black;
             margin: 0px 10px 0px 10px;
         }
         .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
@@ -1520,7 +1565,31 @@ from skyperious.lib import util
         }
         .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
         td { text-align: left; vertical-align: top; }
+        body.darkmode {
+          background: black;
+          color: white;
+        }
+        body.darkmode .header {
+          color: #80FF74;
+        }
+        body.darkmode table.body_table > tbody > tr > td {
+          background: #1E2224;
+        }
+        a#darkmode {
+          color: black;
+          display: inline-block;
+          text-decoration: none;
+        }
+        body.darkmode a#darkmode {
+          color: white;
+        }
     </style>
+    <script>
+      function toggle_darkmode() {
+        document.body.classList.toggle("darkmode");
+        return false;
+      };
+    </script>
 </head>
 <body>
 <table class="body_table">
@@ -1530,7 +1599,13 @@ from skyperious.lib import util
         <td>
             <div class="header">{{title}}</div><br />
             Source: <b>{{db.filename}}</b>.<br />
-            <b>{{row_count}}</b> {{util.plural("row", row_count, numbers=False, sep=",")}} in results.<br />
+            <b>{{row_count}}</b> {{util.plural("row", row_count, numbers=False, sep=",")}} in results.
+<% 
+# &#x1F313; first quarter moon symbol
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+%>
+            <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+            <br />
 %if sql:
             <b>SQL:</b> {{sql}}
 %endif
@@ -2760,7 +2835,7 @@ rectstep = rectsize[0] + (1 if rectsize[0] < 10 else 2)
 interval = data[1][0] - data[0][0]
 %>
 <svg width="{{len(data) * rectstep + 2 * border}}" height="{{rectsize[1] + 2 * border}}">
-  <rect width="100%" height="100%" style="stroke-width: {{border}}; stroke: {{colour}}; fill: none;" />
+  <rect width="100%" height="100%" style="stroke-width: {{border}}; stroke: {{colour}}; fill: white;" />
 %for i, (start, val) in enumerate(data):
 <%
 height = rectsize[1] * util.safedivf(val, maxval)

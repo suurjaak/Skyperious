@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    13.08.2020
+@modified    18.09.2020
 ------------------------------------------------------------------------------
 """
 try:
@@ -899,34 +899,30 @@ ButtonStop = PyEmbeddedImage(
 
 """Clock image icon for new days in exported chat HTML."""
 ExportClock = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAIAAAAmzuBxAAAAK3RFWHRDcmVhdGlvbiBUaW1l"
-    "AE4gMiB2ZWViciAyMDEyIDAxOjU5OjU2ICswMjAwk8LXDAAAAAd0SU1FB9wCAgAAKExUReUA"
-    "AAAJcEhZcwAACxIAAAsSAdLdfvwAAAAEZ0FNQQAAsY8L/GEFAAAAx0lEQVR42m2QPRJEQBBG"
-    "29SWiEgkE3EAcwGXmTvZy7gAByCSKAnJEEnGW3bV7pYOprrfN/3rOedEZFmWpmn6vt+2zff9"
-    "JEnyPA/DEEn4MQxDWZZ1XVtrCXnxIfBXPjHBNE3uMPzTgeCjKopTMIoi+TUIHFXRO01TuTM4"
-    "qmK090Qfex6GA0d9MDmLXJ+MMddXOKpisa7rbrvAUZXWum3beZ7/ZAgc1WOxcRyrqsqyjNFo"
-    "R3GykYuiiOPYO2+6ritX+r4p2UEQIO0jepg0AJyJFgAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA3UlEQVQY032RsY3FIBBEB+tE"
+    "ZC4h+j8iogEacDXuCXL6oAAqIKIAIriIZC6xT7bO+i9b6c1qNStwQFKllHqtFXNOSClhjMG2"
+    "bd9CiIGL+PbeM+fM3jtJsvfOnDO99yT5/tvovWdrjSeHQJJsrZ2zWlJK3TkHrTWe0FrDOYeU"
+    "Ul9qrbDW4hPWWtRascw5oZT6J4QQEEIAACilMOfEl5QSY4xbYN/3W3CMASklFmMMSikfzyil"
+    "wBgDkFxjjLc2rrTWGGMkyfWs7xVjfOz5EF8AIC6PWVNK4+GDSgjxAwC/QILK9tRKzSMAAAAA"
+    "SUVORK5CYII="
 )
 
 
 """Edited image icon for edited messages in exported chat HTML."""
 ExportEdited = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAIAAAAmzuBxAAAAKnRFWHRDcmVhdGlvbiBUaW1l"
-    "AE4gNSBzZXB0IDIwMTMgMTU6Mjk6MzQgKzAyMDCZinEkAAAAB3RJTUUH3QkFDCAbTkEjOAAA"
-    "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACWSURBVHjabZAxEoMRFIQT"
-    "k9GpdA6g0jmHc7qAnjvoVCqdhopG3h8zIvJvY+d9O/vwHGM8Njnneu9CCMbYnKAdAwshxBiN"
-    "MTnnm4T3fhoooJSeCShYCc75mqO9AEJgCCH3CbjBNFLKfTVauNb6X/BNAJjPO/Al+I/WmrW2"
-    "lJJSAj9+dXVgjGGL1hp/dFS85gFAKbX+YNcbtEZUbc4oXmUAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA1klEQVQY03WQsaqFMBBEZ4Ns"
+    "I2JjFWtNczu/wx/0O+zzBamsTGVlZfWsbgjZWzy8qM+3MLDMHgZ2CA9jrZUQAl6vF+q6psNX"
+    "d1BE2HuPZVkwjiO2bZN/YefcW6lfW2uNqqqek0WEp2lClmVQSsEYAxHhR9g5904pIcaIPM/R"
+    "ti2d7xfYew8ASCmh6zoAABGFI/0Lz/Ms+74DAMqyhDGG7v984aIooLVGjBFN01z++FOXtVZE"
+    "pFjXVUSEz7okE1Hw3mMYhh9mBhGFsw44OxZmRt/3l17v8wFVKGiOyD31JQAAAABJRU5ErkJg"
+    "gg=="
 )
 
 
 """Removed image icon for removed messages in exported chat HTML."""
 ExportRemoved = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAIAAAAmzuBxAAAAKnRFWHRDcmVhdGlvbiBUaW1l"
-    "AE4gNSBzZXB0IDIwMTMgMTc6MjA6MDIgKzAyMDDonN18AAAAB3RJTUUH3QkFDhQehoXwLgAA"
-    "AAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAAA/SURBVHjaY/z//z8DXsCE"
-    "xp81axaaCCPQDExROEhLS2NiIAj+g8HMmTOxkkBA2Az6qGCEhBhWDwO9ilCBBwAAobAv6s9R"
-    "MfoAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAAMklEQVQY02NgoBTMnDnzPzZx"
+    "RnySyCA9PZ2RiSKrcdEMDAwMJJk8SBQzEgpbWLCRHGIAnXQV/zSmlRkAAAAASUVORK5CYII="
 )
 
 
