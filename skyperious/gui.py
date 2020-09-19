@@ -210,12 +210,23 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_change_page)
         notebook.Bind(wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CLOSING,
                       self.on_close_page)
-        # Register Ctrl-F4 and Ctrl-W close handlers
-        id_close = wx.NewIdRef().Id
+
+        # Register Ctrl-F4 and Ctrl-W close handlers, and Ctrl-1..9 tab handlers
         def on_close_hotkey(event):
             notebook and notebook.DeletePage(notebook.GetSelection())
-        notebook.SetAcceleratorTable(wx.AcceleratorTable([
-            (wx.ACCEL_CTRL, k, id_close) for k in (ord('W'), wx.WXK_F4)]))
+        def on_tab_hotkey(number, event):
+            if notebook and notebook.GetSelection() != number \
+            and number < notebook.GetPageCount():
+                notebook.SetSelection(number)
+                self.on_change_page(None)
+
+        id_close = wx.NewIdRef().Id
+        accelerators = [(wx.ACCEL_CMD, k, id_close) for k in (ord('W'), wx.WXK_F4)]
+        for i in range(9):
+            id_tab = wx.NewIdRef().Id
+            accelerators += [(wx.ACCEL_CMD, ord(str(i + 1)), id_tab)]
+            notebook.Bind(wx.EVT_MENU, functools.partial(on_tab_hotkey, i), id=id_tab)
+        notebook.SetAcceleratorTable(wx.AcceleratorTable(accelerators))
         notebook.Bind(wx.EVT_MENU, on_close_hotkey, id=id_close)
 
 
