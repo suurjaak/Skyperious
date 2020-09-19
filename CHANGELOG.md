@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.3, 2020-09-19
+---------------
+- added support for single-user install.
+
+
 4.2, 2020-08-29
 ---------------
 - added option to create a blank Skype database;

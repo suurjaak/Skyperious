@@ -2,28 +2,53 @@
 ; installer for Skyperious.
 ;
 ; Expected command-line parameters:
-; /DPRODUCT_VERSION=<program version>
+; /DVERSION=<program version>
 ; /DSUFFIX64=<"_x64" for 64-bit installer>
 ;
 ; @created   13.01.2013
-; @modified  06.07.2020
+; @modified  19.09.2020
 
 Unicode True
 
 ; HM NIS Edit Wizard helper defines
 !define PRODUCT_NAME "Skyperious"
-!ifndef PRODUCT_VERSION
-  ; PRODUCT_VERSION should come from command-line parameter
-  !define PRODUCT_VERSION "1.0"
-!endif
 !define PRODUCT_PUBLISHER "Erki Suurjaak"
-!define PRODUCT_WEB_SITE "http://suurjaak.github.com/Skyperious"
-!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\skyperious.exe"
-!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
-!define PRODUCT_UNINST_ROOT_KEY "HKLM"
+!define PRODUCT_WEB_SITE "https://suurjaak.github.io/Skyperious"
+!define BASENAME "skyperious"
+!define PROGEXE "${BASENAME}.exe"
 
-; MUI 1.67 compatible ------
-!include "MUI.nsh"
+!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${PROGEXE}"
+!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
+
+; VERSION and SUFFIX64 *should* come from command-line parameter
+!define /ifndef VERSION "2.0"
+!define /ifndef SUFFIX64 ""
+
+
+!define UNINSTALL_FILENAME "uninstall.exe"
+; suggested name of directory to install (under $PROGRAMFILES or $LOCALAPPDATA)
+!define MULTIUSER_INSTALLMODE_INSTDIR "${PRODUCT_NAME}"
+; registry key for INSTALL info, placed under [HKLM|HKCU]\Software  (can be ${APP_NAME} or some {GUID})
+!define MULTIUSER_INSTALLMODE_INSTALL_REGISTRY_KEY "${PRODUCT_NAME}"
+; registry key for UNINSTALL info, placed under [HKLM|HKCU]\Software\Microsoft\Windows\CurrentVersion\Uninstall  (can be ${APP_NAME} or some {GUID})
+!define MULTIUSER_INSTALLMODE_UNINSTALL_REGISTRY_KEY "${PRODUCT_NAME}"
+!define MULTIUSER_INSTALLMODE_DEFAULT_REGISTRY_VALUENAME "UninstallString"
+!define MULTIUSER_INSTALLMODE_INSTDIR_REGISTRY_VALUENAME "InstallLocation"
+; allow requesting for elevation... if false, radiobutton will be disabled and user will have to restart installer with elevated permissions
+!define MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
+; only available if MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
+!define MULTIUSER_INSTALLMODE_DEFAULT_ALLUSERS
+!if "${SUFFIX64}" == "_x64"
+  !define MULTIUSER_INSTALLMODE_64_BIT 1
+!endif
+!define LANG_ENGLISH 1033
+
+
+!include NsisMultiUser.nsh
+!include NsisMultiUserLang.nsh
+!include MUI.nsh
+!include nsProcess.nsh
+!include RefreshSysTray.nsh
 !include x64.nsh
 !include FileAssociation.nsh
 
@@ -31,11 +56,13 @@ Unicode True
 
 ; MUI Settings
 !define MUI_ABORTWARNING
-!define MUI_ICON "installer.ico"
+!define MUI_ICON "..\res\Icon.ico"
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
 ; Welcome page
 !insertmacro MUI_PAGE_WELCOME
+; All users / current only
+!insertmacro MULTIUSER_PAGE_INSTALLMODE
 ; Directory page
 !insertmacro MUI_PAGE_DIRECTORY
 ; Instfiles page
@@ -44,68 +71,51 @@ Unicode True
 !define MUI_PAGE_CUSTOMFUNCTION_PRE FinishPage_Pre
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishPage_Show
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE FinishPage_Leave
-!define MUI_FINISHPAGE_RUN "$INSTDIR\skyperious.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PROGEXE}"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\README.txt"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller pages
+!insertmacro MULTIUSER_UNPAGE_INSTALLMODE
 !insertmacro MUI_UNPAGE_INSTFILES
 
 ; Language files
 !insertmacro MUI_LANGUAGE "English"
 
-; MUI end ------
 
-RequestExecutionLevel admin
-
-InstallDir "$PROGRAMFILES\Skyperious"
-OutFile "skyperious_${PRODUCT_VERSION}${SUFFIX64}_setup.exe"
-Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
+Name "${PRODUCT_NAME} ${VERSION}"
+OutFile "${BASENAME}_${VERSION}${SUFFIX64}_setup.exe"
 ShowInstDetails show
 ShowUnInstDetails show
 
+
 Function .OnInit
-  ${If} SUFFIX64 != ''
-    StrCpy $INSTDIR "$PROGRAMFILES64\Skyperious"
-  ${EndIf}
+  !insertmacro MULTIUSER_INIT
 FunctionEnd
 
+Function FinishPage_Pre
+  ; Edit iospecial.ini at runtime before finish page appears, add file association checkbox
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Settings" "NumFields" "6"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Type" "CheckBox"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Text" "&Associate Skyperious with *.db files"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Left" "120"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Right" "315"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Top" "130"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Bottom" "140"
+  WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "State" "0"
+FunctionEnd
 
-Section "MainSection" SEC01
-  ; Fixes potential problems with uninstalling shortcuts in Windows 7
-  SetShellVarContext all
-  SetOutPath "$INSTDIR"
-  SetOverwrite ifnewer
-  File "skyperious.exe"
-  CreateDirectory "$SMPROGRAMS\Skyperious"
-  CreateShortCut "$SMPROGRAMS\Skyperious\Skyperious.lnk" "$INSTDIR\skyperious.exe"
-  SetOverwrite off
-  File "skyperious.ini"
-  SetOverwrite ifnewer
-  File /oname=README.txt "README for Windows.txt"
-  CreateShortCut "$SMPROGRAMS\Skyperious\README.lnk" "$INSTDIR\README.txt"
-  File "3rd-party licenses.txt"
-SectionEnd
+Function FinishPage_Show
+  ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "HWND"
+  SetCtlColors $0 0x000000 0xFFFFFF
+FunctionEnd
 
-Section -AdditionalIcons
-  WriteIniStr "$INSTDIR\${PRODUCT_NAME}.url" "InternetShortcut" "URL" "${PRODUCT_WEB_SITE}"
-  CreateShortCut "$SMPROGRAMS\Skyperious\Website.lnk" "$INSTDIR\${PRODUCT_NAME}.url"
-  CreateShortCut "$SMPROGRAMS\Skyperious\Uninstall Skyperious.lnk" "$INSTDIR\uninst.exe"
-SectionEnd
-
-Section -Post
-  WriteUninstaller "$INSTDIR\uninst.exe"
-  WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\skyperious.exe"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\skyperious.exe"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-SectionEnd
-
+Function FinishPage_Leave
+  ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "State"
+  StrCmp $0 "0" +2
+  ${RegisterExtension} "$INSTDIR\skyperious.exe" ".db" "SQLite3 database file"
+FunctionEnd
 
 Function un.onUninstSuccess
   HideWindow
@@ -115,52 +125,71 @@ FunctionEnd
 Function un.onInit
   MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Are you sure you want to uninstall $(^Name)?" IDYES +2
   Abort
+  !insertmacro MULTIUSER_UNINIT
 FunctionEnd
 
+
+Section "MainSection" SEC01
+  SetOutPath "$INSTDIR"
+  SetOverwrite ifnewer
+  File "${PROGEXE}"
+  SetOverwrite off
+  File "${BASENAME}.ini"
+  SetOverwrite ifnewer
+  File /oname=README.txt "README for Windows.txt"
+  File "3rd-party licenses.txt"
+  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PROGEXE}"
+  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\README.lnk" "$INSTDIR\README.txt"
+SectionEnd
+
+Section -AdditionalIcons
+  WriteIniStr "$INSTDIR\${PRODUCT_NAME}.url" "InternetShortcut" "URL" "${PRODUCT_WEB_SITE}"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Website.lnk" "$INSTDIR\${PRODUCT_NAME}.url"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\${UNINSTALL_FILENAME}"
+SectionEnd
+
+Section -Post
+  WriteUninstaller "$INSTDIR\${UNINSTALL_FILENAME}"
+  !insertmacro MULTIUSER_RegistryAddInstallInfo
+
+  WriteRegStr SHCTX "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\${PROGEXE}"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\${UNINSTALL_FILENAME}"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PROGEXE}"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
+  WriteRegStr SHCTX "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+SectionEnd
+
 Section Uninstall
-  ; Fixes potential problems with uninstalling shortcuts in Windows 7
-  SetShellVarContext all
+  SetAutoClose true
+  ${nsProcess::KillProcess} "${PROGEXE}" $R4
+
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
-  Delete "$INSTDIR\uninst.exe"
+  Delete "$INSTDIR\${UNINSTALL_FILENAME}"
   Delete "$INSTDIR\README.txt"
+  Delete "$INSTDIR\${BASENAME}.ini"
   Delete "$INSTDIR\3rd-party licenses.txt"
-  Delete "$INSTDIR\skyperious.ini"
-  Delete "$INSTDIR\skyperious.exe"
 
-  Delete "$SMPROGRAMS\Skyperious\Skyperious.lnk"
-  Delete "$SMPROGRAMS\Skyperious\README.lnk"
-  Delete "$SMPROGRAMS\Skyperious\Website.lnk"
-  Delete "$SMPROGRAMS\Skyperious\Uninstall Skyperious.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\README.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\Website.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk"
+  RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
 
-  RMDir "$SMPROGRAMS\Skyperious"
+  Delete "$INSTDIR\${PROGEXE}"
   RMDir "$INSTDIR"
+
+  DeleteRegKey SHCTX "${PRODUCT_UNINST_KEY}"
+  DeleteRegKey SHCTX "${PRODUCT_DIR_REGKEY}"
+  !insertmacro MULTIUSER_RegistryRemoveInstallInfo
+  Call un.RefreshSysTray
 
   ${UnregisterExtension} ".db" "SQLite3 database file"
 
-  DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
-  DeleteRegKey HKLM "${PRODUCT_DIR_REGKEY}"
-  SetAutoClose true
+  SetShellVarContext current
+  Delete "$LOCALAPPDATA\${PRODUCT_NAME}\${BASENAME}.ini"
+  RmDir  "$LOCALAPPDATA\${PRODUCT_NAME}"
+  Delete "$SMSTARTUP\${PRODUCT_NAME}.lnk"
 SectionEnd
-
-Function FinishPage_Show
-ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "HWND"
-SetCtlColors $0 0x000000 0xFFFFFF
-FunctionEnd
-
-Function FinishPage_Pre
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Settings" "NumFields" "6"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Type" "CheckBox"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Text" "&Associate Skyperious with *.db files"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Left" "120"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Right" "315"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Top" "130"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "Bottom" "140"
-WriteINIStr "$PLUGINSDIR\iospecial.ini" "Field 6" "State" "0"
-FunctionEnd
-
-Function FinishPage_Leave
-ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "State"
-StrCmp $0 "0" end
-${RegisterExtension} "$INSTDIR\skyperious.exe" ".db" "SQLite3 database file"
-end:
-FunctionEnd
