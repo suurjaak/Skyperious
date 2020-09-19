@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.08.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1120,6 +1120,7 @@ class PropertyDialog(wx.Dialog):
     def __init__(self, parent, title):
         wx.Dialog.__init__(self, parent, title=title,
                           style=wx.CAPTION | wx.CLOSE_BOX | wx.RESIZE_BORDER)
+        self.pages      = [] # [name, label, help]
         self.properties = [] # [(name, type, orig_val, default, label, ctrl), ]
 
         panelwrap = wx.Panel(self)
@@ -1152,7 +1153,8 @@ class PropertyDialog(wx.Dialog):
         ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
 
-    def AddProperty(self, name, value, help="", default=None, typeclass=unicode):
+    def AddProperty(self, name, value, help="", default=None,
+                    typeclass=unicode, page=""):
         """Adds a property to the frame."""
         row = len(self.properties) * 2
         label = wx.StaticText(self.panel, label=name)
@@ -1189,10 +1191,12 @@ class PropertyDialog(wx.Dialog):
         self.sizer_items.AddGrowableCol(1) # Grow ctrl column
 
 
-    def GetProperties(self):
+    def GetProperties(self, page=""):
         """
         Returns the current legal property values, as [(name, value), ].
         Illegal values are replaced with initial values.
+
+        @param   page  name of page if using paged dialog
         """
         result = []
         for name, typeclass, orig, default, label, ctrl in self.properties:

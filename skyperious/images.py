@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    18.09.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 try:
@@ -899,23 +899,23 @@ ButtonStop = PyEmbeddedImage(
 
 """Clock image icon for new days in exported chat HTML."""
 ExportClock = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA3UlEQVQY032RsY3FIBBEB+tE"
-    "ZC4h+j8iogEacDXuCXL6oAAqIKIAIriIZC6xT7bO+i9b6c1qNStwQFKllHqtFXNOSClhjMG2"
-    "bd9CiIGL+PbeM+fM3jtJsvfOnDO99yT5/tvovWdrjSeHQJJsrZ2zWlJK3TkHrTWe0FrDOYeU"
-    "Ul9qrbDW4hPWWtRascw5oZT6J4QQEEIAACilMOfEl5QSY4xbYN/3W3CMASklFmMMSikfzyil"
-    "wBgDkFxjjLc2rrTWGGMkyfWs7xVjfOz5EF8AIC6PWVNK4+GDSgjxAwC/QILK9tRKzSMAAAAA"
-    "SUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA4klEQVQY032RsW3DMBRE7wsB"
+    "q7BiZQ/ABZgBnFHUaCeyYcU5tMDPANxBashUbM6NFdiI4Nd94O7wcSd4QNKKSMg5r2MMGGMw"
+    "z/M3yR8R6XgSXmOMVFW21kiSrTWqKmOMJHn9S4wxcts2HjwEJMlt247bTiISQghwzuEM5xxC"
+    "CBCRMOWcV+893uG9R855ncYYsNb+E6SUkFICAFhrMcbAhzEGvfcXw7IsL8beO4wxAICbqvId"
+    "qkoAt4mk1lqx7/vpv/u+o9YKknrUdymlnPZcSiHJCwDI0zCfIvJ1sqCKyC8A3AF0iM8aPIik"
+    "BAAAAABJRU5ErkJggg=="
 )
 
 
 """Edited image icon for edited messages in exported chat HTML."""
 ExportEdited = PyEmbeddedImage(
-    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA1klEQVQY03WQsaqFMBBEZ4Ns"
-    "I2JjFWtNczu/wx/0O+zzBamsTGVlZfWsbgjZWzy8qM+3MLDMHgZ2CA9jrZUQAl6vF+q6psNX"
-    "d1BE2HuPZVkwjiO2bZN/YefcW6lfW2uNqqqek0WEp2lClmVQSsEYAxHhR9g5904pIcaIPM/R"
-    "ti2d7xfYew8ASCmh6zoAABGFI/0Lz/Ms+74DAMqyhDGG7v984aIooLVGjBFN01z++FOXtVZE"
-    "pFjXVUSEz7okE1Hw3mMYhh9mBhGFsw44OxZmRt/3l17v8wFVKGiOyD31JQAAAABJRU5ErkJg"
-    "gg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAA20lEQVQY03WQMYuFMBCEZ4Ok"
+    "EREsPe51mlYR/6x/Jr8gWliZSjhOsH1WL4TsFYcP9byBhWX3Y2CGcCOtNTvnkGXZR9u2y34X"
+    "V5CZpbUW8zyj7/vvYRg+/4WNMS8hfs95nqOu669bmJnlOI6IoghCCCilwMzyFjbGvEII8N4j"
+    "jmOUZUnH/wm21gIAQghomgYAQERud3/D0zTxtm0AgDRNoZSia543nCQJ8jyH9x5FUZxy/KlL"
+    "a83MnCzLwswsj3NyJiJnrUXXdc91XR9E5I6zw9G+SClRVdXj2OtVP75NbogDzH5sAAAAAElF"
+    "TkSuQmCC"
 )
 
 
