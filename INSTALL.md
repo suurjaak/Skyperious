@@ -55,7 +55,7 @@ If wxPython installation fails, consult https://wxpython.org/pages/downloads/.
 ### Docker ###
 
 Skyperious has a [Dockerfile](Dockerfile), see
-[dist/README for Docker.md](dist/README%20for%20Docker.md).
+[build/README for Docker.md](build/README%20for%20Docker.md).
 
 
 ### General remarks ###

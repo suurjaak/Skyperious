@@ -9,7 +9,7 @@ Download the [Dockerfile](Dockerfile) for Skyperious,
 build and run the Docker image:
 
 ```
-    wget https://raw.githubusercontent.com/suurjaak/Skyperious/master/dist/Dockerfile
+    wget https://raw.githubusercontent.com/suurjaak/Skyperious/master/build/Dockerfile
     docker build . -t skyperious
 
     xhost +

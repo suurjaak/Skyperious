@@ -4,7 +4,7 @@ skyperious\. Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  26.07.2020
+@modified  19.09.2020
 """
 import glob
 import os
@@ -53,7 +53,7 @@ if "__main__" == __name__:
         for subdir, wildcard in [("res", "*"),
         (pathjoin("res", "emoticons"), "*"), ("skyperious", "*.py"),
         ("skyperious", "skyperious.ini"),
-        ("dist", "*"), (pathjoin("skyperious", "lib"), "*.py"),
+        ("build", "*"), (pathjoin("skyperious", "lib"), "*.py"),
         (pathjoin("skyperious", "lib", "vendor"), "*.py"),
         (pathjoin("skyperious", "res"), "*")]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))

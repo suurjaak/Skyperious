@@ -4,7 +4,7 @@ Pyinstaller spec file for Skyperious, produces a 32-bit or 64-bit executable,
 depending on current environment.
 
 @created   03.04.2012
-@modified  29.08.2020
+@modified  19.09.2020
 """
 import os
 import struct
@@ -54,7 +54,7 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name=os.path.join("dist", app_file),
+    name=os.path.join("build", app_file),
     debug=DO_DEBUG_VERSION, # Verbose or non-verbose debug statements printed
     strip=False,  # EXE and all shared libraries run through cygwin's strip, tends to render Win32 DLLs unusable
     upx=True, # Using Ultimate Packer for eXecutables
