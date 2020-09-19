@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    12.08.2020
+@modified    18.09.2020
 """
 import datetime
 import logging
@@ -117,6 +117,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             conf.ConsoleHistoryCommands = [] 
         for cmd in conf.ConsoleHistoryCommands:
             console.addHistory(cmd)
+        ColourManager.Register(console)
         console.Bind(wx.EVT_KEY_DOWN, self.on_keydown_console)
         self.widget_inspector = wx.lib.inspection.InspectionTool()
 

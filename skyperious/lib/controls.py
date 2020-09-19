@@ -204,8 +204,9 @@ class ColourManager(object):
     colourmap         = {} # {colour name in container: wx.SYS_COLOUR_XYZ}
     darkcolourmap     = {} # {colour name in container: wx.SYS_COLOUR_XYZ}
     darkoriginals     = {} # {colour name in container: original value}
-    # {ctrl: (prop name: colour name in container)}
-    ctrls             = collections.defaultdict(dict)
+    regctrls          = set() # {ctrl, }
+    # {ctrl: (prop name: colour name in container or wx.SYS_COLOUR_XYZ)}
+    ctrlprops         = collections.defaultdict(dict)
 
 
     @classmethod
@@ -265,8 +266,19 @@ class ColourManager(object):
                          or system colour ID like wx.SYS_COLOUR_WINDOW
         """
         if not ctrl: return
-        cls.ctrls[ctrl][prop] = colour
+        cls.ctrlprops[ctrl][prop] = colour
         cls.UpdateControlColour(ctrl, prop, colour)
+
+
+    @classmethod
+    def Register(cls, ctrl):
+        """
+        Registers a control for special handling, e.g. refreshing STC colours
+        for instances of wx.py.shell.Shell on system colour change.
+        """
+        if isinstance(ctrl, wx.py.shell.Shell):
+            cls.regctrls.add(ctrl)
+            cls.SetShellStyles(ctrl)
 
 
     @classmethod
@@ -333,13 +345,17 @@ class ColourManager(object):
     @classmethod
     def UpdateControls(cls):
         """Updates all managed controls."""
-        for ctrl, props in cls.ctrls.items():
+        for ctrl, props in cls.ctrlprops.items():
             if not ctrl: # Component destroyed
-                cls.ctrls.pop(ctrl)
+                cls.ctrlprops.pop(ctrl)
                 continue # for ctrl, props
 
             for prop, colour in props.items():
                 cls.UpdateControlColour(ctrl, prop, colour)
+
+        for ctrl in cls.regctrls:
+            if not ctrl: cls.regctrls.discard(ctrl)
+            elif isinstance(ctrl, wx.py.shell.Shell): cls.SetShellStyles(ctrl)
 
 
     @classmethod
@@ -350,6 +366,75 @@ class ColourManager(object):
             setattr(ctrl, prop, mycolour)
         elif hasattr(ctrl, "Set" + prop):
             getattr(ctrl, "Set" + prop)(mycolour)
+
+
+    @classmethod
+    def SetShellStyles(cls, stc):
+        """Sets system colours to Python shell console."""
+
+        fg    = cls.GetColour(wx.SYS_COLOUR_WINDOWTEXT)
+        bg    = cls.GetColour(wx.SYS_COLOUR_WINDOW)
+        btbg  = cls.GetColour(wx.SYS_COLOUR_BTNFACE)
+        grfg  = cls.GetColour(wx.SYS_COLOUR_GRAYTEXT)
+        ibg   = cls.GetColour(wx.SYS_COLOUR_INFOBK)
+        ifg   = cls.GetColour(wx.SYS_COLOUR_INFOTEXT)
+        hlfg  = cls.GetColour(wx.SYS_COLOUR_HOTLIGHT)
+        q3bg  = cls.GetColour(wx.SYS_COLOUR_INFOBK)
+        q3sfg = wx.Colour(127,   0,   0) # brown  #7F0000
+        deffg = wx.Colour(  0, 127, 127) # teal   #007F7F
+        eolbg = wx.Colour(224, 192, 224) # pink   #E0C0E0
+        strfg = wx.Colour(127,   0, 127) # purple #7F007F
+
+        if sum(fg) > sum(bg): # Background darker than foreground
+            deffg = cls.Adjust(deffg, bg, -1)
+            eolbg = cls.Adjust(eolbg, bg, -1)
+            q3bg  = cls.Adjust(q3bg,  bg)
+            q3sfg = cls.Adjust(q3sfg, bg, -1)
+            strfg = cls.Adjust(strfg, bg, -1)
+
+        faces = dict(wx.py.editwindow.FACES,
+                     q3bg =cls.ColourHex(q3bg),  backcol  =cls.ColourHex(bg),
+                     q3fg =cls.ColourHex(ifg),   forecol  =cls.ColourHex(fg),
+                     deffg=cls.ColourHex(deffg), calltipbg=cls.ColourHex(ibg),
+                     eolbg=cls.ColourHex(eolbg), calltipfg=cls.ColourHex(ifg),
+                     q3sfg=cls.ColourHex(q3sfg), linenobg =cls.ColourHex(btbg),
+                     strfg=cls.ColourHex(strfg), linenofg =cls.ColourHex(grfg),
+                     keywordfg=cls.ColourHex(hlfg))
+
+        # Default style
+        stc.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, "face:%(mono)s,size:%(size)d,"
+                                                   "back:%(backcol)s,fore:%(forecol)s" % faces)
+        stc.SetCaretForeground(fg)
+        stc.StyleClearAll()
+        stc.SetSelForeground(True, cls.GetColour(wx.SYS_COLOUR_HIGHLIGHTTEXT))
+        stc.SetSelBackground(True, cls.GetColour(wx.SYS_COLOUR_HIGHLIGHT))
+
+        # Built in styles
+        stc.StyleSetSpec(wx.stc.STC_STYLE_LINENUMBER,  "back:%(linenobg)s,fore:%(linenofg)s,"
+                                                       "face:%(mono)s,size:%(lnsize)d" % faces)
+        stc.StyleSetSpec(wx.stc.STC_STYLE_CONTROLCHAR, "face:%(mono)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_STYLE_BRACELIGHT,  "fore:#0000FF,back:#FFFF88")
+        stc.StyleSetSpec(wx.stc.STC_STYLE_BRACEBAD,    "fore:#FF0000,back:#FFFF88")
+
+        # Python styles
+        stc.StyleSetSpec(wx.stc.STC_P_DEFAULT,      "face:%(mono)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_COMMENTLINE,  "fore:#007F00,face:%(mono)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_NUMBER,       "")
+        stc.StyleSetSpec(wx.stc.STC_P_STRING,       "fore:%(strfg)s,face:%(mono)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_CHARACTER,    "fore:%(strfg)s,face:%(mono)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_WORD,         "fore:%(keywordfg)s,bold" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_TRIPLE,       "fore:%(q3sfg)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_TRIPLEDOUBLE, "fore:%(q3fg)s,back:%(q3bg)s" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_CLASSNAME,    "fore:%(deffg)s,bold" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_DEFNAME,      "fore:%(deffg)s,bold" % faces)
+        stc.StyleSetSpec(wx.stc.STC_P_OPERATOR,     "")
+        stc.StyleSetSpec(wx.stc.STC_P_IDENTIFIER,   "")
+        stc.StyleSetSpec(wx.stc.STC_P_COMMENTBLOCK, "fore:#7F7F7F")
+        stc.StyleSetSpec(wx.stc.STC_P_STRINGEOL,    "fore:#000000,face:%(mono)s,"
+                                                    "back:%(eolbg)s,eolfilled" % faces)
+
+        stc.CallTipSetBackground(faces['calltipbg'])
+        stc.CallTipSetForeground(faces['calltipfg'])
 
 
 
