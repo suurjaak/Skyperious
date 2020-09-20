@@ -899,10 +899,10 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 %for entry in timeline:
   <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.quote(entry["datestr"]) }}">
     <a href="#message:{{ entry["messages"][0] }}" title="{{ entry["datestr"] }} : {{ util.plural("message", entry["messages"], sep=",") }}">
-%if entry["unit"] in ("month", "date"):
+%if entry["unit"] in ("month", "day"):
       <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
-%elif "day" == entry["unit"]:
-      <span class="date">{{ entry["label"] }}<sup>{{ entry["label2"] }}</sup></span>
+%elif "date" == entry["unit"]:
+      <span class="date name">{{ entry["label"] }}<sup>{{ entry["label2"] }}</sup></span>
 %else:
       <span class="date name">{{ entry["label"] }}</span>
 %endif
