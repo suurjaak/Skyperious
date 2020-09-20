@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.09.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -161,26 +161,21 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         sizer.Add(notebook, proportion=1, flag=wx.GROW | wx.RIGHT | wx.BOTTOM)
         self.create_menu()
 
-        self.dialog_selectfolder = wx.DirDialog(
-            parent=self,
+        self.dialog_selectfolder = wx.DirDialog(parent=self,
             message="Choose a directory where to search for databases",
-            defaultPath=os.getcwd(),
             style=wx.DD_DIR_MUST_EXIST | wx.RESIZE_BORDER)
         self.dialog_openfile = wx.FileDialog(
             parent=self, message="Open database",
-            defaultDir=os.getcwd(), defaultFile="",
             wildcard="SQLite database (*.db)|*.db|All files|*.*",
             style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
         self.dialog_openexport = wx.FileDialog(
             parent=self, message="Open Skype export archive",
-            defaultDir=os.getcwd(), defaultFile="",
             wildcard="Skype export (*.json;*.tar)|*.json;*.tar|"
                      "JSON file (*.json)|*.json|TAR archive (*.tar)|*.tar|"
                      "All files|*.*",
             style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
         self.dialog_savefile = wx.FileDialog(
-            parent=self, defaultDir=os.getcwd(), defaultFile="",
-            style=wx.FD_SAVE | wx.RESIZE_BORDER)
+            parent=self, style=wx.FD_SAVE | wx.RESIZE_BORDER)
         self.dialog_search = controls.EntryDialog(
             parent=self, title="Find in %s" % conf.Title, label="Search:",
             emptyvalue="Find in last database..",
@@ -2380,8 +2375,7 @@ class DatabasePage(wx.Panel):
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
         self.dialog_savefile = wx.FileDialog(
-            parent=self, defaultDir=os.getcwd(), defaultFile="",
-            style=wx.FD_SAVE | wx.RESIZE_BORDER)
+            parent=self, style=wx.FD_SAVE | wx.RESIZE_BORDER)
 
         self.TopLevelParent.page_db_latest = self
         self.TopLevelParent.run_console(
@@ -5966,7 +5960,7 @@ class MergerPage(wx.Panel):
         formatargs = collections.defaultdict(str); formatargs.update(self.chat)
         default = "Diff of %s" % conf.ExportChatTemplate % formatargs
         dialog = wx.FileDialog(parent=self, message="Save new messages",
-            defaultDir=os.getcwd(), defaultFile=util.safe_filename(default),
+            defaultFile=util.safe_filename(default),
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         dialog.Wildcard = export.CHAT_WILDCARD
