@@ -902,7 +902,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 %if entry["unit"] in ("month", "date"):
       <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
 %elif "day" == entry["unit"]:
-      <span class="date">{{ entry["label"] }}<sup>{{ entry["ordinal"] }}</sup></span>
+      <span class="date">{{ entry["label"] }}<sup>{{ entry["label2"] }}</sup></span>
 %else:
       <span class="date name">{{ entry["label"] }}</span>
 %endif
