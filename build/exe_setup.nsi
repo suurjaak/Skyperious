@@ -114,18 +114,18 @@ FunctionEnd
 Function FinishPage_Leave
   ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "State"
   StrCmp $0 "0" +2
-  ${RegisterExtension} "$INSTDIR\skyperious.exe" ".db" "SQLite3 database file"
-FunctionEnd
-
-Function un.onUninstSuccess
-  HideWindow
-  MessageBox MB_ICONINFORMATION|MB_OK "$(^Name) was successfully removed from your computer."
+  ${RegisterExtension} "$INSTDIR\${PROGEXE}" ".db" "SQLite3 database file"
 FunctionEnd
 
 Function un.onInit
   MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Are you sure you want to uninstall $(^Name)?" IDYES +2
   Abort
   !insertmacro MULTIUSER_UNINIT
+FunctionEnd
+
+Function un.onUninstSuccess
+  HideWindow
+  MessageBox MB_ICONINFORMATION|MB_OK "$(^Name) was successfully removed from your computer."
 FunctionEnd
 
 
@@ -166,10 +166,10 @@ Section Uninstall
   SetAutoClose true
   ${nsProcess::KillProcess} "${PROGEXE}" $R4
 
+  Delete "$INSTDIR\${BASENAME}.ini"
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
   Delete "$INSTDIR\${UNINSTALL_FILENAME}"
   Delete "$INSTDIR\README.txt"
-  Delete "$INSTDIR\${BASENAME}.ini"
   Delete "$INSTDIR\3rd-party licenses.txt"
 
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
