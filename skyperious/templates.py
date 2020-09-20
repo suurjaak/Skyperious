@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    18.09.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -1391,22 +1391,22 @@ HTML chat history export template for shared image message body.
 @param   author          author skypename
 @param   author_name     author display name
 @param   datetime        message datetime
-@param   message_id      message ID
+@param   message         message data dict
 @param   ?filename       image filename, if any
 @param   ?images_folder  path to save images under, if not embedding
 """
 CHAT_MESSAGE_IMAGE = """<%
 import base64, imghdr, logging, os, urllib
-from skyperious import conf
+from skyperious import conf, skypedata
 from skyperious.lib import util
 
 filetype = imghdr.what("", image) or "image"
-caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message_id, datetime.strftime("%Y-%m-%d %H:%M")]))
+caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
 title = "Click to enlarge."
 if isdef("filename") and filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
 if isdef("images_folder") and images_folder:
-    basename = isdef("filename") and filename or "%s.%s" % (message_id, filetype)
+    basename = isdef("filename") and filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(images_folder, basename))
     url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (images_folder, filepath))
@@ -1418,6 +1418,9 @@ if isdef("images_folder") and images_folder:
 else:
     url = "data:image/%s;base64,%s" % (escape(filetype), base64.b64encode(image))
 %>
+%if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
+  Changed the conversation picture:<br />
+%endif
 <span class="shared_image">
 %if isdef("images_folder") and images_folder:
   <a href="{{url}}" target="_blank" onclick="return false">

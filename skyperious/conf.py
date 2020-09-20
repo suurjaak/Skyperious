@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.09.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.3.dev3"
-VersionDate = "18.09.2020"
+Version = "4.3.dev4"
+VersionDate = "19.09.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable

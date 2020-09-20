@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.08.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1637,7 +1637,7 @@ class MessageParser(object):
         Parses the body of the Skype message according to message type.
 
         @param   message  message data dict
-        @param   output   output options, {merge: True} has different content
+        @param   options  output options, {merge: True} has different content
         @return           ElementTree instance
         """
         body = message["body_xml"] or ""
@@ -1747,7 +1747,15 @@ class MessageParser(object):
         elif MESSAGE_TYPE_TOPIC == message["type"]:
             text = dom.text
             # Newer message format has content like
-            # <pictureupdate><eventtime>1498740806804</eventtime>..
+            # <pictureupdate><eventtime>1498740806804</eventtime><value>URL@https://..
+            if self.stats:
+                tag = next(dom.getiterator("value"), None)
+                url = tag is not None and (tag.text or "").replace("URL@", "")
+                if url:
+                    data = dict(url=url, author_name=get_author_name(message),
+                                author=message["author"], success=False,
+                                datetime=message["datetime"])
+                    self.stats["shared_images"][message["id"]] = data
             dom.clear()
             if text:
                 dom.text = 'Changed the conversation topic to "%s".' % text
@@ -1965,10 +1973,12 @@ class MessageParser(object):
         shared_image = self.stats.get("shared_images", {}).get(message["id"])
         if shared_image and output.get("export") \
         and conf.SharedImageAutoDownload and self.db.live.is_logged_in():
-            raw = self.db.live.get_api_image(shared_image["url"])
+            category = None
+            if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
+            raw = self.db.live.get_api_image(shared_image["url"], category)
             if raw:
                 shared_image["success"] = True
-                ns = dict(shared_image, image=raw, message_id=message["id"])
+                ns = dict(shared_image, image=raw, message=message)
                 return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns, **output)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
