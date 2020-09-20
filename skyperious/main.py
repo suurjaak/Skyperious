@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.08.2020
+@modified    19.09.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -723,6 +723,8 @@ def run_gui(filenames):
 def run(nogui=False):
     """Parses command-line arguments and either runs GUI, or a CLI action."""
     global is_gui_possible, logger
+
+    warnings.simplefilter("ignore", UnicodeWarning)
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
