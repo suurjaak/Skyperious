@@ -114,15 +114,17 @@ FunctionEnd
 Function FinishPage_Leave
   ReadINIStr $0 "$PLUGINSDIR\iospecial.ini" "Field 6" "State"
   StrCmp $0 "0" end
+
   ${RegisterExtension} "$INSTDIR\${PROGEXE}" ".db" "SQLite3 database file"
   end:
 FunctionEnd
 
 Function un.onInit
-  MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Are you sure you want to uninstall $(^Name)?" IDYES
+  MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Are you sure you want to uninstall $(^Name)?" IDYES proceed
   Abort
+
+  proceed:
   !insertmacro MULTIUSER_UNINIT
-  end:
 FunctionEnd
 
 Function un.onUninstSuccess
@@ -132,9 +134,21 @@ FunctionEnd
 
 
 Section "MainSection" SEC01
-  ${nsProcess::KillProcess} "${PROGEXE}" $R4
-  Call RefreshSysTray
+  start:
+  ${nsProcess::FindProcess} "${PROGEXE}" $0
+  StrCmp $0 "0" warn
+  Goto proceed
 
+  warn:
+  MessageBox MB_ICONEXCLAMATION|MB_OKCANCEL "${PRODUCT_NAME} is currently running. Please close it before continuing." /SD IDCANCEL IDOK ok IDCANCEL cancel
+  ok:
+  Call RefreshSysTray
+  Goto start
+
+  cancel:
+  Abort
+
+  proceed:
   SetOutPath "$INSTDIR"
   SetOverwrite ifnewer
   File "${PROGEXE}"
@@ -169,13 +183,29 @@ SectionEnd
 
 Section Uninstall
   SetAutoClose true
-  ${nsProcess::KillProcess} "${PROGEXE}" $R4
+  start:
 
+  ${nsProcess::FindProcess} "${PROGEXE}" $0
+  StrCmp $0 "0" warn
+  Goto proceed
+
+  warn:
+  MessageBox MB_ICONEXCLAMATION|MB_OKCANCEL "${PRODUCT_NAME} is currently running. Please close it before continuing." /SD IDCANCEL IDOK ok IDCANCEL cancel
+  ok:
+  Call un.RefreshSysTray
+  Goto start
+
+  cancel:
+  Abort
+
+  proceed:
+  Delete "$INSTDIR\${PROGEXE}"
   Delete "$INSTDIR\${BASENAME}.ini"
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
   Delete "$INSTDIR\${UNINSTALL_FILENAME}"
   Delete "$INSTDIR\README.txt"
   Delete "$INSTDIR\3rd-party licenses.txt"
+  RMDir "$INSTDIR"
 
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\README.lnk"
@@ -183,13 +213,9 @@ Section Uninstall
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk"
   RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
 
-  Delete "$INSTDIR\${PROGEXE}"
-  RMDir "$INSTDIR"
-
   DeleteRegKey SHCTX "${PRODUCT_UNINST_KEY}"
   DeleteRegKey SHCTX "${PRODUCT_DIR_REGKEY}"
   !insertmacro MULTIUSER_RegistryRemoveInstallInfo
-  Call un.RefreshSysTray
 
   ${UnregisterExtension} ".db" "SQLite3 database file"
 

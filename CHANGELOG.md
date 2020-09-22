@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-4.3, 2020-09-19
+4.3, 2020-09-22
 ---------------
 - added dark mode toggle to HTML export (issue #81);
 - added support for single-user install.
