@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2020
+@modified    22.09.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.3.dev5"
-VersionDate = "19.09.2020"
+Version = "4.3.dev6"
+VersionDate = "22.09.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -424,8 +424,8 @@ def save():
             except Exception: continue # for path
             else: break # for path
 
-        f.write("# %s %s configuration written on %s.\n" % (Title, Version,
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        f.write("# %s configuration written on %s.\n" % 
+                (Title, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try: parser.set(section, name, json.dumps(getattr(module, name)))
             except Exception: pass
