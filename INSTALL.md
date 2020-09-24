@@ -39,7 +39,7 @@ E.g. installing Skyperious for Ubuntu 18.04:
 
 Another option is to have wxPython built locally, e.g. for Ubuntu 20.04:
 
-* run `sudo apt-get install build-essential libgtk-3-dev libwxgtk3.0-dev python`
+* run `sudo apt-get install build-essential libgtk-3-dev libwxgtk3.0-gtk3-dev python`
 * run `wget https://bootstrap.pypa.io/get-pip.py`
 * run `sudo python get-pip.py`
 * run `sudo pip install skyperious`
