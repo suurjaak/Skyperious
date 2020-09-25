@@ -35,11 +35,13 @@ ENV LC_ALL   en_US.UTF-8
 ENV LANG     en_US.UTF-8
 ENV LANGUAGE en_US.UTF-8
 
-RUN pip install -U -f --no-cache-dir \
-    https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 \
-    wxPython
+RUN pip install --upgrade pip
 
-RUN pip install skyperious
+RUN pip install --ignore-installed --find-links \
+    https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 \
+    wxPython --no-cache-dir --no-python-version-warning
+
+RUN pip install skyperious --no-python-version-warning
 
 RUN printf '\nConfigFile = "/etc/skyperious/skyperious.ini"\n' \
     >> /usr/local/lib/python2.7/dist-packages/skyperious/conf.py
