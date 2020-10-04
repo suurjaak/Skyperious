@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.3.1.dev1"
+Version = "4.3.1.dev2"
 VersionDate = "04.10.2020"
 
 if getattr(sys, "frozen", False):
@@ -125,7 +125,7 @@ SQLWindowTexts = {}
 ExportChatTemplate = u"Skype %(title_long_lc)s"
 
 """Database export filename template, format can use Skype.Accounts data."""
-ExportDbTemplate = u"Export from %(fullname)s"
+ExportDbTemplate = u"Export from %(name)s"
 
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
