@@ -1865,8 +1865,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return
         try:
             stats = db.get_general_statistics(full=False)
-            if "name" in stats and "username" in stats:
-                self.label_account.Value = "%(name)s (%(username)s)" % stats
+            if "username" in stats:
+                text = stats["username"]
+                if "name" in stats and stats["name"] != text:
+                    text = "%s (%s)" % (stats["name"], text)
+                self.label_account.Value = text
             text = util.plural("chat", stats["chats"], sep=",")
             if stats.get("lastmessage_chat"):
                 text += ", latest %(lastmessage_chat)s" % stats
