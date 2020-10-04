@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2020
+@modified    04.10.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -337,7 +337,7 @@ class SkypeDatabase(object):
 
         # Remove live login tokenfile if not storing password
         if not conf.Login.get(self.filename, {}).get("store"):
-            util.try_ignore(os.unlink, self.live.tokenpath)
+            util.try_ignore(lambda: os.unlink(self.live.tokenpath))
 
 
     def execute(self, sql, params=(), log=True):

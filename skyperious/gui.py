@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2020
+@modified    04.10.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1339,14 +1339,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db.account: formatargs.update(db.account)
             folder = util.safe_filename(conf.ExportDbTemplate % formatargs)
-            export_dir = util.unique_path(os.path.join(os.path.dirname(path), folder))
+            path = util.unique_path(os.path.join(os.path.dirname(path), folder))
             try:
-                os.mkdir(export_dir)
+                os.mkdir(path)
             except Exception as e:
                 errormsg_short = "Failed to create directory %s: %s" % (
-                                 export_dir, util.format_exc(e))
+                                 path, util.format_exc(e))
                 errormsg = "Failed to create directory %s:\n\n%s" % \
-                           (export_dir, traceback.format_exc())
+                           (path, traceback.format_exc())
                 error = True
         elif not error:
             format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
@@ -1361,7 +1361,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             try:
                 db.get_conversations_stats(chats)
                 progressfunc = lambda *args: wx.SafeYield()
-                opts = dict(multi=True, progress=progressfunc)
+                opts = dict(multi=not do_singlefile, progress=progressfunc)
                 if images_folder: opts["images_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
@@ -4032,7 +4032,7 @@ class DatabasePage(wx.Panel):
         files, count, message_count, errormsg, errormsg_short = [], 0, 0, None, None
         try:
             progressfunc = lambda *args: wx.SafeYield()
-            opts = dict(multi=True, progress=progressfunc, timerange=timerange,
+            opts = dict(multi=not do_singlefile, progress=progressfunc, timerange=timerange,
                         noskip=not do_all)
             if images_folder: opts["images_folder"] = True
             result = export.export_chats(chats, path, format, self.db, opts)

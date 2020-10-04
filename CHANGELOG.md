@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.3.1, 2020-10-04
+-----------------
+- fixed export errors (issue #86).
+
+
 4.3, 2020-09-22
 ---------------
 - added dark mode toggle to HTML export (issue #81);

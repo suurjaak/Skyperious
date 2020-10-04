@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2020
+@modified    04.10.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -77,7 +77,7 @@ ARGUMENTS = {
              {"args": ["-t", "--type"], "dest": "type",
               "choices": ["html", "xlsx", "csv", "txt", "xlsx_single"]
                          if export.xlsxwriter else ["html", "csv", "txt"],
-              "default": "html", "required": False,
+              "default": "html", "required": False, "type" : str.lower,
               "help": "export type: HTML files (default), Excel workbooks, "
                       "CSV spreadsheets, text files, or a single Excel "
                       "workbook with separate sheets" if export.xlsxwriter
@@ -570,6 +570,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
+    if is_xlsx_single: format = "xlsx"
     timerange = map(util.datetime_to_epoch, (start_date, end_date))
     output_dir = output_dir or os.getcwd()
 
@@ -597,13 +598,14 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
         else:
             path = os.path.join(output_dir, basename)
         path = util.unique_path(path)
+        util.try_ignore(os.makedirs, output_dir)
         try:
             extras = [("", chatnames)] if chatnames else []
             extras += [(" with authors", authornames)] if authornames else []
             output("Exporting%s%s as %s %sto %s." % 
                   (" chats" if extras else "",
                    ",".join("%s like %s" % (x, y) for x, y in extras),
-                   format[:4].upper(), dbstr, path))
+                   format.upper(), dbstr, path))
             chats = sorted(db.get_conversations(chatnames, authornames),
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
@@ -613,6 +615,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
             bar = ProgressBar(max=bar_total, afterword=bartext, pulse=pulse)
             bar.start()
             opts = dict(progress=bar.update, timerange=timerange)
+            if not is_xlsx_single: opts["multi"] = True
             if images_folder: opts["images_folder"] = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
@@ -625,7 +628,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                 logger.info("Exported %s and %s %sto %s as %s.",
                             util.plural("chat", count),
                             util.plural("message", message_count),
-                            dbstr, path, format[:4].upper())
+                            dbstr, path, format.upper())
             else:
                 output("\nNo messages to export%s." %
                       ("" if len(dbs) == 1 else " from %s" % db))
@@ -798,7 +801,7 @@ def run(nogui=False):
     elif "merge" == arguments.command:
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.output,
+        run_export(arguments.FILE, arguments.type, arguments.output_dir,
                    arguments.chat, arguments.author, arguments.start_date,
                    arguments.end_date, arguments.images_folder,
                    arguments.ask_password, arguments.store_password)
