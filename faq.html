@@ -73,13 +73,24 @@
 
         <h3><a name="login-fail"></a>Why am I getting login failure from Skype online?</h3>
         <p>
-          Skype login can sometimes fail for no discernible reason, giving errors like
+        If login fails with <code>"Authentication Failure"</code>, it may be because of having
+        an original pre-Microsoft Skype account.
+        A possible work-around is to make an e-mail the primary alias of your Skype/Microsoft account:
+        <ul>
+          <li>log in at <a href="https://account.live.com" target="_blank">account.live.com</a></li>
+          <li>go to "Services and subscriptions"</li>
+          <li>choose "Use Outlook.com for free"</li>
+          <li>select or add an e-mail to your account</li>
+          <li>verify that logging in at <a href="https://outlook.live.com" target="_blank">outlook.live.com</a> works</li>
+          <li>login inside Skyperious should now work</li>
+        </ul>
+
+        </p>
+        <p>
+          Also, Skype login can sometimes fail for no discernible reason, giving errors like
           <code>"Couldn't retrieve field from login response"</code> or
           <code>"That Microsoft account doesn't exist."</code>. These failures tend
           to be intermittent: try again after a while.
-
-XXX @todo
-
         </p>
         <br />
 
