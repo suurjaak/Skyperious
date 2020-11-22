@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -98,14 +98,14 @@ ARGUMENTS = {
               "help": "date to export messages from, as YYYY-MM-DD", "type": date},
              {"args": ["-e", "--end"], "dest": "end_date", "required": False,
               "help": "date to export messages until, as YYYY-MM-DD", "type": date},
-             {"args": ["--images-folder"], "dest": "images_folder",
+             {"args": ["--media-folder"], "dest": "media_folder",
               "action": "store_true", "required": False,
-              "help": "save images into a subfolder in HTML export "
+              "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
-                      "to download shared images"},
+                      "to download shared media"},
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
               "help": "store entered password in configuration"},
@@ -566,7 +566,7 @@ def run_create(filenames, input=None, username=None, password=None,
 
 
 def run_export(filenames, format, output_dir, chatnames, authornames,
-               start_date, end_date, images_folder, ask_password, store_password):
+               start_date, end_date, media_folder, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
@@ -576,7 +576,8 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
 
     for db in dbs:
 
-        if ask_password and db.username and conf.SharedImageAutoDownload \
+        if ask_password and db.username \
+        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
         and "html" == format:
             while not db.live.is_logged_in():
                 password = get_password(db.username)
@@ -616,7 +617,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
             bar.start()
             opts = dict(progress=bar.update, timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
@@ -803,7 +804,7 @@ def run(nogui=False):
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.output_dir,
                    arguments.chat, arguments.author, arguments.start_date,
-                   arguments.end_date, arguments.images_folder,
+                   arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)

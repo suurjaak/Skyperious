@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1574,7 +1574,7 @@ class MessageParser(object):
                 "hists": {},     # Author histogram data {author: {"hours", ..} }
                 "workhist": {},  # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
                 "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
-                "shared_images": {}} # {message_id: {url, datetime, author, author_name, ?filename}, }
+                "shared_media": {}} # {message_id: {url, datetime, author, author_name, category, ?filename}, }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1608,7 +1608,7 @@ class MessageParser(object):
         if dom is None:
             dom = self.parse_message_dom(message, output)
             if not (output.get("merge")
-            or message["id"] in self.stats.get("shared_images", {})):
+            or message["id"] in self.stats.get("shared_media", {})):
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
@@ -1755,7 +1755,7 @@ class MessageParser(object):
                     data = dict(url=url, author_name=get_author_name(message),
                                 author=message["author"], success=False,
                                 datetime=message["datetime"])
-                    self.stats["shared_images"][message["id"]] = data
+                    self.stats["shared_media"][message["id"]] = data
             dom.clear()
             if text:
                 dom.text = 'Changed the conversation topic to "%s".' % text
@@ -1856,7 +1856,7 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        # Photo/video sharing: take image link, if any
+        # Photo/video/file sharing: take file link, if any
         if any(dom.getiterator("URIObject")):
             url, filename = dom.find("URIObject").get("uri"), None
             nametag = next(dom.getiterator("OriginalName"), None)
@@ -1880,7 +1880,8 @@ class MessageParser(object):
                             author=message["author"], success=False,
                             datetime=message["datetime"])
                 if filename: data.update(filename=filename)
-                self.stats["shared_images"][message["id"]] = data
+                # @todo siia veel category juurdepookimine.
+                self.stats["shared_media"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
@@ -1970,15 +1971,17 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
-        shared_image = self.stats.get("shared_images", {}).get(message["id"])
-        if shared_image and output.get("export") \
-        and conf.SharedImageAutoDownload and self.db.live.is_logged_in():
-            category = None
+        media = self.stats.get("shared_media", {}).get(message["id"])
+        if media and output.get("export") \
+        and (conf.SharedImageAutoDownload      and media.get("category") not in ("audio", "video") or
+             conf.SharedAudioVideoAutoDownload and media.get("category")     in ("audio", "video")) \
+        and self.db.live.is_logged_in():
+            category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
-            raw = self.db.live.get_api_image(shared_image["url"], category)
+            raw = self.db.live.get_api_media(media["url"], category)
             if raw:
-                shared_image["success"] = True
-                ns = dict(shared_image, image=raw, message=message)
+                media["success"] = True
+                ns = dict(media, image=raw, message=message)
                 return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns, **output)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]

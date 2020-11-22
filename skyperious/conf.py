@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.3.1.dev2"
-VersionDate = "04.10.2020"
+Version = "4.4.dev0"
+VersionDate = "22.11.2020"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -55,10 +55,10 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedImageAutoDownload",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
-    "WordCloudWordsAuthorMax"
+    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
+    "SharedImageAutoDownload", "StatisticsPlotWidth", "StatusFlashLength",
+    "UpdateCheckInterval", "WordCloudLengthMin", "WordCloudCountMin", 
+    "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -329,9 +329,10 @@ StatisticsPlotWidth = 150
 """Width of the chat emoticons plots, in pixels."""
 EmoticonsPlotWidth = 200
 
-"""
-Download shared images from Skype online service for HTML export.
-"""
+"""Download shared audio & video from Skype online service for HTML export."""
+SharedAudioVideoAutoDownload = True
+
+"""Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
 
 """Duration of status message on program statusbar, in milliseconds."""

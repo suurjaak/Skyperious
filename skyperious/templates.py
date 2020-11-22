@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    19.09.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 import re
@@ -413,7 +413,7 @@ from skyperious.lib.vendor import step
       position: relative;
       top: 2px;
     }
-    #shared_images, #transfers {
+    #shared_media, #transfers {
       margin-top: 10px;
       padding-top: 5px;
       border-top: 1px solid #99BBFF;
@@ -423,30 +423,30 @@ from skyperious.lib.vendor import step
       margin-top: 10px;
       width: 100%;
     }
-    #shared_images table {
+    #shared_media table {
       display: none;
       margin-top: 10px;
       width: 100%;
     }
-    #shared_images table td, #transfers table td {
+    #shared_media table td, #transfers table td {
       vertical-align: top;
       white-space: nowrap;
     }
-    #shared_images table a, #transfers table a {
+    #shared_media table a, #transfers table a {
       color: blue;
     }
-    #shared_images table td:first-child, #transfers table td:first-child {
+    #shared_media table td:first-child, #transfers table td:first-child {
       padding-right: 15px;
       text-align: right;
       white-space: normal;
     }
-    #shared_images table td:first-child a, #transfers table td:first-child a {
+    #shared_media table td:first-child a, #transfers table td:first-child a {
       color: inherit;
     }
-    #shared_images table td:first-child a:hover, #transfers table td:first-child a:hover {
+    #shared_media table td:first-child a:hover, #transfers table td:first-child a:hover {
       text-decoration: underline;
     }
-    #shared_images table td:last-child, #transfers table td:last-child {
+    #shared_media table td:last-child, #transfers table td:last-child {
       text-align: right;
     }
     #transfers .filename {
@@ -536,14 +536,14 @@ from skyperious.lib.vendor import step
     #timeline ul li.day .date {
       font-size: 11px;
     }
-    span.shared_image {
+    span.shared_media {
       background: black;
       border-radius: 5px;
       display: inline-block;
       max-width: 305px;
       max-height: 210px;
     }
-    span.shared_image img {
+    span.shared_media img {
       border-radius: 5px;
       cursor: pointer;
       max-width: 305px;
@@ -583,7 +583,7 @@ from skyperious.lib.vendor import step
     body.darkmode a, body.darkmode a.visited,
     body.darkmode #transfers .filename,
     body.darkmode .toggle_plusminus,
-    body.darkmode #shared_images table td:not(:first-child) a {
+    body.darkmode #shared_media table td:not(:first-child) a {
       color: #80FF74;
     }
     body.darkmode #stats_data > tbody > tr > td:nth-child(3),
@@ -616,7 +616,7 @@ from skyperious.lib.vendor import step
                   center center no-repeat;
     }
 %endfor
-%if any(x["success"] for x in stats["shared_images"].values()):
+%if any(x["success"] for x in stats["shared_media"].values()):
     {{!templates.LIGHTBOX_CSS}}
 %endif
   </style>
@@ -886,7 +886,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
       document.addEventListener("DOMContentLoaded", init_timeline);
     };
 
-%if any(x["success"] for x in stats["shared_images"].values()):
+%if any(x["success"] for x in stats["shared_media"].values()):
     {{!templates.LIGHTBOX_JS}}
 %endif
   </script>
@@ -1249,12 +1249,12 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 %endif
 
 
-%if stats["shared_images"]:
-    <div id="shared_images">
+%if stats["shared_media"]:
+    <div id="shared_media">
 
-    <b>Shared images</b>&nbsp;&nbsp;[<a title="Click to show/hide shared image links" href="#" onClick="return toggle_plusminus(this, 'shared_images_table');" class="toggle_plusminus">+</a>]
-    <table id="shared_images_table">
-%for message_id, data in sorted(stats["shared_images"].items(), key=lambda x: x[1]["datetime"]):
+    <b>Shared media</b>&nbsp;&nbsp;[<a title="Click to show/hide shared media links" href="#" onClick="return toggle_plusminus(this, 'shared_media_table');" class="toggle_plusminus">+</a>]
+    <table id="shared_media_table">
+%for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
       <tr>
         <td class="{{"remote" if data["author"] != db.id else "local"}}" title="{{data["author"]}}"><a href="#message:{{message_id}}">{{data["author_name"]}}</a></td>
         <td><a href="{{data["url"]}}" target="_blank">{{data["url"]}}</a></td>
@@ -1307,7 +1307,7 @@ for chunk in message_buffer:
   </table>
 </td></tr></table>
 <div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
-%if any(x["success"] for x in stats["shared_images"].values()):
+%if any(x["success"] for x in stats["shared_media"].values()):
 <script> new Lightbox().load({carousel: false}); </script>
 %endif
 </body>
@@ -1322,14 +1322,14 @@ HTML chat history export template for the messages part.
 @param   chat            chat data dictionary
 @param   messages        message iterator
 @param   parser          MessageParser instance
-@param   ?images_folder  path to save images under, if not embedding
+@param   ?media_folder   path to save images under, if not embedding
 """
 CHAT_MESSAGES_HTML = """<%
 from skyperious import skypedata
 from skyperious.lib import util
 
 output = {"format": "html", "export": True}
-if isdef("images_folder") and images_folder: output["images_folder"] = images_folder
+if isdef("media_folder") and media_folder: output["media_folder"] = media_folder
 previous_day, previous_author = None, None
 %>
 %for m in messages:
@@ -1393,7 +1393,7 @@ HTML chat history export template for shared image message body.
 @param   datetime        message datetime
 @param   message         message data dict
 @param   ?filename       image filename, if any
-@param   ?images_folder  path to save images under, if not embedding
+@param   ?media_folder   path to save images under, if not embedding
 """
 CHAT_MESSAGE_IMAGE = """<%
 import base64, imghdr, logging, os, urllib
@@ -1405,11 +1405,11 @@ caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author
 title = "Click to enlarge."
 if isdef("filename") and filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
-if isdef("images_folder") and images_folder:
+if isdef("media_folder") and media_folder:
     basename = isdef("filename") and filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
-    filepath = util.unique_path(os.path.join(images_folder, basename))
-    url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (images_folder, filepath))
+    filepath = util.unique_path(os.path.join(media_folder, basename))
+    url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
     except Exception:
@@ -1421,12 +1421,12 @@ else:
 %if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
   Changed the conversation picture:<br />
 %endif
-<span class="shared_image">
-%if isdef("images_folder") and images_folder:
+<span class="shared_media">
+%if isdef("media_folder") and media_folder:
   <a href="{{url}}" target="_blank" onclick="return false">
 %endif
-  <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" />
-%if isdef("images_folder") and images_folder:
+  <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_media" data-jslghtbx-caption="{{caption}}" />
+%if isdef("media_folder") and media_folder:
   </a>
 %endif
 </span>
@@ -1708,7 +1708,7 @@ HTML statistics template, for use with HtmlWindow.
 @param   authorimages     {identity: {image type: memoryfs filename}}
 @param   imagemaps        {histogram type: [(rect, href)]}
 @param   authorimagemaps  {identity: {histogram type: [(rect, href)]}}
-@param   expand           {clouds: bool, emoticons, shared_images}
+@param   expand           {clouds: bool, emoticons, shared_media}
 """
 STATS_HTML = """<%
 import urllib
@@ -1989,13 +1989,13 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %endif
 
 
-%if stats["shared_images"]:
+%if stats["shared_media"]:
 <br /><br />
-<b>Shared images</b> [<a href="expand://shared_images"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["shared_images"]]}}</font></a>]
-%if expand["shared_images"]:
+<b>Shared media</b> [<a href="expand://shared_media"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["shared_media"]]}}</font></a>]
+%if expand["shared_media"]:
 <br /><br />
 <table width="100%">
-%for message_id, data in sorted(stats["shared_images"].items(), key=lambda x: x[1]["datetime"]):
+%for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
   <tr>
     <td align="right" nowrap="" valign="top"><a href="message:{{message_id}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font></a></td>
     <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{data["url"]}}"><font color="{{conf.LinkColour}}">{{data["url"]}}</font></a></font></td>
@@ -2494,7 +2494,7 @@ from skyperious import conf
       </td><td width="10"></td><td valign="center">
         Log in to Skype online service<br />
         in order to synchronize chat history from live, <br />
-        and download shared images in HTML export. 
+        and download shared media in HTML export. 
       </td></tr><tr><td nowrap align="center">
         <a href="page:live"><b><font color="{{conf.FgColour}}">Online</font></b></a>
     </td></tr></table>

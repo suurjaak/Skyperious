@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1322,7 +1322,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if focused_control: focused_control.SetFocus()
             return
 
-        db, files, count, message_count, images_folder = None, [], 0, 0, False
+        db, files, count, message_count, media_folder = None, [], 0, 0, False
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
@@ -1334,7 +1334,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             errormsg = "Cannot export %s. Not a valid Skype database?" % db
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+            media_folder = "html" == format and self.dialog_savefile.FilterIndex
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db.account: formatargs.update(db.account)
@@ -1362,7 +1362,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 db.get_conversations_stats(chats)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(multi=not do_singlefile, progress=progressfunc)
-                if images_folder: opts["images_folder"] = True
+                if media_folder: opts["media_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
             except Exception as e:
@@ -2306,7 +2306,7 @@ class DatabasePage(wx.Panel):
         }
         self.stats_sort_field = "name"
         self.stats_expand = {"clouds": False, "emoticons": False,
-                             "shared_images": False}
+                             "shared_media": False}
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -3034,7 +3034,7 @@ class DatabasePage(wx.Panel):
         button_login.Label = "&Log in as '%s'" % self.db.username
         button_login.Note = "After login, local database can be updated from " \
                             "Skype online service.\nAdditionally, HTML export " \
-                            "can download and include shared images."
+                            "can download and include shared media."
         label_info.SetFonts(normal_face=self.Font.FaceName, fixed_face=self.Font.FaceName, sizes=[8] * 7)
         label_info.SetPage(step.Template(templates.LOGIN_FAIL_INFO).expand())
         label_info.Hide()
@@ -3855,7 +3855,7 @@ class DatabasePage(wx.Panel):
 
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -3864,7 +3864,7 @@ class DatabasePage(wx.Panel):
             messages = self.stc_history.GetMessages()
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(progress=progressfunc, noskip=True, messages=messages)
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
@@ -4020,13 +4020,13 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if not chats or wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        path, images_folder = self.dialog_savefile.GetPath(), False
+        path, media_folder = self.dialog_savefile.GetPath(), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
         else:
             path = os.path.dirname(path)
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+            media_folder = "html" == format and self.dialog_savefile.FilterIndex
 
         msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
               ("all " if do_all else "", self.db.filename, format.upper(), path)
@@ -4037,7 +4037,7 @@ class DatabasePage(wx.Panel):
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(multi=not do_singlefile, progress=progressfunc, timerange=timerange,
                         noskip=not do_all)
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats(chats, path, format, self.db, opts)
             files, count, message_count = result
         except Exception as e:
@@ -4071,7 +4071,7 @@ class DatabasePage(wx.Panel):
 
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
 
@@ -4090,7 +4090,7 @@ class DatabasePage(wx.Panel):
                 guibase.status("Filtering and exporting to %s.", filepath, log=True)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(messages=messages, progress=progressfunc)
-                if images_folder: opts["images_folder"] = True
+                if media_folder: opts["media_folder"] = True
                 result = export.export_chats([self.chat], filepath, format, self.db, opts)
                 files, count, message_count = result
                 guibase.status("Exported %s to %s.",
@@ -5971,7 +5971,7 @@ class MergerPage(wx.Panel):
 
         filepath = dialog.GetPath()
         format = export.CHAT_EXTS[dialog.FilterIndex]
-        images_folder = "html" == format and dialog.FilterIndex
+        media_folder = "html" == format and dialog.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -5979,7 +5979,7 @@ class MergerPage(wx.Panel):
         try:
             messages = self.db1.message_iterator(self.chat_diff["messages"])
             opts = dict(messages=messages, progress=lambda *args: wx.SafeYield())
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db1, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",

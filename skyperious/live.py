@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    25.08.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -431,7 +431,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_image(item.picture, category="avatar")
+                    raw = self.get_api_media(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw)
             else: result = None
@@ -732,11 +732,11 @@ class SkypeLogin(object):
         )
 
 
-    def get_api_image(self, url, category=None):
+    def get_api_media(self, url, category=None):
         """
-        Returns image raw binary from Skype API URL via login, or None.
+        Returns media raw binary from Skype API URL via login, or None.
 
-        @param   category  type of image, e.g. "avatar"
+        @param   category  type of media, e.g. "avatar" for avatar image
         """
         if "avatar" == category and not url.endswith("/views/avatar_fullsize"):
             url += "/views/avatar_fullsize"
