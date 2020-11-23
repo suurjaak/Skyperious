@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    22.11.2020
+@modified    23.11.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -602,8 +602,8 @@ class SkypeLogin(object):
         getter = lambda c: self.request(self.skype.chats.chat, c, __raise=False)
         selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
 
-        updateds, new, mtotalnew, mtotalupdated, run = set(), 0, 0, 0, True
-        msgids = set()
+        new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
+        updateds, completeds, msgids = set(), set(), set()
         while run:
             mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
             if not mychats: break # while run
@@ -666,7 +666,18 @@ class SkypeLogin(object):
                     if not msgs:
                         break # while mrun
                 mtotalnew, mtotalupdated = mtotalnew + mnew, mtotalupdated + mupdated
-                if (mtotalnew or mtotalupdated): updateds.add(cidentity)
+                if (mnew or mupdated):
+                    updateds.add(cidentity)
+                    if cidentity in self.cache["chats"]:
+                        row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
+                                              "MAX(timestamp) AS last "
+                                              "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity])
+                        self.db.execute("UPDATE conversations SET last_message_id = :id, "
+                                        "last_activity_timestamp = :last, "
+                                        "creation_timestamp = COALESCE(creation_timestamp, :first) "
+                                        "WHERE id = :convo_id", row)
+                        completeds.add(cidentity)
+
                 if self.progress and not self.progress(action="populate", table="messages",
                     chat=cidentity, end=True, count=mcount,
                     new=mnew, updated=mupdated, first=mfirst, last=mlast
@@ -676,7 +687,8 @@ class SkypeLogin(object):
                 if not mrun: break # for chat
             if chats: break # while run
 
-        ids = [self.cache["chats"][x]["id"] for x in updateds if x in self.cache["chats"]]
+        ids = [self.cache["chats"][x]["id"] for x in updateds
+               if x in self.cache["chats"] and x not in completeds]
         for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
             # Divide into chunks: SQLite can take up to 999 parameters.
             idstr = ", ".join(":id%s" % (j+1) for j in range(len(myids)))
