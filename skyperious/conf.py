@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.4.dev5"
+Version = "4.4.dev6"
 VersionDate = "23.11.2020"
 
 if getattr(sys, "frozen", False):
@@ -386,7 +386,7 @@ def load():
     try:
         # Try user-specific path first, then path under application folder
         for path in configpaths[::-1]:
-            if os.path.isfile(path) and parser.read(ConfigFile):
+            if os.path.isfile(path) and parser.read(path):
                 break # for path
 
         def parse_value(name):
