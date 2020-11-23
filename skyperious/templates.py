@@ -358,6 +358,9 @@ from skyperious.lib.vendor import step
     table.plot_row.files td:first-child {
       background-color: {{conf.PlotFilesColour}};
     }
+    table.plot_row.shares td:first-child {
+      background-color: {{conf.PlotSharesColour}};
+    }
     table.plot_row td:nth-child(2) {
       background-color: {{conf.PlotBgColour}};
       color: {{conf.PlotMessagesColour}};
@@ -1089,6 +1092,9 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %if stats["transfers"]:
         <a title="Sort statistics by files sent" href="#" onClick="return sort_stats(this, 'file');">Files</a>
 %endif
+%if stats["shares"]:
+        <a title="Sort statistics by media shared" href="#" onClick="return sort_stats(this, 'share');">Shares</a>
+%endif
       </div></td>
       </tr>
 %endif
@@ -1099,10 +1105,10 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 <%
 stat_rows = [] # [(type, label, count, total)]
 if stats["counts"][p["identity"]]["messages"]:
-  stat_rows.append(("messages", "message", stats["counts"][p["identity"]]["messages"], stats["messages"]))
-  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"], stats["chars"]))
+  stat_rows.append(("messages", "message",   stats["counts"][p["identity"]]["messages"], stats["messages"]))
+  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"],    stats["chars"]))
 if stats["counts"][p["identity"]]["smses"]:
-  stat_rows.append(("smses", "SMS message", stats["counts"][p["identity"]]["smses"], stats["smses"]))
+  stat_rows.append(("smses", "SMS message",   stats["counts"][p["identity"]]["smses"],    stats["smses"]))
   stat_rows.append(("smses", "SMS character", stats["counts"][p["identity"]]["smschars"], stats["smschars"]))
 if stats["counts"][p["identity"]]["calls"]:
   stat_rows.append(("calls", "call", stats["counts"][p["identity"]]["calls"], stats["calls"]))
@@ -1111,13 +1117,16 @@ if stats["counts"][p["identity"]]["calldurations"]:
 if stats["counts"][p["identity"]]["files"]:
   stat_rows.append(("files", "file", stats["counts"][p["identity"]]["files"], stats["files"]))
   stat_rows.append(("files", "byte", stats["counts"][p["identity"]]["bytes"], stats["bytes"]))
+if stats["counts"][p["identity"]]["shares"]:
+  stat_rows.append(("shares", "share", stats["counts"][p["identity"]]["shares"],     stats["shares"]))
+  stat_rows.append(("shares", "byte",  stats["counts"][p["identity"]]["sharebytes"], stats["sharebytes"]))
 %>
 %for type, label, count, total in stat_rows:
 <%
 percent = util.safedivf(count * 100, total)
 text_cell1 = "%d%%" % round(percent) if (round(percent) > 25) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
-if "byte" == label:
+if "byte" in label:
   text_total = util.format_bytes(total)
 elif "callduration" == label:
   text_total = util.format_seconds(total)
@@ -1131,7 +1140,7 @@ else:
         </table></td><td>
 %for type, label, count, total in stat_rows:
 <%
-if "byte" == label:
+if "byte" in label:
   text = util.format_bytes(count)
 elif "callduration" == label:
   text = util.format_seconds(count, "call")
@@ -1843,7 +1852,7 @@ interval = items[1][0] - items[0][0]
 %if len(stats["counts"]) > 1:
   <tr><td><br /><br /></td><td colspan="3" valign="bottom">
     <b>Sort by:&nbsp;&nbsp;&nbsp;</b>
-%for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files")]:
+%for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files"), ("shares", "Shares")]:
 %if "name" == name or stats[name]:
 %if sort_by == name:
       <span><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</span>
@@ -1856,7 +1865,7 @@ interval = items[1][0] - items[0][0]
 %endif
 
 <%
-colormap = {"messages": conf.PlotMessagesColour, "smses": conf.PlotSMSesColour, "calls": conf.PlotCallsColour, "files": conf.PlotFilesColour}
+colormap = {"messages": conf.PlotMessagesColour, "smses": conf.PlotSMSesColour, "calls": conf.PlotCallsColour, "files": conf.PlotFilesColour, "shares": conf.PlotSharesColour}
 sort_key = lambda p: -stats["counts"][p["identity"]].get(sort_by, 0) if "name" != sort_by else p["name"].lower()
 participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], participants), key=sort_key)
 %>
@@ -1865,10 +1874,10 @@ participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], 
 <%
 stat_rows = [] # [(type, label, count, total)]
 if stats["counts"][p["identity"]]["messages"]:
-  stat_rows.append(("messages", "message", stats["counts"][p["identity"]]["messages"], stats["messages"]))
-  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"], stats["chars"]))
+  stat_rows.append(("messages", "message",   stats["counts"][p["identity"]]["messages"], stats["messages"]))
+  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"],    stats["chars"]))
 if stats["counts"][p["identity"]]["smses"]:
-  stat_rows.append(("smses", "SMS message", stats["counts"][p["identity"]]["smses"], stats["smses"]))
+  stat_rows.append(("smses", "SMS message",   stats["counts"][p["identity"]]["smses"],    stats["smses"]))
   stat_rows.append(("smses", "SMS character", stats["counts"][p["identity"]]["smschars"], stats["smschars"]))
 if stats["counts"][p["identity"]]["calls"]:
   stat_rows.append(("calls", "call", stats["counts"][p["identity"]]["calls"], stats["calls"]))
@@ -1877,6 +1886,9 @@ if stats["counts"][p["identity"]]["calldurations"]:
 if stats["counts"][p["identity"]]["files"]:
   stat_rows.append(("files", "file", stats["counts"][p["identity"]]["files"], stats["files"]))
   stat_rows.append(("files", "byte", stats["counts"][p["identity"]]["bytes"], stats["bytes"]))
+if stats["counts"][p["identity"]]["shares"]:
+  stat_rows.append(("shares", "share", stats["counts"][p["identity"]]["shares"],     stats["shares"]))
+  stat_rows.append(("shares", "byte",  stats["counts"][p["identity"]]["sharebytes"], stats["sharebytes"]))
 %>
   <tr>
     <td valign="top">
