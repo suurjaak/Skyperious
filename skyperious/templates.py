@@ -435,21 +435,34 @@ from skyperious.lib.vendor import step
     #shared_media table a, #transfers table a {
       color: blue;
     }
-    #shared_media table td:first-child, #transfers table td:first-child {
+    #shared_media table td:first-child, #transfers table td:first-child { /* author */
       padding-right: 15px;
       text-align: right;
       white-space: normal;
     }
-    #shared_media table td:last-child a, #transfers table td:last-child a {
+    #shared_media table td:last-child, #transfers table td:last-child { /* timestamp */
+      text-align: right;
+    }
+    #shared_media table td:last-child a, #transfers table td:last-child a { /* timestamp link */
       color: inherit;
     }
     #shared_media table td:last-child a:hover, #transfers table td:last-child a:hover {
       text-decoration: underline;
     }
-    #shared_media table td:last-child, #transfers table td:last-child {
+    #shared_media td:nth-child(2) { /* filename and filesize */
+      display: flex;
+      justify-content: space-between;
+    }
+    #shared_media td:nth-child(3) { /* live-link */
       text-align: right;
     }
-    #transfers .filename {
+    #transfers td:nth-child(3) { /* filesize */
+      text-align: right;
+    }
+    #shared_media .filename {
+      color: {{conf.HistoryBackgroundColour}};
+    }
+    #shared_media .filename, #transfers .filename {
       color: blue;
     }
     #timeline {
@@ -1267,7 +1280,19 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 %for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
       <tr>
         <td class="{{"remote" if data["author"] != db.id else "local"}}" title="{{data["author"]}}">{{data["author_name"]}}</td>
-        <td><a href="{{data["url"]}}" target="_blank">{{data["url"]}}</a></td>
+        <td>
+%if data.get("filename"):
+          <span class="filename">{{data["filename"]}}</span>
+%endif
+%if data.get("filesize") is not None:
+          <span class="filesize" title="{{util.plural("byte", data["filesize"], sep=",")}}">{{util.format_bytes(data["filesize"])}}</span>
+%endif
+        </td>
+        <td>
+%if data.get("url"):
+            <a href="{{data["url"]}}" target="_blank">Online</a>
+%endif
+        </td>
         <td class="timestamp" title="{{data["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}"><a href="#message:{{message_id}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</a></td>
       </tr>
 %endfor
@@ -2043,9 +2068,25 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 <table width="100%">
 %for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
   <tr>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font></td>
-    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{data["url"]}}"><font color="{{conf.LinkColour}}">{{data["url"]}}</font></a></font></td>
-    <td align="right" nowrap="" valign="top"><a href="message:{{message_id}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</font></a></td>
+    <td align="right" valign="top" nowrap="">
+      <font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font>
+    </td>
+    <td valign="top">
+%if data.get("filename"):
+      <font size="2" face="{{conf.HistoryFontName}}" color="{{conf.LinkColour}}">{{data["filename"]}}</font>
+%endif
+    </td>
+    <td align="right" valign="top" nowrap="">
+%if data.get("filesize") is not None:
+      <font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(data["filesize"])}}</font>
+%endif
+    </td>
+    <td valign="top">
+%if data.get("url"):
+      <font size="2" face="{{conf.HistoryFontName}}"><a href="{{data["url"]}}"><font color="{{conf.LinkColour}}">Online</font></a></font>
+%endif
+    </td>
+    <td align="right" valign="top" nowrap=""><a href="message:{{message_id}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</font></a></td>
   </tr>
 %endfor
 </table>
@@ -2064,7 +2105,7 @@ partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
+    <td align="right" valign="top" nowrap=""><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
     <td valign="top"><font size="2" face="{{conf.HistoryFontName}}">
 %if f["filepath"]:
     <a href="{{util.path_to_url(f["filepath"])}}">
@@ -2074,8 +2115,8 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
     <font color="{{conf.LinkColour}}">{{f["filename"]}}</font>
 %endif
     </font></td>
-    <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
-    <td nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></a></td>
+    <td align="right" valign="top" nowrap=""><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
+    <td align="right" valign="top" nowrap=""><a href="message:{{f["__message_id"]}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></a></td>
   </tr>
 %endfor
 </table>

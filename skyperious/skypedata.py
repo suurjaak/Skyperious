@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.11.2020
+@modified    23.11.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1884,6 +1884,9 @@ class MessageParser(object):
                             datetime=message["datetime"])
                 if filename: data.update(filename=filename)
 
+                try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
+                except Exception: pass     
+
                 objtype = (dom0.find("URIObject").get("type") or "").lower()
                 if   "audio"   in objtype: data["category"] = "audio"
                 elif "video"   in objtype: data["category"] = "video"
@@ -2002,8 +2005,8 @@ class MessageParser(object):
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
             raw = self.db.live.get_api_media(media["url"], category)
-            if raw:
-                media["success"] = True
+            if raw is not None:
+                media.update(success=True, filesize=len(raw))
                 ns = dict(media, content=raw, message=message)
                 return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
 
