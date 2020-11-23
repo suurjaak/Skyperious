@@ -440,10 +440,10 @@ from skyperious.lib.vendor import step
       text-align: right;
       white-space: normal;
     }
-    #shared_media table td:first-child a, #transfers table td:first-child a {
+    #shared_media table td:last-child a, #transfers table td:last-child a {
       color: inherit;
     }
-    #shared_media table td:first-child a:hover, #transfers table td:first-child a:hover {
+    #shared_media table td:last-child a:hover, #transfers table td:last-child a:hover {
       text-decoration: underline;
     }
     #shared_media table td:last-child, #transfers table td:last-child {
@@ -1266,9 +1266,9 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
     <table id="shared_media_table">
 %for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
       <tr>
-        <td class="{{"remote" if data["author"] != db.id else "local"}}" title="{{data["author"]}}"><a href="#message:{{message_id}}">{{data["author_name"]}}</a></td>
+        <td class="{{"remote" if data["author"] != db.id else "local"}}" title="{{data["author"]}}">{{data["author_name"]}}</td>
         <td><a href="{{data["url"]}}" target="_blank">{{data["url"]}}</a></td>
-        <td class="timestamp" title="{{data["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</td>
+        <td class="timestamp" title="{{data["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}"><a href="#message:{{message_id}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</a></td>
       </tr>
 %endfor
     </table>
@@ -1289,7 +1289,7 @@ dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.username}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
+        <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.username}}">{{partner if from_remote else db.account["name"]}}</td><td>
 %if f["filepath"]:
           <a href="{{util.path_to_url(f["filepath"])}}" target="_blank" class="filename">{{f["filepath"]}}</a>
 %else:
@@ -1298,7 +1298,7 @@ f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
         </td><td title="{{util.plural("byte", int(f["filesize"]), sep=",")}}">
           {{util.format_bytes(int(f["filesize"]))}}
         </td><td class="timestamp" title="{{f_datetime_title}}">
-          {{f_datetime}}
+          <a href="#message:{{f["__message_id"]}}">{{f_datetime}}</a>
         </td></tr>
 %endfor
       </table>
@@ -2036,26 +2036,25 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 
 
 %if stats["shared_media"]:
-<br /><br />
+<hr />
 <b>Shared media</b> [<a href="expand://shared_media"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["shared_media"]]}}</font></a>]
 %if expand["shared_media"]:
 <br /><br />
 <table width="100%">
 %for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
   <tr>
-    <td align="right" nowrap="" valign="top"><a href="message:{{message_id}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font></a></td>
+    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font></td>
     <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{data["url"]}}"><font color="{{conf.LinkColour}}">{{data["url"]}}</font></a></font></td>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</font></td>
+    <td align="right" nowrap="" valign="top"><a href="message:{{message_id}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</font></a></td>
   </tr>
 %endfor
 </table>
 %endif
-</font>
 %endif
 
 
 %if stats.get("transfers"):
-<br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td></tr></table><br /><br />
+<hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td></tr></table><br /><br />
 <table width="100%">
 %for f in stats["transfers"]:
 <%
@@ -2065,7 +2064,7 @@ partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
-    <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
+    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></td>
     <td valign="top"><font size="2" face="{{conf.HistoryFontName}}">
 %if f["filepath"]:
     <a href="{{util.path_to_url(f["filepath"])}}">
@@ -2076,7 +2075,7 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 %endif
     </font></td>
     <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
+    <td nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" color="{{conf.HistoryTimestampColour}}" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></a></td>
   </tr>
 %endfor
 </table>
