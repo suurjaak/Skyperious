@@ -16,6 +16,7 @@ import collections
 import copy
 import cStringIO
 import datetime
+import json
 import logging
 import math
 import os
@@ -38,6 +39,7 @@ from . lib.vendor import step
 from . import conf
 from . import emoticons
 from . import templates
+live = None # Imported and populated later, circular import
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat
@@ -168,6 +170,7 @@ class SkypeDatabase(object):
                             are not written to log (written by default)
         @param   truncate   create or overwrite file before opening
         """
+        global live
         self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
         self.filesize = None
@@ -1724,7 +1727,7 @@ class MessageParser(object):
         elif MESSAGE_TYPE_INFO == message["type"] \
         and "<location" in message["body_xml"]:
             href, text = None, None
-            for link in dom.getiterator("a"):
+            for link in dom.iter("a"):
                 href, text = link.get("href"), link.text
                 break # for link
             if href and text:
@@ -1749,7 +1752,7 @@ class MessageParser(object):
             # Newer message format has content like
             # <pictureupdate><eventtime>1498740806804</eventtime><value>URL@https://..
             if self.stats:
-                tag = next(dom.getiterator("value"), None)
+                tag = next(dom.iter("value"), None)
                 url = tag is not None and (tag.text or "").replace("URL@", "")
                 if url:
                     data = dict(url=url, author_name=get_author_name(message),
@@ -1767,7 +1770,7 @@ class MessageParser(object):
             # or only in end message if it's like '<partlist type="ended" ..'
             do_durations = MESSAGE_TYPE_CALL == message["type"] or \
                            "ended" == (dom.find("partlist") or {}).get("type")
-            for elem in dom.getiterator("part") if do_durations else ():
+            for elem in dom.iter("part") if do_durations else ():
                 identity = elem.get("identity")
                 duration = elem.findtext("duration")
                 if identity and duration:
@@ -1857,14 +1860,14 @@ class MessageParser(object):
                     b.tail = " can now participate in this chat."
 
         # Photo/video/file sharing: take file link, if any
-        if any(dom.getiterator("URIObject")):
-            url, filename = dom.find("URIObject").get("uri"), None
-            nametag = next(dom.getiterator("OriginalName"), None)
+        if any(dom.iter("URIObject")):
+            url, filename, dom0 = dom.find("URIObject").get("uri"), None, dom
+            nametag = next(dom.iter("OriginalName"), None)
             if nametag is not None: filename = nametag.get("v")
             if not filename:
-                metatag = next(dom.getiterator("meta"), None)
+                metatag = next(dom.iter("meta"), None)
                 if metatag is not None: filename = metatag.get("originalName")
-            link = next(dom.getiterator("a"), None)
+            link = next(dom.iter("a"), None)
             if not url and link:
                 url = link.get("href")
             elif not url: # Parse link from message contents
@@ -1875,13 +1878,33 @@ class MessageParser(object):
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
                     text2 = text.replace(url, a.encode("utf-8"))
                     dom = self.make_xml(text2, message) or dom
-            if url and self.stats:
+            if url:
                 data = dict(url=url, author_name=get_author_name(message),
                             author=message["author"], success=False,
                             datetime=message["datetime"])
                 if filename: data.update(filename=filename)
-                # @todo siia veel category juurdepookimine.
-                self.stats["shared_media"][message["id"]] = data
+
+                objtype = (dom0.find("URIObject").get("type") or "").lower()
+                if   "audio"   in objtype: data["category"] = "audio"
+                elif "video"   in objtype: data["category"] = "video"
+                elif "sticker" in objtype: data["category"] = "sticker"
+                elif "swift"   in objtype:
+                    # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
+                    try:
+                        pkg = json.loads(next(dom0.iter("Swift")).get("b64").decode("base64"))
+                        if "message/card" == pkg["type"]:
+                            # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
+                            url = pkg["attachments"][0]["content"]["images"][0]["url"]
+                            data.update(category="card", url=live.make_media_url(url, "card"))
+                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' % 
+                                                (urllib.quote(url, ":/=?&#"), url), message)
+                    except Exception: pass
+
+                url = data["url"] = live.make_media_url(data["url"], data.get("category"))
+                a = next(dom.iter("a"), None)
+                if a is not None: a.set("href", url); a.text = url
+
+                if self.stats: self.stats["shared_media"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
@@ -1930,20 +1953,20 @@ class MessageParser(object):
 
     def highlight_text(self, dom, rgx_highlight):
         """Wraps text matching regex in any dom element in <b> nodes."""
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        parent_map = dict((c, p) for p in dom.iter() for c in p)
         rgx_highlight_split = re.compile("<b>")
         repl_highlight = lambda x: "<b>%s<b>" % x.group(0) 
         # Highlight substrings in <b>-tags
-        for i in dom.getiterator():
+        for i in dom.iter():
             if "b" == i.tag:
-                continue # continue for i in dom.getiterator()
+                continue # for i
             for j, t in enumerate([i.text, i.tail]):
                 if not t:
-                    continue # continue for j, t in enumerate(..)
+                    continue # for j, t
                 highlighted = rgx_highlight.sub(repl_highlight, t)
                 parts = rgx_highlight_split.split(highlighted)
                 if len(parts) < 2:
-                    continue # continue for j, t in enumerate(..)
+                    continue # for j, t
                 index_insert = (list(parent_map[i]).index(i) + 1) if j else 0
                 setattr(i, "tail" if j else "text", "")
                 b = None
@@ -1981,14 +2004,14 @@ class MessageParser(object):
             raw = self.db.live.get_api_media(media["url"], category)
             if raw:
                 media["success"] = True
-                ns = dict(media, image=raw, message=message)
-                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns, **output)
+                ns = dict(media, content=raw, message=message)
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
             greytag, greyattr, greyval = "span", "class", "gray"
-        for elem in dom.getiterator():
+        for elem in dom.iter():
             index = 0
             for subelem in elem:
                 if "quote" == subelem.tag:
@@ -2055,7 +2078,7 @@ class MessageParser(object):
                         subelem.attrib.clear()
                 index += 1
             if not self.wrapfunc:
-                continue # continue for elem in dom.getiterator()
+                continue # for elem
             for i, v in enumerate([elem.text, elem.tail]):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
         try:
@@ -2107,7 +2130,7 @@ class MessageParser(object):
 
     def sanitize(self, dom, known_tags):
         """Turns unknown tags to span, drops empties and unnests single root."""
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        parent_map = dict((c, p) for p in dom.iter() for c in p)
         blank = lambda x: not (x.text or x.tail or x.getchildren())
         drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
 
@@ -2214,7 +2237,7 @@ class MessageParser(object):
         """Updates current statistics with data from the message DOM."""
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
-        for elem in dom.getiterator():
+        for elem in dom.iter():
             if elem in to_skip:
                 continue
             text = elem.text or ""
@@ -2490,7 +2513,7 @@ def detect_databases(progress):
         for path in ["%s\\Users" % c, "%s\\Documents and Settings" % c]:
             if os.path.exists(path):
                 search_paths.append(path)
-                break # break for path in [..]
+                break # for path
     else:
         search_paths = [os.getenv("HOME"),
                         "/Users" if "mac" == os.name else "/home"]

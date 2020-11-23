@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.11.2020
+@modified    23.11.2020
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import collections, base64, datetime, imghdr, json, logging, os, pyparsing, re, string, sys, urllib, wx
+#import collections, base64, datetime, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, urllib, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -122,7 +122,7 @@ from skyperious.lib.vendor import step
     table.quote td:last-child {
       padding: 0 0 0 5px;
     }
-    a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; cursor: pointer; }
+    a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; cursor: pointer; outline: 0; }
     a:hover, a.visited:hover { text-decoration: underline; }
     #footer {
       text-align: center;
@@ -536,19 +536,29 @@ from skyperious.lib.vendor import step
     #timeline ul li.day .date {
       font-size: 11px;
     }
-    span.shared_media {
-      background: black;
+    div.shared_media.image {
       border-radius: 5px;
       display: inline-block;
       max-width: 305px;
       max-height: 210px;
+      position: relative;
+      overflow: hidden;
     }
-    span.shared_media img {
+    div.shared_media.image img {
       border-radius: 5px;
       cursor: pointer;
       max-width: 305px;
       max-height: 210px;
-      opacity: 0.5;
+    }
+    div.shared_media.image .cover {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+      pointer-events: none;
     }
     #chat_picture {
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
@@ -1385,51 +1395,87 @@ previous_author = m["author"]
 
 
 """
-HTML chat history export template for shared image message body.
+HTML chat history export template for shared media message body.
 
-@param   image           raw image binary
+@param   content         raw file binary
 @param   author          author skypename
 @param   author_name     author display name
 @param   datetime        message datetime
+@param   url             file URL in Skype online
 @param   message         message data dict
-@param   ?filename       image filename, if any
-@param   ?media_folder   path to save images under, if not embedding
+@param   ?category       media category like "video", defaults to "image"
+@param   ?filename       media filename, if any
+@param   ?media_folder   path to save files under, if not embedding
 """
-CHAT_MESSAGE_IMAGE = """<%
-import base64, imghdr, logging, os, urllib
+CHAT_MESSAGE_MEDIA = """<%
+import base64, imghdr, logging, mimetypes, os, urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
 
-filetype = imghdr.what("", image) or "image"
-caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
-title = "Click to enlarge."
+category = category if isdef("category") else None
+filename = filename if isdef("filename") else None
+if category not in ("audio", "video"): category = "image"
+src, mimetype, filetype = url, None, None
 if isdef("filename") and filename:
+    filetype = os.path.splitext(filename)[-1][1:]
+if category in ("audio", "video"):
+    mimetype = mimetypes.guess_type(filename or "")[0]
+else:
+    filetype = imghdr.what("", content) or filetype or "image"
+filetype = filetype or "binary"
+mimetype = mimetype or "%s/%s" % (category, escape(filetype))
+
+caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
+title = "Click to %s." % ("enlarge" if "image" == category else "play")
+if filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
 if isdef("media_folder") and media_folder:
-    basename = isdef("filename") and filename or "%s.%s" % (message["id"], filetype)
+    basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, basename))
     try:
-        with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
+        with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:
         logger = logging.getLogger(conf.Title.lower())
         logger.exception("Error saving export image %s.", filepath)
 else:
-    url = "data:image/%s;base64,%s" % (escape(filetype), base64.b64encode(image))
+    src = "data:%s;base64,%s" % (mimetype, base64.b64encode(content))
 %>
 %if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
   Changed the conversation picture:<br />
 %endif
-<span class="shared_media">
-%if isdef("media_folder") and media_folder:
-  <a href="{{url}}" target="_blank" onclick="return false">
-%endif
-  <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_media" data-jslghtbx-caption="{{caption}}" />
-%if isdef("media_folder") and media_folder:
+<div class="shared_media {{category}}">
+%if "audio" == category:
+  <audio {{ 'data-name="%s" ' % filename if filename else ''}} title="{{title}}" src="{{src}}" controls>
+    To hear this voice message, go to:
+    <a href="{{url}}" target="_blank">{{url}}</a>.
+  </audio>
+%elif "video" == category:
+  <video {{ 'data-name="%s" ' % filename if filename else ''}}width="240" title="{{title}}" src="{{src}}" controls>
+    To view this video message, go to:
+    <a href="{{url}}" target="_blank">{{url}}</a>.
+  </video>
+%else:
+<%
+size, MAXW, MAXH = None, 305, 210
+try:
+    w, h = size = util.img_size(content)
+    if w > MAXW or h > MAXH:
+        ratio = min(util.safedivf(min(MAXW, w), w), util.safedivf(min(MAXH, h), h))
+        size = w * ratio, h * ratio
+except Exception: pass
+%>
+    %if isdef("media_folder") and media_folder:
+  <a href="{{src}}" target="_blank" onclick="return false">
+    %endif
+  <img src="{{src}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_media" data-jslghtbx-caption="{{caption}}" />
+  <div class="cover"{{ ' style="width: %spx; height: %spx;"' % size if size else ''}}></div>
+    %if isdef("media_folder") and media_folder:
   </a>
+    %endif
 %endif
-</span>
+</div>
 """
 
 

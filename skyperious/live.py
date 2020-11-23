@@ -398,7 +398,7 @@ class SkypeLogin(object):
 
             if item.avatar and "?" in item.avatar:
                 # https://avatar.skype.com/v1/avatars/username/public?auth_key=1455825688
-                raw = self.download_image(item.avatar)
+                raw = self.download_media(item.avatar)
                 # main.db has NULL-byte in front of image binary
                 if raw: result.update(avatar_image="\0" + raw)
 
@@ -738,28 +738,25 @@ class SkypeLogin(object):
 
         @param   category  type of media, e.g. "avatar" for avatar image
         """
-        if "avatar" == category and not url.endswith("/views/avatar_fullsize"):
-            url += "/views/avatar_fullsize"
-        elif "/views/" not in url:
-            url += "/views/imgpsh_fullsize"
-
+        url = make_media_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
         for url in urls:
-            raw = self.download_image(url)
+            raw = self.download_media(url)
             if raw: return raw
 
 
-    def download_image(self, url):
-        """Downloads and returns image raw binary from Skype URL via login, or None."""
+    def download_media(self, url):
+        """Downloads and returns media raw binary from Skype URL via login, or None."""
         try:
             r = self.request(self.skype.conn, "GET", url,
                              auth=skpy.SkypeConnection.Auth.Authorize,
                              __retry=False)
-            if r.ok and r.content and "image" in r.headers.get("content-type", ""):
+            hdr = lambda r: r.headers.get("content-type", "")
+            if r.ok and r.content and any(x in hdr(r) for x in ("image", "audio", "video")):
                 return r.content
         except Exception: pass
 
@@ -1328,3 +1325,27 @@ def process_message_edit(msg):
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
     except Exception:
         if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
+
+
+def make_media_url(url, category=None):
+    """
+    Returns URL with appropriate path appended if Skype shared media URL,
+    e.g. "https://api.asm.skype.com/v1/objects/0-weu-d11-../views/imgpsh_fullsize"
+    for  "https://api.asm.skype.com/v1/objects/0-weu-d11-..".
+
+    @param   category  type of media, e.g. "avatar" for avatar image
+    """
+    if "api.asm.skype.com/" not in url: return url
+
+    if   "avatar"  == category and not url.endswith("/views/avatar_fullsize"):
+        url += "/views/avatar_fullsize"
+    elif "audio"   == category and not url.endswith("/views/audio"):
+        url += "/views/audio"
+    elif "video"   == category and not url.endswith("/views/video"):
+        url += "/views/video"
+    elif "sticker" == category and not url.endswith("/views/thumbnail"):
+        url += "/views/thumbnail"
+    elif "/views/" not in url:
+        url += "/views/imgpsh_fullsize"
+
+    return url
