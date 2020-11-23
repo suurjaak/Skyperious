@@ -1571,6 +1571,7 @@ class MessageParser(object):
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
+                "shares": 0, "sharebytes": 0,
                 "authors": set(), # Authors encountered in parsed messages
                 "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
@@ -2230,6 +2231,11 @@ class MessageParser(object):
             size_files = sum([util.try_ignore(lambda: int(i["filesize"]))[0] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
+        elif message["id"] in self.stats["shared_media"]:
+            share = self.stats["shared_media"][message["id"]]
+            self.stats["shares"] += 1
+            self.stats["counts"][author]["shares"]     += 1
+            self.stats["counts"][author]["sharebytes"] += share.get("filesize", 0)
         elif MESSAGE_TYPE_MESSAGE == message["type"]:
             self.stats["messages"] += 1
             self.stats["counts"][author]["messages"] += 1
@@ -2281,7 +2287,7 @@ class MessageParser(object):
         if not self.stats or self.stats["wordclouds"]:
             return self.stats
         stats = self.stats
-        for k in ["chars", "smschars", "files", "bytes", "calls"]:
+        for k in ["chars", "smschars", "files", "bytes", "calls", "sharebytes"]:
             stats[k] = sum(i[k] for i in stats["counts"].values())
 
         del stats["info_items"][:]
@@ -2312,6 +2318,10 @@ class MessageParser(object):
             files_value  = "%d (%s)" % (len(stats["transfers"]),
                            util.format_bytes(stats["bytes"]))
             stats["info_items"].append(("Files", files_value))
+        if stats["shares"]:
+            shares_value = "%d (%s)" % (stats["shares"],
+                           util.format_bytes(stats["sharebytes"]))
+            stats["info_items"].append(("Shared media", shares_value))
 
         if delta_date is not None:
             per_day = util.safedivf(stats["messages"], delta_date.days + 1)

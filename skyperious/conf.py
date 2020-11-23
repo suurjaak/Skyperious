@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.4.dev4"
+Version = "4.4.dev5"
 VersionDate = "23.11.2020"
 
 if getattr(sys, "frozen", False):
@@ -299,6 +299,9 @@ PlotCallsColour = "#FF6C91"
 
 """Colour for files plot in chat statistics."""
 PlotFilesColour = "#33DD66"
+
+"""Colour for shares plot in chat statistics."""
+PlotSharesColour = "#FFB333"
 
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
