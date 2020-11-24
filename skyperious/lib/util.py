@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    29.08.2020
+@modified    24.11.2020
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -22,6 +22,7 @@ import re
 import string
 import subprocess
 import sys
+import threading
 import time
 import urllib
 import warnings
@@ -432,6 +433,22 @@ def img_pil_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
             result, result0 = Image.new(img.mode, size, bg), result
             result.paste(result0, tuple(map(int, align_pos)))
     return result
+
+
+def run_once(function):
+    """Runs the function in a later thread at most once."""
+    myqueue = getattr(run_once, "queue", set())
+    setattr(run_once, "queue", myqueue)
+
+    def later():
+        functions = list(myqueue)
+        myqueue.clear()
+        for f in functions: f()
+
+    if function not in myqueue:
+        myqueue.add(function)
+        if wx: wx.CallLater(100, later)
+        else: threading.Thread(target=later).start()
 
 
 def timedelta_seconds(timedelta):
