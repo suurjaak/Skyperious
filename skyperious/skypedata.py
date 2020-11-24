@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.11.2020
+@modified    24.11.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1756,9 +1756,10 @@ class MessageParser(object):
                 tag = next(dom.iter("value"), None)
                 url = tag is not None and (tag.text or "").replace("URL@", "")
                 if url:
-                    data = dict(url=url, author_name=get_author_name(message),
+                    data = dict(url=live.make_media_url(url, "avatar"),
+                                author_name=get_author_name(message),
                                 author=message["author"], success=False,
-                                datetime=message["datetime"])
+                                datetime=message["datetime"], category="avatar")
                     self.stats["shared_media"][message["id"]] = data
             dom.clear()
             if text:
@@ -2164,7 +2165,6 @@ class MessageParser(object):
 
     def collect_message_stats(self, message, dom):
         """Adds message statistics to accumulating data."""
-        author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
         self.stats["enddate"] = message["datetime"]
         author = message["author"]
@@ -2179,21 +2179,19 @@ class MessageParser(object):
                                                 author)
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
-        if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
-        MESSAGE_TYPE_CALL_END, MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
-        and author not in self.stats["counts"]):
-            self.stats["counts"][author] = author_stats.copy()
+        if author not in self.stats["counts"]:
+            self.stats["counts"][author] = collections.defaultdict(lambda: 0)
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
         if not self.stats["workhist"]:
             MAXSTAMP = MessageParser.MessageStamp(
                 datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
-            intdict = lambda: collections.defaultdict(int)
+            intdict   = lambda: collections.defaultdict(int)
             stampdict = lambda: collections.defaultdict(lambda: MAXSTAMP)
             self.stats["workhist"] = {
-                "hours": collections.defaultdict(intdict),
-                "days": collections.defaultdict(intdict),
+                "hours":        collections.defaultdict(intdict),
+                "days":         collections.defaultdict(intdict),
                 "hours-firsts": collections.defaultdict(stampdict),
-                "days-firsts": collections.defaultdict(stampdict), }
+                "days-firsts":  collections.defaultdict(stampdict), }
         stamp = MessageParser.MessageStamp(message["datetime"], message["id"])
         for name, key in [("hours", hourkey), ("days", daykey)]:
             self.stats["workhist"][name][key][author] += 1
@@ -2213,7 +2211,7 @@ class MessageParser(object):
             calldurations = message.get("__calldurations", {})
             for identity, duration in calldurations.items():
                 if identity not in self.stats["counts"]:
-                    self.stats["counts"][identity] = author_stats.copy()
+                    self.stats["counts"][identity] = collections.defaultdict(lambda: 0)
                 self.stats["counts"][identity]["calldurations"] += duration
             if calldurations:
                 self.stats["calldurations"] += max(calldurations.values())
@@ -2231,7 +2229,8 @@ class MessageParser(object):
             size_files = sum([util.try_ignore(lambda: int(i["filesize"]))[0] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
-        elif message["id"] in self.stats["shared_media"]:
+        elif MESSAGE_TYPE_TOPIC != message["type"] \
+        and message["id"] in self.stats["shared_media"]:
             share = self.stats["shared_media"][message["id"]]
             self.stats["shares"] += 1
             self.stats["counts"][author]["shares"]     += 1
@@ -2239,7 +2238,7 @@ class MessageParser(object):
         elif MESSAGE_TYPE_MESSAGE == message["type"]:
             self.stats["messages"] += 1
             self.stats["counts"][author]["messages"] += 1
-            self.stats["counts"][author]["chars"] += len_msg
+            self.stats["counts"][author]["chars"]    += len_msg
 
 
     def collect_dom_stats(self, dom, message, tails_new=None):

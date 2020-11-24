@@ -396,8 +396,7 @@ class SkypeLogin(object):
             if item.raw.get("emails"):
                 result.update(emails=" ".join(item.raw["emails"]))
 
-            if item.avatar and "?" in item.avatar:
-                # https://avatar.skype.com/v1/avatars/username/public?auth_key=1455825688
+            if item.avatar: # https://avatar.skype.com/v1/avatars/username/public
                 raw = self.download_media(item.avatar)
                 # main.db has NULL-byte in front of image binary
                 if raw: result.update(avatar_image="\0" + raw)
@@ -1316,7 +1315,7 @@ def make_media_url(url, category=None):
 
     @param   category  type of media, e.g. "avatar" for avatar image
     """
-    if "api.asm.skype.com/" not in url: return url
+    if not url or "api.asm.skype.com/" not in url: return url
 
     if   "avatar"  == category and not url.endswith("/views/avatar_fullsize"):
         url += "/views/avatar_fullsize"
