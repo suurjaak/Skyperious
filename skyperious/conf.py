@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.4.dev6"
+Version = "4.4.dev7"
 VersionDate = "23.11.2020"
 
 if getattr(sys, "frozen", False):
@@ -369,8 +369,9 @@ def load():
     if not Defaults:
         # Instantiate OS- and user-specific paths
         try:
-            p = appdirs.user_config_dir(Title, False)
-            configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+            p = appdirs.user_config_dir(Title, appauthor=False)
+            # Try user-specific path first, then path under application folder
+            configpaths.insert(0, os.path.join(p, "%s.ini" % Title.lower()))
         except Exception: pass
         try: VarDirectory = appdirs.user_data_dir(Title, False)
         except Exception: pass
@@ -384,7 +385,6 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        # Try user-specific path first, then path under application folder
         for path in configpaths[::-1]:
             if os.path.isfile(path) and parser.read(path):
                 break # for path
@@ -410,8 +410,11 @@ def save():
     """Saves FileDirectives into ConfigFile."""
     configpaths = [ConfigFile]
     try:
-        p = appdirs.user_config_dir(Title, False)
-        configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+        p = appdirs.user_config_dir(Title, appauthor=False)
+        userpath = os.path.join(p, "%s.ini" % Title.lower())
+        # Pick only userpath if exists, else try application folder first
+        if os.path.isfile(userpath): configpaths = [userpath]
+        else: configpaths.append(userpath)
     except Exception: pass
 
     section = "*"
@@ -421,7 +424,6 @@ def save():
     parser.add_section(section)
     try:
         for path in configpaths:
-            # Try path under application folder first, then user-specific path
             try: os.makedirs(os.path.dirname(path))
             except Exception: pass
             try: f = open(path, "wb")

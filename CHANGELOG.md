@@ -4,7 +4,8 @@ CHANGELOG
 
 4.4, 2020-11-23
 -----------------
-- added support for shared audio & video in HTML export.
+- added support for shared audio & video in HTML export;
+- fixed loading and saving user-specific configuration file (issue #90).
 
 
 4.3.1, 2020-10-04
