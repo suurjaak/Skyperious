@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.11.2020
+@modified    24.11.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -566,7 +566,7 @@ class SkypeLogin(object):
 
     def populate(self, chats=()):
         """
-        Retrieves all available contacts, chats and messages, or selected chats only.
+        Retrieves all chats and messages, or selected chats only.
         
         @param   chats  list of chat identities to populate if not everything
         """
@@ -581,7 +581,6 @@ class SkypeLogin(object):
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
-        if not chats: self.populate_contacts()
         self.populate_history(chats)
         self.cache.clear()
         self.populated = True
@@ -620,26 +619,29 @@ class SkypeLogin(object):
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
 
                 if cidentity in updateds: continue # for chat
-                try: action = self.save("chats", chat)
-                except Exception:
-                    logger.exception("Error saving chat %r.", chat)
-                    if self.progress and not self.progress():
-                        run = False
-                        break # for chat
-                    continue # for chat
-                if self.SAVE.INSERT == action: new += 1
-                if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
-                    updateds.add(cidentity)
-                if self.progress and not self.progress(
-                    action="populate", table="messages", chat=cidentity, start=True
-                ):
-                    run = False
-                    break # for chat
 
                 mcount, mnew, mupdated, mrun = 0, 0, 0, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
+
+                    if msgs and cidentity not in self.cache["chats"]:
+                        # Save chat only if there are any messages
+                        try: action = self.save("chats", chat)
+                        except Exception:
+                            logger.exception("Error saving chat %r.", chat)
+                            if self.progress and not self.progress(): run = False
+                            mrun = False
+                            break # while mrun
+                        if self.SAVE.INSERT == action: new += 1
+                        if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                            updateds.add(cidentity)
+                        if self.progress and not self.progress(
+                            action="populate", table="messages", chat=cidentity, start=True
+                        ):
+                            run = mrun = False
+                            break # while mrun
+
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)
                         except Exception:
@@ -671,7 +673,8 @@ class SkypeLogin(object):
                     if cidentity in self.cache["chats"]:
                         row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
                                               "MAX(timestamp) AS last "
-                                              "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity])
+                                              "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity]
+                        ).fetchone()
                         self.db.execute("UPDATE conversations SET last_message_id = :id, "
                                         "last_activity_timestamp = :last, "
                                         "creation_timestamp = COALESCE(creation_timestamp, :first) "
@@ -707,40 +710,6 @@ class SkypeLogin(object):
         if self.progress: self.progress(
             action="populate", table="chats", end=True, count=len(updateds), new=new,
             message_count_new=mtotalnew, message_count_updated=mtotalupdated
-        )
-
-
-    def populate_contacts(self):
-        """Retrieves the list of contacts."""
-        if self.progress and not self.progress(action="populate", table="contacts", start=True):
-            return
-        if not self.cache: self.build_cache()
-
-        self.request(self.skype.contacts.sync)
-        contacts = set(self.skype.contacts.contactIds)
-        total = len(contacts)
-        if self.progress and not self.progress(
-            action="populate", table="contacts", total=total
-        ):
-            return
-        count, new, updated = 0, 0, 0
-        for username in contacts:
-            contact = self.request(self.skype.contacts.contact, username, __raise=False)
-            if not contact: continue # for username
-            try: action = self.save("contacts", contact)
-            except Exception:
-                logger.exception("Error saving contact %r.", contact)
-                if self.progress and not self.progress():
-                    break # for username
-                continue # for username
-            if self.SAVE.INSERT == action: new     += 1
-            if self.SAVE.UPDATE == action: updated += 1
-            count += 1
-            if self.progress and not self.progress(
-                action="populate", table="contacts", count=count, total=total, new=new, updated=updated
-            ): break # for username
-        if self.progress: self.progress(
-            action="populate", table="contacts", end=True, count=count, total=total, new=new, updated=updated
         )
 
 
