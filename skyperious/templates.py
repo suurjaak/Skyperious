@@ -159,8 +159,10 @@ from skyperious.lib.vendor import step
       width: 100%;
     }
     #header_left div, #header_right div {
-      width: 100px;
+      overflow: hidden;
       text-align: center;
+      text-overflow: ellipsis;
+      width: 100px;
     }
     #header_right {
       width: 100px;
@@ -232,6 +234,12 @@ from skyperious.lib.vendor import step
     #participants .avatar_large {
       margin-right: 5px;
     }
+    #participants .avatar_item span {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     #content_table td.day {
       border-top: 1px solid {{ conf.HistoryLineColour }};
       border-bottom: 1px solid {{ conf.HistoryLineColour }};
@@ -293,6 +301,11 @@ from skyperious.lib.vendor import step
     #stats_data > tbody > tr > td:nth-child(4),
     #stats_data > tbody > tr > td:nth-child(5) {
       vertical-align: top;
+    }
+    #stats_data > tbody > tr.stats_row > td > table > tbody > tr td:nth-child(2) { /* participant name and identity */
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     #stats_data > tbody > tr.stats_row > td:nth-child(3) {
       padding-left: 5px;
@@ -948,9 +961,9 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br />{{ p["name"] }}
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
-      <br /><span class="identity">{{ p["identity"] }}</span>
+      <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
@@ -1003,9 +1016,9 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br />{{ p["name"] }}
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
-      <br /><span class="identity">{{ p["identity"] }}</span>
+      <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
@@ -1022,8 +1035,8 @@ filterer = lambda p: not stats["counts"] or p["identity"] == db.id or p["identit
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span>{{ p["name"] }}<br />
-    <span class="identity">
+    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
+    <span class="identity" title="{{ p["identity"] }}">
         {{ p["identity"] }}
 %if 1 == p.get("rank"):
         <br /><br />chat creator
@@ -1074,7 +1087,7 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %endif
       </td></tr>
 
-%if len(stats["counts"]) > 1:
+%if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
       <tr id="stats_header"><td></td><td colspan="4"><div id="sort_header"><b>Sort by:</b>
         <a title="Sort statistics by name" href="#" onClick="return sort_stats(this, 'name');" class="selected">Name</a>
 %if stats["messages"]:
@@ -1100,7 +1113,7 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
-        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -1290,9 +1303,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
       <tr>
         <td class="{{ "remote" if data["author"] != db.id else "local" }}" title="{{ data["author"] }}">{{ data["author_name"] }}</td>
         <td>
-%if data.get("filename"):
-          <span class="filename">{{ data["filename"] }}</span>
-%endif
+          <span class="filename">{{ data.get("filename") or "" }}</span>
 %if data.get("filesize") is not None:
           <span class="filesize" title="{{ util.plural("byte", data["filesize"], sep=",") }}">{{ util.format_bytes(data["filesize"]) }}</span>
 %endif
@@ -1849,7 +1860,7 @@ interval = items[1][0] - items[0][0]
   </tr>
 %endfor
 
-%if len(stats["counts"]) > 1:
+%if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
   <tr><td><br /><br /></td><td colspan="3" valign="bottom">
     <b>Sort by:&nbsp;&nbsp;&nbsp;</b>
 %for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files"), ("shares", "Shares")]:
