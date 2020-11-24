@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.11.2020
+@modified    24.11.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -373,22 +373,6 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         if "error" in result:
             if ns["bar"]: ns["bar"] = ns["bar"].stop()
             output("\nError syncing chat history: %(error)s" % result)
-
-        elif "contacts" == result.get("table"):
-            if result.get("start"):
-                ns["bar"] = ProgressBar(afterword=" Synchronizing contacts..")
-                ns["bar"].start()
-            elif result.get("end"):
-                t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
-                ns["bar"].afterword = " Synchronized contacts%s." % (": %s" % t if t else "")
-                ns["bar"].update(result["total"])
-                ns["bar"] = ns["bar"].stop()
-            else:
-                ns["bar"].max = result["total"]
-                if "count" in result:
-                    t = (", %s new" % result["new"]) if result["new"] else ""
-                    ns["bar"].afterword = " Synchronizing contacts, %s processed%s." % (result["count"], t)
-                    ns["bar"].update(result["count"])
 
         elif "chats" == result.get("table"):
             if result.get("start"):

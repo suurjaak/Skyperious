@@ -1695,8 +1695,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not conf.Login.get(filename, {}).get("store"):
             conf.Login.get(filename, {}).pop("password", None)
         page.notebook.Selection = page.pageorder[page.page_live]        
-        if not conf.Login.get(filename, {}).get("auto"):
-            page.on_live_result(action="login", opts={"auto": True})
+        if not conf.Login.get(filename, {}).get("sync"):
+            page.on_live_result(action="login", opts={"sync": True})
 
 
     def on_new_export(self, event):
@@ -3003,7 +3003,8 @@ class DatabasePage(wx.Panel):
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
         edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
-        check_auto   = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
+        check_login  = wx.CheckBox(panel1, label="Log &in &automatically")
+        check_sync   = wx.CheckBox(panel1, label="Synchronize history &automatically")
         edit_status  = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
         button_login = controls.NoteButton(panel1, bmp=images.ButtonLogin.Bitmap)
         label_info   = wx.html.HtmlWindow(panel1)
@@ -3024,9 +3025,11 @@ class DatabasePage(wx.Panel):
         label_login.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
         check_store.ToolTip = "Store password for this database locally"
-        check_auto.ToolTip  = "Update database from Skype online service " \
+        check_login.ToolTip = "Log in to Skype online service automatically " \
+                              "on opening this database next time"
+        check_sync.ToolTip  = "Update database from Skype online service " \
                               "automatically on opening this database next time"
-        check_auto.Disable()
+        check_login.Enabled = check_sync.Enabled = False
         ColourManager.Manage(edit_status, "ForegroundColour", "DisabledColour")
         ColourManager.Manage(edit_status, "BackgroundColour", "BgColour")
         edit_status.SetEditable(False)
@@ -3070,7 +3073,8 @@ class DatabasePage(wx.Panel):
 
         self.Bind(wx.EVT_TEXT,     self.on_change_ctrl_login, edit_pw)
         self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_store)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_auto)
+        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_login)
+        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_sync)
         self.Bind(wx.EVT_BUTTON,   self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync,         button_sync)
         self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
@@ -3082,7 +3086,8 @@ class DatabasePage(wx.Panel):
         self.edit_user           = edit_user
         self.edit_pw             = edit_pw
         self.check_login_store   = check_store
-        self.check_login_auto    = check_auto
+        self.check_login_auto    = check_login
+        self.check_login_sync    = check_sync
         self.edit_login_status   = edit_status
         self.button_login        = button_login
         self.label_login_fail    = label_info
@@ -3109,7 +3114,9 @@ class DatabasePage(wx.Panel):
         sizer_login.AddSpacer(5)
         sizer_login.Add(check_store, border=5, flag=wx.ALL | wx.GROW)
         sizer_login.AddSpacer(5)
-        sizer_login.Add(check_auto,  border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.Add(check_login, border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.AddSpacer(5)
+        sizer_login.Add(check_sync,  border=5, flag=wx.ALL | wx.GROW)
 
         sizer1.Add(label_login,  border=5,  flag=wx.ALL)
         sizer1.Add(sizer_login,  border=20, flag=wx.TOP | wx.GROW)
@@ -3168,8 +3175,10 @@ class DatabasePage(wx.Panel):
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
-        self.check_login_auto.Value  = opts.get("auto",  False)
+        self.check_login_auto.Value  = opts.get("auto",  False) and self.check_login_store.Value
+        self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
+        self.check_login_sync.Enable(self.check_login_auto .Value)
 
 
     def on_change_ctrl_login(self, event):
@@ -3179,16 +3188,27 @@ class DatabasePage(wx.Panel):
             name, value = "password", util.obfuscate(value)
         elif ctrl is self.check_login_store: name = "store"
         elif ctrl is self.check_login_auto:  name = "auto"
+        elif ctrl is self.check_login_sync:  name = "sync"
+        if not self.check_login_store.Value: self.check_login_auto.Value = False
+        if not self.check_login_auto .Value: self.check_login_sync.Value = False
         self.check_login_auto.Enable(self.check_login_store.Value)
+        self.check_login_sync.Enable(self.check_login_auto.Value)
         conf.Login.setdefault(self.db.filename, {})[name] = value
         if "store" == name and value and self.edit_pw.Value:
             pw = util.obfuscate(self.edit_pw.Value)
             conf.Login[self.db.filename]["password"] = pw
         if not self.check_login_store.Value:
-            self.check_login_auto.Value = False
+            self.check_login_auto.Value = self.check_login_sync.Value = False
             conf.Login[self.db.filename].pop("store",    None)
             conf.Login[self.db.filename].pop("auto",     None)
+            conf.Login[self.db.filename].pop("sync",     None)
             conf.Login[self.db.filename].pop("password", None)
+        if not self.check_login_auto.Value:
+            self.check_login_sync.Value = False
+            conf.Login[self.db.filename].pop("auto",     None)
+            conf.Login[self.db.filename].pop("sync",     None)
+        if not self.check_login_sync.Value:
+            conf.Login[self.db.filename].pop("sync",     None)
         if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
         util.run_once(conf.save)
 
@@ -3206,11 +3226,11 @@ class DatabasePage(wx.Panel):
             self.stc_history.SetFocus()
 
 
-    def on_live_login(self, event=None, auto=False):
+    def on_live_login(self, event=None, sync=False):
         """
         Attempts to login to Skype online service.
 
-        @param   auto  whether sync should start automatically after login
+        @param   sync  whether sync should start automatically after login
         """
         if not self or not self.edit_pw.Value or not live.skpy: return
         self.edit_login_status.Value = "Logging in to Skype.."
@@ -3218,7 +3238,7 @@ class DatabasePage(wx.Panel):
             if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
         self.button_login.Disable() 
         self.panel_login.Refresh()
-        action = {"action": "login", "password": self.edit_pw.Value, "auto": auto}
+        action = {"action": "login", "password": self.edit_pw.Value, "sync": sync}
         self.worker_live.work(action)
 
 
@@ -3313,6 +3333,7 @@ class DatabasePage(wx.Panel):
                     self.button_sync.Enable()
                     self.button_sync_sel.Enable()
                     self.button_sync_stop.Disable()
+                    if not self.get_unsaved_grids(): self.on_refresh_tables()
                     wx.Bell()
                     self.update_info_page()
                 else:
@@ -3322,7 +3343,7 @@ class DatabasePage(wx.Panel):
                         if not chat:
                             cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
                             self.chats.extend(cc)
-                            chat = cc[0]
+                            if cc: chat = cc[0]
 
                         title = chat["title_long_lc"] if chat else result["chat"]
                         if len(title) > 35:
@@ -3340,7 +3361,7 @@ class DatabasePage(wx.Panel):
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
                     elif result.get("start") and "messages" != result["table"] and self.worker_live.is_working():
-                        plabel = slabel = "Synchronizing %s.." % ("contacts" if "contacts" == result["table"] else "messages")
+                        plabel = slabel = "Synchronizing messages.."
 
                     if result.get("end"):
                         slabel = "Synchronized %s" % result["table"]
@@ -3383,10 +3404,6 @@ class DatabasePage(wx.Panel):
                                 if result["updated"]: slabel += ", %s updated" % result["updated"]
                                 slabel += "."
 
-                        if "contacts" == result["table"]:
-                            t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
-                            slabel += (": %s" % t if t else "") + "."
-
                 if plabel:
                     self.label_sync_progress.Label = plabel
                 if slabel:
@@ -3408,7 +3425,9 @@ class DatabasePage(wx.Panel):
                     self.label_login_fail.Hide()
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
-                    if result.get("opts", {}).get("auto"): wx.CallAfter(self.on_live_sync)
+                    if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
+                self.check_login_auto.Enable(self.check_login_store.Value)
+                self.check_login_sync.Enable(self.check_login_auto .Value)
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
@@ -3610,7 +3629,7 @@ class DatabasePage(wx.Panel):
         self.button_refresh_fileinfo.Enabled = True
 
 
-    def on_refresh_tables(self, event):
+    def on_refresh_tables(self, event=None):
         """
         Refreshes the table tree and open table data. Asks for confirmation
         if there are uncommitted changes.
@@ -5527,7 +5546,7 @@ class DatabasePage(wx.Panel):
         wx.CallLater(200, self.load_tables_data)
         self.update_liveinfo()
         if conf.Login.get(self.db.filename, {}).get("auto"):
-            wx.CallLater(1000, self.on_live_login, auto=True)
+            wx.CallLater(1000, self.on_live_login, sync=conf.Login[self.db.filename].get("sync"))
 
 
     def load_later_data(self):
