@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    24.11.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 import base64
@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import struct
+import sys
 import tarfile
 import tempfile
 import time
@@ -103,11 +104,12 @@ class SkypeLogin(object):
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
+                _, e, tb = sys.exc_info()
                 if kwargs is not kwargslist[-1]: continue # for kwargs
                 logger.exception("Error logging in to Skype as '%s'.", self.username)
                 try: os.unlink(path)
                 except Exception: pass
-                raise
+                raise e, None, tb
             else: break # for kwargs
         if init_db: self.init_db()
 

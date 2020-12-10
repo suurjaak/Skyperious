@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.11.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -198,9 +198,10 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception:
+            _, e, tb = sys.exc_info()
             if log_error: logger.exception("Error opening database %s.", self.filename)
             self.close()
-            raise
+            raise e, None, tb
         from . import live # Avoid circular import
         if not truncate: self.update_accountinfo(log_error=log_error)
         self.live = live.SkypeLogin(self)
