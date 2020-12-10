@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.11.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1625,8 +1625,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             db.tables_list = None # Force reload
             db.update_accountinfo()
         except Exception:
+            _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise
+            raise e, None, tb
         finally: busy.Close()
 
         self.load_database(filename, db)
@@ -1681,10 +1682,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 skype.db.tables_list = None # Force reload
                 skype.db.update_accountinfo()
             except Exception:
+                _, e, tb = sys.exc_info()
                 util.try_ignore(skype.db and skype.db.close)
                 util.try_ignore(os.unlink, filename)
                 logger.exception("Error saving account %r.", skype.skype.user)
-                raise
+                raise e, None, tb
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
@@ -1772,8 +1774,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         try:
             db = live.SkypeExport(efilename, filename)
         except Exception:
+            _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise
+            raise e, None, tb
 
         dlg = controls.ProgressWindow(self, "Import progress",
                                       cancel=on_cancel, agwStyle=wx.ALIGN_CENTER)

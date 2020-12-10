@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-4.4, 2020-11-24
+4.4, 2020-12-10
 ---------------
 - added support for shared audio & video in HTML export;
 - import chats and contacts from Skype online only if they have messages (issue #89).

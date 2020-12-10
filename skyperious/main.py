@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.11.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -530,10 +530,11 @@ def run_create(filenames, input=None, username=None, password=None,
 
     try: db.export_read(progress)
     except Exception:
+        _, e, tb = sys.exc_info()
         logger.exception("Error importing Skype export archive %s.", filename)
         util.try_ignore(db.close)
         util.try_ignore(os.unlink, filename)
-        raise
+        raise e, None, tb
 
     bar.stop()
     bar.pulse = False
