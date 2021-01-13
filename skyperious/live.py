@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    10.12.2020
+@modified    13.01.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -943,6 +943,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
                     for identity in map(id_to_identity, json.loads(value)):
+                        if not identity: continue # for identity
                         if identity not in self.table_objects["contacts"] and identity != self.id:
                             contact = dict(skypename=identity, is_permanent=1)
                             contact["id"] = self.insert_row("contacts", contact)
@@ -1240,6 +1241,8 @@ def id_to_identity(chatid):
     or "19:xyz@thread.skype" for newer group chats.
     """
     result = chatid
+    if isinstance(result, dict): result = result.get("MemberMri")
+    if not isinstance(result, basestring): result = None
     if result and not result.endswith("@thread.skype"):
         result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
         if result.endswith("@p2p.thread.skype"):
