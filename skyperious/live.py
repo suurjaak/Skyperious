@@ -864,7 +864,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         self.get_tables()
         self.table_objects.setdefault("contacts", {})
         self.table_rows.setdefault("participants", [])
-        chat, msg, edited_msgs, skip_chat = {}, {}, {}, False
+        chat, msg, edited_msgs, skip_chat, skip_msg = {}, {}, {}, False, False
         counts = {"chats": 0, "messages": 0}
         lastcounts = dict(counts)
         logger.info("Parsing Skype export file %s.", self.export_path)
@@ -891,20 +891,33 @@ class SkypeExport(skypedata.SkypeDatabase):
                 if "conversations.item" == prefix:
                     if skip_chat:
                         skip_chat = False
-                        self.delete_row("conversations", chat, log=False)
-                        counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
-                                                           [chat["id"]], log=False).rowcount
+                        try:
+                            self.delete_row("conversations", chat, log=False)
+                            counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
+                                                               [chat["id"]], log=False).rowcount
+                            self.execute("DELETE FROM participants WHERE convo_id = ?",
+                                         [chat["id"]], log=False)
+                        except Exception:
+                            logger.warn("Error dropping from database chat %s.", chat, exc_info=True)
                         counts["chats"] -= 1
                     else:
-                        chat = self.export_finalize_chat(chat)
-                        self.update_row("conversations", chat, chat, log=False)
+                        try:
+                            chat = self.export_finalize_chat(chat)
+                            self.update_row("conversations", chat, chat, log=False)
+                        except Exception:
+                            logger.warn("Error updating chat %s.", chat, exc_info=True)
                     edited_msgs.clear()
+                    skip_msg = False
                 elif "conversations.item.MessageList.item" == prefix:
-                    if not skip_chat: 
-                        msg = self.export_finalize_message(msg, chat, edited_msgs)
-                        if msg:
-                            msg["id"] = self.insert_row("messages", msg, log=False)
-                            counts["messages"] += 1
+                    if not skip_chat and not skip_msg:
+                        try:
+                            msg = self.export_finalize_message(msg, chat, edited_msgs)
+                            if msg:
+                                msg["id"] = self.insert_row("messages", msg, log=False)
+                                counts["messages"] += 1
+                        except Exception:
+                            logger.warn("Error finalizing and inserting message %s.", msg, exc_info=True)
+                    skip_msg = False
 
             # List start: ("nested path", "start_array", None)
             elif "start_array" == evt: pass
@@ -926,66 +939,103 @@ class SkypeExport(skypedata.SkypeDatabase):
                     self.update_accountinfo()
 
                 elif "conversations.item.id" == prefix:
-                    # Skip specials like "48:calllogs" or "28:concierge"
-                    skip_chat = value.startswith("48:") or value.startswith("28:")
-                    chat["identity"] = value
-                    chat["type"] = skypedata.CHATS_TYPE_GROUP
-                    if value.startswith("8:"):
-                        chat["identity"] = value[2:]
-                        chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+                    try:
+                        # Skip specials like "48:calllogs" or "28:concierge"
+                        skip_chat = value.startswith("48:") or value.startswith("28:")
+                        chat["identity"] = value
+                        chat["type"] = skypedata.CHATS_TYPE_GROUP
+                        if value.startswith("8:"):
+                            chat["identity"] = value[2:]
+                            chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+                    except Exception:
+                        logger.warn("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
+                        skip_chat = True
 
                 elif "conversations.item.displayName" == prefix:
-                    chat["displayname"] = value
+                    if isinstance(value, basestring):
+                        chat["displayname"] = value
 
                 elif "conversations.item.threadProperties.topic" == prefix:
-                    chat["meta_topic"] = value
+                    if isinstance(value, basestring):
+                        chat["meta_topic"] = value
 
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
-                    for identity in map(id_to_identity, json.loads(value)):
-                        if not identity: continue # for identity
-                        if identity not in self.table_objects["contacts"] and identity != self.id:
-                            contact = dict(skypename=identity, is_permanent=1)
-                            contact["id"] = self.insert_row("contacts", contact)
-                            self.table_objects["contacts"][identity] = contact
-                        p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
-                        p["id"] = self.insert_row("participants", p, log=False)
-                        self.table_rows["participants"].append(p)
+                    try:
+                        for identity in map(id_to_identity, json.loads(value)):
+                            if not identity: continue # for identity
+                            if identity not in self.table_objects["contacts"] and identity != self.id:
+                                contact = dict(skypename=identity, is_permanent=1)
+                                contact["id"] = self.insert_row("contacts", contact)
+                                self.table_objects["contacts"][identity] = contact
+                            p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
+                            p["id"] = self.insert_row("participants", p, log=False)
+                            self.table_rows["participants"].append(p)
+                    except Exception:
+                        logger.warn("Error parsing chat members from %s for %s.", value, chat, exc_info=True)
+                        skip_chat = True
 
                 elif "conversations.item.MessageList.item.id" == prefix:
-                    if skip_chat: continue # while True
-                    pk_id, guid = make_message_ids(value)
-                    msg.update(pk_id=pk_id, guid=guid)
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        pk_id, guid = make_message_ids(value)
+                        msg.update(pk_id=pk_id, guid=guid)
+                    except Exception:
+                        logger.warn("Error parsing message ID %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.from" == prefix:
-                    if skip_chat: continue # while True
-                    msg["author"] = id_to_identity(value)
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        identity = id_to_identity(value)
+                        if identity: msg["author"] = identity
+                        else: skip_msg = True
+                    except Exception:
+                        logger.warn("Error parsing message author %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.displayName" == prefix:
-                    if value: msg["from_dispname"] = value
+                    if skip_chat or skip_msg: continue # while True
+                    if value and isinstance(value, basestring):
+                        msg["from_dispname"] = value
 
                 elif "conversations.item.MessageList.item.content" == prefix:
+                    if skip_chat or skip_msg: continue # while True
                     msg["body_xml"] = value
 
                 elif "conversations.item.MessageList.item.originalarrivaltime" == prefix:
-                    if skip_chat: continue # while True
-                    ts = self.export_parse_timestamp(value)
-                    msg["timestamp"] = int(ts)
-                    msg["timestamp__ms"] = ts * 1000
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        ts = self.export_parse_timestamp(value)
+                        msg["timestamp"] = int(ts)
+                        msg["timestamp__ms"] = ts * 1000
+                    except Exception:
+                        logger.warn("Error parsing message timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.edittime" == prefix:
-                    msg["edited_timestamp"] = int(value) / 1000
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        msg["edited_timestamp"] = int(value) / 1000
+                    except Exception:
+                        logger.warn("Error parsing message edited timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.deletetime" == prefix:
-                    if skip_chat: continue # while True
-                    msg["edited_timestamp"] = int(value) / 1000
-                    msg["body_xml"] = ""
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        msg["edited_timestamp"] = int(value) / 1000
+                        msg["body_xml"] = ""
+                    except Exception:
+                        logger.warn("Error parsing message deleted timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.isserversidegenerated" == prefix:
-                    if skip_chat: continue # while True
+                    if skip_chat or skip_msg: continue # while True
                     if value: msg["__generated"] = True
 
                 elif "conversations.item.MessageList.item.messagetype" == prefix:
+                    if skip_chat or skip_msg: continue # while True
                     msg["__type"] = value # For post-processing
 
             if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
