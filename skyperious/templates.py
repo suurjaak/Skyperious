@@ -2476,7 +2476,7 @@ under the MIT License.
       <a href="http://wxpython.org"><font color="{{ conf.LinkColour }}">wxpython.org</font></a></li>
   <li>appdirs{{ " 1.4.4" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
-  <li>beautifulsoup4{{ " 4.9.1" if getattr(sys, 'frozen', False) else "" }},
+  <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
   <li>ijson{{ " 3.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
       <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
