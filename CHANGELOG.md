@@ -9,6 +9,7 @@ CHANGELOG
 - fixed loading and saving user-specific configuration file (issue #90);
 - fixed handling unexpected data on importing Skype export (issue #92);
 - upgraded beautifulsoup4 from 4.9.1 to 4.9.3.
+- upgraded ijson from 3.1 to 3.1.3.
 - upgraded skpy from 0.10 to 0.10.2;
 - upgraded XlsxWriter from 1.2.9 to 1.3.7.
 
