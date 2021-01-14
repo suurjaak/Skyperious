@@ -8,7 +8,8 @@ CHANGELOG
 - import chats and contacts from Skype online only if they have messages (issue #89).
 - fixed loading and saving user-specific configuration file (issue #90);
 - fixed handling unexpected data on importing Skype export (issue #92);
-- upgraded skpy from 0.10 to 0.10.2.
+- upgraded skpy from 0.10 to 0.10.2;
+- upgraded XlsxWriter from 1.2.9 to 1.3.7.
 
 
 4.3.1, 2020-10-04
