@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    13.01.2021
+@modified    14.01.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -101,11 +101,24 @@ class SkypeLogin(object):
             kwargslist.insert(0, {"tokenFile": path}) # Try with existing token
         else:
             util.create_file(path)
+
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
-                _, e, tb = sys.exc_info()
                 if kwargs is not kwargslist[-1]: continue # for kwargs
+                _, e, tb = sys.exc_info()
+
+                if self.username and password and "@" not in self.username:
+                    # Special case: if a legacy account is linked to a MS account,
+                    # it needs to use soapLogin() explicitly
+                    # (skpy auto-selects liveLogin() for legacy accounts).
+                    sk = skpy.Skype(tokenFile=path, connect=False)
+                    try: sk.conn.soapLogin(self.username, password)
+                    except Exception: _, e, tb = sys.exc_info()
+                    else:
+                        self.skype = sk
+                        break # for kwargs
+
                 logger.exception("Error logging in to Skype as '%s'.", self.username)
                 try: os.unlink(path)
                 except Exception: pass

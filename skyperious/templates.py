@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    24.11.2020
+@modified    14.01.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -2484,7 +2484,7 @@ under the MIT License.
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
   <li>pyparsing{{ " 2.4.7" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
-  <li>SkPy{{ " 0.10.1" if getattr(sys, 'frozen', False) else "" }},
+  <li>SkPy{{ " 0.10.2" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>

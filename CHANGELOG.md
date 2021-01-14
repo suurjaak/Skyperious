@@ -2,13 +2,13 @@ CHANGELOG
 =========
 
 
-4.4, 2021-01-13
+4.4, 2021-01-14
 ---------------
 - added support for shared audio & video in HTML export;
 - import chats and contacts from Skype online only if they have messages (issue #89).
 - fixed loading and saving user-specific configuration file (issue #90);
 - fixed handling unexpected data on importing Skype export (issue #92);
-- upgraded skpy from 0.10 to 0.10.1.
+- upgraded skpy from 0.10 to 0.10.2.
 
 
 4.3.1, 2020-10-04
