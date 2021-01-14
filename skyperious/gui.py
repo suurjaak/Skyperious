@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.12.2020
+@modified    14.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3004,7 +3004,7 @@ class DatabasePage(wx.Panel):
         label_user   = wx.StaticText(panel1, label="Username:")
         edit_user    = wx.TextCtrl(panel1)
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
-        edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
+        edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
         check_login  = wx.CheckBox(panel1, label="Log &in &automatically")
         check_sync   = wx.CheckBox(panel1, label="Synchronize history &automatically")
@@ -3074,14 +3074,15 @@ class DatabasePage(wx.Panel):
             button_login.Disable()
             page.Disable()
 
-        self.Bind(wx.EVT_TEXT,     self.on_change_ctrl_login, edit_pw)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_store)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_login)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_sync)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_login,        button_login)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync,         button_sync)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
+        self.Bind(wx.EVT_TEXT,       self.on_change_ctrl_login, edit_pw)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_live_login,        edit_pw)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_login)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_sync)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
         label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                         lambda e: webbrowser.open(e.GetLinkInfo().Href))
