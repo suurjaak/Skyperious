@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.01.2021
+@modified    16.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2692,14 +2692,14 @@ class DatabasePage(wx.Panel):
         html.Font.PixelSize = (0, 8)
 
         ColourManager.Manage(label_html, "BackgroundColour", "WidgetColour")
-        
+
         sizer_top.Add(label_html, proportion=1, flag=wx.GROW)
         sizer_top.Add(tb, border=5, flag=wx.TOP | wx.RIGHT |
                       wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(sizer_top, border=5, flag=wx.TOP | wx.RIGHT | wx.GROW)
         sizer.Add(html, border=5, proportion=1,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT | wx.BOTTOM)
-        wx.CallAfter(label_html.Show)
+        wx.CallAfter(lambda: label_html and label_html.Show())
 
 
     def create_page_tables(self, notebook):
@@ -5264,7 +5264,8 @@ class DatabasePage(wx.Panel):
             dts = "first_message_datetime", "last_message_datetime"
             date_range = [chat[n].date() if chat[n] else None for n in dts]
             self.chat_filter["daterange"] = date_range
-            self.chat_filter["startdaterange"] = date_range
+            if chat != self.chat:
+                self.chat_filter["startdaterange"] = date_range
             dates_range = dates_values = date_range
             avatar_default = images.AvatarDefault.Bitmap
             if chat != self.chat:
@@ -5276,9 +5277,8 @@ class DatabasePage(wx.Panel):
                 il.Add(avatar_default)
                 plist.AssignImageList( il, wx.IMAGE_LIST_SMALL)
                 index = 0
-                # wx will otherwise open a warning dialog on image error
 
-                nolog = wx.LogNull()
+                nolog = wx.LogNull() # wx will otherwise open a warning dialog on image error
                 for p in chat["participants"]:
                     b = 0
                     if not p["contact"].get("avatar_bitmap"):
@@ -5318,6 +5318,11 @@ class DatabasePage(wx.Panel):
             try:
                 self.stc_history.Populate(chat, self.db,
                     center_message_id=center_message_id)
+                if center_message_id \
+                and not self.stc_history.IsMessageShown(center_message_id):
+                    self.stc_history.SetFilter(self.chat_filter)
+                    self.stc_history.RefreshMessages(center_message_id)
+                    self.stc_history.FocusMessage(center_message_id)
             except Exception as e:
                 guibase.status("Error loading %s: %s",
                                chat["title_long_lc"], util.format_exc(e))
@@ -5336,7 +5341,8 @@ class DatabasePage(wx.Panel):
             if not any(filter(None, dates_range)):
                 dates_range = dates_values
             self.chat_filter["daterange"] = dates_range
-            self.chat_filter["startdaterange"] = dates_values
+            if chat != self.chat or not all(self.chat_filter["startdaterange"]):
+                self.chat_filter["startdaterange"] = dates_values
         self.range_date.SetRange(*dates_range)
         self.edit_filterdate1.Range = self.edit_filterdate2.Range = dates_range
         self.range_date.SetValues(*dates_values)
@@ -5559,6 +5565,8 @@ class DatabasePage(wx.Panel):
         statistics for all chats, used as a background callback to speed
         up page opening.
         """
+        if not self: return
+
         try:
             # Load chat statistics and update the chat list
             self.db.get_conversations_stats(self.chats)
