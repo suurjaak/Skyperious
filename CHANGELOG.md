@@ -8,6 +8,7 @@ CHANGELOG
 - import chats and contacts from Skype online only if they have messages (issue #89).
 - fixed loading and saving user-specific configuration file (issue #90);
 - fixed handling unexpected data on importing Skype export (issue #92);
+- fixed not focusing search result message in chat history on first click;
 - upgraded beautifulsoup4 from 4.9.1 to 4.9.3.
 - upgraded ijson from 3.1 to 3.1.3.
 - upgraded skpy from 0.10 to 0.10.2;
