@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.01.2021
+@modified    18.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1853,7 +1853,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_open_from_list_db(self, event):
         """Handler for clicking to open selected files from database list."""
         if event.GetIndex() > 0:
-            self.load_database_page(event.GetText())
+            self.load_database_page(self.list_db.GetItemText(event.GetIndex()))
 
 
     def update_database_stats(self, filename):
@@ -1940,9 +1940,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_select_list_db(self, event):
         """Handler for selecting an item in main list, updates info panel."""
+        filename = self.list_db.GetItemText(event.GetIndex())
         if event.GetIndex() > 0 \
-        and event.GetText() != self.db_filename:
-            self.db_filename = event.GetText()
+        and filename != self.db_filename:
+            self.db_filename = filename
             self.update_database_detail()
         elif event.GetIndex() == 0 and not self.panel_db_main.Shown:
             self.db_filename = None
