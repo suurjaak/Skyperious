@@ -13,7 +13,7 @@ build and run the Docker image:
     docker build . -t skyperious
 
     xhost +
-    docker run -it --rm --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious
+    docker run -it --rm --net=host --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious
 ```
 
 `docker build . -t skyperious` will prepare an Ubuntu 18.04 Docker image

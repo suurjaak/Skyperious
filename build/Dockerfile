@@ -5,7 +5,7 @@
 # and running afterwards:
 #
 #     xhost +
-#     docker run -it --rm --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious
+#     docker run -it --rm --net=host --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious
 #
 # Add 'sudo' before docker commands if not running as root user.
 #
@@ -39,7 +39,7 @@ RUN pip install --upgrade pip
 
 RUN pip install --ignore-installed --find-links \
     https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 \
-    wxPython --no-cache-dir --no-python-version-warning
+    wxPython==4.1.0 --no-cache-dir --no-python-version-warning
 
 RUN pip install skyperious --no-python-version-warning
 
