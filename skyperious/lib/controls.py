@@ -4089,12 +4089,16 @@ class TabbedHtmlWindow(wx.Panel):
         ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        agwStyle = (wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
+                    wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
+                    wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
+                    wx.lib.agw.flatnotebook.FNB_VC8)
+        if "linux2" == sys.platform and wx.VERSION[:3] == (4, 1, 1):
+            # wxPython 4.1.1 on Linux crashes with FNB_VC8
+            agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
         notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
             parent=self, size=(-1, 27), style=wx.NB_TOP,
-            agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
-                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
-                     wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
-                     wx.lib.agw.flatnotebook.FNB_VC8)
+            agwStyle=agwStyle)
         self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
 
         self.Sizer.Add(notebook, flag=wx.GROW)
