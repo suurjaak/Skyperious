@@ -278,7 +278,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                 raw = skypedata.fix_image_raw(pic)
                 namespace["chat_picture_raw"] = raw
                 namespace["chat_picture_size"] = util.img_size(raw)
-                
+
 
             contacts = dict((c["skypename"], c) for c in db.get_contacts())
             partics = dict((p["identity"], p) for p in chat["participants"])

@@ -486,7 +486,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         try: db.live.populate(chats)
         except Exception as e: progress(error=util.format_exc(e))
         db.close()
-    
+
 
 def run_create(filenames, input=None, username=None, password=None,
                ask_password=False, store_password=False):

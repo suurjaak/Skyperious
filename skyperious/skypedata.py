@@ -240,7 +240,7 @@ class SkypeDatabase(object):
     def recover_data(self, filename):
         """
         Recovers as much data from this database to a new database as possible.
-        
+
         @return  a list of encountered errors, if any
         """
         result = []
@@ -1888,7 +1888,7 @@ class MessageParser(object):
                 if filename: data.update(filename=filename)
 
                 try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
-                except Exception: pass     
+                except Exception: pass
 
                 objtype = (dom0.find("URIObject").get("type") or "").lower()
                 if   "audio"   in objtype: data["category"] = "audio"

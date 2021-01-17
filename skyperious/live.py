@@ -581,7 +581,7 @@ class SkypeLogin(object):
     def populate(self, chats=()):
         """
         Retrieves all chats and messages, or selected chats only.
-        
+
         @param   chats  list of chat identities to populate if not everything
         """
         if self.populated:

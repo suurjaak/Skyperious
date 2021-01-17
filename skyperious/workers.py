@@ -424,7 +424,7 @@ class MergeThread(WorkerThread):
         while self._is_running:
             params = self._queue.get()
             if not params: continue # while self._is_running
-                
+
             self._is_working, self._drop_results = True, False
             try:
                 if "diff_left" == params.get("type"):
@@ -758,7 +758,7 @@ class MergeThread(WorkerThread):
         delta = d2 - d1
         if util.timedelta_seconds(delta) > 24 * 3600:
             return False # Skip if not even within same day
-            
+
         result = False
         for hour in range(int(util.timedelta_seconds(delta) / 3600) + 1):
             d1plus = d1 + datetime.timedelta(hours=hour)

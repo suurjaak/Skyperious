@@ -96,7 +96,7 @@ class GUILogHandler(logging.Handler):
                 del self.deferred[:]
             else: self.deferred.append(msg)
         except Exception: pass
-        
+
 
 
 class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):

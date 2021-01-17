@@ -89,7 +89,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "DisabledColour":            wx.SYS_COLOUR_GRAYTEXT,
             "MainBgColour":              wx.SYS_COLOUR_WINDOW,
             "WidgetColour":              wx.SYS_COLOUR_BTNFACE,
-        }, darkcolourmap={               
+        }, darkcolourmap={
             "DBListForegroundColour":    wx.SYS_COLOUR_BTNTEXT,
             "DBListBackgroundColour":    wx.SYS_COLOUR_WINDOW,
             "LinkColour":                wx.SYS_COLOUR_HOTLIGHT,
@@ -1696,7 +1696,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         if not conf.Login.get(filename, {}).get("store"):
             conf.Login.get(filename, {}).pop("password", None)
-        page.notebook.Selection = page.pageorder[page.page_live]        
+        page.notebook.Selection = page.pageorder[page.page_live]
         if not conf.Login.get(filename, {}).get("sync"):
             page.on_live_result(action="login", opts={"sync": True})
 
@@ -4211,7 +4211,7 @@ class DatabasePage(wx.Panel):
             self.html_stats.GetScrollRange(wx.HORIZONTAL),
             self.html_stats.GetScrollRange(wx.VERTICAL)
         ]
-        
+
 
     def on_click_html_stats(self, event):
         """
