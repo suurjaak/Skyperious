@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.4.dev19"
+Version = "4.4.dev20"
 VersionDate = "17.01.2021"
 
 if getattr(sys, "frozen", False):
