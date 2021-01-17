@@ -271,7 +271,7 @@ optional arguments:
 
 usage: skyperious export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [-o DIR]
                          [-c CHAT [CHAT ...]] [-a AUTHOR [AUTHOR ...]]
-                         [-s START_DATE] [-e END_DATE] [--images-folder]
+                         [-s START_DATE] [-e END_DATE] [--media-folder]
                          [--ask-password] [--store-password] [--verbose]
                          FILE [FILE ...]
 
@@ -296,10 +296,10 @@ optional arguments:
                         date to export messages from, as YYYY-MM-DD
   -e END_DATE, --end END_DATE
                         date to export messages until, as YYYY-MM-DD
-  --images-folder       save images into a subfolder in HTML export instead of
-                        embedding into HTML
+  --media-folder        save shared media into a subfolder in HTML export
+                        instead of embedding into HTML
   --ask-password        prompt for Skype password on HTML export to download
-                        shared images
+                        shared media
   --store-password      store entered password in configuration
   --verbose             print detailed progress messages to stderr
 </pre>
