@@ -341,7 +341,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             self.edit_text.SetFocus()
             self.SetScreenshot(None)
             text, style = "Feedback sent", wx.OK
-        else:        
+        else:
             text = "Could not post feedback. Connection problems?"
             style = wx.OK | wx.ICON_WARNING
         guibase.status()

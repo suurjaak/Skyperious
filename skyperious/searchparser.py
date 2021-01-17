@@ -101,7 +101,7 @@ class SearchQueryParser(object):
                         ).setResultsName("GRAMMAR")
             self._grammar = grammar
 
-    
+
     def Parse(self, query, table=None):
         """
         Parses the query string and returns (sql, sql params, words).
@@ -128,7 +128,7 @@ class SearchQueryParser(object):
                     key = negation + key
                     keywords[key.lower()].append(value)
                     split_words.remove(word)
-            try:                
+            try:
                 parse_results = ParseResults(split_words)
             except NameError: # pyparsing.ParseResults not available
                 parse_results = split_words
