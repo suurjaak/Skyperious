@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.01.2021
+@modified    17.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -863,8 +863,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         else: do_filter(search)
 
 
-    def on_open_feedback(self, event):
+    def on_open_feedback(self, event=None):
         """Handler for clicking to send feedback, opens the feedback form."""
+        if not self: return
+
         if support.feedback_window:
             if not support.feedback_window.Shown:
                 support.feedback_window.Show()
@@ -8605,7 +8607,7 @@ class AboutDialog(wx.Dialog):
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
         button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
-        button_feedback.Bind(wx.EVT_BUTTON, parent.on_open_feedback)
+        button_feedback.Bind(wx.EVT_BUTTON, self.OnOpenFeedback)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
@@ -8618,6 +8620,12 @@ class AboutDialog(wx.Dialog):
         self.Layout()
         self.Size = (self.Size[0], html.VirtualSize[1] + 70)
         self.CenterOnParent()
+
+
+    def OnOpenFeedback(self, event):
+        """Handler for feedback button, closes dialog and opens feedback dialog."""
+        wx.CallAfter(self.Parent.on_open_feedback)
+        self.Close()
 
 
     def OnSysColourChange(self, event):
