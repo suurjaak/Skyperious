@@ -6,7 +6,7 @@ depending on Python environment.
 Pyinstaller-provided names and variables: Analysis, EXE, PYZ, SPEC, TOC.
 
 @created   03.04.2012
-@modified  19.09.2020
+@modified  23.11.2020
 """
 import os
 import struct
@@ -35,7 +35,8 @@ with open(entrypoint, "w") as f:
 a = Analysis(
     [entrypoint],
     excludes=["FixTk", "numpy", "tcl", "tk", "_tkinter", "tkinter", "Tkinter"],
-    hiddenimports=["ijson.backends.python"] # ijson imports backends indirectly
+    hiddenimports=["imghdr", "mimetypes",   # Imported within templates
+                   "ijson.backends.python"] # ijson imports backends indirectly
 )
 a.datas += [("conf.py",             "%s/conf.py" % NAME,             "DATA"), # For configuration docstrings
             ("res/Carlito.ttf",     "%s/res/Carlito.ttf" % NAME,     "DATA"),

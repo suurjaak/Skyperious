@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    18.09.2020
+@modified    11.01.2021
 """
 import datetime
 import logging
@@ -96,7 +96,7 @@ class GUILogHandler(logging.Handler):
                 del self.deferred[:]
             else: self.deferred.append(msg)
         except Exception: pass
-        
+
 
 
 class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
@@ -112,6 +112,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             title=u"%s Console" % conf.Title, size=conf.ConsoleSize)
         self.frame_console.Bind(wx.EVT_CLOSE, self.on_showhide_console)
         self.frame_console_shown = False # Init flag
+        self.status_clearer      = None  # wx.CallLater instance
         console = self.console = self.frame_console.shell
         if not isinstance(conf.ConsoleHistoryCommands, list):
             conf.ConsoleHistoryCommands = [] 
@@ -226,17 +227,23 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         history = h[:conf.MaxConsoleHistory][::-1]
         if history != conf.ConsoleHistoryCommands:
             conf.ConsoleHistoryCommands[:] = history
-            conf.save()
+            util.run_once(conf.save)
 
 
     def set_status(self, text, timeout=False):
         """Sets main window status bar text, optionally clears after timeout."""
         self.SetStatusText(text)
+        if self.status_clearer: self.status_clearer.Stop()
+        self.status_clearer = None
         if not timeout or not text: return
 
+        def clear(sb, text):
+            if not sb or sb.StatusText != text: return
+            self.status_clearer = None
+            self.SetStatusText("")
+
         if timeout is True: timeout = conf.StatusFlashLength
-        clear = lambda sb: sb and sb.StatusText == text and self.SetStatusText("")
-        wx.CallLater(timeout, clear, self.StatusBar)
+        self.status_clearer = wx.CallLater(timeout, clear, self.StatusBar, text)
 
 
     def log_message(self, text):

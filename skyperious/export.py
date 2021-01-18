@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    29.08.2020
+@modified    22.11.2020
 ------------------------------------------------------------------------------
 """
 import collections
@@ -81,7 +81,7 @@ def export_chats(chats, path, format, db, opts=None):
     @param   db                SkypeDatabase instance
     @param   opts              export options dictionary
                ?multi          whether exporting multiple files under path
-               ?images_folder  whether to save images to subfolder in HTML export
+               ?media_folder   whether to save images to subfolder in HTML export
                ?timerange      additional arguments for filtering messages, as
                                (from_timestamp or None, to_timestamp or None)
                ?messages       list messages to export if not querying all
@@ -115,10 +115,11 @@ def export_chats(chats, path, format, db, opts=None):
                        export_chat_csv   if "csv"  == format else
                        export_chat_template)
 
-        if "html" == format and conf.SharedImageAutoDownload \
+        if "html" == format \
+        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
-            # Log in to Skype online service to download shared images
+            # Log in to Skype online service to download shared media
             pwd = util.deobfuscate(conf.Login[db.filename]["password"])
             util.try_ignore(db.live.login, password=pwd)
 
@@ -230,7 +231,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                        .html|.txt determines file format
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
-    @param   opts      export options dictionary, as {"images_folder": true}
+    @param   opts      export options dictionary, as {"media_folder": true}
                        if saving images to subfolder in HTML export
     @return            (number of chats exported, number of messages exported)
     """
@@ -241,11 +242,11 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
         namespace = {"db": db, "chat": chat, "messages": messages,
                      "parser": parser}
-        if opts.get("images_folder"):
+        if opts.get("media_folder"):
             filedir, basename = os.path.split(filename)
             basename = os.path.splitext(basename)[0]
-            imagedir = os.path.join(filedir, "%s_files" % basename)
-            namespace["images_folder"] = imagedir
+            mediadir = os.path.join(filedir, "%s_files" % basename)
+            namespace["media_folder"] = mediadir
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
         # statistics will be available for the main file after parsing.
@@ -277,7 +278,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                 raw = skypedata.fix_image_raw(pic)
                 namespace["chat_picture_raw"] = raw
                 namespace["chat_picture_size"] = util.img_size(raw)
-                
+
 
             contacts = dict((c["skypename"], c) for c in db.get_contacts())
             partics = dict((p["identity"], p) for p in chat["participants"])

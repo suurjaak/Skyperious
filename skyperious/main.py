@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -98,14 +98,14 @@ ARGUMENTS = {
               "help": "date to export messages from, as YYYY-MM-DD", "type": date},
              {"args": ["-e", "--end"], "dest": "end_date", "required": False,
               "help": "date to export messages until, as YYYY-MM-DD", "type": date},
-             {"args": ["--images-folder"], "dest": "images_folder",
+             {"args": ["--media-folder"], "dest": "media_folder",
               "action": "store_true", "required": False,
-              "help": "save images into a subfolder in HTML export "
+              "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
-                      "to download shared images"},
+                      "to download shared media"},
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
               "help": "store entered password in configuration"},
@@ -374,22 +374,6 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             if ns["bar"]: ns["bar"] = ns["bar"].stop()
             output("\nError syncing chat history: %(error)s" % result)
 
-        elif "contacts" == result.get("table"):
-            if result.get("start"):
-                ns["bar"] = ProgressBar(afterword=" Synchronizing contacts..")
-                ns["bar"].start()
-            elif result.get("end"):
-                t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
-                ns["bar"].afterword = " Synchronized contacts%s." % (": %s" % t if t else "")
-                ns["bar"].update(result["total"])
-                ns["bar"] = ns["bar"].stop()
-            else:
-                ns["bar"].max = result["total"]
-                if "count" in result:
-                    t = (", %s new" % result["new"]) if result["new"] else ""
-                    ns["bar"].afterword = " Synchronizing contacts, %s processed%s." % (result["count"], t)
-                    ns["bar"].update(result["count"])
-
         elif "chats" == result.get("table"):
             if result.get("start"):
                 output("\nSynchronizing chats..")
@@ -502,7 +486,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         try: db.live.populate(chats)
         except Exception as e: progress(error=util.format_exc(e))
         db.close()
-    
+
 
 def run_create(filenames, input=None, username=None, password=None,
                ask_password=False, store_password=False):
@@ -546,10 +530,11 @@ def run_create(filenames, input=None, username=None, password=None,
 
     try: db.export_read(progress)
     except Exception:
+        _, e, tb = sys.exc_info()
         logger.exception("Error importing Skype export archive %s.", filename)
         util.try_ignore(db.close)
         util.try_ignore(os.unlink, filename)
-        raise
+        raise e, None, tb
 
     bar.stop()
     bar.pulse = False
@@ -566,7 +551,7 @@ def run_create(filenames, input=None, username=None, password=None,
 
 
 def run_export(filenames, format, output_dir, chatnames, authornames,
-               start_date, end_date, images_folder, ask_password, store_password):
+               start_date, end_date, media_folder, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
@@ -576,7 +561,8 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
 
     for db in dbs:
 
-        if ask_password and db.username and conf.SharedImageAutoDownload \
+        if ask_password and db.username \
+        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
         and "html" == format:
             while not db.live.is_logged_in():
                 password = get_password(db.username)
@@ -616,7 +602,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
             bar.start()
             opts = dict(progress=bar.update, timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
@@ -803,7 +789,7 @@ def run(nogui=False):
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.output_dir,
                    arguments.chat, arguments.author, arguments.start_date,
-                   arguments.end_date, arguments.images_folder,
+                   arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY)

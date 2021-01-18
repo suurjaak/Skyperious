@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    10.12.2020
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -16,6 +16,7 @@ import collections
 import copy
 import cStringIO
 import datetime
+import json
 import logging
 import math
 import os
@@ -38,6 +39,7 @@ from . lib.vendor import step
 from . import conf
 from . import emoticons
 from . import templates
+live = None # Imported and populated later, circular import
 
 
 CHATS_TYPE_SINGLE          =   1 # 1:1 chat
@@ -168,6 +170,7 @@ class SkypeDatabase(object):
                             are not written to log (written by default)
         @param   truncate   create or overwrite file before opening
         """
+        global live
         self.filename = os.path.realpath(filename)
         self.basefilename = os.path.basename(self.filename)
         self.filesize = None
@@ -195,9 +198,10 @@ class SkypeDatabase(object):
             for row in rows:
                 self.tables[row["name"].lower()] = row
         except Exception:
+            _, e, tb = sys.exc_info()
             if log_error: logger.exception("Error opening database %s.", self.filename)
             self.close()
-            raise
+            raise e, None, tb
         from . import live # Avoid circular import
         if not truncate: self.update_accountinfo(log_error=log_error)
         self.live = live.SkypeLogin(self)
@@ -236,7 +240,7 @@ class SkypeDatabase(object):
     def recover_data(self, filename):
         """
         Recovers as much data from this database to a new database as possible.
-        
+
         @return  a list of encountered errors, if any
         """
         result = []
@@ -1568,13 +1572,14 @@ class MessageParser(object):
                 "last_cloudtext": "",
                 "last_message": "", "chars": 0, "smschars": 0, "files": 0,
                 "bytes": 0, "calldurations": 0, "info_items": [],
+                "shares": 0, "sharebytes": 0,
                 "authors": set(), # Authors encountered in parsed messages
                 "cloudcounter": wordcloud.GroupCounter(conf.WordCloudLengthMin),
                 "totalhist": {}, # Histogram data {"hours", "hours-firsts", "days", ..}}
                 "hists": {},     # Author histogram data {author: {"hours", ..} }
                 "workhist": {},  # {"hours": {0: {author: count}}, "days": .., "stamps": [..]}
                 "emoticons": collections.defaultdict(lambda: collections.defaultdict(int)),
-                "shared_images": {}} # {message_id: {url, datetime, author, author_name, ?filename}, }
+                "shared_media": {}} # {message_id: {url, datetime, author, author_name, category, ?filename}, }
 
 
     def parse(self, message, rgx_highlight=None, output=None):
@@ -1608,7 +1613,7 @@ class MessageParser(object):
         if dom is None:
             dom = self.parse_message_dom(message, output)
             if not (output.get("merge")
-            or message["id"] in self.stats.get("shared_images", {})):
+            or message["id"] in self.stats.get("shared_media", {})):
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
@@ -1724,7 +1729,7 @@ class MessageParser(object):
         elif MESSAGE_TYPE_INFO == message["type"] \
         and "<location" in message["body_xml"]:
             href, text = None, None
-            for link in dom.getiterator("a"):
+            for link in dom.iter("a"):
                 href, text = link.get("href"), link.text
                 break # for link
             if href and text:
@@ -1749,13 +1754,14 @@ class MessageParser(object):
             # Newer message format has content like
             # <pictureupdate><eventtime>1498740806804</eventtime><value>URL@https://..
             if self.stats:
-                tag = next(dom.getiterator("value"), None)
+                tag = next(dom.iter("value"), None)
                 url = tag is not None and (tag.text or "").replace("URL@", "")
                 if url:
-                    data = dict(url=url, author_name=get_author_name(message),
+                    data = dict(url=live.make_media_url(url, "avatar"),
+                                author_name=get_author_name(message),
                                 author=message["author"], success=False,
-                                datetime=message["datetime"])
-                    self.stats["shared_images"][message["id"]] = data
+                                datetime=message["datetime"], category="avatar")
+                    self.stats["shared_media"][message["id"]] = data
             dom.clear()
             if text:
                 dom.text = 'Changed the conversation topic to "%s".' % text
@@ -1767,7 +1773,7 @@ class MessageParser(object):
             # or only in end message if it's like '<partlist type="ended" ..'
             do_durations = MESSAGE_TYPE_CALL == message["type"] or \
                            "ended" == (dom.find("partlist") or {}).get("type")
-            for elem in dom.getiterator("part") if do_durations else ():
+            for elem in dom.iter("part") if do_durations else ():
                 identity = elem.get("identity")
                 duration = elem.findtext("duration")
                 if identity and duration:
@@ -1856,15 +1862,15 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        # Photo/video sharing: take image link, if any
-        if any(dom.getiterator("URIObject")):
-            url, filename = dom.find("URIObject").get("uri"), None
-            nametag = next(dom.getiterator("OriginalName"), None)
+        # Photo/video/file sharing: take file link, if any
+        if any(dom.iter("URIObject")):
+            url, filename, dom0 = dom.find("URIObject").get("uri"), None, dom
+            nametag = next(dom.iter("OriginalName"), None)
             if nametag is not None: filename = nametag.get("v")
             if not filename:
-                metatag = next(dom.getiterator("meta"), None)
+                metatag = next(dom.iter("meta"), None)
                 if metatag is not None: filename = metatag.get("originalName")
-            link = next(dom.getiterator("a"), None)
+            link = next(dom.iter("a"), None)
             if not url and link:
                 url = link.get("href")
             elif not url: # Parse link from message contents
@@ -1875,12 +1881,36 @@ class MessageParser(object):
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
                     text2 = text.replace(url, a.encode("utf-8"))
                     dom = self.make_xml(text2, message) or dom
-            if url and self.stats:
+            if url:
                 data = dict(url=url, author_name=get_author_name(message),
                             author=message["author"], success=False,
                             datetime=message["datetime"])
                 if filename: data.update(filename=filename)
-                self.stats["shared_images"][message["id"]] = data
+
+                try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
+                except Exception: pass
+
+                objtype = (dom0.find("URIObject").get("type") or "").lower()
+                if   "audio"   in objtype: data["category"] = "audio"
+                elif "video"   in objtype: data["category"] = "video"
+                elif "sticker" in objtype: data["category"] = "sticker"
+                elif "swift"   in objtype:
+                    # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
+                    try:
+                        pkg = json.loads(next(dom0.iter("Swift")).get("b64").decode("base64"))
+                        if "message/card" == pkg["type"]:
+                            # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
+                            url = pkg["attachments"][0]["content"]["images"][0]["url"]
+                            data.update(category="card", url=live.make_media_url(url, "card"))
+                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' % 
+                                                (urllib.quote(url, ":/=?&#"), url), message)
+                    except Exception: pass
+
+                url = data["url"] = live.make_media_url(data["url"], data.get("category"))
+                a = next(dom.iter("a"), None)
+                if a is not None: a.set("href", url); a.text = url
+
+                if self.stats: self.stats["shared_media"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
@@ -1929,20 +1959,20 @@ class MessageParser(object):
 
     def highlight_text(self, dom, rgx_highlight):
         """Wraps text matching regex in any dom element in <b> nodes."""
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        parent_map = dict((c, p) for p in dom.iter() for c in p)
         rgx_highlight_split = re.compile("<b>")
         repl_highlight = lambda x: "<b>%s<b>" % x.group(0) 
         # Highlight substrings in <b>-tags
-        for i in dom.getiterator():
+        for i in dom.iter():
             if "b" == i.tag:
-                continue # continue for i in dom.getiterator()
+                continue # for i
             for j, t in enumerate([i.text, i.tail]):
                 if not t:
-                    continue # continue for j, t in enumerate(..)
+                    continue # for j, t
                 highlighted = rgx_highlight.sub(repl_highlight, t)
                 parts = rgx_highlight_split.split(highlighted)
                 if len(parts) < 2:
-                    continue # continue for j, t in enumerate(..)
+                    continue # for j, t
                 index_insert = (list(parent_map[i]).index(i) + 1) if j else 0
                 setattr(i, "tail" if j else "text", "")
                 b = None
@@ -1970,22 +2000,24 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
-        shared_image = self.stats.get("shared_images", {}).get(message["id"])
-        if shared_image and output.get("export") \
-        and conf.SharedImageAutoDownload and self.db.live.is_logged_in():
-            category = None
+        media = self.stats.get("shared_media", {}).get(message["id"])
+        if media and output.get("export") \
+        and (conf.SharedImageAutoDownload      and media.get("category") not in ("audio", "video") or
+             conf.SharedAudioVideoAutoDownload and media.get("category")     in ("audio", "video")) \
+        and self.db.live.is_logged_in():
+            category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
-            raw = self.db.live.get_api_image(shared_image["url"], category)
-            if raw:
-                shared_image["success"] = True
-                ns = dict(shared_image, image=raw, message=message)
-                return step.Template(templates.CHAT_MESSAGE_IMAGE).expand(ns, **output)
+            raw = self.db.live.get_api_media(media["url"], category)
+            if raw is not None:
+                media.update(success=True, filesize=len(raw))
+                ns = dict(media, content=raw, message=message)
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
         if output.get("export"):
             greytag, greyattr, greyval = "span", "class", "gray"
-        for elem in dom.getiterator():
+        for elem in dom.iter():
             index = 0
             for subelem in elem:
                 if "quote" == subelem.tag:
@@ -2052,7 +2084,7 @@ class MessageParser(object):
                         subelem.attrib.clear()
                 index += 1
             if not self.wrapfunc:
-                continue # continue for elem in dom.getiterator()
+                continue # for elem
             for i, v in enumerate([elem.text, elem.tail]):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
         try:
@@ -2104,7 +2136,7 @@ class MessageParser(object):
 
     def sanitize(self, dom, known_tags):
         """Turns unknown tags to span, drops empties and unnests single root."""
-        parent_map = dict((c, p) for p in dom.getiterator() for c in p)
+        parent_map = dict((c, p) for p in dom.iter() for c in p)
         blank = lambda x: not (x.text or x.tail or x.getchildren())
         drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
 
@@ -2134,7 +2166,6 @@ class MessageParser(object):
 
     def collect_message_stats(self, message, dom):
         """Adds message statistics to accumulating data."""
-        author_stats = collections.defaultdict(lambda: 0)
         self.stats["startdate"] = self.stats["startdate"] or message["datetime"]
         self.stats["enddate"] = message["datetime"]
         author = message["author"]
@@ -2149,21 +2180,19 @@ class MessageParser(object):
                                                 author)
             self.stats["last_cloudtext"] = ""
             message["body_txt"] = self.stats["last_message"] # Export kludge
-        if (message["type"] in [MESSAGE_TYPE_SMS, MESSAGE_TYPE_CALL,
-        MESSAGE_TYPE_CALL_END, MESSAGE_TYPE_FILE, MESSAGE_TYPE_MESSAGE]
-        and author not in self.stats["counts"]):
-            self.stats["counts"][author] = author_stats.copy()
+        if author not in self.stats["counts"]:
+            self.stats["counts"][author] = collections.defaultdict(lambda: 0)
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
         if not self.stats["workhist"]:
             MAXSTAMP = MessageParser.MessageStamp(
                 datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
-            intdict = lambda: collections.defaultdict(int)
+            intdict   = lambda: collections.defaultdict(int)
             stampdict = lambda: collections.defaultdict(lambda: MAXSTAMP)
             self.stats["workhist"] = {
-                "hours": collections.defaultdict(intdict),
-                "days": collections.defaultdict(intdict),
+                "hours":        collections.defaultdict(intdict),
+                "days":         collections.defaultdict(intdict),
                 "hours-firsts": collections.defaultdict(stampdict),
-                "days-firsts": collections.defaultdict(stampdict), }
+                "days-firsts":  collections.defaultdict(stampdict), }
         stamp = MessageParser.MessageStamp(message["datetime"], message["id"])
         for name, key in [("hours", hourkey), ("days", daykey)]:
             self.stats["workhist"][name][key][author] += 1
@@ -2183,7 +2212,7 @@ class MessageParser(object):
             calldurations = message.get("__calldurations", {})
             for identity, duration in calldurations.items():
                 if identity not in self.stats["counts"]:
-                    self.stats["counts"][identity] = author_stats.copy()
+                    self.stats["counts"][identity] = collections.defaultdict(lambda: 0)
                 self.stats["counts"][identity]["calldurations"] += duration
             if calldurations:
                 self.stats["calldurations"] += max(calldurations.values())
@@ -2201,17 +2230,23 @@ class MessageParser(object):
             size_files = sum([util.try_ignore(lambda: int(i["filesize"]))[0] or 0
                               for i in files])
             self.stats["counts"][author]["bytes"] += size_files
+        elif MESSAGE_TYPE_TOPIC != message["type"] \
+        and message["id"] in self.stats["shared_media"]:
+            share = self.stats["shared_media"][message["id"]]
+            self.stats["shares"] += 1
+            self.stats["counts"][author]["shares"]     += 1
+            self.stats["counts"][author]["sharebytes"] += share.get("filesize", 0)
         elif MESSAGE_TYPE_MESSAGE == message["type"]:
             self.stats["messages"] += 1
             self.stats["counts"][author]["messages"] += 1
-            self.stats["counts"][author]["chars"] += len_msg
+            self.stats["counts"][author]["chars"]    += len_msg
 
 
     def collect_dom_stats(self, dom, message, tails_new=None):
         """Updates current statistics with data from the message DOM."""
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
-        for elem in dom.getiterator():
+        for elem in dom.iter():
             if elem in to_skip:
                 continue
             text = elem.text or ""
@@ -2252,7 +2287,7 @@ class MessageParser(object):
         if not self.stats or self.stats["wordclouds"]:
             return self.stats
         stats = self.stats
-        for k in ["chars", "smschars", "files", "bytes", "calls"]:
+        for k in ["chars", "smschars", "files", "bytes", "calls", "sharebytes"]:
             stats[k] = sum(i[k] for i in stats["counts"].values())
 
         del stats["info_items"][:]
@@ -2283,6 +2318,10 @@ class MessageParser(object):
             files_value  = "%d (%s)" % (len(stats["transfers"]),
                            util.format_bytes(stats["bytes"]))
             stats["info_items"].append(("Files", files_value))
+        if stats["shares"]:
+            shares_value = "%d (%s)" % (stats["shares"],
+                           util.format_bytes(stats["sharebytes"]))
+            stats["info_items"].append(("Shared media", shares_value))
 
         if delta_date is not None:
             per_day = util.safedivf(stats["messages"], delta_date.days + 1)
@@ -2487,7 +2526,7 @@ def detect_databases(progress):
         for path in ["%s\\Users" % c, "%s\\Documents and Settings" % c]:
             if os.path.exists(path):
                 search_paths.append(path)
-                break # break for path in [..]
+                break # for path
     else:
         search_paths = [os.getenv("HOME"),
                         "/Users" if "mac" == os.name else "/home"]

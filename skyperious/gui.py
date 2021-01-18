@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    18.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -89,7 +89,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "DisabledColour":            wx.SYS_COLOUR_GRAYTEXT,
             "MainBgColour":              wx.SYS_COLOUR_WINDOW,
             "WidgetColour":              wx.SYS_COLOUR_BTNFACE,
-        }, darkcolourmap={               
+        }, darkcolourmap={
             "DBListForegroundColour":    wx.SYS_COLOUR_BTNTEXT,
             "DBListBackgroundColour":    wx.SYS_COLOUR_WINDOW,
             "LinkColour":                wx.SYS_COLOUR_HOTLIGHT,
@@ -684,7 +684,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Handler for window size event, tweaks controls and saves size."""
         event.Skip()
         conf.WindowSize = [-1, -1] if self.IsMaximized() else self.Size[:]
-        conf.save()
+        util.run_once(conf.save)
         self.list_db.SendSizeEvent()
 
 
@@ -693,7 +693,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         event.Skip()
         if not self.IsIconized():
             conf.WindowPosition = event.Position[:]
-            conf.save()
+            util.run_once(conf.save)
 
 
     def on_sys_colour_change(self, event):
@@ -776,7 +776,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_toggle_autoupdate_check(self, event):
         """Handler for toggling automatic update checking, changes conf."""
         conf.UpdateCheckAutomatic = event.IsChecked()
-        conf.save()
+        util.run_once(conf.save)
 
 
     def on_list_db_key(self, event):
@@ -830,7 +830,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def save_sort_state():
             if not self: return
             conf.DBSort = self.list_db.GetSortState()
-            conf.save()
+            util.run_once(conf.save)
         wx.CallAfter(save_sort_state) # Allow list to update sort state
 
 
@@ -840,7 +840,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def save_list_order():
             conf.DBFiles = [self.list_db.GetItemText(i)
                             for i in range(1, self.list_db.GetItemCountFull())]
-            conf.save()
+            util.run_once(conf.save)
         wx.CallAfter(save_list_order) # Allow list to update items
 
 
@@ -863,8 +863,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         else: do_filter(search)
 
 
-    def on_open_feedback(self, event):
+    def on_open_feedback(self, event=None):
         """Handler for clicking to send feedback, opens the feedback form."""
+        if not self: return
+
         if support.feedback_window:
             if not support.feedback_window.Shown:
                 support.feedback_window.Show()
@@ -932,7 +934,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                           "Update information", wx.OK | wx.ICON_WARNING)
         if check_result is not None:
             conf.LastUpdateCheck = datetime.date.today().strftime("%Y%m%d")
-            conf.save()
+            util.run_once(conf.save)
         support.update_window = None
 
 
@@ -1026,7 +1028,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filename = util.to_unicode(filename)
             if filename not in conf.DBFiles:
                 conf.DBFiles.append(filename)
-                conf.save()
+                util.run_once(conf.save)
             data = collections.defaultdict(lambda: None, name=filename)
             if os.path.exists(filename):
                 data["size"] = os.path.getsize(filename)
@@ -1107,7 +1109,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filenames = list(map(self.list_db.GetItemText, selecteds))
             self.remove_databases(filenames)
 
-        conf.save()
+        util.run_once(conf.save)
         self.update_database_list()
         guibase.status("Removed %s from database list.", util.plural("database", count))
 
@@ -1124,7 +1126,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.db_filename = None
         self.list_db.Select(0)
         self.panel_db_main.Layout()
-        conf.save()
+        util.run_once(conf.save)
 
 
     def on_remove_missing(self, event):
@@ -1136,7 +1138,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
-        conf.save()
+        util.run_once(conf.save)
         guibase.status("Removed %s from database list.",
                        util.plural("non-existing file", filenames))
 
@@ -1151,7 +1153,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
-        conf.save()
+        util.run_once(conf.save)
         t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
         guibase.status("Removed %s from database list.", t)
 
@@ -1181,7 +1183,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.db_filename = None
         self.list_db.Select(0)
         self.panel_db_main.Layout()
-        conf.save()
+        util.run_once(conf.save)
 
 
     def remove_databases(self, filenames):
@@ -1322,7 +1324,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if focused_control: focused_control.SetFocus()
             return
 
-        db, files, count, message_count, images_folder = None, [], 0, 0, False
+        db, files, count, message_count, media_folder = None, [], 0, 0, False
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
@@ -1334,7 +1336,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             errormsg = "Cannot export %s. Not a valid Skype database?" % db
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+            media_folder = "html" == format and self.dialog_savefile.FilterIndex
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db.account: formatargs.update(db.account)
@@ -1362,7 +1364,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 db.get_conversations_stats(chats)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(multi=not do_singlefile, progress=progressfunc)
-                if images_folder: opts["images_folder"] = True
+                if media_folder: opts["media_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
             except Exception as e:
@@ -1445,7 +1447,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                        self.get_unique_tab_title(title))
                 self.merger_pages[page] = (db1, db2)
                 self.UpdateAccelerators()
-                conf.save()
+                util.run_once(conf.save)
         elif db1 or db2:
             # Close DB with no owner
             for db in filter(None, [db1, db2]):
@@ -1557,7 +1559,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 # Keep numbers in sane regions
                 if type(v) in [int, long]: v = max(1, min(sys.maxint, v))
                 setattr(conf, k, v)
-            conf.save()
+            util.run_once(conf.save)
             self.MinSize = conf.MinWindowSize
 
 
@@ -1625,8 +1627,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             db.tables_list = None # Force reload
             db.update_accountinfo()
         except Exception:
+            _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise
+            raise e, None, tb
         finally: busy.Close()
 
         self.load_database(filename, db)
@@ -1681,10 +1684,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 skype.db.tables_list = None # Force reload
                 skype.db.update_accountinfo()
             except Exception:
+                _, e, tb = sys.exc_info()
                 util.try_ignore(skype.db and skype.db.close)
                 util.try_ignore(os.unlink, filename)
                 logger.exception("Error saving account %r.", skype.skype.user)
-                raise
+                raise e, None, tb
         finally: busy.Close()
 
         self.load_database(filename, skype.db)
@@ -1694,9 +1698,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         if not conf.Login.get(filename, {}).get("store"):
             conf.Login.get(filename, {}).pop("password", None)
-        page.notebook.Selection = page.pageorder[page.page_live]        
-        if not conf.Login.get(filename, {}).get("auto"):
-            page.on_live_result(action="login", opts={"auto": True})
+        page.notebook.Selection = page.pageorder[page.page_live]
+        if not conf.Login.get(filename, {}).get("sync"):
+            page.on_live_result(action="login", opts={"sync": True})
 
 
     def on_new_export(self, event):
@@ -1772,8 +1776,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         try:
             db = live.SkypeExport(efilename, filename)
         except Exception:
+            _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise
+            raise e, None, tb
 
         dlg = controls.ProgressWindow(self, "Import progress",
                                       cancel=on_cancel, agwStyle=wx.ALIGN_CENTER)
@@ -1848,7 +1853,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     def on_open_from_list_db(self, event):
         """Handler for clicking to open selected files from database list."""
         if event.GetIndex() > 0:
-            self.load_database_page(event.GetText())
+            self.load_database_page(self.list_db.GetItemText(event.GetIndex()))
 
 
     def update_database_stats(self, filename):
@@ -1935,9 +1940,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_select_list_db(self, event):
         """Handler for selecting an item in main list, updates info panel."""
+        filename = self.list_db.GetItemText(event.GetIndex())
         if event.GetIndex() > 0 \
-        and event.GetText() != self.db_filename:
-            self.db_filename = event.GetText()
+        and filename != self.db_filename:
+            self.db_filename = filename
             self.update_database_detail()
         elif event.GetIndex() == 0 and not self.panel_db_main.Shown:
             self.db_filename = None
@@ -1951,7 +1957,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             filename = self.list_db.GetItemText(selected)
             conf.LastSelectedFiles.append(filename)
             selected = self.list_db.GetNextSelected(selected)
-        conf.save()
+        util.run_once(conf.save)
 
 
     def on_exit(self, event):
@@ -2098,7 +2104,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 del self.db_pages[page]
             page_dbs = [page.db]
             guibase.status("Closed database tab for %s.", page.db, log=True)
-            conf.save()
+            util.run_once(conf.save)
         else:
             if page.is_merging:
                 response = wx.MessageBox(
@@ -2158,7 +2164,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 page.edit_searchall.SetChoices(conf.SearchHistory)
                 page.edit_searchall.ShowDropDown(False)
             self.dialog_search.SetChoices(conf.SearchHistory)
-            conf.save()
+            util.run_once(conf.save)
 
 
     def get_unique_tab_title(self, title):
@@ -2224,7 +2230,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 self.history_file.AddFileToHistory(filename)
                 util.add_unique(conf.RecentFiles, filename, -1,
                                 conf.MaxRecentFiles)
-                conf.save()
+                util.run_once(conf.save)
         return db
 
 
@@ -2252,7 +2258,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 page = DatabasePage(self.notebook, tab_title, db, self.memoryfs)
                 self.db_pages[page] = db
                 self.UpdateAccelerators()
-                conf.save()
+                util.run_once(conf.save)
                 self.Bind(wx.EVT_LIST_DELETE_ALL_ITEMS,
                           self.on_clear_searchall, page.edit_searchall)
         if page:
@@ -2306,7 +2312,7 @@ class DatabasePage(wx.Panel):
         }
         self.stats_sort_field = "name"
         self.stats_expand = {"clouds": False, "emoticons": False,
-                             "shared_images": False}
+                             "shared_media": False}
 
         # Create search structures and threads
         self.Bind(EVT_WORKER, self.on_searchall_result)
@@ -2689,14 +2695,14 @@ class DatabasePage(wx.Panel):
         html.Font.PixelSize = (0, 8)
 
         ColourManager.Manage(label_html, "BackgroundColour", "WidgetColour")
-        
+
         sizer_top.Add(label_html, proportion=1, flag=wx.GROW)
         sizer_top.Add(tb, border=5, flag=wx.TOP | wx.RIGHT |
                       wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(sizer_top, border=5, flag=wx.TOP | wx.RIGHT | wx.GROW)
         sizer.Add(html, border=5, proportion=1,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT | wx.BOTTOM)
-        wx.CallAfter(label_html.Show)
+        wx.CallAfter(lambda: label_html and label_html.Show())
 
 
     def create_page_tables(self, notebook):
@@ -3001,9 +3007,10 @@ class DatabasePage(wx.Panel):
         label_user   = wx.StaticText(panel1, label="Username:")
         edit_user    = wx.TextCtrl(panel1)
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
-        edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD, name="live_pw")
+        edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
-        check_auto   = wx.CheckBox(panel1, label="Log in and synchronize history &automatically")
+        check_login  = wx.CheckBox(panel1, label="Log &in &automatically")
+        check_sync   = wx.CheckBox(panel1, label="Synchronize history &automatically")
         edit_status  = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
         button_login = controls.NoteButton(panel1, bmp=images.ButtonLogin.Bitmap)
         label_info   = wx.html.HtmlWindow(panel1)
@@ -3024,9 +3031,11 @@ class DatabasePage(wx.Panel):
         label_login.Font = wx.Font(10, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
         check_store.ToolTip = "Store password for this database locally"
-        check_auto.ToolTip  = "Update database from Skype online service " \
+        check_login.ToolTip = "Log in to Skype online service automatically " \
+                              "on opening this database next time"
+        check_sync.ToolTip  = "Update database from Skype online service " \
                               "automatically on opening this database next time"
-        check_auto.Disable()
+        check_login.Enabled = check_sync.Enabled = False
         ColourManager.Manage(edit_status, "ForegroundColour", "DisabledColour")
         ColourManager.Manage(edit_status, "BackgroundColour", "BgColour")
         edit_status.SetEditable(False)
@@ -3034,7 +3043,7 @@ class DatabasePage(wx.Panel):
         button_login.Label = "&Log in as '%s'" % self.db.username
         button_login.Note = "After login, local database can be updated from " \
                             "Skype online service.\nAdditionally, HTML export " \
-                            "can download and include shared images."
+                            "can download and include shared media."
         label_info.SetFonts(normal_face=self.Font.FaceName, fixed_face=self.Font.FaceName, sizes=[8] * 7)
         label_info.SetPage(step.Template(templates.LOGIN_FAIL_INFO).expand())
         label_info.Hide()
@@ -3068,13 +3077,15 @@ class DatabasePage(wx.Panel):
             button_login.Disable()
             page.Disable()
 
-        self.Bind(wx.EVT_TEXT,     self.on_change_ctrl_login, edit_pw)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_store)
-        self.Bind(wx.EVT_CHECKBOX, self.on_change_ctrl_login, check_auto)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_login,        button_login)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync,         button_sync)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_sel,     button_sync_sel)
-        self.Bind(wx.EVT_BUTTON,   self.on_live_sync_stop,    button_sync_stop)
+        self.Bind(wx.EVT_TEXT,       self.on_change_ctrl_login, edit_pw)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_live_login,        edit_pw)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_login)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_sync)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
         label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                         lambda e: webbrowser.open(e.GetLinkInfo().Href))
@@ -3082,7 +3093,8 @@ class DatabasePage(wx.Panel):
         self.edit_user           = edit_user
         self.edit_pw             = edit_pw
         self.check_login_store   = check_store
-        self.check_login_auto    = check_auto
+        self.check_login_auto    = check_login
+        self.check_login_sync    = check_sync
         self.edit_login_status   = edit_status
         self.button_login        = button_login
         self.label_login_fail    = label_info
@@ -3109,7 +3121,9 @@ class DatabasePage(wx.Panel):
         sizer_login.AddSpacer(5)
         sizer_login.Add(check_store, border=5, flag=wx.ALL | wx.GROW)
         sizer_login.AddSpacer(5)
-        sizer_login.Add(check_auto,  border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.Add(check_login, border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.AddSpacer(5)
+        sizer_login.Add(check_sync,  border=5, flag=wx.ALL | wx.GROW)
 
         sizer1.Add(label_login,  border=5,  flag=wx.ALL)
         sizer1.Add(sizer_login,  border=20, flag=wx.TOP | wx.GROW)
@@ -3168,8 +3182,10 @@ class DatabasePage(wx.Panel):
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
-        self.check_login_auto.Value  = opts.get("auto",  False)
+        self.check_login_auto.Value  = opts.get("auto",  False) and self.check_login_store.Value
+        self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
+        self.check_login_sync.Enable(self.check_login_auto .Value)
 
 
     def on_change_ctrl_login(self, event):
@@ -3179,18 +3195,29 @@ class DatabasePage(wx.Panel):
             name, value = "password", util.obfuscate(value)
         elif ctrl is self.check_login_store: name = "store"
         elif ctrl is self.check_login_auto:  name = "auto"
+        elif ctrl is self.check_login_sync:  name = "sync"
+        if not self.check_login_store.Value: self.check_login_auto.Value = False
+        if not self.check_login_auto .Value: self.check_login_sync.Value = False
         self.check_login_auto.Enable(self.check_login_store.Value)
+        self.check_login_sync.Enable(self.check_login_auto.Value)
         conf.Login.setdefault(self.db.filename, {})[name] = value
         if "store" == name and value and self.edit_pw.Value:
             pw = util.obfuscate(self.edit_pw.Value)
             conf.Login[self.db.filename]["password"] = pw
         if not self.check_login_store.Value:
-            self.check_login_auto.Value = False
+            self.check_login_auto.Value = self.check_login_sync.Value = False
             conf.Login[self.db.filename].pop("store",    None)
             conf.Login[self.db.filename].pop("auto",     None)
+            conf.Login[self.db.filename].pop("sync",     None)
             conf.Login[self.db.filename].pop("password", None)
+        if not self.check_login_auto.Value:
+            self.check_login_sync.Value = False
+            conf.Login[self.db.filename].pop("auto",     None)
+            conf.Login[self.db.filename].pop("sync",     None)
+        if not self.check_login_sync.Value:
+            conf.Login[self.db.filename].pop("sync",     None)
         if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
-        conf.save()
+        util.run_once(conf.save)
 
 
     def on_change_list_chats_sync(self, event):
@@ -3206,11 +3233,11 @@ class DatabasePage(wx.Panel):
             self.stc_history.SetFocus()
 
 
-    def on_live_login(self, event=None, auto=False):
+    def on_live_login(self, event=None, sync=False):
         """
         Attempts to login to Skype online service.
 
-        @param   auto  whether sync should start automatically after login
+        @param   sync  whether sync should start automatically after login
         """
         if not self or not self.edit_pw.Value or not live.skpy: return
         self.edit_login_status.Value = "Logging in to Skype.."
@@ -3218,7 +3245,7 @@ class DatabasePage(wx.Panel):
             if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
         self.button_login.Disable() 
         self.panel_login.Refresh()
-        action = {"action": "login", "password": self.edit_pw.Value, "auto": auto}
+        action = {"action": "login", "password": self.edit_pw.Value, "sync": sync}
         self.worker_live.work(action)
 
 
@@ -3313,6 +3340,7 @@ class DatabasePage(wx.Panel):
                     self.button_sync.Enable()
                     self.button_sync_sel.Enable()
                     self.button_sync_stop.Disable()
+                    if not self.get_unsaved_grids(): self.on_refresh_tables()
                     wx.Bell()
                     self.update_info_page()
                 else:
@@ -3322,7 +3350,7 @@ class DatabasePage(wx.Panel):
                         if not chat:
                             cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
                             self.chats.extend(cc)
-                            chat = cc[0]
+                            if cc: chat = cc[0]
 
                         title = chat["title_long_lc"] if chat else result["chat"]
                         if len(title) > 35:
@@ -3340,7 +3368,7 @@ class DatabasePage(wx.Panel):
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
                     elif result.get("start") and "messages" != result["table"] and self.worker_live.is_working():
-                        plabel = slabel = "Synchronizing %s.." % ("contacts" if "contacts" == result["table"] else "messages")
+                        plabel = slabel = "Synchronizing messages.."
 
                     if result.get("end"):
                         slabel = "Synchronized %s" % result["table"]
@@ -3383,10 +3411,6 @@ class DatabasePage(wx.Panel):
                                 if result["updated"]: slabel += ", %s updated" % result["updated"]
                                 slabel += "."
 
-                        if "contacts" == result["table"]:
-                            t = ", ".join("%s %s" % (result[k], k) for k in ("new", "updated") if result[k])
-                            slabel += (": %s" % t if t else "") + "."
-
                 if plabel:
                     self.label_sync_progress.Label = plabel
                 if slabel:
@@ -3408,7 +3432,9 @@ class DatabasePage(wx.Panel):
                     self.label_login_fail.Hide()
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
-                    if result.get("opts", {}).get("auto"): wx.CallAfter(self.on_live_sync)
+                    if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
+                self.check_login_auto.Enable(self.check_login_store.Value)
+                self.check_login_sync.Enable(self.check_login_auto .Value)
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
@@ -3610,7 +3636,7 @@ class DatabasePage(wx.Panel):
         self.button_refresh_fileinfo.Enabled = True
 
 
-    def on_refresh_tables(self, event):
+    def on_refresh_tables(self, event=None):
         """
         Refreshes the table tree and open table data. Asks for confirmation
         if there are uncommitted changes.
@@ -3855,7 +3881,7 @@ class DatabasePage(wx.Panel):
 
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -3864,7 +3890,7 @@ class DatabasePage(wx.Panel):
             messages = self.stc_history.GetMessages()
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(progress=progressfunc, noskip=True, messages=messages)
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
@@ -4020,13 +4046,13 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if not chats or wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        path, images_folder = self.dialog_savefile.GetPath(), False
+        path, media_folder = self.dialog_savefile.GetPath(), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
         else:
             path = os.path.dirname(path)
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            images_folder = "html" == format and self.dialog_savefile.FilterIndex
+            media_folder = "html" == format and self.dialog_savefile.FilterIndex
 
         msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
               ("all " if do_all else "", self.db.filename, format.upper(), path)
@@ -4037,7 +4063,7 @@ class DatabasePage(wx.Panel):
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(multi=not do_singlefile, progress=progressfunc, timerange=timerange,
                         noskip=not do_all)
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats(chats, path, format, self.db, opts)
             files, count, message_count = result
         except Exception as e:
@@ -4071,7 +4097,7 @@ class DatabasePage(wx.Panel):
 
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-        images_folder = "html" == format and self.dialog_savefile.FilterIndex
+        media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
 
@@ -4090,7 +4116,7 @@ class DatabasePage(wx.Panel):
                 guibase.status("Filtering and exporting to %s.", filepath, log=True)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(messages=messages, progress=progressfunc)
-                if images_folder: opts["images_folder"] = True
+                if media_folder: opts["media_folder"] = True
                 result = export.export_chats([self.chat], filepath, format, self.db, opts)
                 files, count, message_count = result
                 guibase.status("Exported %s to %s.",
@@ -4188,7 +4214,7 @@ class DatabasePage(wx.Panel):
             self.html_stats.GetScrollRange(wx.HORIZONTAL),
             self.html_stats.GetScrollRange(wx.VERTICAL)
         ]
-        
+
 
     def on_click_html_stats(self, event):
         """
@@ -4593,7 +4619,7 @@ class DatabasePage(wx.Panel):
             self.TopLevelParent.dialog_search.SetChoices(conf.SearchHistory)
             self.edit_searchall.SetChoices(conf.SearchHistory)
             self.edit_searchall.SetFocus()
-            conf.save()
+            util.run_once(conf.save)
 
 
     def on_delete_tab_callback(self, tab):
@@ -5241,7 +5267,8 @@ class DatabasePage(wx.Panel):
             dts = "first_message_datetime", "last_message_datetime"
             date_range = [chat[n].date() if chat[n] else None for n in dts]
             self.chat_filter["daterange"] = date_range
-            self.chat_filter["startdaterange"] = date_range
+            if chat != self.chat:
+                self.chat_filter["startdaterange"] = date_range
             dates_range = dates_values = date_range
             avatar_default = images.AvatarDefault.Bitmap
             if chat != self.chat:
@@ -5253,9 +5280,8 @@ class DatabasePage(wx.Panel):
                 il.Add(avatar_default)
                 plist.AssignImageList( il, wx.IMAGE_LIST_SMALL)
                 index = 0
-                # wx will otherwise open a warning dialog on image error
 
-                nolog = wx.LogNull()
+                nolog = wx.LogNull() # wx will otherwise open a warning dialog on image error
                 for p in chat["participants"]:
                     b = 0
                     if not p["contact"].get("avatar_bitmap"):
@@ -5295,6 +5321,11 @@ class DatabasePage(wx.Panel):
             try:
                 self.stc_history.Populate(chat, self.db,
                     center_message_id=center_message_id)
+                if center_message_id \
+                and not self.stc_history.IsMessageShown(center_message_id):
+                    self.stc_history.SetFilter(self.chat_filter)
+                    self.stc_history.RefreshMessages(center_message_id)
+                    self.stc_history.FocusMessage(center_message_id)
             except Exception as e:
                 guibase.status("Error loading %s: %s",
                                chat["title_long_lc"], util.format_exc(e))
@@ -5313,7 +5344,8 @@ class DatabasePage(wx.Panel):
             if not any(filter(None, dates_range)):
                 dates_range = dates_values
             self.chat_filter["daterange"] = dates_range
-            self.chat_filter["startdaterange"] = dates_values
+            if chat != self.chat or not all(self.chat_filter["startdaterange"]):
+                self.chat_filter["startdaterange"] = dates_values
         self.range_date.SetRange(*dates_range)
         self.edit_filterdate1.Range = self.edit_filterdate2.Range = dates_range
         self.range_date.SetValues(*dates_values)
@@ -5527,7 +5559,7 @@ class DatabasePage(wx.Panel):
         wx.CallLater(200, self.load_tables_data)
         self.update_liveinfo()
         if conf.Login.get(self.db.filename, {}).get("auto"):
-            wx.CallLater(1000, self.on_live_login, auto=True)
+            wx.CallLater(1000, self.on_live_login, sync=conf.Login[self.db.filename].get("sync"))
 
 
     def load_later_data(self):
@@ -5536,6 +5568,8 @@ class DatabasePage(wx.Panel):
         statistics for all chats, used as a background callback to speed
         up page opening.
         """
+        if not self: return
+
         try:
             # Load chat statistics and update the chat list
             self.db.get_conversations_stats(self.chats)
@@ -5971,7 +6005,7 @@ class MergerPage(wx.Panel):
 
         filepath = dialog.GetPath()
         format = export.CHAT_EXTS[dialog.FilterIndex]
-        images_folder = "html" == format and dialog.FilterIndex
+        media_folder = "html" == format and dialog.FilterIndex
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -5979,7 +6013,7 @@ class MergerPage(wx.Panel):
         try:
             messages = self.db1.message_iterator(self.chat_diff["messages"])
             opts = dict(messages=messages, progress=lambda *args: wx.SafeYield())
-            if images_folder: opts["images_folder"] = True
+            if media_folder: opts["media_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db1, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
@@ -8574,7 +8608,7 @@ class AboutDialog(wx.Dialog):
         html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
                   lambda e: webbrowser.open(e.GetLinkInfo().Href))
         button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
-        button_feedback.Bind(wx.EVT_BUTTON, parent.on_open_feedback)
+        button_feedback.Bind(wx.EVT_BUTTON, self.OnOpenFeedback)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
         self.Sizer.Add(html, proportion=1, flag=wx.GROW)
@@ -8587,6 +8621,12 @@ class AboutDialog(wx.Dialog):
         self.Layout()
         self.Size = (self.Size[0], html.VirtualSize[1] + 70)
         self.CenterOnParent()
+
+
+    def OnOpenFeedback(self, event):
+        """Handler for feedback button, closes dialog and opens feedback dialog."""
+        wx.CallAfter(self.Parent.on_open_feedback)
+        self.Close()
 
 
     def OnSysColourChange(self, event):

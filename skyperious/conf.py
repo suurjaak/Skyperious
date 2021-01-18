@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2020
+@modified    18.01.2021
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.3.1"
-VersionDate = "04.10.2020"
+Version = "4.4"
+VersionDate = "18.01.2021"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -55,10 +55,10 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedImageAutoDownload",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
-    "WordCloudWordsAuthorMax"
+    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
+    "SharedImageAutoDownload", "StatisticsPlotWidth", "StatusFlashLength",
+    "UpdateCheckInterval", "WordCloudLengthMin", "WordCloudCountMin", 
+    "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -300,6 +300,9 @@ PlotCallsColour = "#FF6C91"
 """Colour for files plot in chat statistics."""
 PlotFilesColour = "#33DD66"
 
+"""Colour for shares plot in chat statistics."""
+PlotSharesColour = "#FFB333"
+
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
@@ -329,9 +332,10 @@ StatisticsPlotWidth = 150
 """Width of the chat emoticons plots, in pixels."""
 EmoticonsPlotWidth = 200
 
-"""
-Download shared images from Skype online service for HTML export.
-"""
+"""Download shared audio & video from Skype online service for HTML export."""
+SharedAudioVideoAutoDownload = True
+
+"""Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
 
 """Duration of status message on program statusbar, in milliseconds."""
@@ -365,8 +369,9 @@ def load():
     if not Defaults:
         # Instantiate OS- and user-specific paths
         try:
-            p = appdirs.user_config_dir(Title, False)
-            configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+            p = appdirs.user_config_dir(Title, appauthor=False)
+            # Try user-specific path first, then path under application folder
+            configpaths.insert(0, os.path.join(p, "%s.ini" % Title.lower()))
         except Exception: pass
         try: VarDirectory = appdirs.user_data_dir(Title, False)
         except Exception: pass
@@ -380,9 +385,8 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        # Try user-specific path first, then path under application folder
         for path in configpaths[::-1]:
-            if os.path.isfile(path) and parser.read(ConfigFile):
+            if os.path.isfile(path) and parser.read(path):
                 break # for path
 
         def parse_value(name):
@@ -406,8 +410,11 @@ def save():
     """Saves FileDirectives into ConfigFile."""
     configpaths = [ConfigFile]
     try:
-        p = appdirs.user_config_dir(Title, False)
-        configpaths.append(os.path.join(p, "%s.ini" % Title.lower()))
+        p = appdirs.user_config_dir(Title, appauthor=False)
+        userpath = os.path.join(p, "%s.ini" % Title.lower())
+        # Pick only userpath if exists, else try application folder first
+        if os.path.isfile(userpath): configpaths = [userpath]
+        else: configpaths.append(userpath)
     except Exception: pass
 
     section = "*"
@@ -417,7 +424,6 @@ def save():
     parser.add_section(section)
     try:
         for path in configpaths:
-            # Try path under application folder first, then user-specific path
             try: os.makedirs(os.path.dirname(path))
             except Exception: pass
             try: f = open(path, "wb")

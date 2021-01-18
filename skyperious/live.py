@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    25.08.2020
+@modified    14.01.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import struct
+import sys
 import tarfile
 import tempfile
 import time
@@ -100,14 +101,28 @@ class SkypeLogin(object):
             kwargslist.insert(0, {"tokenFile": path}) # Try with existing token
         else:
             util.create_file(path)
+
         for kwargs in kwargslist:
             try: self.skype = skpy.Skype(**kwargs)
             except Exception:
                 if kwargs is not kwargslist[-1]: continue # for kwargs
+                _, e, tb = sys.exc_info()
+
+                if self.username and password and "@" not in self.username:
+                    # Special case: if a legacy account is linked to a MS account,
+                    # it needs to use soapLogin() explicitly
+                    # (skpy auto-selects liveLogin() for legacy accounts).
+                    sk = skpy.Skype(tokenFile=path, connect=False)
+                    try: sk.conn.soapLogin(self.username, password)
+                    except Exception: _, e, tb = sys.exc_info()
+                    else:
+                        self.skype = sk
+                        break # for kwargs
+
                 logger.exception("Error logging in to Skype as '%s'.", self.username)
                 try: os.unlink(path)
                 except Exception: pass
-                raise
+                raise e, None, tb
             else: break # for kwargs
         if init_db: self.init_db()
 
@@ -396,9 +411,8 @@ class SkypeLogin(object):
             if item.raw.get("emails"):
                 result.update(emails=" ".join(item.raw["emails"]))
 
-            if item.avatar and "?" in item.avatar:
-                # https://avatar.skype.com/v1/avatars/username/public?auth_key=1455825688
-                raw = self.download_image(item.avatar)
+            if item.avatar: # https://avatar.skype.com/v1/avatars/username/public
+                raw = self.download_media(item.avatar)
                 # main.db has NULL-byte in front of image binary
                 if raw: result.update(avatar_image="\0" + raw)
 
@@ -431,7 +445,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_image(item.picture, category="avatar")
+                    raw = self.get_api_media(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw)
             else: result = None
@@ -566,8 +580,8 @@ class SkypeLogin(object):
 
     def populate(self, chats=()):
         """
-        Retrieves all available contacts, chats and messages, or selected chats only.
-        
+        Retrieves all chats and messages, or selected chats only.
+
         @param   chats  list of chat identities to populate if not everything
         """
         if self.populated:
@@ -581,7 +595,6 @@ class SkypeLogin(object):
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
-        if not chats: self.populate_contacts()
         self.populate_history(chats)
         self.cache.clear()
         self.populated = True
@@ -602,8 +615,8 @@ class SkypeLogin(object):
         getter = lambda c: self.request(self.skype.chats.chat, c, __raise=False)
         selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
 
-        updateds, new, mtotalnew, mtotalupdated, run = set(), 0, 0, 0, True
-        msgids = set()
+        new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
+        updateds, completeds, msgids = set(), set(), set()
         while run:
             mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
             if not mychats: break # while run
@@ -620,26 +633,29 @@ class SkypeLogin(object):
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
 
                 if cidentity in updateds: continue # for chat
-                try: action = self.save("chats", chat)
-                except Exception:
-                    logger.exception("Error saving chat %r.", chat)
-                    if self.progress and not self.progress():
-                        run = False
-                        break # for chat
-                    continue # for chat
-                if self.SAVE.INSERT == action: new += 1
-                if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
-                    updateds.add(cidentity)
-                if self.progress and not self.progress(
-                    action="populate", table="messages", chat=cidentity, start=True
-                ):
-                    run = False
-                    break # for chat
 
                 mcount, mnew, mupdated, mrun = 0, 0, 0, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
+
+                    if msgs and cidentity not in self.cache["chats"]:
+                        # Save chat only if there are any messages
+                        try: action = self.save("chats", chat)
+                        except Exception:
+                            logger.exception("Error saving chat %r.", chat)
+                            if self.progress and not self.progress(): run = False
+                            mrun = False
+                            break # while mrun
+                        if self.SAVE.INSERT == action: new += 1
+                        if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                            updateds.add(cidentity)
+                        if self.progress and not self.progress(
+                            action="populate", table="messages", chat=cidentity, start=True
+                        ):
+                            run = mrun = False
+                            break # while mrun
+
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)
                         except Exception:
@@ -666,7 +682,19 @@ class SkypeLogin(object):
                     if not msgs:
                         break # while mrun
                 mtotalnew, mtotalupdated = mtotalnew + mnew, mtotalupdated + mupdated
-                if (mtotalnew or mtotalupdated): updateds.add(cidentity)
+                if (mnew or mupdated):
+                    updateds.add(cidentity)
+                    if cidentity in self.cache["chats"]:
+                        row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
+                                              "MAX(timestamp) AS last "
+                                              "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity]
+                        ).fetchone()
+                        self.db.execute("UPDATE conversations SET last_message_id = :id, "
+                                        "last_activity_timestamp = :last, "
+                                        "creation_timestamp = COALESCE(creation_timestamp, :first) "
+                                        "WHERE id = :convo_id", row)
+                        completeds.add(cidentity)
+
                 if self.progress and not self.progress(action="populate", table="messages",
                     chat=cidentity, end=True, count=mcount,
                     new=mnew, updated=mupdated, first=mfirst, last=mlast
@@ -676,7 +704,8 @@ class SkypeLogin(object):
                 if not mrun: break # for chat
             if chats: break # while run
 
-        ids = [self.cache["chats"][x]["id"] for x in updateds if x in self.cache["chats"]]
+        ids = [self.cache["chats"][x]["id"] for x in updateds
+               if x in self.cache["chats"] and x not in completeds]
         for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
             # Divide into chunks: SQLite can take up to 999 parameters.
             idstr = ", ".join(":id%s" % (j+1) for j in range(len(myids)))
@@ -698,68 +727,31 @@ class SkypeLogin(object):
         )
 
 
-    def populate_contacts(self):
-        """Retrieves the list of contacts."""
-        if self.progress and not self.progress(action="populate", table="contacts", start=True):
-            return
-        if not self.cache: self.build_cache()
-
-        self.request(self.skype.contacts.sync)
-        contacts = set(self.skype.contacts.contactIds)
-        total = len(contacts)
-        if self.progress and not self.progress(
-            action="populate", table="contacts", total=total
-        ):
-            return
-        count, new, updated = 0, 0, 0
-        for username in contacts:
-            contact = self.request(self.skype.contacts.contact, username, __raise=False)
-            if not contact: continue # for username
-            try: action = self.save("contacts", contact)
-            except Exception:
-                logger.exception("Error saving contact %r.", contact)
-                if self.progress and not self.progress():
-                    break # for username
-                continue # for username
-            if self.SAVE.INSERT == action: new     += 1
-            if self.SAVE.UPDATE == action: updated += 1
-            count += 1
-            if self.progress and not self.progress(
-                action="populate", table="contacts", count=count, total=total, new=new, updated=updated
-            ): break # for username
-        if self.progress: self.progress(
-            action="populate", table="contacts", end=True, count=count, total=total, new=new, updated=updated
-        )
-
-
-    def get_api_image(self, url, category=None):
+    def get_api_media(self, url, category=None):
         """
-        Returns image raw binary from Skype API URL via login, or None.
+        Returns media raw binary from Skype API URL via login, or None.
 
-        @param   category  type of image, e.g. "avatar"
+        @param   category  type of media, e.g. "avatar" for avatar image
         """
-        if "avatar" == category and not url.endswith("/views/avatar_fullsize"):
-            url += "/views/avatar_fullsize"
-        elif "/views/" not in url:
-            url += "/views/imgpsh_fullsize"
-
+        url = make_media_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
         for url in urls:
-            raw = self.download_image(url)
+            raw = self.download_media(url)
             if raw: return raw
 
 
-    def download_image(self, url):
-        """Downloads and returns image raw binary from Skype URL via login, or None."""
+    def download_media(self, url):
+        """Downloads and returns media raw binary from Skype URL via login, or None."""
         try:
             r = self.request(self.skype.conn, "GET", url,
                              auth=skpy.SkypeConnection.Auth.Authorize,
                              __retry=False)
-            if r.ok and r.content and "image" in r.headers.get("content-type", ""):
+            hdr = lambda r: r.headers.get("content-type", "")
+            if r.ok and r.content and any(x in hdr(r) for x in ("image", "audio", "video")):
                 return r.content
         except Exception: pass
 
@@ -885,7 +877,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         self.get_tables()
         self.table_objects.setdefault("contacts", {})
         self.table_rows.setdefault("participants", [])
-        chat, msg, edited_msgs, skip_chat = {}, {}, {}, False
+        chat, msg, edited_msgs, skip_chat, skip_msg = {}, {}, {}, False, False
         counts = {"chats": 0, "messages": 0}
         lastcounts = dict(counts)
         logger.info("Parsing Skype export file %s.", self.export_path)
@@ -912,20 +904,33 @@ class SkypeExport(skypedata.SkypeDatabase):
                 if "conversations.item" == prefix:
                     if skip_chat:
                         skip_chat = False
-                        self.delete_row("conversations", chat, log=False)
-                        counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
-                                                           [chat["id"]], log=False).rowcount
+                        try:
+                            self.delete_row("conversations", chat, log=False)
+                            counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
+                                                               [chat["id"]], log=False).rowcount
+                            self.execute("DELETE FROM participants WHERE convo_id = ?",
+                                         [chat["id"]], log=False)
+                        except Exception:
+                            logger.warn("Error dropping from database chat %s.", chat, exc_info=True)
                         counts["chats"] -= 1
                     else:
-                        chat = self.export_finalize_chat(chat)
-                        self.update_row("conversations", chat, chat, log=False)
+                        try:
+                            chat = self.export_finalize_chat(chat)
+                            self.update_row("conversations", chat, chat, log=False)
+                        except Exception:
+                            logger.warn("Error updating chat %s.", chat, exc_info=True)
                     edited_msgs.clear()
+                    skip_msg = False
                 elif "conversations.item.MessageList.item" == prefix:
-                    if not skip_chat: 
-                        msg = self.export_finalize_message(msg, chat, edited_msgs)
-                        if msg:
-                            msg["id"] = self.insert_row("messages", msg, log=False)
-                            counts["messages"] += 1
+                    if not skip_chat and not skip_msg:
+                        try:
+                            msg = self.export_finalize_message(msg, chat, edited_msgs)
+                            if msg:
+                                msg["id"] = self.insert_row("messages", msg, log=False)
+                                counts["messages"] += 1
+                        except Exception:
+                            logger.warn("Error finalizing and inserting message %s.", msg, exc_info=True)
+                    skip_msg = False
 
             # List start: ("nested path", "start_array", None)
             elif "start_array" == evt: pass
@@ -947,65 +952,103 @@ class SkypeExport(skypedata.SkypeDatabase):
                     self.update_accountinfo()
 
                 elif "conversations.item.id" == prefix:
-                    # Skip specials like "48:calllogs" or "28:concierge"
-                    skip_chat = value.startswith("48:") or value.startswith("28:")
-                    chat["identity"] = value
-                    chat["type"] = skypedata.CHATS_TYPE_GROUP
-                    if value.startswith("8:"):
-                        chat["identity"] = value[2:]
-                        chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+                    try:
+                        # Skip specials like "48:calllogs" or "28:concierge"
+                        skip_chat = value.startswith("48:") or value.startswith("28:")
+                        chat["identity"] = value
+                        chat["type"] = skypedata.CHATS_TYPE_GROUP
+                        if value.startswith("8:"):
+                            chat["identity"] = value[2:]
+                            chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+                    except Exception:
+                        logger.warn("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
+                        skip_chat = True
 
                 elif "conversations.item.displayName" == prefix:
-                    chat["displayname"] = value
+                    if isinstance(value, basestring):
+                        chat["displayname"] = value
 
                 elif "conversations.item.threadProperties.topic" == prefix:
-                    chat["meta_topic"] = value
+                    if isinstance(value, basestring):
+                        chat["meta_topic"] = value
 
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
-                    for identity in map(id_to_identity, json.loads(value)):
-                        if identity not in self.table_objects["contacts"] and identity != self.id:
-                            contact = dict(skypename=identity, is_permanent=1)
-                            contact["id"] = self.insert_row("contacts", contact)
-                            self.table_objects["contacts"][identity] = contact
-                        p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
-                        p["id"] = self.insert_row("participants", p, log=False)
-                        self.table_rows["participants"].append(p)
+                    try:
+                        for identity in map(id_to_identity, json.loads(value)):
+                            if not identity: continue # for identity
+                            if identity not in self.table_objects["contacts"] and identity != self.id:
+                                contact = dict(skypename=identity, is_permanent=1)
+                                contact["id"] = self.insert_row("contacts", contact)
+                                self.table_objects["contacts"][identity] = contact
+                            p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
+                            p["id"] = self.insert_row("participants", p, log=False)
+                            self.table_rows["participants"].append(p)
+                    except Exception:
+                        logger.warn("Error parsing chat members from %s for %s.", value, chat, exc_info=True)
+                        skip_chat = True
 
                 elif "conversations.item.MessageList.item.id" == prefix:
-                    if skip_chat: continue # while True
-                    pk_id, guid = make_message_ids(value)
-                    msg.update(pk_id=pk_id, guid=guid)
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        pk_id, guid = make_message_ids(value)
+                        msg.update(pk_id=pk_id, guid=guid)
+                    except Exception:
+                        logger.warn("Error parsing message ID %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.from" == prefix:
-                    if skip_chat: continue # while True
-                    msg["author"] = id_to_identity(value)
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        identity = id_to_identity(value)
+                        if identity: msg["author"] = identity
+                        else: skip_msg = True
+                    except Exception:
+                        logger.warn("Error parsing message author %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.displayName" == prefix:
-                    if value: msg["from_dispname"] = value
+                    if skip_chat or skip_msg: continue # while True
+                    if value and isinstance(value, basestring):
+                        msg["from_dispname"] = value
 
                 elif "conversations.item.MessageList.item.content" == prefix:
+                    if skip_chat or skip_msg: continue # while True
                     msg["body_xml"] = value
 
                 elif "conversations.item.MessageList.item.originalarrivaltime" == prefix:
-                    if skip_chat: continue # while True
-                    ts = self.export_parse_timestamp(value)
-                    msg["timestamp"] = int(ts)
-                    msg["timestamp__ms"] = ts * 1000
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        ts = self.export_parse_timestamp(value)
+                        msg["timestamp"] = int(ts)
+                        msg["timestamp__ms"] = ts * 1000
+                    except Exception:
+                        logger.warn("Error parsing message timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.edittime" == prefix:
-                    msg["edited_timestamp"] = int(value) / 1000
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        msg["edited_timestamp"] = int(value) / 1000
+                    except Exception:
+                        logger.warn("Error parsing message edited timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.deletetime" == prefix:
-                    if skip_chat: continue # while True
-                    msg["edited_timestamp"] = int(value) / 1000
-                    msg["body_xml"] = ""
+                    if skip_chat or skip_msg: continue # while True
+                    try:
+                        msg["edited_timestamp"] = int(value) / 1000
+                        msg["body_xml"] = ""
+                    except Exception:
+                        logger.warn("Error parsing message deleted timestamp %r for chat %s.", value, chat, exc_info=True)
+                        skip_msg = True
 
                 elif "conversations.item.MessageList.item.properties.isserversidegenerated" == prefix:
-                    if skip_chat: continue # while True
+                    if skip_chat or skip_msg: continue # while True
                     if value: msg["__generated"] = True
 
                 elif "conversations.item.MessageList.item.messagetype" == prefix:
+                    if skip_chat or skip_msg: continue # while True
                     msg["__type"] = value # For post-processing
 
             if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
@@ -1261,6 +1304,8 @@ def id_to_identity(chatid):
     or "19:xyz@thread.skype" for newer group chats.
     """
     result = chatid
+    if isinstance(result, dict): result = result.get("MemberMri")
+    if not isinstance(result, basestring): result = None
     if result and not result.endswith("@thread.skype"):
         result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
         if result.endswith("@p2p.thread.skype"):
@@ -1328,3 +1373,27 @@ def process_message_edit(msg):
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
     except Exception:
         if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
+
+
+def make_media_url(url, category=None):
+    """
+    Returns URL with appropriate path appended if Skype shared media URL,
+    e.g. "https://api.asm.skype.com/v1/objects/0-weu-d11-../views/imgpsh_fullsize"
+    for  "https://api.asm.skype.com/v1/objects/0-weu-d11-..".
+
+    @param   category  type of media, e.g. "avatar" for avatar image
+    """
+    if not url or "api.asm.skype.com/" not in url: return url
+
+    if   "avatar"  == category and not url.endswith("/views/avatar_fullsize"):
+        url += "/views/avatar_fullsize"
+    elif "audio"   == category and not url.endswith("/views/audio"):
+        url += "/views/audio"
+    elif "video"   == category and not url.endswith("/views/video"):
+        url += "/views/video"
+    elif "sticker" == category and not url.endswith("/views/thumbnail"):
+        url += "/views/thumbnail"
+    elif "/views/" not in url:
+        url += "/views/imgpsh_fullsize"
+
+    return url

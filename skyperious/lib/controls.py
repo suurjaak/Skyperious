@@ -41,7 +41,7 @@ Stand-alone GUI components for wx:
 
 - ScrollingHtmlWindow(wx.html.HtmlWindow):
   HtmlWindow that remembers its scroll position on resize and append.
-    
+
 - SearchableStyledTextCtrl(wx.Panel):
   A wx.stc.StyledTextCtrl with a search bar that appears on demand, top or
   bottom of the control.
@@ -63,7 +63,7 @@ Stand-alone GUI components for wx:
 
 - TabbedHtmlWindow(wx.Panel):
   wx.html.HtmlWindow with tabs for different content pages.
-    
+
 - TextCtrlAutoComplete(wx.TextCtrl):
   A text control with autocomplete using a dropdown list of choices. During
   typing, the first matching choice is appended to textbox value, with the
@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.09.2020
+@modified    18.01.2021
 ------------------------------------------------------------------------------
 """
 import collections
@@ -103,7 +103,7 @@ import wx.lib.agw.labelbook
 import wx.lib.agw.ultimatelistctrl
 try: # ShapedButton requires PIL, might not be installed
     import wx.lib.agw.shapedbutton
-except Exception: pass 
+except Exception: pass
 import wx.lib.embeddedimage
 import wx.lib.gizmos
 import wx.lib.mixins.listctrl
@@ -613,7 +613,7 @@ class DatePickerCtrl(wx.ComboCtrl):
     """
     A control that allows the user to input a date, either into a text box
     from keyboard, or using a popup calendar control.
-    
+
     Like wx.adv.DatePickerCtrl, but uses Python dates,
     and allows specifying date format.
     """
@@ -1657,7 +1657,7 @@ class RangeSlider(wx.Panel):
         # 2.3 provides a bit of space between 2 labels
         best.width  = 2.3 * extent[0]
         # +1 for upper gap plus label height plus optional marker label height,
-        # plus all set positions 
+        # plus all set positions
         best.height = (1 + (1 + self.MARKER_LABEL_SHOW) * sum(extent[1:3])
                        + self.RANGE_TOP + self.RANGE_LABEL_TOP_GAP
                        + self.RANGE_LABEL_BOTTOM_GAP + self.TICK_HEIGHT
@@ -4089,12 +4089,16 @@ class TabbedHtmlWindow(wx.Panel):
         ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_WINDOW)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
+        agwStyle = (wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
+                    wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
+                    wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
+                    wx.lib.agw.flatnotebook.FNB_VC8)
+        if "linux2" == sys.platform and wx.VERSION[:3] == (4, 1, 1):
+            # wxPython 4.1.1 on Linux crashes with FNB_VC8
+            agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
         notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
-            parent=self, size=(-1, 27),
-            agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
-                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
-                     wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
-                     wx.lib.agw.flatnotebook.FNB_VC8)
+            parent=self, size=(-1, 27), style=wx.NB_TOP,
+            agwStyle=agwStyle)
         self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
 
         self.Sizer.Add(notebook, flag=wx.GROW)
@@ -4175,7 +4179,7 @@ class TabbedHtmlWindow(wx.Panel):
                                   self.GetScrollPos(wx.VERTICAL)]
             tab["scrollrange"] = [self.GetScrollRange(wx.HORIZONTAL),
                                   self.GetScrollRange(wx.VERTICAL)]
-        
+
 
     def _OnChangeTab(self, event):
         """Handler for selecting another tab in notebook, loads tab content."""

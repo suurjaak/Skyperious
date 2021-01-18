@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    19.09.2020
+@modified    14.01.2021
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import collections, base64, datetime, imghdr, json, logging, os, pyparsing, re, string, sys, urllib, wx
+#import collections, base64, datetime, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, urllib, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -54,9 +54,9 @@ from skyperious.lib.vendor import step
 <!DOCTYPE HTML><html lang="">
 <head>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-  <meta name="generator" content="{{conf.Title}} {{conf.Version}}" />
-  <title>Skype {{chat["title_long_lc"]}}</title>
-  <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{!images.Icon16x16_8bit.data}}"/>
+  <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
+  <title>Skype {{ chat["title_long_lc"] }}</title>
+  <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
   <style>
     .highlight1  { background-color: #FFFF66; }
     .highlight2  { background-color: #A0FFFF; }
@@ -69,9 +69,9 @@ from skyperious.lib.vendor import step
     .highlight9  { background-color: #82C0FF; }
     .highlight10 { background-color: #9F8CFF; }
     body {
-      font-family: {{conf.HistoryFontName}};
+      font-family: {{ conf.HistoryFontName }};
       font-size: 11px;
-      background: {{conf.HistoryBackgroundColour}};
+      background: {{ conf.HistoryBackgroundColour }};
       color: black;
       margin: 0 10px 0 10px;
     }
@@ -83,7 +83,7 @@ from skyperious.lib.vendor import step
     #body_table > tbody > tr > td {
       background: white;
       width: 800px;
-      font-family: {{conf.HistoryFontName}};
+      font-family: {{ conf.HistoryFontName }};
       font-size: 11px;
       border-radius: 10px;
       padding: 10px;
@@ -122,14 +122,14 @@ from skyperious.lib.vendor import step
     table.quote td:last-child {
       padding: 0 0 0 5px;
     }
-    a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; cursor: pointer; }
+    a, a.visited { color: {{ conf.ExportLinkColour }}; text-decoration: none; cursor: pointer; outline: 0; }
     a:hover, a.visited:hover { text-decoration: underline; }
     #footer {
       text-align: center;
       padding-bottom: 10px;
       color: #666;
     }
-    #header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
+    #header { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
     #header_table {
       width: 100%;
     }
@@ -159,8 +159,10 @@ from skyperious.lib.vendor import step
       width: 100%;
     }
     #header_left div, #header_right div {
-      width: 100px;
+      overflow: hidden;
       text-align: center;
+      text-overflow: ellipsis;
+      width: 100px;
     }
     #header_right {
       width: 100px;
@@ -232,14 +234,20 @@ from skyperious.lib.vendor import step
     #participants .avatar_large {
       margin-right: 5px;
     }
+    #participants .avatar_item span {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     #content_table td.day {
-      border-top: 1px solid {{conf.HistoryLineColour}};
-      border-bottom: 1px solid {{conf.HistoryLineColour}};
+      border-top: 1px solid {{ conf.HistoryLineColour }};
+      border-bottom: 1px solid {{ conf.HistoryLineColour }};
       padding-top: 3px; padding-bottom: 4px;
     }
     #content_table .weekday { font-weight: bold; }
     .timestamp {
-      color: {{conf.HistoryTimestampColour}};
+      color: {{ conf.HistoryTimestampColour }};
     }
     #content_table .timestamp {
       text-align: left;
@@ -253,25 +261,25 @@ from skyperious.lib.vendor import step
       height: 11px;
     }
     #content_table .timestamp span.edited {
-      background: url("data:image/png;base64,{{!images.ExportEdited.data}}")
+      background: url("data:image/png;base64,{{! images.ExportEdited.data }}")
                   center center no-repeat;
     }
     #content_table .timestamp span.removed {
-      background: url("data:image/png;base64,{{!images.ExportRemoved.data}}")
+      background: url("data:image/png;base64,{{! images.ExportRemoved.data }}")
                   center center no-repeat;
     }
     #content_table tr.shifted td.author, #content_table tr.shifted td.timestamp { 
       padding-top: 10px;
     }
     #content_table .author { min-width: 90px; text-align: right; }
-    .remote, .remote a { color: {{conf.HistoryRemoteAuthorColour}}; }
-    .local, .local a { color: {{conf.HistoryLocalAuthorColour}}; }
+    .remote, .remote a { color: {{ conf.HistoryRemoteAuthorColour }}; }
+    .local, .local a { color: {{ conf.HistoryLocalAuthorColour }}; }
     #content_table .t1 { width: 50px; }
     #content_table .t2 { width: 40px; }
     #content_table .t3 { width: 15px; min-width: 15px; }
     #content_table .day.t3 {
       padding: 5px;
-      background: url("data:image/png;base64,{{!images.ExportClock.data}}")
+      background: url("data:image/png;base64,{{! images.ExportClock.data }}")
                   center center no-repeat;
     }
     #content_table .message_content {
@@ -294,6 +302,11 @@ from skyperious.lib.vendor import step
     #stats_data > tbody > tr > td:nth-child(5) {
       vertical-align: top;
     }
+    #stats_data > tbody > tr.stats_row > td > table > tbody > tr td:nth-child(2) { /* participant name and identity */
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     #stats_data > tbody > tr.stats_row > td:nth-child(3) {
       padding-left: 5px;
       line-height: 16px;
@@ -306,11 +319,11 @@ from skyperious.lib.vendor import step
       vertical-align: middle;
     }
     #stats_data > tbody > tr > td:nth-child(3) {
-      color: {{conf.PlotHoursColour}};
+      color: {{ conf.PlotHoursColour }};
       vertical-align: top;
     }
     #stats_data > tbody > tr > td:nth-child(4) {
-      color: {{conf.PlotDaysColour}};
+      color: {{ conf.PlotDaysColour }};
       vertical-align: top;
     }
     #stats_data > tbody > tr:first-child > td:nth-child(3),
@@ -347,20 +360,23 @@ from skyperious.lib.vendor import step
       color: white;
     }
     table.plot_row.messages td:first-child {
-      background-color: {{conf.PlotMessagesColour}};
+      background-color: {{ conf.PlotMessagesColour }};
     }
     table.plot_row.smses td:first-child {
-      background-color: {{conf.PlotSMSesColour}};
+      background-color: {{ conf.PlotSMSesColour }};
     }
     table.plot_row.calls td:first-child {
-      background-color: {{conf.PlotCallsColour}};
+      background-color: {{ conf.PlotCallsColour }};
     }
     table.plot_row.files td:first-child {
-      background-color: {{conf.PlotFilesColour}};
+      background-color: {{ conf.PlotFilesColour }};
+    }
+    table.plot_row.shares td:first-child {
+      background-color: {{ conf.PlotSharesColour }};
     }
     table.plot_row td:nth-child(2) {
-      background-color: {{conf.PlotBgColour}};
-      color: {{conf.PlotMessagesColour}};
+      background-color: {{ conf.PlotBgColour }};
+      color: {{ conf.PlotMessagesColour }};
     }
     #wordcloud {
       border-top: 1px solid #99BBFF;
@@ -401,7 +417,7 @@ from skyperious.lib.vendor import step
       padding: 13px;
     }
     #emoticons table.emoticon_rows td:nth-child(3) {
-      color: {{conf.PlotHoursColour}};
+      color: {{ conf.PlotHoursColour }};
       text-align: right;
     }
     #emoticons table.emoticon_rows td:nth-child(4) {
@@ -413,7 +429,7 @@ from skyperious.lib.vendor import step
       position: relative;
       top: 2px;
     }
-    #shared_images, #transfers {
+    #shared_media, #transfers {
       margin-top: 10px;
       padding-top: 5px;
       border-top: 1px solid #99BBFF;
@@ -423,33 +439,46 @@ from skyperious.lib.vendor import step
       margin-top: 10px;
       width: 100%;
     }
-    #shared_images table {
+    #shared_media table {
       display: none;
       margin-top: 10px;
       width: 100%;
     }
-    #shared_images table td, #transfers table td {
+    #shared_media table td, #transfers table td {
       vertical-align: top;
       white-space: nowrap;
     }
-    #shared_images table a, #transfers table a {
+    #shared_media table a, #transfers table a {
       color: blue;
     }
-    #shared_images table td:first-child, #transfers table td:first-child {
+    #shared_media table td:first-child, #transfers table td:first-child { /* author */
       padding-right: 15px;
       text-align: right;
       white-space: normal;
     }
-    #shared_images table td:first-child a, #transfers table td:first-child a {
-      color: inherit;
-    }
-    #shared_images table td:first-child a:hover, #transfers table td:first-child a:hover {
-      text-decoration: underline;
-    }
-    #shared_images table td:last-child, #transfers table td:last-child {
+    #shared_media table td:last-child, #transfers table td:last-child { /* timestamp */
       text-align: right;
     }
-    #transfers .filename {
+    #shared_media table td:last-child a, #transfers table td:last-child a { /* timestamp link */
+      color: inherit;
+    }
+    #shared_media table td:last-child a:hover, #transfers table td:last-child a:hover {
+      text-decoration: underline;
+    }
+    #shared_media td:nth-child(2) { /* filename and filesize */
+      display: flex;
+      justify-content: space-between;
+    }
+    #shared_media td:nth-child(3) { /* live-link */
+      text-align: right;
+    }
+    #transfers td:nth-child(3) { /* filesize */
+      text-align: right;
+    }
+    #shared_media .filename {
+      color: {{ conf.HistoryBackgroundColour }};
+    }
+    #shared_media .filename, #transfers .filename {
       color: blue;
     }
     #timeline {
@@ -536,19 +565,29 @@ from skyperious.lib.vendor import step
     #timeline ul li.day .date {
       font-size: 11px;
     }
-    span.shared_image {
-      background: black;
+    div.shared_media.image {
       border-radius: 5px;
       display: inline-block;
       max-width: 305px;
       max-height: 210px;
+      position: relative;
+      overflow: hidden;
     }
-    span.shared_image img {
+    div.shared_media.image img {
       border-radius: 5px;
       cursor: pointer;
       max-width: 305px;
       max-height: 210px;
-      opacity: 0.5;
+    }
+    div.shared_media.image .cover {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+      pointer-events: none;
     }
     #chat_picture {
 %if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
@@ -559,8 +598,8 @@ from skyperious.lib.vendor import step
       max-height: 125px;
 %endif
 %if chat_picture_size:
-      width: {{chat_picture_size[0]}}px;
-      height: {{chat_picture_size[1]}}px;
+      width: {{ chat_picture_size[0] }}px;
+      height: {{ chat_picture_size[1] }}px;
 %endif
     }
     span.gray {
@@ -583,7 +622,7 @@ from skyperious.lib.vendor import step
     body.darkmode a, body.darkmode a.visited,
     body.darkmode #transfers .filename,
     body.darkmode .toggle_plusminus,
-    body.darkmode #shared_images table td:not(:first-child) a {
+    body.darkmode #shared_media table td:not(:first-child) a {
       color: #80FF74;
     }
     body.darkmode #stats_data > tbody > tr > td:nth-child(3),
@@ -611,13 +650,13 @@ from skyperious.lib.vendor import step
     }
 %endif
 %for e in emoticons_used:
-    span.emoticon.{{e}} {
-      background: url("data:image/gif;base64,{{!getattr(emoticons, e).data}}")
+    span.emoticon.{{ e }} {
+      background: url("data:image/gif;base64,{{! getattr(emoticons, e).data }}")
                   center center no-repeat;
     }
 %endfor
-%if any(x["success"] for x in stats["shared_images"].values()):
-    {{!templates.LIGHTBOX_CSS}}
+%if any(x["success"] for x in stats["shared_media"].values()):
+    {{! templates.LIGHTBOX_CSS }}
 %endif
   </style>
   <script>
@@ -886,8 +925,8 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
       document.addEventListener("DOMContentLoaded", init_timeline);
     };
 
-%if any(x["success"] for x in stats["shared_images"].values()):
-    {{!templates.LIGHTBOX_JS}}
+%if any(x["success"] for x in stats["shared_media"].values()):
+    {{! templates.LIGHTBOX_JS }}
 %endif
   </script>
 </head>
@@ -906,7 +945,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 %else:
       <span class="date name">{{ entry["label"] }}</span>
 %endif
-      <span class="count">{{ (entry["count"])}}</span>
+      <span class="count">{{ (entry["count"]) }}</span>
     </a>
   </li>
 %endfor
@@ -922,21 +961,21 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{!base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
-      <br /><span class="identity">{{p["identity"]}}</span>
+      <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
 %elif chat_picture_raw:
-      <img id="chat_picture" title="{{chat["title"]}}" alt="{{chat["title"]}}" src="data:image/png;base64,{{!base64.b64encode(chat_picture_raw)}}" />
+      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/png;base64,{{! base64.b64encode(chat_picture_raw) }}" />
 %endif
     </td>
     <td id="header_center">
-      <div id="header">{{chat["title_long"]}}.</div><br />
-      Showing {{util.plural("message", message_count, sep=",")}}
+      <div id="header">{{ chat["title_long"] }}.</div><br />
+      Showing {{ util.plural("message", message_count, sep=",") }}
 %if date1 and date2:
-      from <b>{{date1}}</b> to <b>{{date2}}</b>.
+      from <b>{{ date1 }}</b> to <b>{{ date2 }}</b>.
 %else:
 .
 %endif
@@ -947,12 +986,12 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
 <br />
 %if chat["created_datetime"]:
-      Chat created on <b>{{chat["created_datetime"].strftime("%d.%m.%Y")}}</b>,
+      Chat created on <b>{{ chat["created_datetime"].strftime("%d.%m.%Y") }}</b>,
 %else:
       Chat has
 %endif
-      <b>{{util.plural("message", chat["message_count"] or 0, sep=",")}}</b> in total.<br />
-      Source: <b>{{db.filename}}</b>.<br /><br />
+      <b>{{ util.plural("message", chat["message_count"] or 0, sep=",") }}</b> in total.<br />
+      Source: <b>{{ db.filename }}</b>.<br /><br />
 
       <table class="links"><tr>
         <td>
@@ -977,9 +1016,9 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{!base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span><br />{{p["name"]}}
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
-      <br /><span class="identity">{{p["identity"]}}</span>
+      <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
@@ -996,9 +1035,9 @@ filterer = lambda p: not stats["counts"] or p["identity"] == db.id or p["identit
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span><span class="avatar_large"><img title="{{alt}}" alt="{{alt}}" src="data:image/png;base64,{{!base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data}}" /></span>{{p["name"]}}<br />
-    <span class="identity">
-        {{p["identity"]}}
+    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
+    <span class="identity" title="{{ p["identity"] }}">
+        {{ p["identity"] }}
 %if 1 == p.get("rank"):
         <br /><br />chat creator
 %endif
@@ -1011,11 +1050,11 @@ alt = "%s (%s)" % (p["name"], p["identity"])
     <table id="stats_data">
       <tr><td>
 %for label, value in stats["info_items"]:
-      <div>{{label}}</div>
+      <div>{{ label }}</div>
 %endfor
       </td><td colspan="2">
 %for label, value in stats["info_items"]:
-      <div>{{value}}</div>
+      <div>{{ value }}</div>
 %endfor
       </td><td>
 %if stats.get("totalhist", {}).get("hours"):
@@ -1027,8 +1066,8 @@ maxkey, maxval = max(items, key=lambda x: x[1])
 svgdata = {"data": items, "links": links, "maxval": maxval,
            "colour": conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize}
 %>
-        peak {{util.plural("message", maxval)}}<br />
-{{!step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata)}}
+        peak {{ util.plural("message", maxval) }}<br />
+{{! step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata) }}
         <br />24h activity
 %endif
       </td><td>
@@ -1042,13 +1081,13 @@ interval = items[1][0] - items[0][0]
 svgdata = {"data": items, "links": links, "maxval": maxval,
 	         "colour": conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize}
 %>
-        peak {{util.plural("message", maxval)}}<br />
-{{!step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata)}}
-        <br />{{interval.days}}-day intervals
+        peak {{ util.plural("message", maxval) }}<br />
+{{! step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata) }}
+        <br />{{ interval.days }}-day intervals
 %endif
       </td></tr>
 
-%if len(stats["counts"]) > 1:
+%if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
       <tr id="stats_header"><td></td><td colspan="4"><div id="sort_header"><b>Sort by:</b>
         <a title="Sort statistics by name" href="#" onClick="return sort_stats(this, 'name');" class="selected">Name</a>
 %if stats["messages"]:
@@ -1066,20 +1105,23 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %if stats["transfers"]:
         <a title="Sort statistics by files sent" href="#" onClick="return sort_stats(this, 'file');">Files</a>
 %endif
+%if stats["shares"]:
+        <a title="Sort statistics by media shared" href="#" onClick="return sort_stats(this, 'share');">Shares</a>
+%endif
       </div></td>
       </tr>
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
-        <td><table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{!base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
 if stats["counts"][p["identity"]]["messages"]:
-  stat_rows.append(("messages", "message", stats["counts"][p["identity"]]["messages"], stats["messages"]))
-  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"], stats["chars"]))
+  stat_rows.append(("messages", "message",   stats["counts"][p["identity"]]["messages"], stats["messages"]))
+  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"],    stats["chars"]))
 if stats["counts"][p["identity"]]["smses"]:
-  stat_rows.append(("smses", "SMS message", stats["counts"][p["identity"]]["smses"], stats["smses"]))
+  stat_rows.append(("smses", "SMS message",   stats["counts"][p["identity"]]["smses"],    stats["smses"]))
   stat_rows.append(("smses", "SMS character", stats["counts"][p["identity"]]["smschars"], stats["smschars"]))
 if stats["counts"][p["identity"]]["calls"]:
   stat_rows.append(("calls", "call", stats["counts"][p["identity"]]["calls"], stats["calls"]))
@@ -1088,34 +1130,37 @@ if stats["counts"][p["identity"]]["calldurations"]:
 if stats["counts"][p["identity"]]["files"]:
   stat_rows.append(("files", "file", stats["counts"][p["identity"]]["files"], stats["files"]))
   stat_rows.append(("files", "byte", stats["counts"][p["identity"]]["bytes"], stats["bytes"]))
+if stats["counts"][p["identity"]]["shares"]:
+  stat_rows.append(("shares", "share", stats["counts"][p["identity"]]["shares"],     stats["shares"]))
+  stat_rows.append(("shares", "byte",  stats["counts"][p["identity"]]["sharebytes"], stats["sharebytes"]))
 %>
 %for type, label, count, total in stat_rows:
 <%
 percent = util.safedivf(count * 100, total)
 text_cell1 = "%d%%" % round(percent) if (round(percent) > 25) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
-if "byte" == label:
+if "byte" in label:
   text_total = util.format_bytes(total)
 elif "callduration" == label:
   text_total = util.format_seconds(total)
 else:
   text_total = util.plural(label, total, sep=",")
 %>
-          <tr title="{{util.round_float(percent)}}% of {{text_total}} in total" class="{{label}}"><td>
-            <table class="plot_row {{type}}"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table>
+          <tr title="{{ util.round_float(percent) }}% of {{ text_total }} in total" class="{{ label }}"><td>
+            <table class="plot_row {{ type }}"><tr><td style="width: {{ "%.2f" % percent }}%;">{{ text_cell1 }}</td><td style="width: {{ "%.2f" % (100 - percent) }}%;">{{ text_cell2 }}</td></tr></table>
           </td></tr>
 %endfor
         </table></td><td>
 %for type, label, count, total in stat_rows:
 <%
-if "byte" == label:
+if "byte" in label:
   text = util.format_bytes(count)
 elif "callduration" == label:
   text = util.format_seconds(count, "call")
 else:
   text = util.plural(label, count, sep=",")
 %>
-          <div class="{{label}}" title="{{count}}">{{text}}</div>
+          <div class="{{ label }}" title="{{ count }}">{{ text }}</div>
 %endfor
         </td>
         <td>
@@ -1127,7 +1172,7 @@ svgdata = {
     "maxval":   max(stats["totalhist"]["hours"].values()),
     "colour":   conf.PlotHoursColour, "rectsize": conf.PlotHoursUnitSize }
 %>
-{{!step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata)}}
+{{! step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata) }}
 %endif
         </td>
         <td>
@@ -1139,7 +1184,7 @@ svgdata = {
     "maxval":   max(stats["totalhist"]["days"].values()),
     "colour":   conf.PlotDaysColour, "rectsize": conf.PlotDaysUnitSize }
 %>
-{{!step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata)}}
+{{! step.Template(templates.HISTOGRAM_SVG, strip=False, escape=True).expand(svgdata) }}
 %endif
         </td>
       </tr>
@@ -1156,7 +1201,7 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 <%
 countstring = ";\\n".join("%s from %s" % (c, a) for a, c in sorted(stats["wordcounts"][word].items(), key=lambda x: -x[1]))
 %>
-      <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{countstring}}">({{count}})</span></span> 
+      <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ countstring }}">({{ count }})</span></span> 
 %endfor
     </div>
 
@@ -1171,12 +1216,12 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr><td>
-        <table><tr><td class="avatar"><img title="{{p["name"]}}" alt="{{p["name"]}}" src="data:image/png;base64,{{!base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" /></td><td><span>{{p["name"]}}<br /><span class="identity">{{p["identity"]}}</span></span></td></tr></table>
+        <table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
-          <span style="font-size: {{sizes[size]}}"><a title="Highlight '{{word}}' and go to first occurrence" href="#" onClick="return hilite(this);">{{word}}</a> <span title="{{"%d%% of total usage" % round(100. * count / globalcounts.get(word, count))}}">({{count}})</span></span> 
+          <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ "%d%% of total usage" % round(100. * count / globalcounts.get(word, count)) }}">({{ count }})</span></span> 
 %endfor
 %else:
           <span class="gray">Not enough words.</span>
@@ -1210,12 +1255,12 @@ smalltotal = sum(emoticon_counts.get(identity, {}).values())
       <tr>
 %if participant:
         <td><table><tr><td class="avatar">
-        <img title="{{name}}" alt="{{name}}" src="data:image/png;base64,{{!base64.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data}}" />
-        </td><td><span>{{name}}<br /><span class="identity">{{identity}}</span></span></td></tr></table></td>
+        <img title="{{ name }}" alt="{{ name }}" src="data:image/png;base64,{{! base64.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" />
+        </td><td><span>{{ name }}<br /><span class="identity">{{ identity }}</span></span></td></tr></table></td>
 %else:
-        <td style="padding: 13px;">{{name}}</td>
+        <td style="padding: 13px;">{{ name }}</td>
 %endif
-        <td class="total" title="{{"%s%% of %s in total" % (util.round_float(100. * smalltotal / total), total) if participant and smalltotal else ""}}">{{smalltotal or ""}}</td><td>
+        <td class="total" title="{{ "%s%% of %s in total" % (util.round_float(100. * smalltotal / total), total) if participant and smalltotal else "" }}">{{ smalltotal or "" }}</td><td>
 %if identity in emoticon_counts:
         <td><table class="emoticon_rows">
 %endif
@@ -1232,10 +1277,10 @@ text_cell1 = "%d%%" % round(percent) if (round(percent) > 14) else ""
 text_cell2 = "" if text_cell1 else "%d%%" % round(percent)
 subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / smalltotal), smalltotal) if participant else "%s%% of %s in total" % (util.round_float(percent), total)
 %>
-        <tr title="{{util.round_float(percent)}}% of {{total}} in total">
-          <td><span class="emoticon {{emoticon}}" title="{{title}}">{{text}}</span></td>
-          <td><table class="plot_row messages" style="width: {{conf.EmoticonsPlotWidth}}px;"><tr><td style="width: {{"%.2f" % percent}}%;">{{text_cell1}}</td><td style="width: {{"%.2f" % (100 - percent)}}%;">{{text_cell2}}</td></tr></table></td>
-          <td title="{{subtitle}}">{{count}}</td><td title="{{subtitle}}">{{title}}</td>
+        <tr title="{{ util.round_float(percent) }}% of {{ total }} in total">
+          <td><span class="emoticon {{ emoticon }}" title="{{ title }}">{{ text }}</span></td>
+          <td><table class="plot_row messages" style="width: {{ conf.EmoticonsPlotWidth }}px;"><tr><td style="width: {{ "%.2f" % percent }}%;">{{ text_cell1 }}</td><td style="width: {{ "%.2f" % (100 - percent) }}%;">{{ text_cell2 }}</td></tr></table></td>
+          <td title="{{ subtitle }}">{{ count }}</td><td title="{{ subtitle }}">{{ title }}</td>
         </tr>
 %endfor
 %if identity in emoticon_counts:
@@ -1249,16 +1294,26 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 %endif
 
 
-%if stats["shared_images"]:
-    <div id="shared_images">
+%if stats["shared_media"]:
+    <div id="shared_media">
 
-    <b>Shared images</b>&nbsp;&nbsp;[<a title="Click to show/hide shared image links" href="#" onClick="return toggle_plusminus(this, 'shared_images_table');" class="toggle_plusminus">+</a>]
-    <table id="shared_images_table">
-%for message_id, data in sorted(stats["shared_images"].items(), key=lambda x: x[1]["datetime"]):
+    <b>Shared media</b>&nbsp;&nbsp;[<a title="Click to show/hide shared media links" href="#" onClick="return toggle_plusminus(this, 'shared_media_table');" class="toggle_plusminus">+</a>]
+    <table id="shared_media_table">
+%for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
       <tr>
-        <td class="{{"remote" if data["author"] != db.id else "local"}}" title="{{data["author"]}}"><a href="#message:{{message_id}}">{{data["author_name"]}}</a></td>
-        <td><a href="{{data["url"]}}" target="_blank">{{data["url"]}}</a></td>
-        <td class="timestamp" title="{{data["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</td>
+        <td class="{{ "remote" if data["author"] != db.id else "local" }}" title="{{ data["author"] }}">{{ data["author_name"] }}</td>
+        <td>
+          <span class="filename">{{ data.get("filename") or "" }}</span>
+%if data.get("filesize") is not None:
+          <span class="filesize" title="{{ util.plural("byte", data["filesize"], sep=",") }}">{{ util.format_bytes(data["filesize"]) }}</span>
+%endif
+        </td>
+        <td>
+%if data.get("url"):
+            <a href="{{ data["url"] }}" target="_blank">Online</a>
+%endif
+        </td>
+        <td class="timestamp" title="{{ data["datetime"].strftime("%Y-%m-%d %H:%M:%S") }}"><a href="#message:{{ message_id }}">{{ data["datetime"].strftime("%Y-%m-%d %H:%M") }}</a></td>
       </tr>
 %endfor
     </table>
@@ -1279,16 +1334,16 @@ dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td class="{{"remote" if from_remote else "local"}}" title="{{f["partner_handle"] if from_remote else db.username}}"><a href="#message:{{f["__message_id"]}}">{{partner if from_remote else db.account["name"]}}</a></td><td>
+        <tr><td class="{{ "remote" if from_remote else "local" }}" title="{{ f["partner_handle"] if from_remote else db.username }}">{{ partner if from_remote else db.account["name"] }}</td><td>
 %if f["filepath"]:
-          <a href="{{util.path_to_url(f["filepath"])}}" target="_blank" class="filename">{{f["filepath"]}}</a>
+          <a href="{{ util.path_to_url(f["filepath"]) }}" target="_blank" class="filename">{{ f["filepath"] }}</a>
 %else:
-          <span class="filename">{{f["filename"]}}</span>
+          <span class="filename">{{ f["filename"] }}</span>
 %endif
-        </td><td title="{{util.plural("byte", int(f["filesize"]), sep=",")}}">
-          {{util.format_bytes(int(f["filesize"]))}}
-        </td><td class="timestamp" title="{{f_datetime_title}}">
-          {{f_datetime}}
+        </td><td title="{{ util.plural("byte", int(f["filesize"]), sep=",") }}">
+          {{ util.format_bytes(int(f["filesize"])) }}
+        </td><td class="timestamp" title="{{ f_datetime_title }}">
+          <a href="#message:{{ f["__message_id"] }}">{{ f_datetime }}</a>
         </td></tr>
 %endfor
       </table>
@@ -1306,8 +1361,8 @@ for chunk in message_buffer:
 %>
   </table>
 </td></tr></table>
-<div id="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
-%if any(x["success"] for x in stats["shared_images"].values()):
+<div id="footer">Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.</div>
+%if any(x["success"] for x in stats["shared_media"].values()):
 <script> new Lightbox().load({carousel: false}); </script>
 %endif
 </body>
@@ -1322,14 +1377,14 @@ HTML chat history export template for the messages part.
 @param   chat            chat data dictionary
 @param   messages        message iterator
 @param   parser          MessageParser instance
-@param   ?images_folder  path to save images under, if not embedding
+@param   ?media_folder   path to save images under, if not embedding
 """
 CHAT_MESSAGES_HTML = """<%
 from skyperious import skypedata
 from skyperious.lib import util
 
 output = {"format": "html", "export": True}
-if isdef("images_folder") and images_folder: output["images_folder"] = images_folder
+if isdef("media_folder") and media_folder: output["media_folder"] = media_folder
 previous_day, previous_author = None, None
 %>
 %for m in messages:
@@ -1343,8 +1398,8 @@ previous_author = None
   <tr>
     <td class="t1"></td>
     <td class="day t2"></td>
-    <td class="day t3" title="{{day.strftime("%Y-%m-%d")}}"></td>
-    <td class="day" colspan="2" title="{{day.strftime("%Y-%m-%d")}}"><span class="weekday">{{weekday}}</span>, {{weekdate}}</td>
+    <td class="day t3" title="{{ day.strftime("%Y-%m-%d") }}"></td>
+    <td class="day" colspan="2" title="{{ day.strftime("%Y-%m-%d") }}"><span class="weekday">{{ weekday }}</span>, {{ weekdate }}</td>
   </tr>
 %endif
 <%
@@ -1359,20 +1414,20 @@ emot_start = '<span class="emoticon '
 shift_row = emot_start in content and (("<br />" not in content and len(text_plain) < 140) or content.index(emot_start) < 140)
 author_class = "remote" if m["author"] != db.id else "local"
 %>
-  <tr id="message:{{m["id"]}}"{{!' class="shifted"' if shift_row else ""}}>
-    <td class="author {{author_class}}" colspan="2" title="{{m["author"]}}">{{from_name if not is_info else ""}}</td>
+  <tr id="message:{{ m["id"] }}"{{! ' class="shifted"' if shift_row else "" }}>
+    <td class="author {{ author_class }}" colspan="2" title="{{ m["author"] }}">{{ from_name if not is_info else "" }}</td>
     <td class="t3"></td>
     <td class="message_content"><div>
 %if is_info:
-    <span class="{{author_class}}">{{db.get_author_name(m)}}</span>
+    <span class="{{ author_class }}">{{ db.get_author_name(m) }}</span>
 %endif
-      {{!content}}
+      {{! content }}
     </div></td>
-    <td class="timestamp" title="{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}">
+    <td class="timestamp" title="{{ m["datetime"].strftime("%Y-%m-%d %H:%M:%S") }}">
 %if m["edited_timestamp"]:
-      {{m["datetime"].strftime("%H:%M")}}<span class="{{"edited" if m["body_xml"] else "removed"}}" title="{{"Edited" if m["body_xml"] else "Removed"}} {{db.stamp_to_date(m["edited_timestamp"]).strftime("%H:%M:%S")}}">&nbsp;&nbsp;&nbsp;</span>
+      {{ m["datetime"].strftime("%H:%M") }}<span class="{{ "edited" if m["body_xml"] else "removed" }}" title="{{ "Edited" if m["body_xml"] else "Removed" }} {{ db.stamp_to_date(m["edited_timestamp"]).strftime("%H:%M:%S") }}">&nbsp;&nbsp;&nbsp;</span>
 %else:
-      {{m["datetime"].strftime("%H:%M")}}
+      {{ m["datetime"].strftime("%H:%M") }}
 %endif
     </td>
   </tr>
@@ -1385,51 +1440,87 @@ previous_author = m["author"]
 
 
 """
-HTML chat history export template for shared image message body.
+HTML chat history export template for shared media message body.
 
-@param   image           raw image binary
+@param   content         raw file binary
 @param   author          author skypename
 @param   author_name     author display name
 @param   datetime        message datetime
+@param   url             file URL in Skype online
 @param   message         message data dict
-@param   ?filename       image filename, if any
-@param   ?images_folder  path to save images under, if not embedding
+@param   ?category       media category like "video", defaults to "image"
+@param   ?filename       media filename, if any
+@param   ?media_folder   path to save files under, if not embedding
 """
-CHAT_MESSAGE_IMAGE = """<%
-import base64, imghdr, logging, os, urllib
+CHAT_MESSAGE_MEDIA = """<%
+import base64, imghdr, logging, mimetypes, os, urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
 
-filetype = imghdr.what("", image) or "image"
-caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
-title = "Click to enlarge."
+category = category if isdef("category") else None
+filename = filename if isdef("filename") else None
+if category not in ("audio", "video"): category = "image"
+src, mimetype, filetype = url, None, None
 if isdef("filename") and filename:
+    filetype = os.path.splitext(filename)[-1][1:]
+if category in ("audio", "video"):
+    mimetype = mimetypes.guess_type(filename or "")[0]
+else:
+    filetype = imghdr.what("", content) or filetype or "image"
+filetype = filetype or "binary"
+mimetype = mimetype or "%s/%s" % (category, escape(filetype))
+
+caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
+title = "Click to %s." % ("enlarge" if "image" == category else "play")
+if filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
-if isdef("images_folder") and images_folder:
-    basename = isdef("filename") and filename or "%s.%s" % (message["id"], filetype)
+if isdef("media_folder") and media_folder:
+    basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
-    filepath = util.unique_path(os.path.join(images_folder, basename))
-    url = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (images_folder, filepath))
+    filepath = util.unique_path(os.path.join(media_folder, basename))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, basename))
     try:
-        with util.create_file(filepath, "wb", handle=True) as f: f.write(image)
+        with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:
         logger = logging.getLogger(conf.Title.lower())
         logger.exception("Error saving export image %s.", filepath)
 else:
-    url = "data:image/%s;base64,%s" % (escape(filetype), base64.b64encode(image))
+    src = "data:%s;base64,%s" % (mimetype, base64.b64encode(content))
 %>
 %if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
   Changed the conversation picture:<br />
 %endif
-<span class="shared_image">
-%if isdef("images_folder") and images_folder:
-  <a href="{{url}}" target="_blank" onclick="return false">
-%endif
-  <img src="{{url}}" title="{{title}}" alt="{{title}}" data-jslghtbx data-jslghtbx-group="shared_images" data-jslghtbx-caption="{{caption}}" />
-%if isdef("images_folder") and images_folder:
+<div class="shared_media {{ category }}">
+%if "audio" == category:
+  <audio {{ 'data-name="%s" ' % filename if filename else '' }} title="{{ title }}" src="{{ src }}" controls>
+    To hear this voice message, go to:
+    <a href="{{ url }}" target="_blank">{{ url }}</a>.
+  </audio>
+%elif "video" == category:
+  <video {{ 'data-name="%s" ' % filename if filename else '' }}width="240" title="{{ title }}" src="{{ src }}" controls>
+    To view this video message, go to:
+    <a href="{{ url }}" target="_blank">{{ url }}</a>.
+  </video>
+%else:
+<%
+size, MAXW, MAXH = None, 305, 210
+try:
+    w, h = size = util.img_size(content)
+    if w > MAXW or h > MAXH:
+        ratio = min(util.safedivf(min(MAXW, w), w), util.safedivf(min(MAXH, h), h))
+        size = w * ratio, h * ratio
+except Exception: pass
+%>
+    %if isdef("media_folder") and media_folder:
+  <a href="{{ src }}" target="_blank" onclick="return false">
+    %endif
+  <img src="{{ src }}" title="{{ title }}" alt="{{ title }}" data-jslghtbx data-jslghtbx-group="shared_media" data-jslghtbx-caption="{{ caption }}" />
+  <div class="cover"{{ ' style="width: %spx; height: %spx;"' % size if size else '' }}></div>
+    %if isdef("media_folder") and media_folder:
   </a>
+    %endif
 %endif
-</span>
+</div>
 """
 
 
@@ -1449,11 +1540,11 @@ import datetime
 from skyperious import conf, skypedata
 from skyperious.lib import util
 
-%>History of Skype {{chat["title_long_lc"]}}.
-Showing {{util.plural("message", message_count, sep=",")}}{{" from %s to %s" % (date1, date2) if (date1 and date2) else ""}}.
-Chat {{"created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else ""}}{{util.plural("message", chat["message_count"] or 0, sep=",")}} in total.
-Source: {{db.filename}}.
-Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
+%>History of Skype {{ chat["title_long_lc"] }}.
+Showing {{ util.plural("message", message_count, sep=",") }}{{ " from %s to %s" % (date1, date2) if (date1 and date2) else "" }}.
+Chat {{ "created on %s, " % chat["created_datetime"].strftime("%d.%m.%Y") if chat["created_datetime"] else "" }}{{ util.plural("message", chat["message_count"] or 0, sep=",") }} in total.
+Source: {{ db.filename }}.
+Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
 -------------------------------------------------------------------------------
 
 <%
@@ -1485,16 +1576,16 @@ weekday, weekdate = util.get_locale_day_date(day)
 previous_day = m["datetime"].date()
 %>
 
-{{weekday}}, {{weekdate}}
+{{ weekday }}, {{ weekdate }}
 ----------------------------------------
 
 %endif
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
-{{m["datetime"].strftime("%H:%M")}}
-{{db.get_author_name(m)}} {{parser.parse(m, output={"format": "text", "wrap": True})}}
+{{ m["datetime"].strftime("%H:%M") }}
+{{ db.get_author_name(m) }} {{ parser.parse(m, output={"format": "text", "wrap": True}) }}
 %else:
-{{m["datetime"].strftime("%H:%M")}} {{db.get_author_name(m)}}:
-{{parser.parse(m, output={"format": "text", "wrap": True})}}
+{{ m["datetime"].strftime("%H:%M") }} {{ db.get_author_name(m) }}:
+{{ parser.parse(m, output={"format": "text", "wrap": True}) }}
 %endif
 
 %endfor
@@ -1519,17 +1610,17 @@ from skyperious.lib import util
 %><!DOCTYPE HTML><html lang="">
 <head>
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
-    <meta name="generator" content="{{conf.Title}} {{conf.Version}}" />
-    <title>{{title}}</title>
-    <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{!images.Icon16x16_8bit.data}}"/>
+    <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
+    <title>{{ title }}</title>
+    <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
     <style>
-        * { font-family: {{conf.HistoryFontName}}; font-size: 11px; }
+        * { font-family: {{ conf.HistoryFontName }}; font-size: 11px; }
         body {
-            background: {{conf.HistoryBackgroundColour}};
+            background: {{ conf.HistoryBackgroundColour }};
             color: black;
             margin: 0px 10px 0px 10px;
         }
-        .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
+        .header { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
         .header_table {
             width: 100%;
         }
@@ -1545,7 +1636,7 @@ from skyperious.lib import util
         table.body_table > tbody > tr > td {
             background: white;
             width: 800px;
-            font-family: {{conf.HistoryFontName}};
+            font-family: {{ conf.HistoryFontName }};
             font-size: 11px;
             border-radius: 10px;
             padding: 10px;
@@ -1559,14 +1650,14 @@ from skyperious.lib import util
             padding: 5px;
             border: 1px solid #C0C0C0;
         }
-        a, a.visited { color: {{conf.ExportLinkColour}}; text-decoration: none; }
+        a, a.visited { color: {{ conf.ExportLinkColour }}; text-decoration: none; }
         a:hover, a.visited:hover { text-decoration: underline; }
         .footer {
           text-align: center;
           padding-bottom: 10px;
           color: #666;
         }
-        .header { font-size: 1.1em; font-weight: bold; color: {{conf.ExportLinkColour}}; }
+        .header { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
         td { text-align: left; vertical-align: top; }
         body.darkmode {
           background: black;
@@ -1600,9 +1691,9 @@ from skyperious.lib import util
     <tr>
         <td class="header_left"></td>
         <td>
-            <div class="header">{{title}}</div><br />
-            Source: <b>{{db.filename}}</b>.<br />
-            <b>{{row_count}}</b> {{util.plural("row", row_count, numbers=False, sep=",")}} in results.
+            <div class="header">{{ title }}</div><br />
+            Source: <b>{{ db.filename }}</b>.<br />
+            <b>{{ row_count }}</b> {{ util.plural("row", row_count, numbers=False, sep=",") }} in results.
 <% 
 # &#x1F313; first quarter moon symbol
 # &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
@@ -1610,27 +1701,27 @@ from skyperious.lib import util
             <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
             <br />
 %if sql:
-            <b>SQL:</b> {{sql}}
+            <b>SQL:</b> {{ sql }}
 %endif
         </td>
     </tr></table>
 </td></tr><tr><td><table class="content_table">
 <tr><th>#</th>
 %for col in columns:
-<th>{{col}}</th>
+<th>{{ col }}</th>
 %endfor
 </tr>
 %for i, row in enumerate(rows):
 <tr>
-<td>{{i + 1}}</td>
+<td>{{ i + 1 }}</td>
 %for col in columns:
-<td>{{"" if row[col] is None else row[col]}}</td>
+<td>{{ "" if row[col] is None else row[col] }}</td>
 %endfor
 </tr>
 %endfor
 </table>
 </td></tr></table>
-<div class="footer">Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.</div>
+<div class="footer">Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.</div>
 </body>
 </html>
 """
@@ -1654,14 +1745,14 @@ from skyperious import conf
 UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.printable))
 RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
 str_cols = ", ".join(columns)
-%>-- {{title}}.
--- Source: {{db.filename}}.
--- Exported with {{conf.Title}} on {{datetime.datetime.now().strftime("%d.%m.%Y %H:%M")}}.
+%>-- {{ title }}.
+-- Source: {{ db.filename }}.
+-- Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
 %if sql:
--- SQL: {{sql}}
+-- SQL: {{ sql }}
 %endif
 %if table:
-{{create_sql}}
+{{ create_sql }}
 %endif
 
 %for row in rows:
@@ -1690,7 +1781,7 @@ else:
 values.append(value)
 %>
 %endfor
-INSERT INTO {{table}} ({{str_cols}}) VALUES ({{", ".join(values)}});
+INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(values) }});
 %endfor
 """
 
@@ -1708,7 +1799,7 @@ HTML statistics template, for use with HtmlWindow.
 @param   authorimages     {identity: {image type: memoryfs filename}}
 @param   imagemaps        {histogram type: [(rect, href)]}
 @param   authorimagemaps  {identity: {histogram type: [(rect, href)]}}
-@param   expand           {clouds: bool, emoticons, shared_images}
+@param   expand           {clouds: bool, emoticons, shared_media}
 """
 STATS_HTML = """<%
 import urllib
@@ -1716,11 +1807,11 @@ from skyperious import conf, emoticons, skypedata
 from skyperious.lib import util
 
 %>
-<font color="{{conf.FgColour}}" face="{{conf.HistoryFontName}}" size="3">
+<font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="3">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
-  <td><a name="top"><b>Statistics for currently shown messages in {{chat["title_long_lc"]}}:</b></a></td>
+  <td><a name="top"><b>Statistics for currently shown messages in {{ chat["title_long_lc"] }}:</b></a></td>
 %if stats.get("wordcloud"):
-  <td align="right" valign="top" nowrap=""><a href="#cloud"><font color="{{conf.LinkColour}}">Jump to word cloud</font></a></td>
+  <td align="right" valign="top" nowrap=""><a href="#cloud"><font color="{{ conf.LinkColour }}">Jump to word cloud</font></a></td>
 %endif
 </tr></table>
 <font size="0">&nbsp;</font><br />
@@ -1728,39 +1819,39 @@ from skyperious.lib import util
 <table cellpadding="2" cellspacing="2" width="100%">
 %for i, (label, value) in enumerate(stats["info_items"]):
   <tr>
-    <td width="150" valign="top">{{label}}:</td><td valign="top">{{value}}</td>
+    <td width="150" valign="top">{{ label }}:</td><td valign="top">{{ value }}</td>
 %if not i:
-    <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
+    <td rowspan="{{ len(stats["info_items"]) }}" valign="bottom">
 %if "hours" in images:
 <%
 items = sorted(stats["totalhist"]["hours"].items())
 maxkey, maxval = max(items, key=lambda x: x[1])
 %>
-      <font color="{{conf.PlotHoursColour}}">
-      peak {{util.plural("message", maxval)}}<br />
-      <img src="memory:{{images["hours"]}}" usemap="#hours-histogram"/><br />
+      <font color="{{ conf.PlotHoursColour }}">
+      peak {{ util.plural("message", maxval) }}<br />
+      <img src="memory:{{ images["hours"] }}" usemap="#hours-histogram"/><br />
       24h actitity</font>
       <map name="hours-histogram">
 %for (x1, y1, x2, y2), link in imagemaps["hours"]:
-        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+        <area shape="rect" coords="{{ x1 }},{{ y1 }},{{ x2 }},{{ y2 }}" href="{{ link }}">
 %endfor
       </map>
 %endif
     </td>
-    <td rowspan="{{len(stats["info_items"])}}" valign="bottom">
+    <td rowspan="{{ len(stats["info_items"]) }}" valign="bottom">
 %if "days" in images:
 <%
 items = sorted(stats["totalhist"]["days"].items())
 maxkey, maxval = max(items, key=lambda x: x[1])
 interval = items[1][0] - items[0][0]
 %>
-      <font color="{{conf.PlotDaysColour}}">
-      peak {{util.plural("message", maxval)}}<br />
-      <img src="memory:{{images["days"]}}" usemap="#days-histogram" /><br />
-      {{interval.days}}-day intervals</font>
+      <font color="{{ conf.PlotDaysColour }}">
+      peak {{ util.plural("message", maxval) }}<br />
+      <img src="memory:{{ images["days"] }}" usemap="#days-histogram" /><br />
+      {{ interval.days }}-day intervals</font>
       <map name="days-histogram">
 %for (x1, y1, x2, y2), link in imagemaps["days"]:
-        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+        <area shape="rect" coords="{{ x1 }},{{ y1 }},{{ x2 }},{{ y2 }}" href="{{ link }}">
 %endfor
       </map>
 %endif
@@ -1769,15 +1860,15 @@ interval = items[1][0] - items[0][0]
   </tr>
 %endfor
 
-%if len(stats["counts"]) > 1:
+%if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
   <tr><td><br /><br /></td><td colspan="3" valign="bottom">
     <b>Sort by:&nbsp;&nbsp;&nbsp;</b>
-%for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files")]:
+%for name, label in [("name", "Name"), ("messages", "Messages"), ("chars", "Characters"), ("smses", "SMS messages"), ("smschars", "SMS characters"), ("calls", "Calls"), ("calldurations", "Call duration"), ("files", "Files"), ("shares", "Shares")]:
 %if "name" == name or stats[name]:
 %if sort_by == name:
-      <span><font color="gray">{{label}}</font>&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      <span><font color="gray">{{ label }}</font>&nbsp;&nbsp;&nbsp;&nbsp;</span>
 %else:
-      <span><a href="sort://{{name}}"><font color="{{conf.LinkColour}}">{{label}}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      <span><a href="sort://{{ name }}"><font color="{{ conf.LinkColour }}">{{ label }}</font></a>&nbsp;&nbsp;&nbsp;&nbsp;</span>
 %endif
 %endif
 %endfor
@@ -1785,7 +1876,7 @@ interval = items[1][0] - items[0][0]
 %endif
 
 <%
-colormap = {"messages": conf.PlotMessagesColour, "smses": conf.PlotSMSesColour, "calls": conf.PlotCallsColour, "files": conf.PlotFilesColour}
+colormap = {"messages": conf.PlotMessagesColour, "smses": conf.PlotSMSesColour, "calls": conf.PlotCallsColour, "files": conf.PlotFilesColour, "shares": conf.PlotSharesColour}
 sort_key = lambda p: -stats["counts"][p["identity"]].get(sort_by, 0) if "name" != sort_by else p["name"].lower()
 participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], participants), key=sort_key)
 %>
@@ -1794,10 +1885,10 @@ participants_sorted = sorted(filter(lambda p: p["identity"] in stats["counts"], 
 <%
 stat_rows = [] # [(type, label, count, total)]
 if stats["counts"][p["identity"]]["messages"]:
-  stat_rows.append(("messages", "message", stats["counts"][p["identity"]]["messages"], stats["messages"]))
-  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"], stats["chars"]))
+  stat_rows.append(("messages", "message",   stats["counts"][p["identity"]]["messages"], stats["messages"]))
+  stat_rows.append(("messages", "character", stats["counts"][p["identity"]]["chars"],    stats["chars"]))
 if stats["counts"][p["identity"]]["smses"]:
-  stat_rows.append(("smses", "SMS message", stats["counts"][p["identity"]]["smses"], stats["smses"]))
+  stat_rows.append(("smses", "SMS message",   stats["counts"][p["identity"]]["smses"],    stats["smses"]))
   stat_rows.append(("smses", "SMS character", stats["counts"][p["identity"]]["smschars"], stats["smschars"]))
 if stats["counts"][p["identity"]]["calls"]:
   stat_rows.append(("calls", "call", stats["counts"][p["identity"]]["calls"], stats["calls"]))
@@ -1806,12 +1897,15 @@ if stats["counts"][p["identity"]]["calldurations"]:
 if stats["counts"][p["identity"]]["files"]:
   stat_rows.append(("files", "file", stats["counts"][p["identity"]]["files"], stats["files"]))
   stat_rows.append(("files", "byte", stats["counts"][p["identity"]]["bytes"], stats["bytes"]))
+if stats["counts"][p["identity"]]["shares"]:
+  stat_rows.append(("shares", "share", stats["counts"][p["identity"]]["shares"],     stats["shares"]))
+  stat_rows.append(("shares", "byte",  stats["counts"][p["identity"]]["sharebytes"], stats["sharebytes"]))
 %>
   <tr>
     <td valign="top">
       <table cellpadding="0" cellspacing="0"><tr>
-        <td valign="top"><img src="memory:{{authorimages[p["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
-        <td valign="center">{{p["name"]}}<br /><font size="2" color="gray">{{p["identity"]}}</font></td>
+        <td valign="top"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/>&nbsp;&nbsp;</td>
+        <td valign="center">{{ p["name"] }}<br /><font size="2" color="gray">{{ p["identity"] }}</font></td>
       </tr></table>
     </td><td valign="top">
 %for type, label, count, total in stat_rows:
@@ -1828,17 +1922,17 @@ else:
   text_cell3 = util.plural(label, count, sep=",")
 %>
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
-        <td bgcolor="{{colormap[type]}}" width="{{int(round(ratio * conf.StatisticsPlotWidth))}}" align="center">
+        <td bgcolor="{{ colormap[type] }}" width="{{ int(round(ratio * conf.StatisticsPlotWidth)) }}" align="center">
 %if text_cell1:
-          <font color="#FFFFFF" size="2"><b>{{!text_cell1}}</b></font>
+          <font color="#FFFFFF" size="2"><b>{{! text_cell1 }}</b></font>
 %endif
         </td>
-        <td bgcolor="{{conf.PlotBgColour}}" width="{{int(round((1 - ratio) * conf.StatisticsPlotWidth))}}" align="center">
+        <td bgcolor="{{ conf.PlotBgColour }}" width="{{ int(round((1 - ratio) * conf.StatisticsPlotWidth)) }}" align="center">
 %if text_cell2:
-          <font color="{{conf.PlotMessagesColour}}" size="2"><b>{{!text_cell2}}</b></font>
+          <font color="{{ conf.PlotMessagesColour }}" size="2"><b>{{! text_cell2 }}</b></font>
 %endif
         </td>
-        <td nowrap="">&nbsp;{{!text_cell3}}</td>
+        <td nowrap="">&nbsp;{{! text_cell3 }}</td>
       </tr></table>
 %endfor
     </td>
@@ -1847,20 +1941,20 @@ else:
 safe_id = urllib.quote(p["identity"])
 %>
 %if "hours" in authorimages.get(p["identity"] , {}):
-      <img src="memory:{{authorimages[p["identity"]]["hours"]}}" usemap="#{{safe_id}}-hours" />
-      <map name="{{safe_id}}-hours">
+      <img src="memory:{{ authorimages[p["identity"]]["hours"] }}" usemap="#{{ safe_id }}-hours" />
+      <map name="{{ safe_id }}-hours">
 %for (x1, y1, x2, y2), link in authorimagemaps[p["identity"]]["hours"]:
-        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+        <area shape="rect" coords="{{ x1 }},{{ y1 }},{{ x2 }},{{ y2 }}" href="{{ link }}">
 %endfor
       </map>
 %endif
     </td>
     <td valign="top">
 %if "days" in authorimages.get(p["identity"] , {}):
-      <img src="memory:{{authorimages[p["identity"]]["days"]}}" usemap="#{{safe_id}}-days" />
-      <map name="{{safe_id}}-days">
+      <img src="memory:{{ authorimages[p["identity"]]["days"] }}" usemap="#{{ safe_id }}-days" />
+      <map name="{{ safe_id }}-days">
 %for (x1, y1, x2, y2), link in authorimagemaps[p["identity"]]["days"]:
-        <area shape="rect" coords="{{x1}},{{y1}},{{x2}},{{y2}}" href="{{link}}">
+        <area shape="rect" coords="{{ x1 }},{{ y1 }},{{ x2 }},{{ y2 }}" href="{{ link }}">
 %endfor
       </map>
 %endif
@@ -1875,31 +1969,31 @@ safe_id = urllib.quote(p["identity"])
 <br /><hr />
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
   <td><a name="cloud"><b>Word cloud for currently shown messages:</b></a></td>
-  <td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td>
+  <td align="right"><a href="#top"><font color="{{ conf.LinkColour }}">Back to top</font></a></td>
 </tr></table>
 <br /><br />
 %for word, count, size in stats["wordcloud"]:
-<font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
+<font color="{{ conf.LinkColour }}" size="{{ size }}"><a href="{{ word }}"><font color="{{ conf.LinkColour }}">{{ word }}</font></a> ({{ count }}) </font>
 %endfor
 %endif
 
 %if stats.get("wordclouds"):
 <br /><br />
-<b>Word cloud for individuals</b> [<a href="expand://clouds"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["clouds"]]}}</font></a>]
+<b>Word cloud for individuals</b> [<a href="expand://clouds"><font color="{{ conf.LinkColour }}" size="4">{{! ("+", "&ndash;")[expand["clouds"]] }}</font></a>]
 %if expand["clouds"]:
 <br /><br />
 <table cellpadding="0" cellspacing="0" width="100%">
 %for p in participants_sorted:
   <tr><td valign="top" width="150">
     <table cellpadding="0" cellspacing="0"><tr>
-      <td valign="top"><img src="memory:{{authorimages[p["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
-      <td valign="center"><font size="2">{{p["name"]}}<br /><font color="gray">{{p["identity"]}}</font></font></td>
+      <td valign="top"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/>&nbsp;&nbsp;</td>
+      <td valign="center"><font size="2">{{ p["name"] }}<br /><font color="gray">{{ p["identity"] }}</font></font></td>
       <td width="10"></td>
     </tr></table>
   </td><td valign="top">
 %if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
-    <font color="{{conf.LinkColour}}" size="{{size}}"><a href="{{word}}"><font color="{{conf.LinkColour}}">{{word}}</font></a> ({{count}}) </font>
+    <font color="{{ conf.LinkColour }}" size="{{ size }}"><a href="{{ word }}"><font color="{{ conf.LinkColour }}">{{ word }}</font></a> ({{ count }}) </font>
 %endfor
 %else:
     <font color="gray" size="2">Not enough words.</font>
@@ -1913,7 +2007,7 @@ safe_id = urllib.quote(p["identity"])
 
 %if stats.get("emoticons"):
 <br /><br />
-<b>Emoticons statistics</b> [<a href="expand://emoticons"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["emoticons"]]}}</font></a>]
+<b>Emoticons statistics</b> [<a href="expand://emoticons"><font color="{{ conf.LinkColour }}" size="4">{{! ("+", "&ndash;")[expand["emoticons"]] }}</font></a>]
 %if expand["emoticons"]:
 <%
 emoticon_counts = {"": dict((x, sum(vv.values())) for x, vv in stats["emoticons"].items())}
@@ -1933,15 +2027,15 @@ smalltotal = sum(emoticon_counts.get(identity, {}).values())
 %if participant:
   <tr><td valign="top" width="150">
     <table cellpadding="0" cellspacing="0"><tr>
-      <td valign="top"><img src="memory:{{authorimages[participant["identity"]]["avatar"]}}"/>&nbsp;&nbsp;</td>
-      <td valign="center"><font size="2">{{participant["name"]}}<br /><font color="gray">{{participant["identity"]}}</font></font></td>
+      <td valign="top"><img src="memory:{{ authorimages[participant["identity"]]["avatar"] }}"/>&nbsp;&nbsp;</td>
+      <td valign="center"><font size="2">{{ participant["name"] }}<br /><font color="gray">{{ participant["identity"] }}</font></font></td>
       <td width="10"></td>
     </tr></table>
   </td><td valign="top" align="right">
 %else:
-  <tr><td valign="top" width="150"><table cellpadding="3" cellspacing="0"><tr><td><font size="2">{{name}}</font></td></tr></table></td><td valign="top" align="right">
+  <tr><td valign="top" width="150"><table cellpadding="3" cellspacing="0"><tr><td><font size="2">{{ name }}</font></td></tr></table></td><td valign="top" align="right">
 %endif
-    <table cellpadding="0" cellspacing="3"><tr><td align="right"><font size="2">{{smalltotal or ""}}</font></td></tr></table></td><td valign="top">
+    <table cellpadding="0" cellspacing="3"><tr><td align="right"><font size="2">{{ smalltotal or "" }}</font></td></tr></table></td><td valign="top">
 %if identity in emoticon_counts:
     <table cellpadding="0" cellspacing="2">
 %endif
@@ -1959,21 +2053,21 @@ text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 18) else "
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %>
         <tr>
-          <td><img src="memory:emoticon_{{emoticon if hasattr(emoticons, emoticon) else "transparent"}}.png" width="19" height="19"/></td>
-          <td><table cellpadding="0" cellspacing="0" width="{{conf.EmoticonsPlotWidth}}">
+          <td><img src="memory:emoticon_{{ emoticon if hasattr(emoticons, emoticon) else "transparent" }}.png" width="19" height="19"/></td>
+          <td><table cellpadding="0" cellspacing="0" width="{{ conf.EmoticonsPlotWidth }}">
 
-            <td bgcolor="{{conf.PlotMessagesColour}}" width="{{int(round(ratio * conf.EmoticonsPlotWidth))}}" align="center">
+            <td bgcolor="{{ conf.PlotMessagesColour }}" width="{{ int(round(ratio * conf.EmoticonsPlotWidth)) }}" align="center">
 %if text_cell1:
-              <font color="#FFFFFF" size="2"><b>{{!text_cell1}}</b></font>
+              <font color="#FFFFFF" size="2"><b>{{! text_cell1 }}</b></font>
 %endif
             </td>
-            <td bgcolor="{{conf.PlotBgColour}}" width="{{int(round((1 - ratio) * conf.EmoticonsPlotWidth))}}" align="center">
+            <td bgcolor="{{ conf.PlotBgColour }}" width="{{ int(round((1 - ratio) * conf.EmoticonsPlotWidth)) }}" align="center">
 %if text_cell2:
-              <font color="{{conf.PlotMessagesColour}}" size="2"><b>{{!text_cell2}}</b></font>
+              <font color="{{ conf.PlotMessagesColour }}" size="2"><b>{{! text_cell2 }}</b></font>
 %endif
             </td>
 	        </table></td>
-          <td align="right"><font size="2" color="{{conf.PlotHoursColour}}">&nbsp;{{count}}</font></td><td><font size="2" color="gray">&nbsp;{{title}}</font></td>
+          <td align="right"><font size="2" color="{{ conf.PlotHoursColour }}">&nbsp;{{ count }}</font></td><td><font size="2" color="gray">&nbsp;{{ title }}</font></td>
         </tr>
 %endfor
 %if identity in emoticon_counts:
@@ -1989,27 +2083,42 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %endif
 
 
-%if stats["shared_images"]:
-<br /><br />
-<b>Shared images</b> [<a href="expand://shared_images"><font color="{{conf.LinkColour}}" size="4">{{!("+", "&ndash;")[expand["shared_images"]]}}</font></a>]
-%if expand["shared_images"]:
+%if stats["shared_media"]:
+<hr />
+<b>Shared media</b> [<a href="expand://shared_media"><font color="{{ conf.LinkColour }}" size="4">{{! ("+", "&ndash;")[expand["shared_media"]] }}</font></a>]
+%if expand["shared_media"]:
 <br /><br />
 <table width="100%">
-%for message_id, data in sorted(stats["shared_images"].items(), key=lambda x: x[1]["datetime"]):
+%for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
   <tr>
-    <td align="right" nowrap="" valign="top"><a href="message:{{message_id}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour}}">{{data["author_name"]}}</font></a></td>
-    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}"><a href="{{data["url"]}}"><font color="{{conf.LinkColour}}">{{data["url"]}}</font></a></font></td>
-    <td align="right" nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{data["datetime"].strftime("%Y-%m-%d %H:%M")}}</font></td>
+    <td align="right" valign="top" nowrap="">
+      <font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.HistoryRemoteAuthorColour if data["author"] != db.id else conf.HistoryLocalAuthorColour }}">{{ data["author_name"] }}</font>
+    </td>
+    <td valign="top">
+%if data.get("filename"):
+      <font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.LinkColour }}">{{ data["filename"] }}</font>
+%endif
+    </td>
+    <td align="right" valign="top" nowrap="">
+%if data.get("filesize") is not None:
+      <font size="2" face="{{ conf.HistoryFontName }}">{{ util.format_bytes(data["filesize"]) }}</font>
+%endif
+    </td>
+    <td valign="top">
+%if data.get("url"):
+      <font size="2" face="{{ conf.HistoryFontName }}"><a href="{{ data["url"] }}"><font color="{{ conf.LinkColour }}">Online</font></a></font>
+%endif
+    </td>
+    <td align="right" valign="top" nowrap=""><a href="message:{{ message_id }}"><font size="2" color="{{ conf.HistoryTimestampColour }}" face="{{ conf.HistoryFontName }}">{{ data["datetime"].strftime("%Y-%m-%d %H:%M") }}</font></a></td>
   </tr>
 %endfor
 </table>
 %endif
-</font>
 %endif
 
 
 %if stats.get("transfers"):
-<br /><hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{conf.LinkColour}}">Back to top</font></a></td></tr></table><br /><br />
+<hr /><table cellpadding="0" cellspacing="0" width="100%"><tr><td><a name="transfers"><b>Sent and received files:</b></a></td><td align="right"><a href="#top"><font color="{{ conf.LinkColour }}">Back to top</font></a></td></tr></table><br /><br />
 <table width="100%">
 %for f in stats["transfers"]:
 <%
@@ -2019,18 +2128,18 @@ partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
 f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
-    <td align="right" nowrap="" valign="top"><a href="message:{{f["__message_id"]}}"><font size="2" face="{{conf.HistoryFontName}}" color="{{conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour}}">{{partner if from_remote else db.account["name"]}}</font></a></td>
-    <td valign="top"><font size="2" face="{{conf.HistoryFontName}}">
+    <td align="right" valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour }}">{{ partner if from_remote else db.account["name"] }}</font></td>
+    <td valign="top"><font size="2" face="{{ conf.HistoryFontName }}">
 %if f["filepath"]:
-    <a href="{{util.path_to_url(f["filepath"])}}">
-      <font color="{{conf.LinkColour}}">{{f["filepath"]}}</font>
+    <a href="{{ util.path_to_url(f["filepath"]) }}">
+      <font color="{{ conf.LinkColour }}">{{ f["filepath"] }}</font>
     </a>
 %else:
-    <font color="{{conf.LinkColour}}">{{f["filename"]}}</font>
+    <font color="{{ conf.LinkColour }}">{{ f["filename"] }}</font>
 %endif
     </font></td>
-    <td nowrap="" align="right" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{util.format_bytes(int(f["filesize"]))}}</font></td>
-    <td nowrap="" valign="top"><font size="2" face="{{conf.HistoryFontName}}">{{f_datetime}}</font></td>
+    <td align="right" valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}">{{ util.format_bytes(int(f["filesize"])) }}</font></td>
+    <td align="right" valign="top" nowrap=""><a href="message:{{ f["__message_id"] }}"><font size="2" color="{{ conf.HistoryTimestampColour }}" face="{{ conf.HistoryFontName }}">{{ f_datetime }}</font></a></td>
   </tr>
 %endfor
 </table>
@@ -2060,10 +2169,10 @@ if title_matches:
 %>
 <tr>
   <td align="right" valign="top">
-    <font color="{{conf.HistoryGreyColour}}">{{result_count}}</font>
+    <font color="{{ conf.HistoryGreyColour }}">{{ result_count }}</font>
   </td><td colspan="2">
-    <a href="chat:{{chat["id"]}}">
-    <font color="{{conf.SkypeLinkColour}}">{{!title}}</font></a><br />
+    <a href="chat:{{ chat["id"] }}">
+    <font color="{{ conf.SkypeLinkColour }}">{{! title }}</font></a><br />
 %if title_matches:
     Title matches.<br />
 %endif
@@ -2075,7 +2184,7 @@ name = c["fullname"] or c["displayname"]
 name_replaced = pattern_replace.sub(wrap_b, name)
 identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace.sub(wrap_b, c["identity"])
 %>
-{{", " if i else ""}}{{!name_replaced}}{{!identity_replaced}}{{"." if i == len(matching_authors) - 1 else ""}}
+{{ ", " if i else "" }}{{! name_replaced }}{{! identity_replaced }}{{ "." if i == len(matching_authors) - 1 else "" }}
 %endfor
 <br />
 %endif
@@ -2101,7 +2210,7 @@ title = chat["title"]
 if title_matches:
     title = pattern_replace.sub(lambda x: "**%s**" % x.group(0), title)
 %>
-{{"%3d" % result_count}}. {{title}}
+{{ "%3d" % result_count }}. {{ title }}
 %if title_matches:
     Title matches.
 %endif
@@ -2113,7 +2222,7 @@ name = c["fullname"] or c["displayname"]
 name_replaced = pattern_replace.sub(wrap_b, name)
 identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace.sub(wrap_b, c["identity"])
 %>
-{{", " if i else ""}}{{!name_replaced}}{{!identity_replaced}}{{"." if i == len(matching_authors) - 1 else ""}}
+{{ ", " if i else "" }}{{! name_replaced }}{{! identity_replaced }}{{ "." if i == len(matching_authors) - 1 else "" }}
 %endfor
 %endif
 """
@@ -2138,14 +2247,14 @@ from skyperious import conf, skypedata
 %endif
 <tr>
   <td align="right" valign="top">
-    <font color="{{conf.DisabledColour}}">{{result_count}}</font>
+    <font color="{{ conf.DisabledColour }}">{{ result_count }}</font>
   </td><td colspan="2">
-    <font color="{{conf.DisabledColour}}">{{!pattern_replace.sub(wrap_b, contact["name"])}}</font>
+    <font color="{{ conf.DisabledColour }}">{{! pattern_replace.sub(wrap_b, contact["name"]) }}</font>
     <br /><table>
 %for field in filter(lambda x: x in fields_filled, match_fields):
       <tr>
-        <td nowrap valign="top"><font color="{{conf.DisabledColour}}">{{skypedata.CONTACT_FIELD_TITLES[field]}}</font></td>
-        <td>&nbsp;</td><td>{{!fields_filled[field]}}</td>
+        <td nowrap valign="top"><font color="{{ conf.DisabledColour }}">{{ skypedata.CONTACT_FIELD_TITLES[field] }}</font></td>
+        <td>&nbsp;</td><td>{{! fields_filled[field] }}</td>
       </tr>
 %endfor
 </table><br /></td></tr>
@@ -2169,10 +2278,10 @@ from skyperious import conf, skypedata
 %if count <= 1 and result_count > 1:
 -------------------------------------------------------------------------------
 %endif
-{{"%3d" % result_count}}. {{title}}
-{{pattern_replace.sub(wrap_b, contact["name"])}}
+{{ "%3d" % result_count }}. {{ title }}
+{{ pattern_replace.sub(wrap_b, contact["name"]) }}
 %for field in filter(lambda x: x in fields_filled, match_fields):
-  {{"15%s" % skypedata.CONTACT_FIELD_TITLES[field]}}: {{fields_filled[field]}}
+  {{ "15%s" % skypedata.CONTACT_FIELD_TITLES[field] }}: {{ fields_filled[field] }}
 %endfor
 """
 
@@ -2195,7 +2304,7 @@ from skyperious import conf, skypedata
 %endif
 <tr>
   <td align="right" valign="top">
-    <font color="{{conf.HistoryGreyColour}}">{{result_count}}</font>
+    <font color="{{ conf.HistoryGreyColour }}">{{ result_count }}</font>
   </td><td valign="top">
 <%
 after = ""
@@ -2204,17 +2313,17 @@ if (skypedata.CHATS_TYPE_SINGLE != chat["type"]):
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-    <a href="message:{{m["id"]}}"><font color="{{conf.SkypeLinkColour}}">{{search["db"].get_author_name(m)}}{{after}}</font></a>
+    <a href="message:{{ m["id"] }}"><font color="{{ conf.SkypeLinkColour }}">{{ search["db"].get_author_name(m) }}{{ after }}</font></a>
   </td><td align="right" nowrap>
-    &nbsp;&nbsp;<font color="{{conf.HistoryTimestampColour}}">{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}}</font>
+    &nbsp;&nbsp;<font color="{{ conf.HistoryTimestampColour }}">{{ search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M") }}</font>
   </td>
 </tr>
 <tr><td></td>
   <td width="100%" valign="top" colspan="2">
 %if skypedata.MESSAGE_TYPE_INFO == m["type"]:
-    <font color="{{conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour}}">{{search["db"].get_author_name(m)}}</font>
+    <font color="{{ conf.HistoryRemoteAuthorColour if m["author"] == search["db"].id else conf.HistoryLocalAuthorColour }}">{{ search["db"].get_author_name(m) }}</font>
 %endif
-  {{!body}}<br /></td>
+  {{! body }}<br /></td>
 </tr>
 """
 
@@ -2235,7 +2344,7 @@ if skypedata.CHATS_TYPE_SINGLE != chat["type"]:
 elif m["author"] == search["db"].id:
   after = " to %s" % chat["title"]
 %>
-{{search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M")}} {{search["db"].get_author_name(m)}}{{after}}: {{body}}
+{{ search["db"].stamp_to_date(m["timestamp"]).strftime("%d.%m.%Y %H:%M") }} {{ search["db"].get_author_name(m) }}{{ after }}: {{ body }}
 """
 
 
@@ -2249,8 +2358,8 @@ SEARCH_HEADER_HTML = """<%
 from skyperious import conf
 
 %>
-<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
-Results for "{{text}}" from {{fromtext}}:
+<font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
+Results for "{{ text }}" from {{ fromtext }}:
 %if "all tables" != fromtext:
 <br /><br />
 <table width="600" cellpadding="2" cellspacing="0">
@@ -2264,12 +2373,12 @@ HTML template for table search results header, start of HTML table.
 @param   table  table data dictionary {name, columns: [{name, }]}
 """
 SEARCH_ROW_TABLE_HEADER_HTML = """
-<br /><br /><b><a name="{{table["name"]}}">Table {{table["name"]}}:</b></b><br />
+<br /><br /><b><a name="{{ table["name"] }}">Table {{ table["name"] }}:</b></b><br />
 <table border="1" cellpadding="4" cellspacing="0" width="1000">
 <tr>
 <th>#</th>
 %for col in table["columns"]:
-<th>{{col["name"]}}</th>
+<th>{{ col["name"] }}</th>
 %endfor
 </tr>
 """
@@ -2281,9 +2390,9 @@ TXT template for table search results header.
 @param   table  table data dictionary {name, columns: [{name, }]}
 """
 SEARCH_ROW_TABLE_HEADER_TXT = """
-Table {{table["name"]}}:
+Table {{ table["name"] }}:
 %for col in ["#"] + table["columns"]:
-{{col["name"]}}    
+{{ col["name"] }}    
 %endfor
 """
 
@@ -2302,14 +2411,14 @@ from skyperious import conf, templates
 
 %>
 <tr>
-<td align="right" valign="top"><a href="table:{{table["name"]}}:{{count}}">{{count}}</a></td>
+<td align="right" valign="top"><a href="table:{{ table["name"] }}:{{ count }}">{{ count }}</a></td>
 %for col in table["columns"]:
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
 value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 %>
-<td valign="top">{{!pattern_replace.sub(wrap_b, escape(value))}}</td>
+<td valign="top">{{! pattern_replace.sub(wrap_b, escape(value)) }}</td>
 %endfor
 </tr>
 """
@@ -2328,14 +2437,14 @@ import re
 from skyperious import conf, templates
 
 %>
-{{count}}
+{{ count }}
 %for col in table["columns"]:
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
 value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
 %>
-{{pattern_replace.sub(wrap_b, value)}}
+{{ pattern_replace.sub(wrap_b, value) }}
 %endfor
 """
 
@@ -2346,48 +2455,48 @@ import sys
 from skyperious import conf
 
 %>
-<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
+<font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
 <img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
-<b>{{conf.Title}} version {{conf.Version}}</b>, {{conf.VersionDate}}.<br /><br />
+<b>{{ conf.Title }} version {{ conf.Version }}</b>, {{ conf.VersionDate }}.<br /><br />
 
-{{conf.Title}} is written in Python, released as free open source software
+{{ conf.Title }} is written in Python, released as free open source software
 under the MIT License.
 </td></tr></table><br /><br />
 
 
 &copy; 2011, Erki Suurjaak.
-<a href="{{conf.HomeUrl}}"><font color="{{conf.LinkColour}}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
+<a href="{{ conf.HomeUrl }}"><font color="{{ conf.LinkColour }}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
 
 
 
-{{conf.Title}} has been built using the following open source software:
+{{ conf.Title }} has been built using the following open source software:
 <ul>
-  <li>wxPython{{" 4.1.0" if getattr(sys, 'frozen', False) else ""}},
-      <a href="http://wxpython.org"><font color="{{conf.LinkColour}}">wxpython.org</font></a></li>
-  <li>appdirs{{" 1.4.4" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/appdirs"><font color="{{conf.LinkColour}}">pypi.org/project/appdirs</font></a></li>
-  <li>beautifulsoup4{{" 4.9.1" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/beautifulsoup4"><font color="{{conf.LinkColour}}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>ijson{{" 3.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://pypi.org/project/ijson">
-      <font color="{{conf.LinkColour}}">pypi.org/project/ijson</font></a></li>
-  <li>Pillow{{" 6.2.2" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/Pillow"><font color="{{conf.LinkColour}}">pypi.org/project/Pillow</font></a></li>
-  <li>pyparsing{{" 2.4.7" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/pyparsing"><font color="{{conf.LinkColour}}">pypi.org/project/pyparsing</font></a></li>
-  <li>SkPy{{" 0.10" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/SkPy"><font color="{{conf.LinkColour}}">pypi.org/project/SkPy</font></a></li>
+  <li>wxPython{{ " 4.1.0" if getattr(sys, 'frozen', False) else "" }},
+      <a href="http://wxpython.org"><font color="{{ conf.LinkColour }}">wxpython.org</font></a></li>
+  <li>appdirs{{ " 1.4.4" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
+  <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
+  <li>ijson{{ " 3.1.3" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
+      <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
+  <li>Pillow{{ " 6.2.2" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
+  <li>pyparsing{{ " 2.4.7" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
+  <li>SkPy{{ " 0.10.2" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
-      <a href="https://pypi.org/project/step-template"><font color="{{conf.LinkColour}}">pypi.org/project/step-template</font></a></li>
-  <li>XlsxWriter{{" 1.2.9" if getattr(sys, 'frozen', False) else ""}},
-      <a href="https://pypi.org/project/XlsxWriter"><font color="{{conf.LinkColour}}">
+      <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>
+  <li>XlsxWriter{{ " 1.3.7" if getattr(sys, 'frozen', False) else "" }},
+      <a href="https://pypi.org/project/XlsxWriter"><font color="{{ conf.LinkColour }}">
           pypi.org/project/XlsxWriter</font></a></li>
-  <li>jsOnlyLightbox{{" 0.5.1" if getattr(sys, 'frozen', False) else ""}}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
-      <font color="{{conf.LinkColour}}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
+  <li>jsOnlyLightbox{{ " 0.5.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
+      <font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{conf.LinkColour}}">www.python.org</font></a></li>
+  <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
   <li>PyInstaller, <a href="https://www.pyinstaller.org">
-      <font color="{{conf.LinkColour}}">www.pyinstaller.org</font></a></li>
+      <font color="{{ conf.LinkColour }}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br />
 
@@ -2399,18 +2508,18 @@ released under the Skype Component License 1.0.<br /><br />
 
 Default avatar icon from Fancy Avatars, &copy; 2009 Brandon Mathis<br />
 <a href="https://github.com/imathis/fancy-avatars">
-<font color="{{conf.LinkColour}}">github.com/imathis/fancy-avatars</font></a><br /><br />
+<font color="{{ conf.LinkColour }}">github.com/imathis/fancy-avatars</font></a><br /><br />
 
 
 Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
-<a href="https://p.yusukekamiyamane.com/"><font color="{{conf.LinkColour}}">p.yusukekamiyamane.com</font></a>
+<a href="https://p.yusukekamiyamane.com/"><font color="{{ conf.LinkColour }}">p.yusukekamiyamane.com</font></a>
 <br /><br />
 Includes fonts Carlito Regular and Carlito bold,
-<a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{conf.LinkColour}}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
+<a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{ conf.LinkColour }}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
 %if getattr(sys, 'frozen', False):
 <br /><br />
 Installer created with Nullsoft Scriptable Install System,
-<a href="https://nsis.sourceforge.io"><font color="{{conf.LinkColour}}">nsis.sourceforge.io</font></a>
+<a href="https://nsis.sourceforge.io"><font color="{{ conf.LinkColour }}">nsis.sourceforge.io</font></a>
 %endif
 
 </font>
@@ -2423,22 +2532,22 @@ SEARCH_WELCOME_HTML = """<%
 from skyperious import conf
 
 %>
-<font face="{{conf.HistoryFontName}}" size="2" color="{{conf.FgColour}}">
+<font face="{{ conf.HistoryFontName }}" size="2" color="{{ conf.FgColour }}">
 <center>
-<h5><font color="{{conf.SkypeLinkColour}}">Overview</font></h5>
+<h5><font color="{{ conf.SkypeLinkColour }}">Overview</font></h5>
 <table cellpadding="10" cellspacing="0">
 <tr>
   <td>
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
-        Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{conf.LinkColour}}">syntax</font></a>.<br />
+        Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{ conf.LinkColour }}">syntax</font></a>.<br />
         <br />
         Or choose other search targets from the toolbar: <br />
         search in contact information, or in chat information, <br />
         or across all database tables.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:#search"><b><font color="{{conf.FgColour}}">Search</font></b></a><br />
+        <a href="page:#search"><b><font color="{{ conf.FgColour }}">Search</font></b></a><br />
     </td></tr></table>
   </td>
   <td>
@@ -2448,7 +2557,7 @@ from skyperious import conf
         Browse, filter and change database tables,<br />
         export as HTML, SQL INSERT-statements or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:tables"><b><font color="{{conf.FgColour}}">Data tables</font></b></a><br />
+        <a href="page:tables"><b><font color="{{ conf.FgColour }}">Data tables</font></b></a><br />
     </td></tr></table>
   </td>
 </tr>
@@ -2462,7 +2571,7 @@ from skyperious import conf
         filter by content, date or author,<br />
         export as HTML, TXT or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:chats"><b><font color="{{conf.FgColour}}">Chats</font></b></a><br />
+        <a href="page:chats"><b><font color="{{ conf.FgColour }}">Chats</font></b></a><br />
     </td></tr></table>
   </td>
   <td>
@@ -2472,7 +2581,7 @@ from skyperious import conf
         Make direct SQL queries in the database,<br />
         export results as HTML or spreadsheet.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:sql"><b><font color="{{conf.FgColour}}">SQL window</font></b></a><br />
+        <a href="page:sql"><b><font color="{{ conf.FgColour }}">SQL window</font></b></a><br />
     </td></tr></table>
   </td>
 </tr>
@@ -2485,7 +2594,7 @@ from skyperious import conf
         view general database statistics,<br />
         check database integrity for corruption and recovery.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:info"><b><font color="{{conf.FgColour}}">Information</font></b></a>
+        <a href="page:info"><b><font color="{{ conf.FgColour }}">Information</font></b></a>
     </td></tr></table>
   </td>
   <td>
@@ -2494,9 +2603,9 @@ from skyperious import conf
       </td><td width="10"></td><td valign="center">
         Log in to Skype online service<br />
         in order to synchronize chat history from live, <br />
-        and download shared images in HTML export. 
+        and download shared media in HTML export. 
       </td></tr><tr><td nowrap align="center">
-        <a href="page:live"><b><font color="{{conf.FgColour}}">Online</font></b></a>
+        <a href="page:live"><b><font color="{{ conf.FgColour }}">Online</font></b></a>
     </td></tr></table>
   </td>
 </tr>
@@ -2515,51 +2624,51 @@ try:
 except ImportError:
     pyparsing = None
 %>
-<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.FgColour}}">
+<font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
 %if not pyparsing:
 <b><font color="red">Search syntax currently limited:</font></b>&nbsp;&nbsp;pyparsing not installed.<br /><br /><br />
 %endif
-{{conf.Title}} supports a Google-like syntax for searching messages:<br /><br />
+{{ conf.Title }} supports a Google-like syntax for searching messages:<br /><br />
 <table><tr><td width="500">
-  <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{conf.HelpBorderColour}}"
+  <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{ conf.HelpBorderColour }}"
    valign="top" width="500">
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search for exact word or phrase</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>"do re mi"</code></font>
+      <font color="{{ conf.HelpCodeColour }}"><code>"do re mi"</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
-      Use quotes (<font color="{{conf.HelpCodeColour}}"><code>"</code></font>) to search for
+      Use quotes (<font color="{{ conf.HelpCodeColour }}"><code>"</code></font>) to search for
       an exact phrase or word. Quoted text is searched exactly as entered,
       leaving whitespace as-is and ignoring any wildcard characters.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search for either word</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>this OR that</code></font>
+      <font color="{{ conf.HelpCodeColour }}"><code>this OR that</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       To find messages containing at least one of several words,
-      include <font color="{{conf.HelpCodeColour}}"><code>OR</code></font> between the words.
-      <font color="{{conf.HelpCodeColour}}"><code>OR</code></font> works also
+      include <font color="{{ conf.HelpCodeColour }}"><code>OR</code></font> between the words.
+      <font color="{{ conf.HelpCodeColour }}"><code>OR</code></font> works also
       for phrases and grouped words (but not keywords).
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Group words together</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>(these two) OR this<br/>
+      <font color="{{ conf.HelpCodeColour }}"><code>(these two) OR this<br/>
       -(none of these)</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       Surround words with round brackets to group them for <code>OR</code>
       queries or for excluding from results.
@@ -2567,105 +2676,105 @@ except ImportError:
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search for partially matching text</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>bas*ball</code></font>
+      <font color="{{ conf.HelpCodeColour }}"><code>bas*ball</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
-      Use an asterisk (<font color="{{conf.HelpCodeColour}}"><code>*</code></font>) to make a
+      Use an asterisk (<font color="{{ conf.HelpCodeColour }}"><code>*</code></font>) to make a
       wildcard query: the wildcard will match any text between its front and
       rear characters (including other words).
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search within specific chats</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>chat:office<br />
+      <font color="{{ conf.HelpCodeColour }}"><code>chat:office<br />
       chat:"coffee &amp; cig"</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       To find messages from specific chats only, use the keyword
-      <font color="{{conf.HelpCodeColour}}"><code>chat:name</code></font>.<br /><br />
+      <font color="{{ conf.HelpCodeColour }}"><code>chat:name</code></font>.<br /><br />
       Search from more than one chat by adding more 
-      <font color="{{conf.HelpCodeColour}}"><code>chat:</code></font> keywords.
+      <font color="{{ conf.HelpCodeColour }}"><code>chat:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search from specific authors</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>from:maria<br />
+      <font color="{{ conf.HelpCodeColour }}"><code>from:maria<br />
       from:"john smith"</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       To find messages from specific authors only, use the keyword
-      <font color="{{conf.HelpCodeColour}}"><code>from:name</code></font>.<br /><br />
+      <font color="{{ conf.HelpCodeColour }}"><code>from:name</code></font>.<br /><br />
       Search from more than one author by adding more
-      <font color="{{conf.HelpCodeColour}}"><code>from:</code></font> keywords.
+      <font color="{{ conf.HelpCodeColour }}"><code>from:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search from specific time periods</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>date:2008<br />date:2009-01<br />
+      <font color="{{ conf.HelpCodeColour }}"><code>date:2008<br />date:2009-01<br />
       date:2005-12-24..2007</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       To find messages from specific time periods, use the keyword
-      <font color="{{conf.HelpCodeColour}}"><code>date:period</code></font> or
-      <font color="{{conf.HelpCodeColour}}"><code>date:periodstart..periodend</code></font>.
+      <font color="{{ conf.HelpCodeColour }}"><code>date:period</code></font> or
+      <font color="{{ conf.HelpCodeColour }}"><code>date:periodstart..periodend</code></font>.
       For the latter, either start or end can be omitted.<br /><br />
       A date period can be year, year-month, or year-month-day. Additionally,
-      <font color="{{conf.HelpCodeColour}}"><code>date:period</code></font> can use a wildcard
+      <font color="{{ conf.HelpCodeColour }}"><code>date:period</code></font> can use a wildcard
       in place of any part, so
-      <font color="{{conf.HelpCodeColour}}"><code>date:*-12-24</code></font> would search for
+      <font color="{{ conf.HelpCodeColour }}"><code>date:*-12-24</code></font> would search for
       all messages from the 24th of December.<br /><br />
       Search from a more narrowly defined period by adding more
-      <font color="{{conf.HelpCodeColour}}"><code>date:</code></font> keywords.
+      <font color="{{ conf.HelpCodeColour }}"><code>date:</code></font> keywords.
       <br />
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Exclude words or keywords</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>-notthisword<br />-"not this phrase"<br />
+      <font color="{{ conf.HelpCodeColour }}"><code>-notthisword<br />-"not this phrase"<br />
       -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
       -date:2013</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       To exclude certain messages, add a dash
-      (<font color="{{conf.HelpCodeColour}}"><code>-</code></font>) in front of words,
+      (<font color="{{ conf.HelpCodeColour }}"><code>-</code></font>) in front of words,
       phrases, grouped words or keywords.
     </td>
   </tr>
   <tr>
-    <td bgcolor="{{conf.BgColour}}" width="150">
+    <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>SPECIAL: search specific tables</b><br /><br />
-      <font color="{{conf.HelpCodeColour}}"><code>table:fromthistable<br />
+      <font color="{{ conf.HelpCodeColour }}"><code>table:fromthistable<br />
       -table:notfromthistable</code></font>
       <br />
     </td>
-    <td bgcolor="{{conf.BgColour}}">
+    <td bgcolor="{{ conf.BgColour }}">
       <br /><br />
       When performing search on all columns of all database tables
       (the fourth option on the search toolbar),
-      use the keyword <font color="{{conf.HelpCodeColour}}"><code>table:name</code></font>
+      use the keyword <font color="{{ conf.HelpCodeColour }}"><code>table:name</code></font>
       to constrain results to specific tables only.<br /><br />
       Search from more than one table by adding more
-      <font color="{{conf.HelpCodeColour}}"><code>table:</code></font> keywords, or exclude certain
-      tables by adding a <font color="{{conf.HelpCodeColour}}"><code>-table:</code></font> keyword.
+      <font color="{{ conf.HelpCodeColour }}"><code>table:</code></font> keywords, or exclude certain
+      tables by adding a <font color="{{ conf.HelpCodeColour }}"><code>-table:</code></font> keyword.
       <br />
     </td>
   </tr>
@@ -2678,28 +2787,28 @@ except ImportError:
   <ul>
     <li>search for "flickr.com" from John or Jane in chats named "links":
         <br /><br />
-        <font color="{{conf.HelpCodeColour}}">
+        <font color="{{ conf.HelpCodeColour }}">
         <code>flickr.com from:john from:jane chat:links</code></font><br />
     </li>
     <li>search from John Smith up to 2011:<br /><br />
-        <font color="{{conf.HelpCodeColour}}"><code>from:"john smith" date:..2011</code></font>
+        <font color="{{ conf.HelpCodeColour }}"><code>from:"john smith" date:..2011</code></font>
         <br />
     </li>
     <li>search for either "John" and "my side" or "Stark" and "your side":
         <br /><br />
-        <font color="{{conf.HelpCodeColour}}">
+        <font color="{{ conf.HelpCodeColour }}">
         <code>(john "my side") OR (stark "your side")</code></font><br />
     </li>
     <li>search for either "barbecue" or "grill" in 2012,
         except from June to August:<br /><br />
-        <font color="{{conf.HelpCodeColour}}">
+        <font color="{{ conf.HelpCodeColour }}">
         <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
         </font><br />
     </li>
     <li>search for "TPS report" in chats named "office"
         (but not named "backoffice") on the first day of the month in 2012:
         <br /><br />
-        <font color="{{conf.HelpCodeColour}}">
+        <font color="{{ conf.HelpCodeColour }}">
         <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
         </font><br />
     </li>
@@ -2708,14 +2817,14 @@ except ImportError:
   <br /><br /><br />
   Search is made on raw Skype message body, so there can be results which do not
   seem to match the query - Skype messages contain more than plain text.<br />
-  For example, searching for <font color="{{conf.HelpCodeColour}}"><code>href</code></font> will match a message with body
-  <code><font color="{{conf.HelpCodeColour}}">&lt;a href="http://lmgtfy.com/"&gt;lmgtfy.com&lt;/a&gt;</font></code>,<br />
-  displayed as <a href="http://lmgtfy.com/"><font color="{{conf.LinkColour}}">lmgtfy.com</font></a>.<br /><br />
+  For example, searching for <font color="{{ conf.HelpCodeColour }}"><code>href</code></font> will match a message with body
+  <code><font color="{{ conf.HelpCodeColour }}">&lt;a href="http://lmgtfy.com/"&gt;lmgtfy.com&lt;/a&gt;</font></code>,<br />
+  displayed as <a href="http://lmgtfy.com/"><font color="{{ conf.LinkColour }}">lmgtfy.com</font></a>.<br /><br />
   This can be used for finding specific type of messages, for example
-  <font color="{{conf.HelpCodeColour}}"><code>&lt;sms</code></font> finds SMS messages, 
-  <font color="{{conf.HelpCodeColour}}"><code>&lt;file</code></font> finds transfers, 
-  <font color="{{conf.HelpCodeColour}}"><code>&lt;quote</code></font> finds quoted messages,
-  and <font color="{{conf.HelpCodeColour}}"><code>&lt;ss</code></font> finds messages with emoticons.
+  <font color="{{ conf.HelpCodeColour }}"><code>&lt;sms</code></font> finds SMS messages, 
+  <font color="{{ conf.HelpCodeColour }}"><code>&lt;file</code></font> finds transfers, 
+  <font color="{{ conf.HelpCodeColour }}"><code>&lt;quote</code></font> finds quoted messages,
+  and <font color="{{ conf.HelpCodeColour }}"><code>&lt;ss</code></font> finds messages with emoticons.
 
 </td></tr></table>
 </font>
@@ -2731,9 +2840,9 @@ helplink = "Search help"
 if "nt" == os.name: # In Windows, wx.HtmlWindow shows link whitespace quirkily
     helplink = helplink.replace(" ", "_")
 %>
-<font size="2" face="{{conf.HistoryFontName}}" color="{{conf.DisabledColour}}">
+<font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.DisabledColour }}">
 For searching messages from specific chats, add "chat:name", and from specific contacts, add "from:name".
-&nbsp;&nbsp;<a href=\"page:#help\"><font color="{{conf.LinkColour}}">{{helplink}}</font></a>.
+&nbsp;&nbsp;<a href=\"page:#help\"><font color="{{ conf.LinkColour }}">{{ helplink }}</font></a>.
 </font>
 """
 
@@ -2749,9 +2858,9 @@ from skyperious import conf, live
 
 %>
 %if isinstance(db1, live.SkypeExport):
-<font color="{{conf.FgColour}}">From {{db1}} into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+<font color="{{ conf.FgColour }}">From {{ db1 }} into <a href="{{ db2.filename }}"><font color="{{ conf.LinkColour }}">{{ db2.filename }}</font></a>:</font>
 %else:
-<font color="{{conf.FgColour}}">From <a href="{{db1.filename}}"><font color="{{conf.LinkColour}}">{{db1.filename}}</font></a> into <a href="{{db2.filename}}"><font color="{{conf.LinkColour}}">{{db2.filename}}</font></a>:</font>
+<font color="{{ conf.FgColour }}">From <a href="{{ db1.filename }}"><font color="{{ conf.LinkColour }}">{{ db1.filename }}</font></a> into <a href="{{ db2.filename }}"><font color="{{ conf.LinkColour }}">{{ db2.filename }}</font></a>:</font>
 %endif
 """
 
@@ -2789,8 +2898,8 @@ MESSAGE_QUOTE = """
 from skyperious import conf
 %>
 <table cellpadding="0" cellspacing="0"><tr>
-    <td valign="top"><font color="{{conf.DisabledColour}}" size="7">&quot;|</font></td>
-    <td><br /><font color="{{conf.DisabledColour}}">{EMDASH} </font></td>
+    <td valign="top"><font color="{{ conf.DisabledColour }}" size="7">&quot;|</font></td>
+    <td><br /><font color="{{ conf.DisabledColour }}">{EMDASH} </font></td>
 </tr></table>
 %endif
 """
@@ -2805,7 +2914,7 @@ DIFF_RESULT_ITEM = """<%
 from skyperious import conf
 
 %>
-<a href="{{chat["identity"]}}"><font color="{{conf.LinkColour}}">{{chat["title_long"]}}</font></a>
+<a href="{{ chat["identity"] }}"><font color="{{ conf.LinkColour }}">{{ chat["title_long"] }}</font></a>
 """
 
 
@@ -2816,7 +2925,7 @@ Message template for copying to clipboard.
 @param   parser  MessageParser instance
 """
 MESSAGE_CLIPBOARD = """
-[{{m["datetime"].strftime("%Y-%m-%d %H:%M:%S")}}] {{parser.db.get_author_name(m)}}: {{parser.parse(m, output={"format": "text"})}}
+[{{ m["datetime"].strftime("%Y-%m-%d %H:%M:%S") }}] {{ parser.db.get_author_name(m) }}: {{ parser.parse(m, output={"format": "text"}) }}
 """
 
 
@@ -2837,8 +2946,8 @@ border = 1
 rectstep = rectsize[0] + (1 if rectsize[0] < 10 else 2)
 interval = data[1][0] - data[0][0]
 %>
-<svg width="{{len(data) * rectstep + 2 * border}}" height="{{rectsize[1] + 2 * border}}">
-  <rect width="100%" height="100%" style="stroke-width: {{border}}; stroke: {{colour}}; fill: white;" />
+<svg width="{{ len(data) * rectstep + 2 * border }}" height="{{ rectsize[1] + 2 * border }}">
+  <rect width="100%" height="100%" style="stroke-width: {{ border }}; stroke: {{ colour }}; fill: white;" />
 %for i, (start, val) in enumerate(data):
 <%
 height = rectsize[1] * util.safedivf(val, maxval)
@@ -2855,10 +2964,10 @@ else:
 %>
   <g class="svg_hover_group">
 %if start in links:
-    <a xlink:title="{{title}}" xlink:href="{{links[start]}}">
+    <a xlink:title="{{ title }}" xlink:href="{{ links[start] }}">
 %endif
-      <rect width="{{rectsize[0]}}" fill="{{colour}}" height="{{util.round_float(height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{util.round_float(rectsize[1] - height + border, 2)}}"><title>{{title}}</title></rect>
-      <rect width="{{rectsize[0]}}" fill="white" height="{{util.round_float(rectsize[1] - height, 2)}}" x="{{i * rectstep + border + 1}}" y="{{border}}"><title>{{title}}</title></rect>
+      <rect width="{{ rectsize[0] }}" fill="{{ colour }}" height="{{ util.round_float(height, 2) }}" x="{{ i * rectstep + border + 1 }}" y="{{ util.round_float(rectsize[1] - height + border, 2) }}"><title>{{ title }}</title></rect>
+      <rect width="{{ rectsize[0] }}" fill="white" height="{{ util.round_float(rectsize[1] - height, 2) }}" x="{{ i * rectstep + border + 1 }}" y="{{ border }}"><title>{{ title }}</title></rect>
 %if start in links:
     </a>
 %endif
