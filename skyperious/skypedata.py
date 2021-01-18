@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.12.2020
+@modified    06.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1192,8 +1192,10 @@ class SkypeDatabase(object):
                     chatrows_present[m["chatname"]] = 1
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
-                if m["author"] == source_db.id:  # Ensure correct author
-                    m_filled["author"] = self.id # if merge from other account
+                # Ensure correct author if merge from other account
+                if m["author"] \
+                and m["author"] in (self.username, source_db.id, source_db.username):
+                    m_filled["author"] = self.id
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
@@ -1265,6 +1267,8 @@ class SkypeDatabase(object):
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
+            contacts = []
+            existing = {c["identity"] for c in self.get_contacts()}
 
             for p in participants:
                 p_filled = self.fill_missing_fields(p, fields)
@@ -1273,7 +1277,11 @@ class SkypeDatabase(object):
                 self.execute("INSERT INTO participants (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), p_filled)
+                if p.get("contact") and p["contact"].get("identity") \
+                and p["contact"]["identity"] not in existing:
+                    contacts.append(p["contact"])
 
+            if contacts: self.insert_contacts(contacts, source_db)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
 
@@ -1321,7 +1329,7 @@ class SkypeDatabase(object):
             self.insert_account(source_db.account)
         if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
-        if self.is_open() and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables and contacts:
             logger.info("Merging %d contacts into %s.", len(contacts), self.filename)
             self.ensure_backup()
             col_data = self.get_table_columns("contacts")
@@ -1329,12 +1337,18 @@ class SkypeDatabase(object):
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
             for c in contacts:
+                name, identity = c.get("name"), c.get("identity")
                 c_filled = self.fill_missing_fields(c, fields)
                 c_filled = self.blobs_to_binary(c_filled, fields, col_data)
-                self.execute("INSERT INTO contacts (%s) VALUES (%s)" % (
+                cursor = self.execute("INSERT INTO contacts (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), c_filled)
+                c_filled.update(id=cursor.lastrowid, name=name, identity=identity)
+                self.table_rows.setdefault("contacts", []).append(c_filled)
+                self.table_objects.setdefault("contacts", {})[c_filled["id"]] = c_filled
+            self.table_rows["contacts"].sort(key=lambda x: x.get("name"))
             self.connection.commit()
+
             self.last_modified = datetime.datetime.now()
 
 
@@ -1393,6 +1407,63 @@ class SkypeDatabase(object):
                 res = self.get_messages(additional_sql=s, additional_params=p)
                 for m in res:
                     yield m
+
+
+    def delete_conversations(self, conversations):
+        """Deletes the specified conversations and all their related data."""
+        if not self.is_open() or not conversations or "conversations" not in self.tables:
+            return
+        self.ensure_backup()
+        ids = [c["id"] for c in conversations]
+        idstr = ", ".join(map(str, ids))
+        TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
+                  "Participants", "Transfers", "Videos", "Voicemails"]
+
+        if "chats" in self.tables and "chatmembers" in self.tables:
+            # ChatMembers are matched by Chats.name
+            chats = self.execute("SELECT DISTINCT name FROM Chats "
+                                 "WHERE conv_dbid IN (%s)" % idstr).fetchall()
+            while chats: # Divide into chunks: SQLite can take up to 999 parameters.
+                argstr = ", ".join(":name%s" % i for i, _ in enumerate(chats[:999]))
+                args = {"name%s" % i: x["name"] for i, x in enumerate(chats[:999])}
+                self.execute("DELETE FROM ChatMembers WHERE chatname IN (%s)" % argstr, args)
+                chats = chats[999:]
+
+        KEYS = {"Calls": "conv_dbid", "Chats": "conv_dbid", "Conversations": "id"}
+        for table in TABLES:
+            ltable = table.lower()
+            if ltable not in self.tables: continue # for table
+            key = KEYS.get(table, "convo_id")
+            self.execute("DELETE FROM %s WHERE %s IN (%s)" % (table, key, idstr))
+            if "messages" == ltable and self.table_rows.get(ltable):
+                # Messages has {convo ID: [{msg}]} instead of [{msg}]
+                self.table_rows[ltable] = {k: v for k, v in self.table_rows[ltable].items()
+                                           if k not in ids}
+            elif self.table_rows.get(ltable):
+                self.table_rows[ltable] = [x for x in self.table_rows[ltable]
+                                           if x[key] not in ids]
+            if self.table_objects.get(ltable):
+                self.table_objects[ltable] = {k: v for k, v in self.table_objects[ltable].items()
+                                              if v[key] not in ids}
+
+
+    def delete_contacts(self, contacts):
+        """Deletes the specified contacts, from contact groups as well."""
+        if not self.is_open() or not contacts or "contacts" not in self.tables:
+            return
+        self.ensure_backup()
+        ids = [c["id"] for c in contacts if c.get("id")]
+        idstr = ", ".join(map(str, ids))
+        if ids: self.execute("DELETE FROM Contacts WHERE id IN (%s)" % idstr)
+
+        skypenames = [c["skypename"] for c in contacts]
+        for group in self.get_contactgroups():
+            members = (group["members"] or "").split()
+            members2 = [x for x in members if x not in skypenames]
+            if members2 != members:
+                group["members"] = " ".join(members)
+                self.execute("UPDATE ContactGroups SET members = :members "
+                             "WHERE id = :id", group)
 
 
     def update_row(self, table, row, original_row, rowid=None, log=True):

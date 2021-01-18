@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.01.2021
+@modified    06.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1243,6 +1243,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             guibase.status("Saved a copy of %s as %s.", original, newpath,
                            log=True)
             self.update_database_list(newpath)
+            for k in ("LastActivePage", "LastSearchResults", "Login", "SQLWindowTexts"):
+                dct = getattr(conf, k, {})
+                if dct.get(original): dct[newpath] = copy.deepcopy(dct[original])
+            idx = self.list_db.FindItem(newpath)
+            if idx > 0: self.list_db.Select(idx)
+            util.run_once(conf.save)
 
 
     def on_showhide_log(self, event):
@@ -2457,6 +2463,7 @@ class DatabasePage(wx.Panel):
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
                   self.on_change_list_chats, list_chats)
+        list_chats.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_chats)
         sizer1.Add(list_chats, proportion=1, border=5,
                    flag=wx.GROW | wx.LEFT | wx.RIGHT)
 
@@ -3006,6 +3013,7 @@ class DatabasePage(wx.Panel):
         label_login  = wx.StaticText(panel1, label="Log in to Skype online account")
         label_user   = wx.StaticText(panel1, label="Username:")
         edit_user    = wx.TextCtrl(panel1)
+        button_user  = wx.Button(panel1, label="Change")
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
         edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
@@ -3077,6 +3085,7 @@ class DatabasePage(wx.Panel):
             button_login.Disable()
             page.Disable()
 
+        self.Bind(wx.EVT_BUTTON,     self.on_change_live_user,  button_user)
         self.Bind(wx.EVT_TEXT,       self.on_change_ctrl_login, edit_pw)
         self.Bind(wx.EVT_TEXT_ENTER, self.on_live_login,        edit_pw)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
@@ -3091,6 +3100,7 @@ class DatabasePage(wx.Panel):
                         lambda e: webbrowser.open(e.GetLinkInfo().Href))
 
         self.edit_user           = edit_user
+        self.button_user         = button_user
         self.edit_pw             = edit_pw
         self.check_login_store   = check_store
         self.check_login_auto    = check_login
@@ -3111,11 +3121,15 @@ class DatabasePage(wx.Panel):
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_login = wx.FlexGridSizer(cols=2, vgap=0, hgap=10)
         sizer_login.AddGrowableCol(1, 1)
+        sizer_user  = wx.BoxSizer(wx.HORIZONTAL)
         sizer_sync1 = panel_sync1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_sync2 = panel_sync2.Sizer = wx.BoxSizer(wx.VERTICAL)
 
+        sizer_user.Add(edit_user,    flag=wx.GROW, proportion=1)
+        sizer_user.Add(button_user,  border=10, flag=wx.LEFT)
+
         sizer_login.Add(label_user,  border=5, flag=wx.ALL)
-        sizer_login.Add(edit_user,   border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.Add(sizer_user,  border=5, flag=wx.ALL | wx.GROW)
         sizer_login.Add(label_pw,    border=5, flag=wx.ALL)
         sizer_login.Add(edit_pw,     border=5, flag=wx.ALL | wx.GROW)
         sizer_login.AddSpacer(5)
@@ -3179,6 +3193,7 @@ class DatabasePage(wx.Panel):
         """Refreshes account settings in login-page from configuration."""
         opts = conf.Login.get(self.db.filename) or {}
         self.edit_user.Value = self.db.username if self.db.username else ""
+        self.button_login.Label = "&Log in as '%s'" % self.edit_user.Value
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
@@ -3186,6 +3201,27 @@ class DatabasePage(wx.Panel):
         self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
         self.check_login_sync.Enable(self.check_login_auto .Value)
+
+
+    def on_change_live_user(self, event):
+        """Handler for clicking to change live login name, opens input dialog."""
+        msg = "Specify another login name for Skype online.\n\n" \
+              "This should be the username that works for Microsoft Live login:"
+        dlg = wx.TextEntryDialog(self, msg, conf.Title, value=self.db.username or "",
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if not v: return
+
+        if v == self.db.id and v != self.db.username: v = None
+        self.db.update_row("accounts", {"liveid_membername": v}, self.db.account)
+        self.db.account["liveid_membername"] = v
+        self.db.username = v or self.db.id
+        self.edit_user.Value = self.db.username
+        self.button_login.Label = "&Log in as '%s'" % self.db.username
+        self.update_accountinfo()
 
 
     def on_change_ctrl_login(self, event):
@@ -3220,6 +3256,106 @@ class DatabasePage(wx.Panel):
         util.run_once(conf.save)
 
 
+    def on_menu_list_chats(self, event):
+        """Handler for right-clicking  or context-menu-keying chatlist, opens popup menu."""
+        chats, selecteds = [], []
+        selected = self.list_chats.GetFirstSelected()
+        while selected >= 0:
+            selecteds.append(selected)
+            chats.append(self.list_chats.GetItemMappedData(selected))
+            selected = self.list_chats.GetNextSelected(selected)
+        if isinstance(event, wx.ListEvent) and event.GetIndex() >= 0 \
+        and event.GetIndex() not in selecteds:
+            chats = [self.list_chats.GetItemMappedData(event.GetIndex())]
+        if not chats: return
+
+        def clipboard_copy(*a, **kw):
+            if wx.TheClipboard.Open():
+                d = wx.TextDataObject("\n".join(files))
+                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+                guibase.status("Copied file path to clipboard.")
+        def open_folder(*a, **kw):
+            for f in files: util.select_file(f)
+
+        name = ("Open %s " % chats[0]["title_long_lc"]) if len(chats) < 2 \
+               else util.plural("chat", chats)
+
+        menu = wx.Menu()
+        item_name    = wx.MenuItem(menu, -1, name)
+        item_copy    = wx.MenuItem(menu, -1, "&Copy %s" %
+                                   util.plural("title", chats, numbers=False))
+        item_copycon = wx.MenuItem(menu, -1, "Copy %s" %
+                                   util.plural("con&tact name",
+                                   chats[0]["participants"][1:] if len(chats) < 2 else chats,
+                                   numbers=False))
+        item_rename  = wx.MenuItem(menu, -1, "Re&name")
+        item_export  = wx.MenuItem(menu, -1, "&Export to %s" %
+                                   util.plural("file", chats, numbers=False))
+        item_exportm = item_datesm = None
+        if export.xlsxwriter and len(chats) > 1:
+            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
+                                                 "with separate sheets")
+            item_datesm  = wx.MenuItem(menu, -1, "Export date &range a single Excel workbook, "
+                                                 "with separate sheets")
+        item_dates   = wx.MenuItem(menu, -1, "Export &date range to file")
+        item_delete  = wx.MenuItem(menu, -1, "Delete from database")
+
+        boldfont = wx.Font(item_name.Font)
+        boldfont.SetWeight(wx.FONTWEIGHT_BOLD)
+        boldfont.SetFaceName(self.Font.FaceName)
+        boldfont.SetPointSize(self.Font.PointSize)
+        item_name.Font = boldfont
+        if len(chats) > 1: item_name.Enabled = item_rename.Enabled = False
+
+        menu.Append(item_name)
+        menu.AppendSeparator()
+        menu.Append(item_copy)
+        menu.Append(item_copycon)
+        menu.Append(item_rename)
+        menu.AppendSeparator()
+        menu.Append(item_export)
+        if item_exportm: menu.Append(item_exportm)
+        menu.Append(item_dates)
+        if item_datesm: menu.Append(item_datesm)
+        menu.AppendSeparator()
+        menu.Append(item_delete)
+
+        def clipboardize(category):
+            if "title" == category:
+                text = "\n".join(c["title"] for c in chats)
+            else:
+                namer = lambda p: p["identity"] if p["contact"].get("name") \
+                                  and p["identity"] == p["contact"]["name"] \
+                                  else "%s (%s)" % (p["contact"]["name"], p["identity"])
+                if len(chats) < 2: # name1\nname2
+                    text = "\n".join(namer(p) for p in chats[0]["participants"]
+                                     if p["identity"] != self.db.id)
+                else: text = "\n\n".join("%s:\n  %s" % (c["title_long"], "\n  ".join(
+                    namer(p) for p in c["participants"] if p["identity"] != self.db.id
+                )) for c in chats) # Group chat A:\n  name1\nname2\n\nGroup chat B..
+            if wx.TheClipboard.Open():
+                d = wx.TextDataObject(text)
+                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+        def exporter(do_singlefile=False, do_timerange=False):
+            self.on_export_chats(False, do_singlefile, do_timerange)
+
+        menu.Bind(wx.EVT_MENU, lambda e: self.load_chat(chats[0]), item_name)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("title"),    item_copy)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("contact"),  item_copycon)
+        menu.Bind(wx.EVT_MENU, lambda e: self.on_rename_chat(chat=chats[0]), item_rename)
+        menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
+        menu.Bind(wx.EVT_MENU, lambda e: exporter(False, True),  item_dates)
+        if item_exportm:
+            menu.Bind(wx.EVT_MENU, lambda e: exporter(True,  False), item_exportm)
+        if item_datesm:
+            menu.Bind(wx.EVT_MENU, lambda e: exporter(True,  True),  item_datesm)
+        menu.Bind(wx.EVT_MENU, lambda e: self.delete_chats(chats), item_delete)
+
+        # Needs callback, actions can modify list while mouse event ongoing
+        wx.CallAfter(self.list_chats.PopupMenu, menu)
+
+
     def on_change_list_chats_sync(self, event):
         """
         Handler for selecting an item in the synced chats list, loads the
@@ -3243,6 +3379,7 @@ class DatabasePage(wx.Panel):
         self.edit_login_status.Value = "Logging in to Skype.."
         for c in self.panel_login.Children:
             if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
+        self.button_user.Disable() 
         self.button_login.Disable() 
         self.panel_login.Refresh()
         action = {"action": "login", "password": self.edit_pw.Value, "sync": sync}
@@ -3423,6 +3560,7 @@ class DatabasePage(wx.Panel):
                 if "error" in result:
                     logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
+                    self.button_user.Enable() 
                     self.button_login.Enable() 
                     self.label_login_fail.Show()
                     self.label_login_fail.ContainingSizer.Layout()
@@ -3578,6 +3716,7 @@ class DatabasePage(wx.Panel):
 
     def update_info_page(self, reload=True):
         """Updates the Information page with current data."""
+        if not self: return
         self.button_refresh_fileinfo.Enabled = False
         if reload:
             self.db.clear_cache()
@@ -3654,7 +3793,7 @@ class DatabasePage(wx.Panel):
         if not do_refresh: return
 
         self.db.clear_cache()
-        self.load_tables_data()
+        self.load_tables_data(reload=True)
         if self.grid_table.Table:
             grid, table_name = self.grid_table, self.grid_table.Table.table
             scrollpos = map(grid.GetScrollPos, [wx.HORIZONTAL, wx.VERTICAL])
@@ -3771,23 +3910,24 @@ class DatabasePage(wx.Panel):
         self.button_rename.PopupMenu(menu, (0, self.button_rename.Size[1]))
 
 
-    def on_rename_chat(self, event):
+    def on_rename_chat(self, event=None, chat=None):
         """
         Handler for clicking to rename a chat, opens a text entry dialog
         and saves entered value as Conversations.given_displayname.
         """
+        chat = chat or self.chat
         dlg = wx.TextEntryDialog(self, "Give new display name for the conversation",
-                                 conf.Title, value=self.chat["title"],
+                                 conf.Title, value=chat["title"],
                                  style=wx.OK | wx.CANCEL)
         dlg.CenterOnParent()
         if wx.ID_OK != dlg.ShowModal(): return
 
         v = dlg.GetValue().strip()
-        if v == self.chat["title"] \
-        or not v and not self.chat.get("given_displayname"): return
+        if v == chat["title"] \
+        or not v and not chat.get("given_displayname"): return
 
         PREFS = ["displayname", "meta_topic", "identity"]
-        key0, name0 = next((k, self.chat[k]) for k in PREFS if self.chat.get(k))
+        key0, name0 = next((k, chat[k]) for k in PREFS if chat.get(k))
         if not v:
             if wx.OK != wx.MessageBox(
                 'Remove given display name, falling back to %s "%s"?' % 
@@ -3795,18 +3935,20 @@ class DatabasePage(wx.Panel):
             ): return
             v = None
 
-        self.db.update_row("conversations", {"given_displayname": v}, self.chat)
-        self.chat["given_displayname"] = v
-        self.chat["title"] = v or name0
+        self.db.update_row("conversations", {"given_displayname": v}, chat)
+        chat["given_displayname"] = v
+        chat["title"] = v or name0
 
-        ltitle = ("Chat with %s" if skypedata.CHATS_TYPE_SINGLE == self.chat["type"]
+        ltitle = ("Chat with %s" if skypedata.CHATS_TYPE_SINGLE == chat["type"]
                   else 'Group chat "%s"') % (v or name0)
-        self.chat["title_long"] = ltitle
-        self.chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
+        chat["title_long"] = ltitle
+        chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
 
         scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
         self.list_chats.RefreshRows()
         self.list_chats.ScrollLines(scrollpos)
+        if chat is not self.chat: return
+
         # Add shortcut key flag to chat label
         self.label_chat.Label = self.chat["title_long"].replace(
             "chat", "&chat"
@@ -3999,7 +4141,7 @@ class DatabasePage(wx.Panel):
         menu.Popup(pt_btn, self)
 
 
-    def on_export_chats(self, do_all, do_singlefile, do_timerange, event):
+    def on_export_chats(self, do_all, do_singlefile, do_timerange, event=None):
         """
         Handler for clicking to export selected or all chats, displays a select
         folder dialog and exports chats to individual files under the folder.
@@ -4031,6 +4173,8 @@ class DatabasePage(wx.Panel):
             while selected >= 0:
                 chats.append(self.list_chats.GetItemMappedData(selected))
                 selected = self.list_chats.GetNextSelected(selected)
+        if not chats: return
+
         self.dialog_savefile.Message = "Choose folder where to save chat files"
         self.dialog_savefile.Filename = "Filename will be ignored"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
@@ -4042,27 +4186,34 @@ class DatabasePage(wx.Panel):
             default = util.safe_filename(conf.ExportDbTemplate % formatargs)
             self.dialog_savefile.Filename = default
             self.dialog_savefile.Message = "Save chats file"
-            self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-        if not chats or wx.ID_OK != self.dialog_savefile.ShowModal(): return
+            self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
+        elif len(chats) == 1 and not do_singlefile:
+            formatargs = collections.defaultdict(str); formatargs.update(chats[0])
+            default = util.safe_filename(conf.ExportChatTemplate % formatargs)
+            self.dialog_savefile.Filename = default
+            self.dialog_savefile.Message = "Save chat"
+            self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
+        if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
         path, media_folder = self.dialog_savefile.GetPath(), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
         else:
-            path = os.path.dirname(path)
+            if len(chats) > 1: path = os.path.dirname(path)
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
             media_folder = "html" == format and self.dialog_savefile.FilterIndex
 
-        msg = 'Exporting %schats from "%s"\nas %s under %s.' % \
+        msg = 'Exporting to %s.' % path if len(chats) == 1 and not do_singlefile \
+        else  'Exporting %schats from "%s"\nas %s under %s.' % \
               ("all " if do_all else "", self.db.filename, format.upper(), path)
         busy = controls.BusyPanel(self, msg)
         guibase.status(msg, log=True)
         files, count, message_count, errormsg, errormsg_short = [], 0, 0, None, None
         try:
             progressfunc = lambda *args: wx.SafeYield()
-            opts = dict(multi=not do_singlefile, progress=progressfunc, timerange=timerange,
-                        noskip=not do_all)
+            opts = dict(multi=not do_singlefile and len(chats) > 1, noskip=not do_all,
+                        progress=progressfunc, timerange=timerange)
             if media_folder: opts["media_folder"] = True
             result = export.export_chats(chats, path, format, self.db, opts)
             files, count, message_count = result
@@ -4072,11 +4223,15 @@ class DatabasePage(wx.Panel):
                        traceback.format_exc()
         busy.Close()
         if not errormsg:
-            guibase.status("Exported %s and %s from %s as %s under %s.",
-                           util.plural("chat", count, sep=","), 
-                           util.plural("message", message_count, sep=","), self.db,
-                           format.upper(), path, log=True)
-            util.start_file(files[0] if do_singlefile else path)
+            if len(chats) == 1 and not do_singlefile:
+                guibase.status("Exported %s to %s.",
+                               util.plural("message", message_count, sep=","),
+                               path, log=True)
+            else: guibase.status("Exported %s and %s from %s as %s under %s.",
+                                 util.plural("chat", count, sep=","), 
+                                 util.plural("message", message_count, sep=","), self.db,
+                                 format.upper(), path, log=True)
+            util.start_file(files[0] if do_singlefile or len(chats) == 1 else path)
         else:
             guibase.status(errormsg_short or errormsg)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
@@ -5290,9 +5445,10 @@ class DatabasePage(wx.Panel):
                             p["contact"]["avatar_bitmap"] = bmp
                     if "avatar_bitmap" in p["contact"]:
                         b = il.Add(p["contact"]["avatar_bitmap"])
-                    plist.InsertImageStringItem(index,
-                        "%s (%s)" % (p["contact"]["name"], p["identity"]),
-                        b, it_kind=1)
+                    t = p["contact"]["name"]
+                    if p["identity"] != p["contact"]["name"]:
+                        t += " (%s)" % p["identity"]
+                    plist.InsertImageStringItem(index, t, b, it_kind=1)
                     plist.SetItemTextColour(index,       plist.ForegroundColour)
                     plist.SetItemBackgroundColour(index, plist.BackgroundColour)
                     c = plist.GetItem(index)
@@ -5471,6 +5627,131 @@ class DatabasePage(wx.Panel):
         self.html_stats.Thaw()
 
 
+    def close_chat(self):
+        """Closes the currently open chat in ChatContentSTC."""
+        if not self.chat: return
+
+        self.chat = None
+        self.chat_filter = {"daterange": None, "startdaterange": None,
+                            "text": "", "participants": None}
+        # Update chat list colours
+        for i in range(self.list_chats.ItemCount):
+            if self.list_chats.GetItemMappedData(i) == self.chat:
+                self.list_chats.SetItemFont(i, self.list_chats.Font)
+
+        # Clear filter controls
+        self.label_chat.Label = ""
+        self.edit_filtertext.Value = ""
+        self.edit_filterdate1.Value = self.edit_filterdate2.Value = None
+        self.range_date.SetRange(None, None)
+        self.stc_history.Populate(None, self.db)
+        self.stc_history.SetFilter(self.chat_filter)
+        self.stc_history.ClearAll()
+        self.list_participants.ClearAll()
+        self.tb_chat.ToggleTool(wx.ID_MORE, False)
+
+        # Clear and hide timeline
+        if self.list_timeline.Shown:
+            self.list_timeline.Hide()
+            self.list_timeline.ContainingSizer.Layout()
+            self.tb_chat.ToggleTool(wx.ID_JUMP_TO, False)
+        self.list_timeline.Populate([], None)
+
+        # Clear and hide statistics
+        self.html_stats.SetPage("")
+        if self.html_stats.Shown:
+            self.html_stats.Hide()
+            self.stc_history.Show()
+            self.html_stats.ContainingSizer.Layout()
+            self.stc_history.ContainingSizer.Layout()
+            self.tb_chat.ToggleTool(wx.ID_PROPERTIES, False)
+
+        self.panel_chats2.Enabled = False
+
+
+    def delete_chats(self, chats):
+        """Asks for confirmation and deletes specified chats from database."""
+        if not chats: return
+        ongoings = filter(bool, [self.worker_live.is_working() and "live sync",
+                                 self.workers_search and "search"])
+        if ongoings: return wx.MessageBox("%s is currently ongoing, cannot delete." %
+                                          " and ".join(ongoings).capitalize(),
+                                          conf.Title, wx.ICON_INFORMATION | wx.OK)
+
+        msg = "Are you sure you want to delete %s %s?\n\n  %s" % (
+              "these" if len(chats) > 1 else "this",
+              util.plural("chat", chats, single=""),
+              "\n  ".join(c["title_long"] for c in chats))
+        if wx.OK != wx.MessageBox(msg, conf.Title, wx.OK | wx.CANCEL): return
+
+        cmap = {p["contact"]["identity"]: p["contact"]
+                for c in chats for p in c["participants"]
+                if p["identity"] != self.db.id and p["contact"].get("id")}
+        contacts = sorted(cmap.values(), key=lambda x: x["name"].lower())
+
+        chatids = [c["id"] for c in chats]
+        otherchats = [c for c in self.db.get_conversations() if c["id"] not in chatids]
+        purgables = [x for x in contacts if not any(
+            any(p["contact"]["identity"] == x["identity"] for p in c["participants"])
+            for c in otherchats
+        )]
+
+        if purgables:
+            msg = "%s will have no more messages in the database " \
+                  "after deleting %s %s. Delete %s %s also?\n\n  %s" % (
+                  util.plural("contact", purgables, single="This"),
+                  "these" if len(chats) > 1 else "this",
+                  util.plural("chat", chats, single=""),
+                  "these" if len(purgables) > 1 else "the",
+                  util.plural("contact", purgables, single=""),
+                  "\n  ".join(x["identity"] if x["identity"] == x["name"]
+                              else "%s (%s)" % (x["name"], x["identity"])
+                              for x in purgables))
+            resp = wx.MessageBox(msg, conf.Title, wx.YES | wx.NO | wx.CANCEL)
+            if wx.CANCEL == resp: return
+            elif   wx.NO == resp: del purgables[:]
+
+        TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
+                  "Participants", "Transfers", "Videos", "Voicemails"]
+        if purgables: TABLES.extend(["Contacts", "ContactGroups"])
+        openeds, changeds = [], []
+        for t in TABLES:
+            if t.lower() in self.db_grids:
+                openeds.append(t)
+                if self.db_grids[t.lower()].IsChanged(): changeds.append(t)
+
+        if changeds and wx.OK != wx.MessageBox("There are unsaved changes "
+            "in open data grids for the following tables:\n  %s\n\n"
+            "Discard changes and continue?" % "\n  ".join(changeds),
+            conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL): return
+
+        # Close query cursors, discard table grids currently not visible
+        if self.grid_sql.Table: self.grid_sql.Table.Close()
+        if self.grid_table.Table and self.grid_table.Table.IsChanged():
+            self.grid_table.Table.UndoChanges()
+        for t in openeds:
+            grid = self.db_grids[t.lower()]
+            grid.Close()
+            if grid is not self.grid_table.Table: self.db_grids.pop(t.lower())
+        self.update_tabheader()
+
+        busy = controls.BusyPanel(self, "Deleting..")
+        try:
+            if self.chat in chats: self.close_chat()
+
+            self.db.delete_conversations(chats)
+            self.db.delete_contacts(purgables)
+
+            idxs = [i for i in range(self.list_chats.GetItemCount())
+                    if self.list_chats.GetItemMappedData(i) in chats]
+            for idx in idxs[::-1]: self.list_chats.DeleteItem(idx)
+            self.chats = [c for c in self.chats if c not in chats]
+
+            self.on_refresh_tables()
+            wx.CallAfter(self.update_info_page)
+        finally: busy.Close()
+
+
     def on_sort_grid_column(self, event):
         """
         Handler for clicking a table grid column, sorts table by the column.
@@ -5597,10 +5878,13 @@ class DatabasePage(wx.Panel):
             wx.CallAfter(self.update_tabheader)
 
 
-    def load_tables_data(self):
-        """Loads table data into table tree and SQL editor."""
+    def load_tables_data(self, reload=False):
+        """
+        Loads table data into table tree and SQL editor,
+        reloading schema and row counts if specified.
+        """
         try:
-            tables = self.db.get_tables()
+            tables = self.db.get_tables(refresh=reload)
             # Fill table tree with information on row counts and columns
             self.tree_tables.DeleteAllItems()
             root = self.tree_tables.AddRoot("SQLITE")
@@ -6419,6 +6703,7 @@ class MergerPage(wx.Panel):
             mindex, mcount = result["index"], result["count"]
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            if percent == 100 and mindex < mcount: percent = 99
             msg = "Scan %d%% complete (%s of %s)." % \
                   (percent, cindex + 1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
@@ -6505,6 +6790,7 @@ class MergerPage(wx.Panel):
             mindex, mcount = result["index"], result["count"]
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            if percent == 100 and mindex < mcount: percent = 99
             msg = "%s %d%% complete (%s of %s)." % (action, percent,
                   cindex+1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
@@ -7264,7 +7550,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
         center_id, stamp_from = None, None
         if self._messages:
-            center_id  = self._messages_current[0]["id"]
+            if self._messages_current: center_id = self._messages_current[0]["id"]
             stamp_from = self._messages[0]["timestamp"]
         elif any(self._filter.get("daterange") or []):
             stamp_from = util.datetime_to_epoch(self._filter["daterange"][0])
@@ -7588,7 +7874,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self._center_message_index = None
         self._center_message_id = None
 
-        if messages is None:
+        if chat is None:
+            messages_current, message_range = [], []
+        elif messages is None:
             mm, center_message_i = [], None
             for i, m in enumerate(db.get_messages(chat, ascending=False)):
                 mm.append(m)
@@ -8298,6 +8586,13 @@ class SqliteGridBase(wx.grid.GridTableBase):
         self.rows_current.sort(cmp=compare, reverse=self.sort_ascending)
         if self.View:
             self.View.ForceRefresh()
+
+
+    def Close(self):
+        """Closes the underlying query cursor, if any."""
+        try: self.row_iterator.close()
+        except Exception: pass
+        self.row_iterator = None
 
 
     def SaveChanges(self):
