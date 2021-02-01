@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.12.2020
+@modified    01.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1192,8 +1192,10 @@ class SkypeDatabase(object):
                     chatrows_present[m["chatname"]] = 1
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
-                if m["author"] == source_db.id:  # Ensure correct author
-                    m_filled["author"] = self.id # if merge from other account
+                # Ensure correct author if merge from other account
+                if m["author"] \
+                and m["author"] in (self.username, source_db.id, source_db.username):
+                    m_filled["author"] = self.id
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)

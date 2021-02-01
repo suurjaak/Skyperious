@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.5, 2021-02-01
+---------------
+- improved detection of duplicate messages on merging (issue #93).
+
+
 4.4, 2021-01-18
 ---------------
 - added support for shared audio & video in HTML export;
