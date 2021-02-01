@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    26.08.2020
+@modified    01.02.2021
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -691,6 +691,8 @@ class MergeThread(WorkerThread):
         c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
         c1m_diff = [] # [(id, datetime), ] messages different in chat 1
 
+        db_account_ids = set(filter(bool, [db1.id, db1.username, db2.id, db2.username]))
+
         if not c["messages1"]:   # Left side empty, skip all messages
             pass
         elif not c["messages2"]: # Right side empty, take entire left
@@ -711,7 +713,8 @@ class MergeThread(WorkerThread):
 
                 mkey = (m["id"], m["datetime"])
                 t = util.to_unicode(parser2.parse(m, output=parse_options), "utf-8")
-                ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
+                if m["author"] in db_account_ids: ckey = (None, t)
+                else: ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
                 bucket = m2buckets.setdefault(m["datetime"].date(), {})
                 bucket.setdefault(ckey, []).append(mkey)
                 if not self._is_working:
@@ -728,7 +731,8 @@ class MergeThread(WorkerThread):
                 if not m.get("datetime"): continue # for i, m
 
                 t = util.to_unicode(parser1.parse(m, output=parse_options), "utf-8")
-                ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
+                if m["author"] in db_account_ids: ckey = (None, t)
+                else: ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
 
                 potentials, mdate = [], m["datetime"].date()
                 for delta in DELTAS:
