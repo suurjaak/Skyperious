@@ -1243,6 +1243,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             guibase.status("Saved a copy of %s as %s.", original, newpath,
                            log=True)
             self.update_database_list(newpath)
+            for k in ("LastActivePage", "LastSearchResults", "Login", "SQLWindowTexts"):
+                dct = getattr(conf, k, {})
+                if dct.get(original): dct[newpath] = copy.deepcopy(dct[original])
+            idx = self.list_db.FindItem(newpath)
+            if idx > 0: self.list_db.Select(idx)
+            util.run_once(conf.save)
 
 
     def on_showhide_log(self, event):
