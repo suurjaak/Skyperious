@@ -695,10 +695,11 @@ class MergeThread(WorkerThread):
         db_account_ids = set(filter(bool, [db1.id, db1.username, db2.id, db2.username]))
 
         if not c["messages1"]:   # Left side empty, skip all messages
-            pass
+            if postback: postback["index"] += c["messages2"]
         elif not c["messages2"]: # Right side empty, take entire left
             messages1 = db1.get_messages(c["c1"], use_cache=False)
             c1m_diff = [(m["id"], m["datetime"]) for m in messages1]
+            if postback: postback["index"] += len(c1m_diff)
         else:
             messages1 = db1.get_messages(c["c1"], use_cache=False)
             messages2 = db2.get_messages(c["c2"], use_cache=False)
@@ -745,6 +746,9 @@ class MergeThread(WorkerThread):
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
+                if postback: postback["index"] += 1
+                if postback and i and not i % self.POSTBACK_COUNT:
+                    self.postback(postback)
 
         message_ids1 = [x[0] for x in sorted(c1m_diff, key=lambda x: x[1])]
         result = {"messages": message_ids1, "participants": c1p_diff}
