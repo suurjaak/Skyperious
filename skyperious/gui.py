@@ -3012,6 +3012,7 @@ class DatabasePage(wx.Panel):
         label_login  = wx.StaticText(panel1, label="Log in to Skype online account")
         label_user   = wx.StaticText(panel1, label="Username:")
         edit_user    = wx.TextCtrl(panel1)
+        button_user  = wx.Button(panel1, label="Change")
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
         edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
@@ -3083,6 +3084,7 @@ class DatabasePage(wx.Panel):
             button_login.Disable()
             page.Disable()
 
+        self.Bind(wx.EVT_BUTTON,     self.on_change_live_user,  button_user)
         self.Bind(wx.EVT_TEXT,       self.on_change_ctrl_login, edit_pw)
         self.Bind(wx.EVT_TEXT_ENTER, self.on_live_login,        edit_pw)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
@@ -3097,6 +3099,7 @@ class DatabasePage(wx.Panel):
                         lambda e: webbrowser.open(e.GetLinkInfo().Href))
 
         self.edit_user           = edit_user
+        self.button_user         = button_user
         self.edit_pw             = edit_pw
         self.check_login_store   = check_store
         self.check_login_auto    = check_login
@@ -3117,11 +3120,15 @@ class DatabasePage(wx.Panel):
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_login = wx.FlexGridSizer(cols=2, vgap=0, hgap=10)
         sizer_login.AddGrowableCol(1, 1)
+        sizer_user  = wx.BoxSizer(wx.HORIZONTAL)
         sizer_sync1 = panel_sync1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_sync2 = panel_sync2.Sizer = wx.BoxSizer(wx.VERTICAL)
 
+        sizer_user.Add(edit_user,    flag=wx.GROW, proportion=1)
+        sizer_user.Add(button_user,  border=10, flag=wx.LEFT)
+
         sizer_login.Add(label_user,  border=5, flag=wx.ALL)
-        sizer_login.Add(edit_user,   border=5, flag=wx.ALL | wx.GROW)
+        sizer_login.Add(sizer_user,  border=5, flag=wx.ALL | wx.GROW)
         sizer_login.Add(label_pw,    border=5, flag=wx.ALL)
         sizer_login.Add(edit_pw,     border=5, flag=wx.ALL | wx.GROW)
         sizer_login.AddSpacer(5)
@@ -3185,6 +3192,7 @@ class DatabasePage(wx.Panel):
         """Refreshes account settings in login-page from configuration."""
         opts = conf.Login.get(self.db.filename) or {}
         self.edit_user.Value = self.db.username if self.db.username else ""
+        self.button_login.Label = "&Log in as '%s'" % self.edit_user.Value
         try: self.edit_pw.ChangeValue(util.deobfuscate(opts.get("password", "")))
         except Exception as e: logger.error("Error decoding stored password: %s", util.format_exc(e))
         self.check_login_store.Value = opts.get("store", False)
@@ -3192,6 +3200,27 @@ class DatabasePage(wx.Panel):
         self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
         self.check_login_sync.Enable(self.check_login_auto .Value)
+
+
+    def on_change_live_user(self, event):
+        """Handler for clicking to change live login name, opens input dialog."""
+        msg = "Specify another login name for Skype online.\n\n" \
+              "This should be the username that works for Microsoft Live login:"
+        dlg = wx.TextEntryDialog(self, msg, conf.Title, value=self.db.username or "",
+                                 style=wx.OK | wx.CANCEL)
+        dlg.CenterOnParent()
+        if wx.ID_OK != dlg.ShowModal(): return
+
+        v = dlg.GetValue().strip()
+        if not v: return
+
+        if v == self.db.id and v != self.db.username: v = None
+        self.db.update_row("accounts", {"liveid_membername": v}, self.db.account)
+        self.db.account["liveid_membername"] = v
+        self.db.username = v or self.db.id
+        self.edit_user.Value = self.db.username
+        self.button_login.Label = "&Log in as '%s'" % self.db.username
+        self.update_accountinfo()
 
 
     def on_change_ctrl_login(self, event):
@@ -3249,6 +3278,7 @@ class DatabasePage(wx.Panel):
         self.edit_login_status.Value = "Logging in to Skype.."
         for c in self.panel_login.Children:
             if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
+        self.button_user.Disable() 
         self.button_login.Disable() 
         self.panel_login.Refresh()
         action = {"action": "login", "password": self.edit_pw.Value, "sync": sync}
@@ -3429,6 +3459,7 @@ class DatabasePage(wx.Panel):
                 if "error" in result:
                     logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
+                    self.button_user.Enable() 
                     self.button_login.Enable() 
                     self.label_login_fail.Show()
                     self.label_login_fail.ContainingSizer.Layout()
