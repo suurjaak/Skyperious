@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.01.2021
+@modified    02.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5290,9 +5290,10 @@ class DatabasePage(wx.Panel):
                             p["contact"]["avatar_bitmap"] = bmp
                     if "avatar_bitmap" in p["contact"]:
                         b = il.Add(p["contact"]["avatar_bitmap"])
-                    plist.InsertImageStringItem(index,
-                        "%s (%s)" % (p["contact"]["name"], p["identity"]),
-                        b, it_kind=1)
+                    t = p["contact"]["name"]
+                    if p["identity"] != p["contact"]["name"]:
+                        t += " (%s)" % p["identity"]
+                    plist.InsertImageStringItem(index, t, b, it_kind=1)
                     plist.SetItemTextColour(index,       plist.ForegroundColour)
                     plist.SetItemBackgroundColour(index, plist.BackgroundColour)
                     c = plist.GetItem(index)
