@@ -6420,6 +6420,7 @@ class MergerPage(wx.Panel):
             mindex, mcount = result["index"], result["count"]
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            if percent == 100 and mindex < mcount: percent = 99
             msg = "Scan %d%% complete (%s of %s)." % \
                   (percent, cindex + 1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
@@ -6506,6 +6507,7 @@ class MergerPage(wx.Panel):
             mindex, mcount = result["index"], result["count"]
             cindex, ccount = result["chatindex"], result["chatcount"]
             percent = min(100, math.ceil(100 * util.safedivf(mindex, mcount)))
+            if percent == 100 and mindex < mcount: percent = 99
             msg = "%s %d%% complete (%s of %s)." % (action, percent,
                   cindex+1, util.plural("conversation", ccount, sep=","))
             self.update_gauge(self.gauge_progress, percent, msg)
