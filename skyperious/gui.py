@@ -7273,7 +7273,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
         center_id, stamp_from = None, None
         if self._messages:
-            center_id  = self._messages_current[0]["id"]
+            if self._messages_current: center_id = self._messages_current[0]["id"]
             stamp_from = self._messages[0]["timestamp"]
         elif any(self._filter.get("daterange") or []):
             stamp_from = util.datetime_to_epoch(self._filter["daterange"][0])
