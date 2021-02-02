@@ -2,9 +2,10 @@ CHANGELOG
 =========
 
 
-4.5, 2021-02-01
+4.5, 2021-02-02
 ---------------
-- improved detection of duplicate messages on merging (issue #93).
+- improved detection of duplicate messages on merging (issue #93);
+- fixed new contacts not being inserted on merge (issue #93).
 
 
 4.4, 2021-01-18

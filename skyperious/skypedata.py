@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.02.2021
+@modified    02.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1267,6 +1267,8 @@ class SkypeDatabase(object):
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
+            contacts = []
+            existing = {c["identity"] for c in self.get_contacts()}
 
             for p in participants:
                 p_filled = self.fill_missing_fields(p, fields)
@@ -1275,7 +1277,11 @@ class SkypeDatabase(object):
                 self.execute("INSERT INTO participants (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), p_filled)
+                if p.get("contact") and p["contact"].get("identity") \
+                and p["contact"]["identity"] not in existing:
+                    contacts.append(p["contact"])
 
+            if contacts: self.insert_contacts(contacts, source_db)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
 
@@ -1323,7 +1329,7 @@ class SkypeDatabase(object):
             self.insert_account(source_db.account)
         if self.is_open() and "contacts" not in self.tables:
             self.create_table("contacts")
-        if self.is_open() and "contacts" in self.tables:
+        if self.is_open() and "contacts" in self.tables and contacts:
             logger.info("Merging %d contacts into %s.", len(contacts), self.filename)
             self.ensure_backup()
             col_data = self.get_table_columns("contacts")
@@ -1331,12 +1337,18 @@ class SkypeDatabase(object):
             str_cols = ", ".join(fields)
             str_vals = ":" + ", :".join(fields)
             for c in contacts:
+                name, identity = c.get("name"), c.get("identity")
                 c_filled = self.fill_missing_fields(c, fields)
                 c_filled = self.blobs_to_binary(c_filled, fields, col_data)
-                self.execute("INSERT INTO contacts (%s) VALUES (%s)" % (
+                cursor = self.execute("INSERT INTO contacts (%s) VALUES (%s)" % (
                     str_cols, str_vals
                 ), c_filled)
+                c_filled.update(id=cursor.lastrowid, name=name, identity=identity)
+                self.table_rows.setdefault("contacts", []).append(c_filled)
+                self.table_objects.setdefault("contacts", {})[c_filled["id"]] = c_filled
+            self.table_rows["contacts"].sort(key=lambda x: x.get("name"))
             self.connection.commit()
+
             self.last_modified = datetime.datetime.now()
 
 
