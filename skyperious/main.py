@@ -750,9 +750,9 @@ def run(nogui=False):
         arguments.FILE2 = [util.to_unicode(f) for f in arguments.FILE2]
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
-        arguments.FILE = sum([glob.glob(f) if "*" in f else [f]
+        arguments.FILE = sum([sorted(glob.glob(f)) if "*" in f else [f]
                               for f in arguments.FILE], [])
-        arguments.FILE = sorted(set(util.to_unicode(f) for f in arguments.FILE))
+        arguments.FILE = list(set(util.to_unicode(f) for f in arguments.FILE))
 
     conf.load()
     if "gui" == arguments.command and (nogui or not is_gui_possible):
