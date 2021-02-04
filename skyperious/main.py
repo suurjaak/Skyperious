@@ -293,7 +293,9 @@ def run_merge(filenames, output_filename=None):
             chats = db1.get_conversations()
             db1.get_conversations_stats(chats)
             db2.get_conversations_stats(db2.get_conversations(reload=True))
-            bar.afterword = " Processing %.*s.." % (30, db1)
+            bar.afterword = " Processing %s%s.." % (
+                            "..." if len(db1.filename) > 30 else "",
+                            db1.filename[-30:])
             worker.work(dict(args, db1=db1, chats=chats))
             while True:
                 result = postbacks.get()
@@ -316,7 +318,7 @@ def run_merge(filenames, output_filename=None):
             bar.stop()
             bar.afterword = " Processed %s." % db1
             bar.update(bar.max)
-            output()
+            output() # Force linefeed
     finally:
         worker and (worker.stop(), worker.join())
 
@@ -595,7 +597,9 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
             bar_total = sum(c["message_count"] for c in chats)
-            bartext = " Exporting %.*s.." % (30, db.filename) # Enforce width
+            bartext = " Exporting %s%s.." % (
+                      "..." if len(db.filename) > 30 else "", db.filename[-30:])
+
             pulse = any(x is not None for x in timerange)
             bar = ProgressBar(max=bar_total, afterword=bartext, pulse=pulse)
             bar.start()
@@ -632,7 +636,11 @@ def run_diff(filename1, filename2):
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
 
-    bar_text = "%.*s.." % (50, " Scanning %s vs %s" % (db1, db2))
+
+    bar_text = "Scanning %s%s vs %s%s.." % ("..." if len(db1.filename) > 20 else "",
+                                            db1.filename[-20:],
+                                            "..." if len(db2.filename) > 20 else "",
+                                            db2.filename[-20:])
     bar = ProgressBar(afterword=bar_text)
     bar.start()
     chats1, chats2 = db1.get_conversations(), db2.get_conversations()
