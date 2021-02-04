@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.12.2020
+@modified    04.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -285,8 +285,6 @@ def run_merge(filenames, output_filename=None):
     bar.start()
     shutil.copyfile(db_base.filename, output_filename)
     db2 = skypedata.SkypeDatabase(output_filename)
-    chats2 = db2.get_conversations()
-    db2.get_conversations_stats(chats2)
 
     args = {"db2": db2, "type": "diff_merge_left"}
     worker = workers.MergeThread(postbacks.put)
@@ -294,6 +292,7 @@ def run_merge(filenames, output_filename=None):
         for db1 in dbs:
             chats = db1.get_conversations()
             db1.get_conversations_stats(chats)
+            db2.get_conversations_stats(db2.get_conversations(reload=True))
             bar.afterword = " Processing %.*s.." % (30, db1)
             worker.work(dict(args, db1=db1, chats=chats))
             while True:
