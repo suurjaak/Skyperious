@@ -2,10 +2,12 @@ CHANGELOG
 =========
 
 
-4.5, 2021-02-02
+4.5, 2021-02-04
 ---------------
+- added option to change Skype online account username;
 - improved detection of duplicate messages on merging (issue #93);
-- fixed new contacts not being inserted on merge (issue #93).
+- fixed new contacts not being inserted on merge (issue #93);
+- fixed inserting duplicate chats on command-line merge with 2+ databases (#issue 93).
 
 
 4.4, 2021-01-18
