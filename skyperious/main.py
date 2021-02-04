@@ -966,8 +966,9 @@ class ProgressBar(threading.Thread):
                 bartext = "%s%s%s" % (self.foreword, bar, self.afterword)
                 self.pulse_pos = (self.pulse_pos + 1) % (self.width + 2)
         else:
-            new_percent = int(round(100.0 * self.value / (self.max or 1)))
-            w_done = max(1, int(round((new_percent / 100.0) * w_full)))
+            percent = int(round(100.0 * self.value / (self.max or 1)))
+            percent = 99 if percent == 100 and self.value < self.max else percent
+            w_done = max(1, int(round((percent / 100.0) * w_full)))
             # Build bar outline, animate by cycling last char from progress chars
             char_last = self.forechar
             if draw and w_done < w_full: char_last = next(self.progresschar)
@@ -975,10 +976,10 @@ class ProgressBar(threading.Thread):
                        self.foreword, self.forechar * (w_done - 1), char_last,
                        self.backchar * (w_full - w_done), self.afterword)
             # Write percentage into the middle of the bar
-            centertxt = " %2d%% " % new_percent
+            centertxt = " %2d%% " % percent
             pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
             bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
-            self.percent = new_percent
+            self.percent = percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
         self.bar = bartext
         if draw: self.draw()
