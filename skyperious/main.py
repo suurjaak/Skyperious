@@ -288,14 +288,17 @@ def run_merge(filenames, output_filename=None):
 
     args = {"db2": db2, "type": "diff_merge_left"}
     worker = workers.MergeThread(postbacks.put)
+    bar.stop()
     try:
         for db1 in dbs:
-            chats = db1.get_conversations()
-            db1.get_conversations_stats(chats)
-            db2.get_conversations_stats(db2.get_conversations(reload=True))
+            bar = ProgressBar()
+            bar.start()
             bar.afterword = " Processing %s%s.." % (
                             "..." if len(db1.filename) > 30 else "",
                             db1.filename[-30:])
+            chats = db1.get_conversations()
+            db1.get_conversations_stats(chats)
+            db2.get_conversations_stats(db2.get_conversations(reload=True))
             worker.work(dict(args, db1=db1, chats=chats))
             while True:
                 result = postbacks.get()
@@ -304,6 +307,7 @@ def run_merge(filenames, output_filename=None):
                     db1 = None # Signal for global break
                     break # while True
                 if "done" in result:
+                    bar.value, bar.max = 100, 100
                     break # while True
                 if "diff" in result:
                     counts[db1]["chats"] += 1
@@ -313,12 +317,12 @@ def run_merge(filenames, output_filename=None):
                     bar.update(result["index"])
                 if result.get("output"):
                     logger.info(result["output"])
+            bar.stop()
             if not db1:
                 break # for db1
-            bar.stop()
             bar.afterword = " Processed %s." % db1
-            bar.update(bar.max)
-            output() # Force linefeed
+            bar.update() # Lay out full filename, probably wraps to next line
+            output() # Force linefeed for next progress bar
     finally:
         worker and (worker.stop(), worker.join())
 
