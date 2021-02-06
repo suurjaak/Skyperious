@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.02.2021
+@modified    06.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1407,6 +1407,63 @@ class SkypeDatabase(object):
                 res = self.get_messages(additional_sql=s, additional_params=p)
                 for m in res:
                     yield m
+
+
+    def delete_conversations(self, conversations):
+        """Deletes the specified conversations and all their related data."""
+        if not self.is_open() or not conversations or "conversations" not in self.tables:
+            return
+        self.ensure_backup()
+        ids = [c["id"] for c in conversations]
+        idstr = ", ".join(map(str, ids))
+        TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
+                  "Participants", "Transfers", "Videos", "Voicemails"]
+
+        if "chats" in self.tables and "chatmembers" in self.tables:
+            # ChatMembers are matched by Chats.name
+            chats = self.execute("SELECT DISTINCT name FROM Chats "
+                                 "WHERE conv_dbid IN (%s)" % idstr).fetchall()
+            while chats: # Divide into chunks: SQLite can take up to 999 parameters.
+                argstr = ", ".join(":name%s" % i for i, _ in enumerate(chats[:999]))
+                args = {"name%s" % i: x["name"] for i, x in enumerate(chats[:999])}
+                self.execute("DELETE FROM ChatMembers WHERE chatname IN (%s)" % argstr, args)
+                chats = chats[999:]
+
+        KEYS = {"Calls": "conv_dbid", "Chats": "conv_dbid", "Conversations": "id"}
+        for table in TABLES:
+            ltable = table.lower()
+            if ltable not in self.tables: continue # for table
+            key = KEYS.get(table, "convo_id")
+            self.execute("DELETE FROM %s WHERE %s IN (%s)" % (table, key, idstr))
+            if "messages" == ltable and self.table_rows.get(ltable):
+                # Messages has {convo ID: [{msg}]} instead of [{msg}]
+                self.table_rows[ltable] = {k: v for k, v in self.table_rows[ltable].items()
+                                           if k not in ids}
+            elif self.table_rows.get(ltable):
+                self.table_rows[ltable] = [x for x in self.table_rows[ltable]
+                                           if x[key] not in ids]
+            if self.table_objects.get(ltable):
+                self.table_objects[ltable] = {k: v for k, v in self.table_objects[ltable].items()
+                                              if v[key] not in ids}
+
+
+    def delete_contacts(self, contacts):
+        """Deletes the specified contacts, from contact groups as well."""
+        if not self.is_open() or not contacts or "contacts" not in self.tables:
+            return
+        self.ensure_backup()
+        ids = [c["id"] for c in contacts if c.get("id")]
+        idstr = ", ".join(map(str, ids))
+        if ids: self.execute("DELETE FROM Contacts WHERE id IN (%s)" % idstr)
+
+        skypenames = [c["skypename"] for c in contacts]
+        for group in self.get_contactgroups():
+            members = (group["members"] or "").split()
+            members2 = [x for x in members if x not in skypenames]
+            if members2 != members:
+                group["members"] = " ".join(members)
+                self.execute("UPDATE ContactGroups SET members = :members "
+                             "WHERE id = :id", group)
 
 
     def update_row(self, table, row, original_row, rowid=None, log=True):
