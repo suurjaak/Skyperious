@@ -280,6 +280,7 @@ folder, or a single Excel workbook with chats on separate sheets.
 
 positional arguments:
   FILE                  one or more Skype databases to export
+                        (supports * wildcards)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -319,6 +320,7 @@ positional arguments:
                         "this OR that chat:links from:john". More on syntax at
                         https://suurjaak.github.io/Skyperious/help.html.
   FILE                  Skype database file(s) to search
+                        (supports * wildcards)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -341,7 +343,8 @@ usage: skyperious sync [-h] [-u USERNAME] [-p PASSWORD] [--store-password]
 Synchronize Skype database via login to Skype online service.
 
 positional arguments:
-  FILE                  Skype database file to sync
+  FILE                  Skype database file(s) to sync (supports * wildcards),
+                        will be created if it does not exist yet
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -399,6 +402,8 @@ directory, with a full combined message history. New filename will be chosen
 automatically. Last database in the list will be used as base for comparison.
 
 positional arguments:
+  FILE                  two or merge Skype databases to merge
+                        (supports * wildcards)
   FILE1       first Skype database
   FILE2       second Skype database, or more
 
@@ -434,7 +439,8 @@ usage: skyperious gui [-h] [FILE [FILE ...]]
 Launch Skyperious graphical program (default option).
 
 positional arguments:
-  FILE        Skype database to open on startup, if any
+  FILE        Skype database(s) to open on startup, if any
+              (supports * wildcards)
 
 optional arguments:
   -h, --help  show this help message and exit
