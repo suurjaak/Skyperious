@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.02.2021
+@modified    08.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -27,8 +27,10 @@ import io
 import itertools
 import Queue
 import os
+import re
 import shutil
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -85,7 +87,8 @@ ARGUMENTS = {
                       "export type: HTML files (default), CSV spreadsheets, "
                       "text files"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "one or more Skype databases to export"}, 
+              "help": "one or more Skype databases to export\n"
+                      "(supports * wildcards)"}, 
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
               "help": "Output directory if not current directory"},
@@ -128,7 +131,8 @@ ARGUMENTS = {
                       "\"this OR that chat:links from:john\". More on syntax "
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file(s) to search"},
+              "help": "Skype database file(s) to search\n"
+                      "(supports * wildcards)"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -153,7 +157,7 @@ ARGUMENTS = {
               "help": "names of specific authors whose chats to sync",
               "nargs": "+"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file to sync, "
+              "help": "Skype database file(s) to sync (supports * wildcards), "
                       "will be created if it does not exist yet"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
@@ -188,10 +192,9 @@ ARGUMENTS = {
                         "automatically. Last database in the list will "
                         "be used as base for comparison.",
          "arguments": [
-             {"args": ["FILE1"], "metavar": "FILE1", "nargs": 1,
-              "help": "first Skype database"},
-             {"args": ["FILE2"], "metavar": "FILE2", "nargs": "+",
-              "help": "more Skype databases"},
+             {"args": ["FILE"], "metavar": "FILE", "nargs": "+",
+              "help": "two or more Skype databases to merge\n"
+                      "(supports * wildcards)"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["-o", "--output"], "dest": "output", "required": False,
@@ -211,7 +214,8 @@ ARGUMENTS = {
          "description": "Launch Skyperious graphical program (default option)",
          "arguments": [
              {"args": ["FILE"], "nargs": "*",
-              "help": "Skype database to open on startup, if any"}, ]
+              "help": "Skype database(s) to open on startup, if any\n"
+                      "(supports * wildcards)"}, ]
         },
     ],
 }
@@ -219,6 +223,14 @@ ARGUMENTS = {
 
 logger = logging.getLogger(__package__)
 window = None # Application main window instance
+
+
+class LineSplitFormatter(argparse.HelpFormatter):
+    """Formatter for argparse that retains newlines in help texts."""
+
+    def _split_lines(self, text, width):
+        return sum((textwrap.wrap(re.sub(r"\s+", " ", t).strip(), width)
+                    for t in text.split("\n")), [])
 
 
 def except_hook(etype, evalue, etrace):
@@ -368,7 +380,7 @@ def run_search(filenames, query):
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
              store_password=False, chatnames=(), authornames=(), truncate=False):
-    """Synchronizes history in specified database from Skype online service."""
+    """Synchronizes history in specified databases from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
     enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
@@ -741,14 +753,16 @@ def run(nogui=False):
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
-        subparser = subparsers.add_parser(cmd["name"], **kwargs)
+        subparser = subparsers.add_parser(cmd["name"],
+                    formatter_class=LineSplitFormatter, **kwargs)
         for arg in cmd["arguments"]:
             kwargs = dict((k, arg[k]) for k in arg if k != "args")
             subparser.add_argument(*arg["args"], **kwargs)
 
+    argv = sys.argv[:]
     if "nt" == os.name: # Fix Unicode arguments, otherwise converted to ?
-        sys.argv[:] = win32_unicode_argv()
-    argv = sys.argv[1:]
+        argv = win32_unicode_argv(argv)
+    argv = argv[1:]
     if not argv or (argv[0] not in subparsers.choices
     and argv[0].endswith(".db")):
         argv[:0] = ["gui"] # argparse hack: force default argument
@@ -796,6 +810,11 @@ def run(nogui=False):
     elif "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
+        if len(arguments.FILE) < 2:
+            output("%s%s merge: error: too few FILE arguments" % (
+                   subparsers.choices["merge"].format_usage(),
+                   os.path.basename(sys.argv[0])))
+            return
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.output_dir,
@@ -1013,9 +1032,9 @@ class ProgressBar(threading.Thread):
         self.is_running = False
 
 
-def win32_unicode_argv():
+def win32_unicode_argv(argv):
     # @from http://stackoverflow.com/a/846931/145400
-    result = sys.argv
+    result = argv
     from ctypes import POINTER, byref, cdll, c_int, windll
     from ctypes.wintypes import LPCWSTR, LPWSTR
  
