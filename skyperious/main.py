@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.12.2020
+@modified    08.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -27,8 +27,10 @@ import io
 import itertools
 import Queue
 import os
+import re
 import shutil
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -85,7 +87,8 @@ ARGUMENTS = {
                       "export type: HTML files (default), CSV spreadsheets, "
                       "text files"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "one or more Skype databases to export"}, 
+              "help": "one or more Skype databases to export\n"
+                      "(supports * wildcards)"}, 
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
               "help": "Output directory if not current directory"},
@@ -128,7 +131,8 @@ ARGUMENTS = {
                       "\"this OR that chat:links from:john\". More on syntax "
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file(s) to search"},
+              "help": "Skype database file(s) to search\n"
+                      "(supports * wildcards)"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
         }, 
@@ -153,7 +157,7 @@ ARGUMENTS = {
               "help": "names of specific authors whose chats to sync",
               "nargs": "+"},
              {"args": ["FILE"], "nargs": "+",
-              "help": "Skype database file to sync, "
+              "help": "Skype database file(s) to sync (supports * wildcards), "
                       "will be created if it does not exist yet"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"}, ],
@@ -188,10 +192,9 @@ ARGUMENTS = {
                         "automatically. Last database in the list will "
                         "be used as base for comparison.",
          "arguments": [
-             {"args": ["FILE1"], "metavar": "FILE1", "nargs": 1,
-              "help": "first Skype database"},
-             {"args": ["FILE2"], "metavar": "FILE2", "nargs": "+",
-              "help": "more Skype databases"},
+             {"args": ["FILE"], "metavar": "FILE", "nargs": "+",
+              "help": "two or more Skype databases to merge\n"
+                      "(supports * wildcards)"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["-o", "--output"], "dest": "output", "required": False,
@@ -211,7 +214,8 @@ ARGUMENTS = {
          "description": "Launch Skyperious graphical program (default option)",
          "arguments": [
              {"args": ["FILE"], "nargs": "*",
-              "help": "Skype database to open on startup, if any"}, ]
+              "help": "Skype database(s) to open on startup, if any\n"
+                      "(supports * wildcards)"}, ]
         },
     ],
 }
@@ -219,6 +223,14 @@ ARGUMENTS = {
 
 logger = logging.getLogger(__package__)
 window = None # Application main window instance
+
+
+class LineSplitFormatter(argparse.HelpFormatter):
+    """Formatter for argparse that retains newlines in help texts."""
+
+    def _split_lines(self, text, width):
+        return sum((textwrap.wrap(re.sub(r"\s+", " ", t).strip(), width)
+                    for t in text.split("\n")), [])
 
 
 def except_hook(etype, evalue, etrace):
@@ -285,16 +297,20 @@ def run_merge(filenames, output_filename=None):
     bar.start()
     shutil.copyfile(db_base.filename, output_filename)
     db2 = skypedata.SkypeDatabase(output_filename)
-    chats2 = db2.get_conversations()
-    db2.get_conversations_stats(chats2)
 
     args = {"db2": db2, "type": "diff_merge_left"}
     worker = workers.MergeThread(postbacks.put)
+    bar.stop()
     try:
         for db1 in dbs:
+            bar = ProgressBar()
+            bar.start()
+            bar.afterword = " Processing %s%s.." % (
+                            "..." if len(db1.filename) > 30 else "",
+                            db1.filename[-30:])
             chats = db1.get_conversations()
             db1.get_conversations_stats(chats)
-            bar.afterword = " Processing %.*s.." % (30, db1)
+            db2.get_conversations_stats(db2.get_conversations(reload=True))
             worker.work(dict(args, db1=db1, chats=chats))
             while True:
                 result = postbacks.get()
@@ -303,6 +319,7 @@ def run_merge(filenames, output_filename=None):
                     db1 = None # Signal for global break
                     break # while True
                 if "done" in result:
+                    bar.value, bar.max = 100, 100
                     break # while True
                 if "diff" in result:
                     counts[db1]["chats"] += 1
@@ -312,12 +329,12 @@ def run_merge(filenames, output_filename=None):
                     bar.update(result["index"])
                 if result.get("output"):
                     logger.info(result["output"])
+            bar.stop()
             if not db1:
                 break # for db1
-            bar.stop()
             bar.afterword = " Processed %s." % db1
-            bar.update(bar.max)
-            output()
+            bar.update() # Lay out full filename, probably wraps to next line
+            output() # Force linefeed for next progress bar
     finally:
         worker and (worker.stop(), worker.join())
 
@@ -363,7 +380,7 @@ def run_search(filenames, query):
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
              store_password=False, chatnames=(), authornames=(), truncate=False):
-    """Synchronizes history in specified database from Skype online service."""
+    """Synchronizes history in specified databases from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
     enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
@@ -596,7 +613,9 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
             bar_total = sum(c["message_count"] for c in chats)
-            bartext = " Exporting %.*s.." % (30, db.filename) # Enforce width
+            bartext = " Exporting %s%s.." % (
+                      "..." if len(db.filename) > 30 else "", db.filename[-30:])
+
             pulse = any(x is not None for x in timerange)
             bar = ProgressBar(max=bar_total, afterword=bartext, pulse=pulse)
             bar.start()
@@ -633,7 +652,11 @@ def run_diff(filename1, filename2):
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
     postbacks = Queue.Queue()
 
-    bar_text = "%.*s.." % (50, " Scanning %s vs %s" % (db1, db2))
+
+    bar_text = "Scanning %s%s vs %s%s.." % ("..." if len(db1.filename) > 20 else "",
+                                            db1.filename[-20:],
+                                            "..." if len(db2.filename) > 20 else "",
+                                            db2.filename[-20:])
     bar = ProgressBar(afterword=bar_text)
     bar.start()
     chats1, chats2 = db1.get_conversations(), db2.get_conversations()
@@ -730,14 +753,16 @@ def run(nogui=False):
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
-        subparser = subparsers.add_parser(cmd["name"], **kwargs)
+        subparser = subparsers.add_parser(cmd["name"],
+                    formatter_class=LineSplitFormatter, **kwargs)
         for arg in cmd["arguments"]:
             kwargs = dict((k, arg[k]) for k in arg if k != "args")
             subparser.add_argument(*arg["args"], **kwargs)
 
+    argv = sys.argv[:]
     if "nt" == os.name: # Fix Unicode arguments, otherwise converted to ?
-        sys.argv[:] = win32_unicode_argv()
-    argv = sys.argv[1:]
+        argv = win32_unicode_argv(argv)
+    argv = argv[1:]
     if not argv or (argv[0] not in subparsers.choices
     and argv[0].endswith(".db")):
         argv[:0] = ["gui"] # argparse hack: force default argument
@@ -751,9 +776,9 @@ def run(nogui=False):
         arguments.FILE2 = [util.to_unicode(f) for f in arguments.FILE2]
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
-        arguments.FILE = sum([glob.glob(f) if "*" in f else [f]
+        arguments.FILE = sum([sorted(glob.glob(f)) if "*" in f else [f]
                               for f in arguments.FILE], [])
-        arguments.FILE = sorted(set(util.to_unicode(f) for f in arguments.FILE))
+        arguments.FILE = list(set(util.to_unicode(f) for f in arguments.FILE))
 
     conf.load()
     if "gui" == arguments.command and (nogui or not is_gui_possible):
@@ -785,6 +810,11 @@ def run(nogui=False):
     elif "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
+        if len(arguments.FILE) < 2:
+            output("%s%s merge: error: too few FILE arguments" % (
+                   subparsers.choices["merge"].format_usage(),
+                   os.path.basename(sys.argv[0])))
+            return
         run_merge(arguments.FILE, arguments.output)
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.output_dir,
@@ -967,8 +997,9 @@ class ProgressBar(threading.Thread):
                 bartext = "%s%s%s" % (self.foreword, bar, self.afterword)
                 self.pulse_pos = (self.pulse_pos + 1) % (self.width + 2)
         else:
-            new_percent = int(round(100.0 * self.value / (self.max or 1)))
-            w_done = max(1, int(round((new_percent / 100.0) * w_full)))
+            percent = int(round(100.0 * self.value / (self.max or 1)))
+            percent = 99 if percent == 100 and self.value < self.max else percent
+            w_done = max(1, int(round((percent / 100.0) * w_full)))
             # Build bar outline, animate by cycling last char from progress chars
             char_last = self.forechar
             if draw and w_done < w_full: char_last = next(self.progresschar)
@@ -976,10 +1007,10 @@ class ProgressBar(threading.Thread):
                        self.foreword, self.forechar * (w_done - 1), char_last,
                        self.backchar * (w_full - w_done), self.afterword)
             # Write percentage into the middle of the bar
-            centertxt = " %2d%% " % new_percent
+            centertxt = " %2d%% " % percent
             pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
             bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
-            self.percent = new_percent
+            self.percent = percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
         self.bar = bartext
         if draw: self.draw()
@@ -1001,9 +1032,9 @@ class ProgressBar(threading.Thread):
         self.is_running = False
 
 
-def win32_unicode_argv():
+def win32_unicode_argv(argv):
     # @from http://stackoverflow.com/a/846931/145400
-    result = sys.argv
+    result = argv
     from ctypes import POINTER, byref, cdll, c_int, windll
     from ctypes.wintypes import LPCWSTR, LPWSTR
  

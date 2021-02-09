@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    18.01.2021
+@modified    05.02.2021
 ------------------------------------------------------------------------------
 """
 import collections
@@ -640,6 +640,7 @@ class DatePickerCtrl(wx.ComboCtrl):
 
         def SetStringValue(self, val):
             """Sets value for the inner calendar control. Required override."""
+            if not val: return
             fmt = self.GetComboCtrl().Format
             self._calendar.SetDate(datetime.datetime.strptime(val, fmt).date())
 
@@ -703,7 +704,8 @@ class DatePickerCtrl(wx.ComboCtrl):
     def SetValue(self, dt):
         """Sets current date value."""
         if isinstance(dt, basestring): return self.SetText(dt)
-        super(DatePickerCtrl, self).SetValue(dt.strftime(self._format))
+        text = dt.strftime(self._format) if isinstance(dt, datetime.date) else ""
+        super(DatePickerCtrl, self).SetValue(text)
         self._value = dt
     Value = property(GetValue, SetValue)
 
