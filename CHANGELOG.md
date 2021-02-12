@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.5.1, 2021-02-12
+-----------------
+- fixed not retaining the order of command-line FILE arguments (issue #93).
+
+
 4.5, 2021-02-09
 ---------------
 - added option to change Skype online account username;
