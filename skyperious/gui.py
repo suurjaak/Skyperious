@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.02.2021
+@modified    13.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1343,6 +1343,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
             media_folder = "html" == format and self.dialog_savefile.FilterIndex
+            if media_folder and not check_media_export_login(db):
+                self.button_export.Enabled = True
+                if focused_control: focused_control.SetFocus()
+                return
+
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db.account: formatargs.update(db.account)
@@ -4024,6 +4029,8 @@ class DatabasePage(wx.Panel):
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -4204,6 +4211,8 @@ class DatabasePage(wx.Panel):
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
             media_folder = "html" == format and self.dialog_savefile.FilterIndex
 
+        if media_folder and not check_media_export_login(self.db): return
+
         msg = 'Exporting to %s.' % path if len(chats) == 1 and not do_singlefile \
         else  'Exporting %schats from "%s"\nas %s under %s.' % \
               ("all " if do_all else "", self.db.filename, format.upper(), path)
@@ -4253,6 +4262,8 @@ class DatabasePage(wx.Panel):
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
 
@@ -6290,6 +6301,8 @@ class MergerPage(wx.Panel):
         filepath = dialog.GetPath()
         format = export.CHAT_EXTS[dialog.FilterIndex]
         media_folder = "html" == format and dialog.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -8974,6 +8987,20 @@ class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
     Password = property(GetPassword)
 
 
+def check_media_export_login(db):
+    """
+    Returns whether db can login to download shared madia to subfolder for export
+    or whether user confirms to proceed without login information.
+    """
+    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
+    and not db.live.is_logged_in() \
+    and not conf.Login.get(db.filename, {}).get("password") and wx.OK != wx.MessageBox(
+        "You have selected to export HTML with shared media in subfolder, "
+        "but the database does not have login information "
+        "for downloading media.\n\nAre you sure you want to continue?",
+        conf.Title, wx.OK | wx.CANCEL | wx.ICON_INFORMATION
+    ): return False
+    return True
 
 
 def messageBox(message, title, style):
