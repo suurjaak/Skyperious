@@ -1378,6 +1378,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if media_folder: opts["media_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
+                page = next((k for k, v in self.db_pages.items() if v is db), None)
+                if page: wx.CallAfter(page.update_liveinfo)
             except Exception as e:
                 errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
                 errormsg = "Error exporting chats:\n\n%s" % traceback.format_exc()
@@ -3196,6 +3198,7 @@ class DatabasePage(wx.Panel):
 
     def update_liveinfo(self):
         """Refreshes account settings in login-page from configuration."""
+        if not self: return
         opts = conf.Login.get(self.db.filename) or {}
         self.edit_user.Value = self.db.username if self.db.username else ""
         self.button_login.Label = "&Log in as '%s'" % self.edit_user.Value
@@ -3206,6 +3209,13 @@ class DatabasePage(wx.Panel):
         self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
         self.check_login_sync.Enable(self.check_login_auto .Value)
+        if self.db.live.is_logged_in() and self.button_login.Enabled:
+            # Probable auto-login during HTML export
+            self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
+            self.button_login.Disable() 
+            self.label_login_fail.Hide()
+            for c in controls.get_controls(self.panel_sync): c.Enable()
+            self.button_sync_stop.Disable()
 
 
     def on_change_live_user(self, event):
@@ -4047,6 +4057,7 @@ class DatabasePage(wx.Panel):
             try: util.start_file(filepath)
             except Exception:
                 logger.exception("Error starting %s.", filepath)
+            wx.CallAfter(self.update_liveinfo)
         except Exception:
             logger.exception("Error saving %s.", filepath)
             guibase.status("Error saving %s.", filepath)
@@ -4231,6 +4242,7 @@ class DatabasePage(wx.Panel):
             errormsg = "Error exporting chats:\n\n%s" % \
                        traceback.format_exc()
         busy.Close()
+        wx.CallAfter(self.update_liveinfo)
         if not errormsg:
             if len(chats) == 1 and not do_singlefile:
                 guibase.status("Exported %s to %s.",
@@ -4289,6 +4301,7 @@ class DatabasePage(wx.Panel):
                                util.plural("message", message_count, sep=","),
                                filepath, log=True)
                 util.start_file(filepath)
+                wx.CallAfter(self.update_liveinfo)
             else:
                 wx.MessageBox("Current filter leaves no data to export.",
                               conf.Title, wx.OK | wx.ICON_INFORMATION)
