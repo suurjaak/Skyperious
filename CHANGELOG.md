@@ -4,7 +4,8 @@ CHANGELOG
 
 4.5.1, 2021-02-12
 -----------------
-- fixed not retaining the order of command-line FILE arguments (issue #93).
+- fixed not retaining the order of command-line FILE arguments (issue #93);
+- add detected media type extension to shared media exported in HTML if lacking one (issue #93).
 
 
 4.5, 2021-02-06

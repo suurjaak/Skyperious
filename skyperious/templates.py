@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    14.01.2021
+@modified    13.02.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -1461,12 +1461,14 @@ category = category if isdef("category") else None
 filename = filename if isdef("filename") else None
 if category not in ("audio", "video"): category = "image"
 src, mimetype, filetype = url, None, None
-if isdef("filename") and filename:
+if filename:
     filetype = os.path.splitext(filename)[-1][1:]
 if category in ("audio", "video"):
     mimetype = mimetypes.guess_type(filename or "")[0]
 else:
     filetype = imghdr.what("", content) or filetype or "image"
+if filename and filetype and not os.path.splitext(filename)[-1]:
+    filename = "%s.%s" % (filename, filetype)
 filetype = filetype or "binary"
 mimetype = mimetype or "%s/%s" % (category, escape(filetype))
 
