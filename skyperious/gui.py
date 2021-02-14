@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.02.2021
+@modified    14.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7785,7 +7785,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         """
         tagstyle_map = {"b": "bold", "i": "italic", "s": "strike",
                         "bodystatus": "special",  "quotefrom": "special",
-                        "a": "link", "ss": "default"}
+                        "a": "link", "ss": "default", "at": "bold"}
         other_tags = ["blink", "font", "bodystatus", "i", "span", "flag"]
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
@@ -7828,6 +7828,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 text = "\n%s\n" % text
             elif e.tag in ["xml", "b"]:
                 linefeed_final = "\n\n"
+            elif "at" == e.tag:
+                if text and not text.startswith("@"): text = "@" + text
             elif "s" == e.tag:
                 text = "~%s~" % text # STC does not support strikethrough style
             elif e.tag not in other_tags:

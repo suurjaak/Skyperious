@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.02.2021
+@modified    14.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2132,6 +2132,10 @@ class MessageParser(object):
                     subelem.tail = " " + (subelem.tail or "")
                 elif subelem.tag in ["b", "i", "s"]:
                     subelem.attrib.clear() # Clear raw_pre and raw_post
+                elif "at" == subelem.tag:
+                    subelem.tag = "b"
+                    if subelem.text and not subelem.text.startswith("@"):
+                        subelem.text = "@" + subelem.text
                 elif "a" == subelem.tag:
                     subelem.set("target", "_blank")
                     if output.get("export"):
@@ -2197,6 +2201,8 @@ class MessageParser(object):
             text = "\"\r\n%s\r\n" % text
         elif "msgstatus" == dom.tag:
             text = "[%s]\r\n" % text.strip()
+        elif "at" == dom.tag and text and not text.startswith("@"):
+            text = "@" + text
         elif dom.tag in ["i", "b", "s"]: # italic bold strikethrough
             pre = post = dict(i="_", b="*", s="~")[dom.tag]
             if dom.get("raw_pre"): pre = dom.get("raw_pre")
