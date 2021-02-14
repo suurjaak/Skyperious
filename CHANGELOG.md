@@ -7,6 +7,7 @@ CHANGELOG
 - show <pre>-tag content in chat reader;
 - show @-taggings in chat reader and style them bold in reader and HTML;
 - ask for confirmation when exporting HTML with media in subfolder, but login unavailable for downloading media (issue #93).
+- fixed duplicates in syncing bot contacts and messages from live (issue #93);
 - fixed not retaining the order of command-line FILE arguments (issue #93);
 - add detected media type extension to shared media exported in HTML if lacking one (issue #93).
 
