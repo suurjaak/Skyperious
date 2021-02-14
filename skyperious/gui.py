@@ -7786,7 +7786,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         tagstyle_map = {"b": "bold", "i": "italic", "s": "strike",
                         "bodystatus": "special",  "quotefrom": "special",
                         "a": "link", "ss": "default", "at": "bold"}
-        other_tags = ["blink", "font", "bodystatus", "i", "span", "flag"]
+        other_tags = ["blink", "font", "bodystatus", "i", "span", "flag", "pre"]
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
         linefeed_final = "\n\n" # Decreased if quotefrom is last

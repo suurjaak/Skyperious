@@ -4,6 +4,7 @@ CHANGELOG
 
 4.5.1, 2021-02-14
 -----------------
+- show <pre>-tag content in chat reader;
 - show @-taggings in chat reader and style them bold in reader and HTML;
 - ask for confirmation when exporting HTML with media in subfolder, but login unavailable for downloading media (issue #93).
 - fixed not retaining the order of command-line FILE arguments (issue #93);
