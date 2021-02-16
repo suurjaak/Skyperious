@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.02.2021
+@modified    16.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -86,6 +86,9 @@ CHATMSG_TYPE_PICTURE       = 15 # Changed chat picture (type 2)
 CHATMSG_TYPE_SPECIAL2      = 18 # Calls/contacts/transfers (type 30, 39, 51, 68)
 TRANSFER_TYPE_OUTBOUND     =  1 # Transfer sent by partner_handle
 TRANSFER_TYPE_INBOUND      =  2 # Transfer sent to partner_handle
+CONTACT_TYPE_NORMAL        =  1 # Normal Skype user contact
+CONTACT_TYPE_PHONE         =  2 # Phone number contact
+CONTACT_TYPE_BOT           = 10 # Bot user contact
 CONTACT_FIELD_TITLES = collections.OrderedDict([
     ("displayname",  "Display name"),
     ("skypename",    "Skype Name"),
@@ -122,6 +125,10 @@ ACCOUNT_FIELD_TITLES = collections.OrderedDict([
     ("about",               "About me"),
     ("skypeout_balance",    "SkypeOut balance"),
 ])
+ID_PREFIX_SINGLE  =  "8:" # Conversations.identity prefix for normal 1:1 chats
+ID_PREFIX_GROUP   = "19:" # Conversations.identity prefix for group chats
+ID_PREFIX_BOT     = "28:" # Conversations.identity and Contacts.skypename for bots
+ID_PREFIX_SPECIAL = "48:" # Conversations.identity prefix for special chats like calllogs
 AUTHORS_SPECIAL = ["sys"] # Used by Skype for system messages
 
 logger = logging.getLogger(__name__)
@@ -1679,7 +1686,7 @@ class MessageParser(object):
         output = output or {}
         is_html = "html" == output.get("format")
 
-        if "dom" in message:
+        if not output.get("merge") and "dom" in message:
             dom = message["dom"] # Cached DOM already exists
         if dom is None:
             dom = self.parse_message_dom(message, output)
