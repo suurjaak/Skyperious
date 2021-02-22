@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.02.2021
+@modified    22.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -777,9 +777,10 @@ def run(nogui=False):
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
         arguments.FILE = sum([sorted(glob.glob(f)) if "*" in f else [f]
-                              for f in arguments.FILE], [])
-        arguments.FILE = list(collections.OrderedDict((util.to_unicode(f), 1)
-                                                      for f in arguments.FILE))
+                             for f in arguments.FILE], [])
+        arguments.FILE = list(collections.OrderedDict(
+            (util.to_unicode(f), 1) for f in arguments.FILE[::-1]
+        ))[::-1] # Reverse and re-reverse to discard earlier duplicates
 
     conf.load()
     if "gui" == arguments.command and (nogui or not is_gui_possible):
