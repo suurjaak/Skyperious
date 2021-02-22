@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    16.02.2021
+@modified    22.02.2021
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -475,7 +475,7 @@ class MergeThread(WorkerThread):
             result["chatindex"] = index
             postback = dict((k, v) for k, v in result.items()
                             if k not in ["output", "chats", "params"])
-            diff = self.get_chat_diff_left(chat, db1, db2, postback)
+            diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
             if not self._is_working:
                 break # for index, chat
             if diff["messages"] \
@@ -545,7 +545,7 @@ class MergeThread(WorkerThread):
                 result["chatindex"] = index
                 postback = dict((k, v) for k, v in result.items()
                                 if k not in ["output", "chats", "params"])
-                diff = self.get_chat_diff_left(chat, db1, db2, postback)
+                diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
                 if not self._is_working:
                     break # for index, chat
                 if diff["messages"] \
@@ -680,7 +680,7 @@ class MergeThread(WorkerThread):
                 self.postback(result)
 
 
-    def get_chat_diff_left(self, chat, db1, db2, postback=None):
+    def get_chat_diff_left(self, chat, db1, db2, postback=None, runcheck=False):
         """
         Compares the chat in the two databases and returns the differences from
         the left as {"messages": [message IDs different in db1],
@@ -690,6 +690,7 @@ class MergeThread(WorkerThread):
 
         @param   postback  if {"count": .., "index": ..}, updates index
                            and posts the result at POSTBACK_COUNT intervals
+        @param   runcheck  if true, breaks when thread is no longer marked working
         """
         c = chat
         participants1 = c["c1"]["participants"] if c["c1"] else []
@@ -776,7 +777,7 @@ class MergeThread(WorkerThread):
                     bucket = m2buckets.setdefault(m["datetime"].date(), {})
                     bucket.setdefault(ckey, []).append(mkey)
 
-                if not self._is_working:
+                if runcheck and not self._is_working:
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
@@ -799,7 +800,7 @@ class MergeThread(WorkerThread):
                     potentials += m2buckets.get(mdate+delta, {}).get(ckey, [])
                 if not any(self.match_time(m["datetime"], x[1], 180) for x in potentials):
                     c1m_diff.append((m["id"], m["datetime"]))
-                if not self._is_working:
+                if runcheck and not self._is_working:
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
