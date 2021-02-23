@@ -8011,6 +8011,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 threshold, shifted = make_threshold(msg["datetime"], step=0), True
             idx += step
             msg, prevmsg = (mm[idx] if 0 <= idx < len(mm) else None), msg
+        if step < 0 and prevmsg and prevmsg["datetime"] >= threshold:
+            # Corner case: content starts with threshold
+            return self.FocusMessage(prevmsg["id"])
         label = "previous" if direction < 0 else "next"
         guibase.status("No %s %s found in current view.", label, unit)
 
