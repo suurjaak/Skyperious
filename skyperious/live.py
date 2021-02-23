@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    16.02.2021
+@modified    23.02.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -1432,14 +1432,17 @@ def fix_bot_identity(db, *identities):
     @param   db          SkypeDatabase instance
     @param   identities  one or more bot identities, with or without bot-prefix
     """
-    SIMPLES = {"contacts":    ["skypename"], "participants": ["identity"],
-               "transfers":   ["partner_handle"], "chats": ["dialog_partner"],
-               "calls":       ["host_identity"], "messageannotations": ["author"],
-               "callmembers": ["identity", "real_identity"],
-               "alerts":      ["partner_name"],
-               "messages":    ["author", "dialog_partner", "edited_by"]}
-    SPACEDS = {"chats":       ["posters", "participants", "activemembers"],
-               "messages":    ["identities"]}
+    SIMPLES = {"alerts":             ["partner_name"],
+               "callmembers":        ["identity", "real_identity"],
+               "calls":              ["host_identity"],
+               "chats":              ["dialog_partner"],
+               "contacts":           ["skypename"],
+               "messageannotations": ["author"],
+               "messages":           ["author", "dialog_partner", "edited_by"],
+               "participants":       ["identity"],
+               "transfers":          ["partner_handle"], }
+    SPACEDS = {"chats":              ["posters", "participants", "activemembers"],
+               "messages":           ["identities"], }
     changeds = set()
     for identity2 in filter(bool, identities):
         if not identity2.startswith(skypedata.ID_PREFIX_BOT):
@@ -1467,6 +1470,7 @@ def fix_bot_identity(db, *identities):
         args = (skypedata.CONTACT_TYPE_BOT, identity2)
         if db.execute("UPDATE contacts SET type = ? WHERE skypename = ?", args).rowcount:
             changeds.add("contacts")
+    if changeds: changeds.add("conversations")
     for table in changeds:
         for d in (db.table_rows, db.table_objects): d.pop(table, None)
 
