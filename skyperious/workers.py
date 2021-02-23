@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.02.2021
+@modified    23.02.2021
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -708,9 +708,9 @@ class MergeThread(WorkerThread):
                       and skypedata.ID_PREFIX_BOT + x in c2p_map)
         botids2 = set(x for x in c2p_map if not x.startswith(skypedata.ID_PREFIX_BOT)
                       and skypedata.ID_PREFIX_BOT + x in c1p_map)
-        if botids1: # Merge unprefixed bots as-is and replace later
+        if botids1: # Merge unprefixed bots to the right as-is and replace later
             postprocess = functools.partial(live.fix_bot_identity, db2, *botids1)
-        if botids2: # Replace unprefixed bots before starting merge
+        if botids2: # Replace unprefixed bots on the right before starting merge
             preprocess  = functools.partial(live.fix_bot_identity, db2, *botids2)
         c1p_diff = [p for p in c1p_diff if p["identity"] not in botids1 | botids2]
         is_identities_msg = lambda m: m["identities"] and m["type"] in [
