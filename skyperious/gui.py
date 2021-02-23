@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.02.2021
+@modified    23.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7485,6 +7485,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
 
             item_msg.Enabled = item_filter.Enabled = item_goto.Enabled = bool(msg)
+            if not self._auto_retrieve: item_filter.Enabled = False
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
             menu.Bind(wx.EVT_MENU, on_search,                id=item_search.GetId())
@@ -7541,7 +7542,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
 
     def SetAutoRetrieve(self, retrieve):
-        """Sets whether to auto-retrieve more messages."""
+        """
+        Sets whether to auto-retrieve more messages,
+        and allow date periods navigation and filtering.
+        """
         self._auto_retrieve = retrieve
 
 
@@ -7691,11 +7695,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._append_text("  (%s). " % util.plural(
                                   "message", self._messages_current, sep=","))
 
-            if self._chat["message_count"] and (not self._messages 
+            if self._chat["message_count"] and self._auto_retrieve and (not self._messages 
             or self._messages[0]["datetime"] > self._chat["first_message_datetime"]):
                 self._append_text("Scroll back more.", "link")
 
-            if self._chat["message_count"]:
+            if self._chat["message_count"] and self._auto_retrieve:
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
                 date_last = self._chat["last_message_datetime"].date()
