@@ -4,7 +4,7 @@ Installing Skyperious
 ### Windows ###
 
 Download and launch the latest setup from
-http://suurjaak.github.com/Skyperious/downloads.html.
+https://suurjaak.github.io/Skyperious/downloads.html.
 
 or, to run from source code:
 * install [Python 2](https://www.python.org/downloads/)
