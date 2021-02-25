@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    13.02.2021
+@modified    25.02.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -1480,7 +1480,7 @@ if isdef("media_folder") and media_folder:
     basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, basename))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:
