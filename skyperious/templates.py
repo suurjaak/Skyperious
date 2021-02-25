@@ -1469,7 +1469,7 @@ else:
     filetype = imghdr.what("", content) or filetype or "image"
 if filename and filetype and not os.path.splitext(filename)[-1]:
     filename = "%s.%s" % (filename, filetype)
-filetype = filetype or "binary"
+filetype = filetype or category
 mimetype = mimetype or "%s/%s" % (category, escape(filetype))
 
 caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
