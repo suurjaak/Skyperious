@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.02.2021
+@modified    27.02.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -644,18 +644,20 @@ class SkypeLogin(object):
             return
         if not self.cache: self.build_cache()
 
-        identities = map(identity_to_id, chats or ())
-        identities = sum(([x] + ([skypedata.ID_PREFIX_BOT + x[len(skypedata.ID_PREFIX_SINGLE):]]
-                          if x.startswith(skypedata.ID_PREFIX_SINGLE) else [])
-                          for x in identities), []) # Add bot prefixes for single chats
-        getter = lambda x: self.request(self.skype.chats.chat, x, __raise=False)
-        selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
+        chatgetter = lambda x: self.request(self.skype.chats.chat, x, __raise=False)
+        def get_live_chats(identities):
+            """Returns {identity: skpy.SkypeChat}"""
+            myids = map(identity_to_id, identities or ())
+            myids = sum(([x] + ([skypedata.ID_PREFIX_BOT + x[len(skypedata.ID_PREFIX_SINGLE):]]
+                                if x.startswith(skypedata.ID_PREFIX_SINGLE) else [])
+                         for x in myids), []) # Add bot prefixes for single chats
+            return {k: v for (k, v) in ((x, chatgetter(x)) for x in myids) if v}
 
+        selchats = get_live_chats(chats)
         new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
-        updateds, completeds, msgids = set(), set(), set()
+        updateds, completeds, processeds, msgids = set(), set(), set(), set()
         while run:
             mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
-            if not mychats: break # while run
             for chat in mychats.values():
                 if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
                     continue # for chat
@@ -668,6 +670,7 @@ class SkypeLogin(object):
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
                             or isinstance(chat.user, skpy.SkypeBotUser) else chat.userId
                 if cidentity in updateds: continue # for chat
+                processeds.add(cidentity)
 
                 mcount, mnew, mupdated, mrun = 0, 0, 0, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
@@ -737,7 +740,11 @@ class SkypeLogin(object):
                     run = False
                     break # for chat
                 if not mrun: break # for chat
-            if chats: break # while run
+            if chats: break # while run; stop after processing specific chats
+            elif not mychats: # Exhausted recents: check other existing chats as well
+                chats = set(self.cache["chats"]) - processeds
+                selchats = get_live_chats(chats)
+                if not selchats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]
