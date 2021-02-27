@@ -226,7 +226,7 @@ class SkypeLogin(object):
             else: # Assemble name from participants
                 for x in item.userIds[:4]: # Use up to 4 names
                     if x not in self.cache["contacts"]:
-                        contact = self.request(self.skype.contacts.contact, x, __raise=False)
+                        contact = self.request(self.skype.contacts.__getitem__, x, __raise=False)
                         try:
                             if contact: self.save("contacts", contact)
                         except Exception:
@@ -247,7 +247,8 @@ class SkypeLogin(object):
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
                 if dbitem["timestamp__ms"] <= self.msg_stamps[dbitem["remote_id"]]:
                     dbitem.pop("body_xml") # We have a later more valid content
-                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"], self.msg_stamps[dbitem["remote_id"]])
+                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"],
+                                                           self.msg_stamps[dbitem["remote_id"]])
                 if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
                     dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp")})
                 result, dbitem1 = self.SAVE.SKIP, dict(dbitem)
@@ -255,6 +256,7 @@ class SkypeLogin(object):
             self.db.update_row(dbtable, dbitem, dbitem0, log=False)
             for k, v in dbitem0.items() if result is None else ():
                 if k not in dbitem: dbitem[k] = v
+            dbitem["__updated__"] = True
         else:
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
@@ -325,7 +327,7 @@ class SkypeLogin(object):
     def insert_participants(self, chat, row, row0):
         """Inserts Participants-rows for SkypeChat, if not already present."""
         try:
-            participants, newcontacts = [], []
+            participants, savecontacts = [], []
             users = chat.users if isinstance(chat, skpy.SkypeGroupChat) \
                     else set([self.skype.user, chat.user])
             for user in users:
@@ -350,14 +352,17 @@ class SkypeLogin(object):
                     self.db.update_row("participants", p, p0, log=False)
                 elif p["identity"] not in existing:
                     self.db.insert_row("participants", p, log=False)
-                if p["identity"] not in self.cache["contacts"]:
+                if p["identity"] not in self.cache["contacts"] \
+                or (not conf.Login.get(self.db.filename, {}).get("skip_contact_update")
+                    and not self.cache["contacts"][p["identity"]].get("__updated__")
+                ):
                     idx = len(skypedata.ID_PREFIX_BOT) \
                           if p["identity"].startswith(skypedata.ID_PREFIX_BOT) else 0
                     uidentity = p["identity"][idx:]
-                    contact = self.request(self.skype.contacts.contact,
+                    contact = self.request(self.skype.contacts.__getitem__,
                                            uidentity, __raise=False)
-                    if contact: newcontacts.append(contact)
-            for c in newcontacts: self.save("contacts", c)
+                    if contact: savecontacts.append(contact)
+            for c in savecontacts: self.save("contacts", c)
         except Exception:
             logger.exception("Error inserting Participants-rows for chat %r.", chat)
 
@@ -457,7 +462,7 @@ class SkypeLogin(object):
                 result.update(identity=uidentity, type=skypedata.CHATS_TYPE_SINGLE)
 
                 if uidentity not in self.cache["contacts"]:
-                    citem = self.request(self.skype.contacts.contact, item.userId, __raise=False)
+                    citem = self.request(self.skype.contacts.__getitem__, item.userId, __raise=False)
                     if citem: self.save("contacts", citem)
                 result.update(displayname=self.get_contact_name(item.userId))
 
@@ -651,7 +656,13 @@ class SkypeLogin(object):
             myids = sum(([x] + ([skypedata.ID_PREFIX_BOT + x[len(skypedata.ID_PREFIX_SINGLE):]]
                                 if x.startswith(skypedata.ID_PREFIX_SINGLE) else [])
                          for x in myids), []) # Add bot prefixes for single chats
-            return {k: v for (k, v) in ((x, chatgetter(x)) for x in myids) if v}
+            result = {}
+            for k in myids:
+                result[k] = chatgetter(k)
+                if self.progress and not self.progress(
+                    action="info", message="Querying older chats.."
+                ): break # for k
+            return {k: v for k, v in result.items() if v}
 
         selchats = get_live_chats(chats)
         new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
@@ -677,8 +688,9 @@ class SkypeLogin(object):
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
 
-                    if msgs and cidentity not in self.cache["chats"]:
-                        # Save chat only if there are any messages
+                    if msgs and (cidentity not in self.cache["chats"]
+                    or not conf.Login.get(self.db.filename, {}).get("skip_contact_update")):
+                        # Insert chat only if there are any messages, or update existing contacts
                         try: action = self.save("chats", chat)
                         except Exception:
                             logger.exception("Error saving chat %r.", chat)
@@ -741,10 +753,11 @@ class SkypeLogin(object):
                     break # for chat
                 if not mrun: break # for chat
             if chats: break # while run; stop after processing specific chats
-            elif not mychats: # Exhausted recents: check other existing chats as well
+            elif run and not mychats: # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
                 selchats = get_live_chats(chats)
-                if not selchats: break # while run
+                if not selchats or self.progress and not self.progress():
+                    break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]

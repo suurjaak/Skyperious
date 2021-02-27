@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.02.2021
+@modified    27.02.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -27,6 +27,7 @@ import sys
 import textwrap
 import time
 import urllib
+import warnings
 from xml.etree import cElementTree as ElementTree
 
 try: import wx # For avatar bitmaps in GUI program
@@ -1480,12 +1481,16 @@ class SkypeDatabase(object):
         """
         if not self.is_open():
             return
-        table, where = table.lower(), ""
+        table, where, col_data = table.lower(), "", []
+        colmap = {x["name"]: x for x in self.get_table_columns(table)}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore") # Swallow Unicode equality warnings
+            col_data = [colmap[x] for x in row if x in colmap
+                        and original_row.get(x) != row[x]]
+        if not col_data: return
         if log: logger.info("Updating 1 row in table %s, %s.",
                             self.tables[table]["name"], self.filename)
         self.ensure_backup()
-        colmap = {x["name"]: x for x in self.get_table_columns(table)}
-        col_data = [colmap[x] for x in row if x in colmap]
         values, where = row.copy(), ""
         setsql = ", ".join("%(name)s = :%(name)s" % x for x in col_data)
         if rowid is not None:

@@ -4,6 +4,8 @@ CHANGELOG
 
 4.5.1, 2021-02-27
 -----------------
+- update existing contact information in database on live sync;
+- added option to not overwrite contact information in database from live;
 - show <pre>-tag content in chat reader;
 - show @-taggings in chat reader and style them bold in reader and HTML;
 - ask for confirmation when exporting HTML with media in subfolder, but login unavailable for downloading media (issue #93).

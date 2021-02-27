@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.02.2021
+@modified    27.02.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3035,6 +3035,7 @@ class DatabasePage(wx.Panel):
         gauge = wx.Gauge(panel_sync2, size=(300, 15), style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
         label_progress   = wx.StaticText(panel_sync2)
         edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
+        check_contacts   = wx.CheckBox(panel_sync2, label="Do not overwrite existing &contact information")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
@@ -3077,6 +3078,9 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(edit_sync_status, "ForegroundColour", "DisabledColour")
         ColourManager.Manage(edit_sync_status, "BackgroundColour", "BgColour")
         edit_sync_status.SetEditable(False)
+        check_contacts.ToolTip = "Do not overwrite contact information from online data " \
+                                 "if contact already exists in database"
+        check_contacts.Enabled = False
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
@@ -3098,6 +3102,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_login)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_sync)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_contacts)
         self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
@@ -3119,6 +3124,7 @@ class DatabasePage(wx.Panel):
         self.gauge_sync          = gauge
         self.label_sync_progress = label_progress
         self.edit_sync_status    = edit_sync_status
+        self.check_skip_contacts = check_contacts
         self.button_sync         = button_sync
         self.button_sync_sel     = button_sync_sel
         self.button_sync_stop    = button_sync_stop
@@ -3158,6 +3164,7 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(gauge, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         sizer_sync2.Add(label_progress, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         sizer_sync2.Add(edit_sync_status, proportion=1, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(check_contacts, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
@@ -3209,6 +3216,7 @@ class DatabasePage(wx.Panel):
         self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
         self.check_login_sync.Enable(self.check_login_auto .Value)
+        self.check_skip_contacts.Value = opts.get("skip_contact_update", False)
         if self.db.live.is_logged_in() and self.button_login.Enabled:
             # Probable auto-login during HTML export
             self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
@@ -3244,9 +3252,10 @@ class DatabasePage(wx.Panel):
         ctrl, value = event.EventObject, event.EventObject.Value
         if ctrl is self.edit_pw:
             name, value = "password", util.obfuscate(value)
-        elif ctrl is self.check_login_store: name = "store"
-        elif ctrl is self.check_login_auto:  name = "auto"
-        elif ctrl is self.check_login_sync:  name = "sync"
+        elif ctrl is self.check_login_store:   name = "store"
+        elif ctrl is self.check_login_auto:    name = "auto"
+        elif ctrl is self.check_login_sync:    name = "sync"
+        elif ctrl is self.check_skip_contacts: name = "skip_contact_update"
         if not self.check_login_store.Value: self.check_login_auto.Value = False
         if not self.check_login_auto .Value: self.check_login_sync.Value = False
         self.check_login_auto.Enable(self.check_login_store.Value)
@@ -3267,6 +3276,8 @@ class DatabasePage(wx.Panel):
             conf.Login[self.db.filename].pop("sync",     None)
         if not self.check_login_sync.Value:
             conf.Login[self.db.filename].pop("sync",     None)
+        if not self.check_skip_contacts.Value:
+            conf.Login[self.db.filename].pop("skip_contact_update", None)
         if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
         util.run_once(conf.save)
 
@@ -3588,6 +3599,9 @@ class DatabasePage(wx.Panel):
                     if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
                 self.check_login_auto.Enable(self.check_login_store.Value)
                 self.check_login_sync.Enable(self.check_login_auto .Value)
+            elif "info" == result["action"] and "message" in result:
+                self.label_sync_progress.Label = result["message"] or ""
+                self.gauge_sync.ContainingSizer.Layout()
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())

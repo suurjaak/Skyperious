@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.02.2021
+@modified    27.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -151,6 +151,12 @@ ARGUMENTS = {
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
               "help": "store given password in configuration"},
+             {"args": ["--contact-update"], "dest": "skip_contact_update",
+              "action": "store_false", "required": False, "default": None,
+              "help": "overwrite contact information in database"},
+             {"args": ["--no-contact-update"], "dest": "skip_contact_update",
+              "action": "store_true", "required": False, "default": None,
+              "help": "do not overwrite contact information in database"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -379,7 +385,8 @@ def run_search(filenames, query):
 
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, chatnames=(), authornames=(), truncate=False):
+             store_password=False, skip_contact_update=None,
+             chatnames=(), authornames=(), truncate=False):
     """Synchronizes history in specified databases from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
@@ -490,6 +497,14 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         if store_password:
             conf.Login.setdefault(filename, {})
             conf.Login[filename].update(store=True, password=util.obfuscate(password0))
+
+        if skip_contact_update is not None:
+            if skip_contact_update:
+                conf.Login.setdefault(filename, {})["skip_contact_update"] = True
+            elif filename in conf.Login:
+                conf.Login[filename].pop("skip_contact_update", None)
+
+        if store_password or skip_contact_update is not None:
             conf.save()
 
         chats = []
@@ -828,7 +843,7 @@ def run(nogui=False):
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
-                 arguments.chat, arguments.author)
+                 arguments.skip_contact_update, arguments.chat, arguments.author)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
 
