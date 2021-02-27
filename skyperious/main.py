@@ -153,7 +153,7 @@ ARGUMENTS = {
               "help": "store given password in configuration"},
              {"args": ["--contact-update"], "dest": "skip_contact_update",
               "action": "store_false", "required": False, "default": None,
-              "help": "overwrite contact information in database"},
+              "help": "overwrite contact information in database (default)"},
              {"args": ["--no-contact-update"], "dest": "skip_contact_update",
               "action": "store_true", "required": False, "default": None,
               "help": "do not overwrite contact information in database"},
@@ -410,6 +410,13 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     util.plural("new message", result["message_count_new"]),
                     ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                 ))
+                if result["contact_count_new"] or result["contact_count_updated"]:
+                    output("%s." % ", ".join(filter(bool, [
+                        util.plural("new contact", result["contact_count_new"], sep=",")
+                        if result["contact_count_new"] else "",
+                        util.plural("contact", result["message_count_updated"], sep=",") + " updated"
+                        if result["message_count_updated"] else "",
+                    ])))
 
         elif "messages" == result.get("table"):
             if result.get("start"):

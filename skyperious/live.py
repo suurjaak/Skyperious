@@ -70,6 +70,7 @@ class SkypeLogin(object):
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
         self.populated    = False
+        self.sync_counts  = {} # Additional counts like {"contacts_new": x}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
 
@@ -165,6 +166,7 @@ class SkypeLogin(object):
 
         @param   __retry  special keyword argument, does not retry if falsy
         @param   __raise  special keyword argument, does not raise if falsy
+        @param   __log    special keyword argument, does not log error if falsy
         """
         self.query_stamps.append(datetime.datetime.utcnow())
         while len(self.query_stamps) > self.RATE_LIMIT:
@@ -174,14 +176,15 @@ class SkypeLogin(object):
         delta = (dts[-1] - dts[0]) if len(dts) == self.RATE_LIMIT else 0
         if delta and delta.total_seconds() < self.RATE_WINDOW:
             time.sleep(self.RATE_WINDOW)
-        doretry, doraise = kwargs.pop("__retry", True), kwargs.pop("__raise", True)
+        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__raise", "__retry", "__log"))
+
         tries = 0
         while True:
             try: return func(*args, **kwargs)
             except Exception:
                 tries += 1
                 if tries > self.RETRY_LIMIT or not doretry:
-                    logger.exception("Error calling %r.", func)
+                    if dolog: logger.exception("Error calling %r.", func)
                     if doraise: raise
                     else: return
                 time.sleep(self.RETRY_DELAY)
@@ -260,6 +263,8 @@ class SkypeLogin(object):
         else:
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
+            self.sync_counts.setdefault("%s_new" % table, 0)
+            self.sync_counts["%s_new" % table] += 1
             result = self.SAVE.INSERT
 
         if "messages" == table and "remote_id" in dbitem1 \
@@ -302,6 +307,9 @@ class SkypeLogin(object):
                 warnings.simplefilter("ignore") # Swallow Unicode equality warnings
                 same = all(v == dbitem0[k] for k, v in dbitem1.items() if k in dbitem0)
                 result = self.SAVE.NOCHANGE if same else self.SAVE.UPDATE
+                if not same:
+                    self.sync_counts.setdefault("%s_updated" % table, 0)
+                    self.sync_counts["%s_updated" % table] += 1
         return result
 
 
@@ -626,6 +634,7 @@ class SkypeLogin(object):
             self.skype = None
             self.login() # Re-login to reset query cache
         self.build_cache()
+        self.sync_counts.clear()
         if not chats:
             try: self.save("accounts", self.skype.user)
             except Exception:
@@ -648,28 +657,28 @@ class SkypeLogin(object):
         if self.progress and not self.progress(action="populate", table="chats", start=True):
             return
         if not self.cache: self.build_cache()
+        self.sync_counts.clear()
 
-        chatgetter = lambda x: self.request(self.skype.chats.chat, x, __raise=False)
-        def get_live_chats(identities):
-            """Returns {identity: skpy.SkypeChat}"""
+        chatgetter = lambda x, l: self.request(self.skype.chats.chat, x, __raise=False, __log=l)
+        def get_live_chats(identities, __log=True):
+            """Yields skpy.SkypeChat instances for identities"""
             myids = map(identity_to_id, identities or ())
             myids = sum(([x] + ([skypedata.ID_PREFIX_BOT + x[len(skypedata.ID_PREFIX_SINGLE):]]
                                 if x.startswith(skypedata.ID_PREFIX_SINGLE) else [])
                          for x in myids), []) # Add bot prefixes for single chats
-            result = {}
             for k in myids:
-                result[k] = chatgetter(k)
                 if self.progress and not self.progress(
                     action="info", message="Querying older chats.."
                 ): break # for k
-            return {k: v for k, v in result.items() if v}
+                v = chatgetter(k, __log)
+                if v: yield v
 
         selchats = get_live_chats(chats)
         new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
         updateds, completeds, processeds, msgids = set(), set(), set(), set()
         while run:
-            mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
-            for chat in mychats.values():
+            mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False).values()
+            for chat in mychats:
                 if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
                     continue # for chat
                 if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
@@ -755,9 +764,7 @@ class SkypeLogin(object):
             if chats: break # while run; stop after processing specific chats
             elif run and not mychats: # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
-                selchats = get_live_chats(chats)
-                if not selchats or self.progress and not self.progress():
-                    break # while run
+                selchats = get_live_chats(chats, __log=False)
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]
@@ -778,8 +785,11 @@ class SkypeLogin(object):
 
         if self.progress: self.progress(
             action="populate", table="chats", end=True, count=len(updateds), new=new,
-            message_count_new=mtotalnew, message_count_updated=mtotalupdated
+            message_count_new=mtotalnew, message_count_updated=mtotalupdated,
+            contact_count_new=self.sync_counts.get("contacts_new", 0),
+            contact_count_updated=self.sync_counts.get("contacts_updated", 0),
         )
+
 
 
     def get_api_media(self, url, category=None):

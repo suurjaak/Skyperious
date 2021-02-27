@@ -3543,6 +3543,14 @@ class DatabasePage(wx.Panel):
                                 util.plural("new message", result["message_count_new"], sep=","),
                                 ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                             )
+                            if result["contact_count_new"] or result["contact_count_updated"]:
+                                slabel += "\n%s." % ", ".join(filter(bool, [
+                                    util.plural("new contact", result["contact_count_new"], sep=",")
+                                    if result["contact_count_new"] else "",
+                                    util.plural("contact", result["message_count_updated"], sep=",") + " updated"
+                                    if result["message_count_updated"] else "",
+                                ]))
+
                             self.chats = self.db.get_conversations(reload=True, log=False)
                             def after2():
                                 if self: self.db.get_conversations_stats(self.chats)
