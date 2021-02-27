@@ -176,7 +176,7 @@ class SkypeLogin(object):
         delta = (dts[-1] - dts[0]) if len(dts) == self.RATE_LIMIT else 0
         if delta and delta.total_seconds() < self.RATE_WINDOW:
             time.sleep(self.RATE_WINDOW)
-        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__raise", "__retry", "__log"))
+        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__retry", "__raise", "__log"))
 
         tries = 0
         while True:
@@ -425,7 +425,7 @@ class SkypeLogin(object):
             if item.name:
                 name = unicode(item.name)
                 result.update(displayname=name, fullname=name)
-            if item.birthday:
+            if getattr(item, "birthday", None): # Not all SkypeUsers have birthday
                 result.update(birthday=date_to_integer(item.birthday))
             if item.location and item.location.country:
                 result.update(country=item.location.country)
@@ -433,7 +433,7 @@ class SkypeLogin(object):
                 result.update(province=item.location.region)
             if item.location and item.location.city:
                 result.update(city=item.location.city)
-            for phone in item.phones or ():
+            for phone in getattr(item, "phones", ()) or ():
                 if skpy.SkypeContact.Phone.Type.Mobile == phone.type:
                     result.update(phone_mobile=phone.number)
                 elif skpy.SkypeContact.Phone.Type.Work == phone.type:
@@ -494,7 +494,8 @@ class SkypeLogin(object):
             result.update(type=skypedata.CONTACT_TYPE_BOT
                           if isinstance(item, skpy.SkypeBotUser)
                           else skypedata.CONTACT_TYPE_NORMAL,
-                          isblocked=item.blocked, isauthorized=item.authorised)
+                          isblocked=getattr(item, "blocked", False),
+                          isauthorized=getattr(item, "authorised", False))
             if item.name and item.name.first:
                 result.update(firstname=item.name.first)
             if item.name and item.name.last:
@@ -659,8 +660,7 @@ class SkypeLogin(object):
         if not self.cache: self.build_cache()
         self.sync_counts.clear()
 
-        chatgetter = lambda x, l: self.request(self.skype.chats.chat, x, __raise=False, __log=l)
-        def get_live_chats(identities, __log=True):
+        def get_live_chats(identities, log=True):
             """Yields skpy.SkypeChat instances for identities"""
             myids = map(identity_to_id, identities or ())
             myids = sum(([x] + ([skypedata.ID_PREFIX_BOT + x[len(skypedata.ID_PREFIX_SINGLE):]]
@@ -670,14 +670,21 @@ class SkypeLogin(object):
                 if self.progress and not self.progress(
                     action="info", message="Querying older chats.."
                 ): break # for k
-                v = chatgetter(k, __log)
+                v = self.request(self.skype.chats.chat, k, __raise=False, __log=log)
                 if v: yield v
 
         selchats = get_live_chats(chats)
         new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
         updateds, completeds, processeds, msgids = set(), set(), set(), set()
         while run:
-            mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False).values()
+            if chats: mychats = selchats
+            else:
+                if self.progress and not self.progress(
+                    action="info", message="Querying recent chats.."
+                ):
+                    run = False
+                    break # while run
+                mychats = self.request(self.skype.chats.recent, __raise=False).values()
             for chat in mychats:
                 if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
                     continue # for chat
@@ -764,7 +771,7 @@ class SkypeLogin(object):
             if chats: break # while run; stop after processing specific chats
             elif run and not mychats: # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
-                selchats = get_live_chats(chats, __log=False)
+                selchats = get_live_chats(chats, log=False)
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]
