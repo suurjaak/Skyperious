@@ -698,7 +698,7 @@ class SkypeLogin(object):
                 if cidentity in updateds: continue # for chat
                 processeds.add(cidentity)
 
-                mcount, mnew, mupdated, mrun = 0, 0, 0, True
+                mcount, mnew, mupdated, mrun, mstarted = 0, 0, 0, True, False
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
@@ -715,11 +715,12 @@ class SkypeLogin(object):
                         if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                             updateds.add(cidentity)
 
-                    if msgs and self.progress and not self.progress(
+                    if msgs and not mstarted and self.progress and not self.progress(
                         action="populate", table="messages", chat=cidentity, start=True
                     ):
                         run = mrun = False
                         break # while mrun
+                    mstarted = True
 
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)

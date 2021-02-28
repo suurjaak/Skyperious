@@ -409,6 +409,9 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             if result.get("start"):
                 output("\nSynchronizing chats..")
             elif result.get("end"):
+                ns["bar"].pulse_pos = None
+                ns["bar"].afterword = " Complete."
+                ns["bar"].update()
                 ns["bar"] = ns["bar"].stop()
                 output("\n\nSynchronized %s%s in %s: %s in total%s." % (
                     util.plural("chat", result["count"]) if result["count"] else "chats",
@@ -1060,8 +1063,8 @@ class ProgressBar(threading.Thread):
             bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
             self.percent = percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
-        self.bar = bartext
-        if draw: self.draw()
+        self.bar, prevbar = bartext, self.bar
+        if draw and prevbar != self.bar: self.draw()
 
 
     def draw(self):
