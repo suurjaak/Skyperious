@@ -410,6 +410,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 output("\nSynchronizing chats..")
             elif result.get("end"):
                 ns["bar"].pulse_pos = None
+                ns["bar"].value = ns["bar"].max
                 ns["bar"].afterword = " Complete."
                 ns["bar"].update()
                 ns["bar"] = ns["bar"].stop()
@@ -444,10 +445,11 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
                 ns["chat_title"] = title
                 if ns["bar"]:
+                    ns["bar"].pulse     = True
                     ns["bar"].pulse_pos = 0
-                    ns["bar"].pause = False
                     ns["bar"].afterword = " Synchronizing %s" % title
                     ns["bar"].update()
+                    ns["bar"].pause = False
                 else:
                     ns["bar"] = ProgressBar(pulse=True, interval=0.05,
                                             afterword=" Synchronizing %s" % title)
@@ -459,9 +461,9 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     t += ": %s new" % result["new"]
                     if result["updated"]: t += ", %s updated" % result["updated"]
 
+                ns["bar"].pause = True
                 ns["bar"].afterword = " Synchronized %s%s." % (ns["chat_title"], t)
                 ns["bar"].pulse_pos = None
-                ns["bar"].pause = True
                 ns["bar"].update()
                 if t: output() # Force new line if chat got updated
 
@@ -478,8 +480,12 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 ns["bar"].start()
             ns["bar"].afterword = " %s" % result["message"].strip()
             ns["bar"].pulse_pos = 0
+            if "index" in result and "count" in result:
+                ns["bar"].pulse = False
+                ns["bar"].value = result["index"]
+                ns["bar"].max   = result["count"]
+            else: ns["bar"].update()
             ns["bar"].pause = False
-            ns["bar"].update()
 
         return True
 
@@ -521,24 +527,22 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
             else: output(" success!")
 
-        if store_password:
-            conf.Login.setdefault(filename, {})
-            conf.Login[filename].update(store=True, password=util.obfuscate(password0))
+        if password and store_password:
+            conf.Login.setdefault(filepath, {})
+            conf.Login[filepath].update(store=True, password=util.obfuscate(password))
             conf.save()
 
         if skip_contact_update is not None:
             if skip_contact_update:
-                conf.Login.setdefault(filename, {})["skip_contact_update"] = True
-            elif filename in conf.Login:
-                conf.Login[filename].pop("skip_contact_update", None)
-            conf.save()
+                conf.Login.setdefault(filepath, {})["skip_contact_update"] = True
+            elif filepath in conf.Login:
+                conf.Login[filepath].pop("skip_contact_update", None)
 
         if skip_older_chats is not None:
             if skip_older_chats:
-                conf.Login.setdefault(filename, {})["skip_older_chats"] = True
-            elif filename in conf.Login:
-                conf.Login[filename].pop("skip_older_chats", None)
-            conf.save()
+                conf.Login.setdefault(filepath, {})["skip_older_chats"] = True
+            elif filepath in conf.Login:
+                conf.Login[filepath].pop("skip_older_chats", None)
 
         chats = []
         if chatnames or authornames:

@@ -3533,10 +3533,6 @@ class DatabasePage(wx.Panel):
 
                     if result.get("count"):
                         clabel = ", %s processed" % result["count"]
-                        if "total" in result:
-                            clabel = ", %s of %s processed" % (result["count"], result["total"])
-                            percent = min(100, math.ceil(100 * util.safedivf(result["count"], result["total"])))
-                            self.gauge_sync.Value = percent
                         for k in "new", "updated":
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
@@ -3545,7 +3541,6 @@ class DatabasePage(wx.Panel):
 
                     if result.get("end"):
                         slabel = "Synchronized %s" % result["table"]
-                        if self.worker_live.is_working(): self.gauge_sync.Pulse()
                         if "chats" == result["table"]:
                             slabel = "Synchronized %s%s: %s in total%s." % (
                                 util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
@@ -3619,6 +3614,9 @@ class DatabasePage(wx.Panel):
                 self.check_login_sync.Enable(self.check_login_auto .Value)
             elif "info" == result["action"] and "message" in result:
                 self.label_sync_progress.Label = result["message"] or ""
+                if "index" in result and "count" in result:
+                    percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
+                    self.gauge_sync.Value = percent
                 self.gauge_sync.ContainingSizer.Layout()
 
         if self: wx.CallAfter(after, result or kwargs)
