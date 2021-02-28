@@ -714,11 +714,12 @@ class SkypeLogin(object):
                             break # while mrun
                         if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                             updateds.add(cidentity)
-                        if self.progress and not self.progress(
-                            action="populate", table="messages", chat=cidentity, start=True
-                        ):
-                            run = mrun = False
-                            break # while mrun
+
+                    if msgs and self.progress and not self.progress(
+                        action="populate", table="messages", chat=cidentity, start=True
+                    ):
+                        run = mrun = False
+                        break # while mrun
 
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)
@@ -766,9 +767,12 @@ class SkypeLogin(object):
                     break # for chat
                 if not mrun: break # for chat
             if chats: break # while run; stop after processing specific chats
-            elif run and not mychats: # Exhausted recents: check other existing chats as well
+            elif run and not mychats \
+            and not conf.Login.get(self.db.filename, {}).get("skip_older_chats"):
+                # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
                 selchats = get_live_chats(chats, log=False)
+            elif run and not mychats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]

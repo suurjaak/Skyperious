@@ -2,10 +2,12 @@ CHANGELOG
 =========
 
 
-4.5.1, 2021-02-27
+4.5.1, 2021-02-28
 -----------------
 - update existing contact information in database on live sync;
 - added option to not overwrite contact information in database from live;
+- sync older chats from live not just recent ones (issue #93);
+- added option to not sync older chats from live;
 - show <pre>-tag content in chat reader;
 - show @-taggings in chat reader and style them bold in reader and HTML;
 - ask for confirmation when exporting HTML with media in subfolder, but login unavailable for downloading media (issue #93).
@@ -13,7 +15,6 @@ CHANGELOG
 - fixed merge not showing correct diff in individual chats view;
 - fixed duplicates in syncing bot contacts and messages from live (issue #93);
 - fixed not retaining the order of command-line FILE arguments (issue #93);
-- fixed not syncing older chats from live (issue #93);
 - fixed displaying shared media with duplicate filenames in HTML export with subfolder (issue #93);
 - add detected media type extension to shared media exported in HTML if lacking one (issue #93).
 

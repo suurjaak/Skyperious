@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.02.2021
+@modified    28.02.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -157,6 +157,13 @@ ARGUMENTS = {
              {"args": ["--no-contact-update"], "dest": "skip_contact_update",
               "action": "store_true", "required": False, "default": None,
               "help": "do not overwrite contact information in database"},
+             {"args": ["--check-older"], "dest": "skip_older_chats",
+              "action": "store_false", "required": False, "default": None,
+              "help": "check older chats for messages to sync, "
+                      "may take a long time (default)"},
+             {"args": ["--no-check-older"], "dest": "skip_older_chats",
+              "action": "store_true", "required": False, "default": None,
+              "help": "do not check older chats for messages to sync"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -385,7 +392,7 @@ def run_search(filenames, query):
 
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, skip_contact_update=None,
+             store_password=False, skip_contact_update=None, skip_older_chats=None,
              chatnames=(), authornames=(), truncate=False):
     """Synchronizes history in specified databases from Skype online service."""
 
@@ -437,6 +444,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     ns["bar"].pulse_pos = 0
                     ns["bar"].pause = False
                     ns["bar"].afterword = " Synchronizing %s" % title
+                    ns["bar"].update()
                 else:
                     ns["bar"] = ProgressBar(pulse=True, interval=0.05,
                                             afterword=" Synchronizing %s" % title)
@@ -460,6 +468,15 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     if result.get(k): t += ", %s %s" % (result[k], k)
                 if t: t += "."
                 ns["bar"].afterword = " Synchronizing %s%s" % (ns["chat_title"], t)
+
+        elif "info" == result.get("action") and result.get("message"):
+            if not ns["bar"]:
+                ns["bar"] = ProgressBar(pulse=True, interval=0.05)
+                ns["bar"].start()
+            ns["bar"].afterword = " %s" % result["message"].strip()
+            ns["bar"].pulse_pos = 0
+            ns["bar"].pause = False
+            ns["bar"].update()
 
         return True
 
@@ -504,14 +521,20 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         if store_password:
             conf.Login.setdefault(filename, {})
             conf.Login[filename].update(store=True, password=util.obfuscate(password0))
+            conf.save()
 
         if skip_contact_update is not None:
             if skip_contact_update:
                 conf.Login.setdefault(filename, {})["skip_contact_update"] = True
             elif filename in conf.Login:
                 conf.Login[filename].pop("skip_contact_update", None)
+            conf.save()
 
-        if store_password or skip_contact_update is not None:
+        if skip_older_chats is not None:
+            if skip_older_chats:
+                conf.Login.setdefault(filename, {})["skip_older_chats"] = True
+            elif filename in conf.Login:
+                conf.Login[filename].pop("skip_older_chats", None)
             conf.save()
 
         chats = []
@@ -850,7 +873,8 @@ def run(nogui=False):
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
-                 arguments.skip_contact_update, arguments.chat, arguments.author)
+                 arguments.skip_contact_update, arguments.skip_older_chats,
+                 arguments.chat, arguments.author)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
 
@@ -1043,6 +1067,9 @@ class ProgressBar(threading.Thread):
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
         output("\r" + self.printbar, end=" ")
+        if len(self.printbar) != len(self.bar):
+            self.printbar = self.bar # Discard padding to clear previous
+            output("\r" + self.printbar, end=" ")
 
 
     def run(self):
