@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    28.02.2021
+@modified    01.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -215,6 +215,16 @@ class SkypeLogin(object):
             dbitem0 = self.cache[table].get(identity[len(skypedata.ID_PREFIX_BOT):])
             if dbitem0: self.cache[table].pop(dbitem0.get("identity"), None)
             do_fix_bot = dbitem0 and "contacts" == table
+
+        if "contacts" == table and not dbitem0 \
+        and not (identity or "").startswith(skypedata.ID_PREFIX_BOT):
+            # Bot accounts from live are without bot prefix
+            dbitem0 = self.cache[table].get(skypedata.ID_PREFIX_BOT + identity)
+            if dbitem0:
+                identity = skypedata.ID_PREFIX_BOT + identity
+                dbitem["skypename"] = dbitem1["skypename"] = identity
+                dbitem["type"] = dbitem1["type"] = skypedata.CONTACT_TYPE_BOT
+
         if "messages" == table and dbitem.get("remote_id") \
         and not isinstance(item, (skpy.SkypeCallMsg, skpy.SkypeMemberMsg, skpy.msg.SkypePropertyMsg)):
             # Look up message by remote_id instead, to detect edited messages
@@ -338,7 +348,11 @@ class SkypeLogin(object):
                    else set([self.skype.userId, chat.userId])
             for uid in uids:
                 user = self.request(self.skype.contacts.__getitem__, uid)
-                uidentity = (skypedata.ID_PREFIX_BOT if isinstance(user, skpy.SkypeBotUser) else "") + user.id
+                uidentity = user.id
+                # Keep bot prefixes on bot accounts
+                if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
+                and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
+                    uidentity = skypedata.ID_PREFIX_BOT + user.id
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
                 if isinstance(chat, skpy.SkypeGroupChat) and user.id == chat.creatorId:
                     p.update(rank=1)
@@ -518,7 +532,8 @@ class SkypeLogin(object):
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
-                           or isinstance(parent.user, skpy.SkypeBotUser) else parent.userId
+                           or isinstance(parent.user, skpy.SkypeBotUser) \
+                           or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
                     self.save("chats", parent)
@@ -528,7 +543,7 @@ class SkypeLogin(object):
             if remote_id: result.update(remote_id=hash(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
-                result.update(dialog_partner=item.userId)
+                result.update(dialog_partner=result["author"])
 
             if isinstance(item, skpy.SkypeTextMsg):
                 # SkypeTextMsg(id='1594466183791', type='RichText', time=datetime.datetime(2020, 7, 11, 11, 16, 16, 392000), clientId='16811922854185209745', userId='username', chatId='8:username', content='<ss type="hi">(wave)</ss>')
@@ -691,7 +706,8 @@ class SkypeLogin(object):
                     # Conversation with self?
                     continue # for chat
                 cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
-                            or isinstance(chat.user, skpy.SkypeBotUser) else chat.userId
+                            or isinstance(chat.user, skpy.SkypeBotUser) \
+                            or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
                 if cidentity in processeds: continue # for chat
                 processeds.add(cidentity)
 
@@ -707,7 +723,8 @@ class SkypeLogin(object):
                     msgs = self.request(chat.getMsgs, __raise=False) or []
 
                     if msgs and (cidentity not in self.cache["chats"]
-                    or not conf.Login.get(self.db.filename, {}).get("skip_contact_update")):
+                    or not (conf.Login.get(self.db.filename, {}).get("skip_contact_update")
+                            or self.cache["chats"][cidentity].get("__updated__"))):
                         # Insert chat only if there are any messages, or update existing contacts
                         try: action = self.save("chats", chat)
                         except Exception:
