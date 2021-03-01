@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.02.2021
+@modified    01.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -425,8 +425,8 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     output("%s." % ", ".join(filter(bool, [
                         util.plural("new contact", result["contact_count_new"], sep=",")
                         if result["contact_count_new"] else "",
-                        util.plural("contact", result["message_count_updated"], sep=",") + " updated"
-                        if result["message_count_updated"] else "",
+                        util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
+                        if result["contact_count_updated"] else "",
                     ])))
 
         elif "messages" == result.get("table"):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.02.2021
+@modified    03.01.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3552,8 +3552,8 @@ class DatabasePage(wx.Panel):
                                 slabel += "\n%s." % ", ".join(filter(bool, [
                                     util.plural("new contact", result["contact_count_new"], sep=",")
                                     if result["contact_count_new"] else "",
-                                    util.plural("contact", result["message_count_updated"], sep=",") + " updated"
-                                    if result["message_count_updated"] else "",
+                                    util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
+                                    if result["contact_count_updated"] else "",
                                 ]))
 
                             self.chats = self.db.get_conversations(reload=True, log=False)
