@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.03.2021
+@modified    04.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -151,19 +151,21 @@ ARGUMENTS = {
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
               "help": "store given password in configuration"},
-             {"args": ["--contact-update"], "dest": "skip_contact_update",
-              "action": "store_false", "required": False, "default": None,
-              "help": "overwrite contact information in database (default)"},
-             {"args": ["--no-contact-update"], "dest": "skip_contact_update",
+             {"args": ["--contact-update"], "dest": "sync_contacts",
               "action": "store_true", "required": False, "default": None,
-              "help": "do not overwrite contact information in database"},
-             {"args": ["--check-older"], "dest": "skip_older_chats",
+              "help": "update profile fields of existing contacts "
+                      "from online data (default)"},
+             {"args": ["--no-contact-update"], "dest": "sync_contacts",
               "action": "store_false", "required": False, "default": None,
-              "help": "check older chats for messages to sync, "
+              "help": "do not update profile fields of existing contacts "
+                      "from online data"},
+             {"args": ["--check-older"], "dest": "sync_older",
+              "action": "store_true", "required": False, "default": None,
+              "help": "check all older chats in database for messages to sync, "
                       "may take a long time (default)"},
-             {"args": ["--no-check-older"], "dest": "skip_older_chats",
-              "action": "store_true", "required": False, "default": None,
-              "help": "do not check older chats for messages to sync"},
+             {"args": ["--no-check-older"], "dest": "sync_older",
+              "action": "store_false", "required": False, "default": None,
+              "help": "do not check all older chats in database for messages to sync"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -392,7 +394,7 @@ def run_search(filenames, query):
 
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, skip_contact_update=None, skip_older_chats=None,
+             store_password=False, sync_contacts=None, sync_older=None,
              chatnames=(), authornames=(), truncate=False):
     """Synchronizes history in specified databases from Skype online service."""
 
@@ -532,17 +534,17 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             conf.Login[filepath].update(store=True, password=util.obfuscate(password))
             conf.save()
 
-        if skip_contact_update is not None:
-            if skip_contact_update:
-                conf.Login.setdefault(filepath, {})["skip_contact_update"] = True
+        if sync_contacts is not None:
+            if not sync_contacts:
+                conf.Login.setdefault(filepath, {})["sync_contacts"] = False
             elif filepath in conf.Login:
-                conf.Login[filepath].pop("skip_contact_update", None)
+                conf.Login[filepath].pop("sync_contacts", None)
 
-        if skip_older_chats is not None:
-            if skip_older_chats:
-                conf.Login.setdefault(filepath, {})["skip_older_chats"] = True
+        if sync_older is not None:
+            if not sync_older:
+                conf.Login.setdefault(filepath, {})["sync_older"] = False
             elif filepath in conf.Login:
-                conf.Login[filepath].pop("skip_older_chats", None)
+                conf.Login[filepath].pop("sync_older", None)
 
         chats = []
         if chatnames or authornames:
@@ -880,7 +882,7 @@ def run(nogui=False):
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
-                 arguments.skip_contact_update, arguments.skip_older_chats,
+                 arguments.sync_contacts, arguments.sync_older,
                  arguments.chat, arguments.author)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)

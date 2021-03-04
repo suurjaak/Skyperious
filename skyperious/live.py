@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.03.2021
+@modified    04.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -241,7 +241,7 @@ class SkypeLogin(object):
                 for uid in item.userIds[:4]: # Use up to 4 names
                     name = self.get_contact_name(uid)
                     if not self.get_contact(uid) \
-                    or not conf.Login.get(self.db.filename, {}).get("skip_contact_update"):
+                    or conf.Login.get(self.db.filename, {}).get("sync_contacts", True):
                         user = self.request(self.skype.contacts.__getitem__, uid, __raise=False)
                         if user and user.name: name = unicode(user.name)
                     names.append(name)
@@ -374,7 +374,7 @@ class SkypeLogin(object):
                 elif p["identity"] not in existing:
                     self.db.insert_row("participants", p, log=False)
                 if p["identity"] not in self.cache["contacts"] \
-                or (not conf.Login.get(self.db.filename, {}).get("skip_contact_update")
+                or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
                     and not self.cache["contacts"][p["identity"]].get("__updated__")
                 ):
                     idx = len(skypedata.ID_PREFIX_BOT) \
@@ -723,8 +723,8 @@ class SkypeLogin(object):
                     msgs = self.request(chat.getMsgs, __raise=False) or []
 
                     if msgs and (cidentity not in self.cache["chats"]
-                    or not (conf.Login.get(self.db.filename, {}).get("skip_contact_update")
-                            or self.cache["chats"][cidentity].get("__updated__"))):
+                    or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
+                        and not self.cache["chats"][cidentity].get("__updated__"))):
                         # Insert chat only if there are any messages, or update existing contacts
                         try: action = self.save("chats", chat)
                         except Exception:
@@ -788,7 +788,7 @@ class SkypeLogin(object):
                 if not mrun: break # for chat
             if chats: break # while run; stop after processing specific chats
             elif run and not mychats \
-            and not conf.Login.get(self.db.filename, {}).get("skip_older_chats"):
+            and conf.Login.get(self.db.filename, {}).get("sync_older", True):
                 # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
                 selchats = get_live_chats(chats, log=False)
