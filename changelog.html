@@ -40,14 +40,33 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+        <h4>v4.6, 2021-04-03:</h4>
+        <ul>
+          <li>update existing contact information in database on live sync</li>
+          <li>added flag to not update contact information in database from live</li>
+          <li>sync older chats from live not just recent ones (issue #93)</li>
+          <li>added flag to not sync older chats from live</li>
+          <li>show &lt;pre&gt;-tag content in chat reader</li>
+          <li>show @-taggings in chat reader and style them bold in reader and HTML</li>
+          <li>ask for confirmation when exporting HTML with media in subfolder, but login unavailable for downloading media (issue #93)</li>
+          <li>fixed error on creating chat date links during the month of March</li>
+          <li>fixed "Go to previous [period]" not working in chat history if history starts with previous period</li>
+          <li>fixed merge not showing correct diff in individual chats view</li>
+          <li>fixed duplicates in syncing bot contacts and messages from live (issue #93)</li>
+          <li>fixed not retaining the order of command-line FILE arguments (issue #93)</li>
+          <li>fixed displaying shared media with duplicate filenames in HTML export with subfolder (issue #93)</li>
+          <li>add detected media type extension to shared media exported in HTML if lacking one (issue #93)</li>
+        </ul>
+        <br />
 
         <h4>v4.5, 2021-02-09:</h4>
         <ul>

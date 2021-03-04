@@ -45,9 +45,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.5-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.6-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -356,6 +356,14 @@ optional arguments:
                         prompted
   --ask-password        prompt for Skype account password
   --store-password      store given password in configuration
+  --contact-update      update profile fields of existing contacts from online
+                        data (default)
+  --no-contact-update   do not update profile fields of existing contacts from
+                        online data
+  --check-older         check all older chats in database for messages to
+                        sync, may take a long time (default)
+  --no-check-older      do not check all older chats in database for messages
+                        to sync
   -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
                         names of specific chats to sync
   -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
@@ -398,7 +406,7 @@ optional arguments:
 usage: skyperious merge [-h] [--verbose] [-o OUTPUT] FILE1 FILE2 [FILE2 ...]
 
 Merge two or more Skype database files into a new database in current
-directory, with a full combined message history. New filename will be chosen
+directory, with a full combined message history. New filename will be generated
 automatically. Last database in the list will be used as base for comparison.
 
 positional arguments:
