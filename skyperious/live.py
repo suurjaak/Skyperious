@@ -576,10 +576,11 @@ class SkypeLogin(object):
             elif isinstance(item, skpy.SkypeFileMsg):
                 # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
 
+                filename, filesize = (item.file.name, item.file.size) if file else (None, None)
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
-                                       (urllib.quote(util.to_unicode(item.file.size or 0)),
-                                        util.to_unicode(item.file.name or "file").replace("<", "&lt;").replace(">", "&gt;")))
+                                       (urllib.quote(util.to_unicode(filesize or 0)),
+                                        util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
                 # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='username', chatId='19:abcdef..@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:username</initiator><value>The Topic</value></topicupdate>', topic='The Topic')
