@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.02.2021
+@modified    04.03.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1343,6 +1343,11 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
             media_folder = "html" == format and self.dialog_savefile.FilterIndex
+            if media_folder and not check_media_export_login(db):
+                self.button_export.Enabled = True
+                if focused_control: focused_control.SetFocus()
+                return
+
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db.account: formatargs.update(db.account)
@@ -1373,6 +1378,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 if media_folder: opts["media_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
+                page = next((k for k, v in self.db_pages.items() if v is db), None)
+                if page: wx.CallAfter(page.update_liveinfo)
             except Exception as e:
                 errormsg_short = "Error exporting chats: %s" % util.format_exc(e)
                 errormsg = "Error exporting chats:\n\n%s" % traceback.format_exc()
@@ -3028,6 +3035,8 @@ class DatabasePage(wx.Panel):
         gauge = wx.Gauge(panel_sync2, size=(300, 15), style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
         label_progress   = wx.StaticText(panel_sync2)
         edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
+        check_contacts   = wx.CheckBox(panel_sync2, label="Update existing &contact information")
+        check_older      = wx.CheckBox(panel_sync2, label="Check &older chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
@@ -3070,6 +3079,11 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(edit_sync_status, "ForegroundColour", "DisabledColour")
         ColourManager.Manage(edit_sync_status, "BackgroundColour", "BgColour")
         edit_sync_status.SetEditable(False)
+        check_contacts.ToolTip = "Update profile fields of existing contacts from online data"
+        check_older.ToolTip = "Check all older chats in database for messages " \
+                              "to sync from online, may take a long while"
+        check_contacts.Value   = check_older.Value   = True
+        check_contacts.Enabled = check_older.Enabled = False
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
@@ -3091,6 +3105,8 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_store)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_login)
         self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_sync)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_contacts)
+        self.Bind(wx.EVT_CHECKBOX,   self.on_change_ctrl_login, check_older)
         self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
@@ -3112,6 +3128,8 @@ class DatabasePage(wx.Panel):
         self.gauge_sync          = gauge
         self.label_sync_progress = label_progress
         self.edit_sync_status    = edit_sync_status
+        self.check_sync_contacts = check_contacts
+        self.check_sync_older    = check_older
         self.button_sync         = button_sync
         self.button_sync_sel     = button_sync_sel
         self.button_sync_stop    = button_sync_stop
@@ -3151,6 +3169,8 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(gauge, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         sizer_sync2.Add(label_progress, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         sizer_sync2.Add(edit_sync_status, proportion=1, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(check_contacts, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(check_older,    border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
@@ -3159,7 +3179,7 @@ class DatabasePage(wx.Panel):
 
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
-        pos = self.Size[1] / 3
+        pos = self.Size[1] / 4
         splitter_sync.SplitHorizontally(panel_sync1, panel_sync2, sashPosition=pos)
 
 
@@ -3191,6 +3211,7 @@ class DatabasePage(wx.Panel):
 
     def update_liveinfo(self):
         """Refreshes account settings in login-page from configuration."""
+        if not self: return
         opts = conf.Login.get(self.db.filename) or {}
         self.edit_user.Value = self.db.username if self.db.username else ""
         self.button_login.Label = "&Log in as '%s'" % self.edit_user.Value
@@ -3201,6 +3222,15 @@ class DatabasePage(wx.Panel):
         self.check_login_sync.Value  = opts.get("sync",  False) and self.check_login_auto .Value
         self.check_login_auto.Enable(self.check_login_store.Value)
         self.check_login_sync.Enable(self.check_login_auto .Value)
+        self.check_sync_contacts.Value = opts.get("sync_contacts", True)
+        self.check_sync_older.Value    = opts.get("sync_older",    True)
+        if self.db.live.is_logged_in() and self.button_login.Enabled:
+            # Probable auto-login during HTML export
+            self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
+            self.button_login.Disable() 
+            self.label_login_fail.Hide()
+            for c in controls.get_controls(self.panel_sync): c.Enable()
+            self.button_sync_stop.Disable()
 
 
     def on_change_live_user(self, event):
@@ -3229,9 +3259,11 @@ class DatabasePage(wx.Panel):
         ctrl, value = event.EventObject, event.EventObject.Value
         if ctrl is self.edit_pw:
             name, value = "password", util.obfuscate(value)
-        elif ctrl is self.check_login_store: name = "store"
-        elif ctrl is self.check_login_auto:  name = "auto"
-        elif ctrl is self.check_login_sync:  name = "sync"
+        elif ctrl is self.check_login_store:   name = "store"
+        elif ctrl is self.check_login_auto:    name = "auto"
+        elif ctrl is self.check_login_sync:    name = "sync"
+        elif ctrl is self.check_sync_contacts: name = "sync_contacts"
+        elif ctrl is self.check_sync_older:    name = "sync_older"
         if not self.check_login_store.Value: self.check_login_auto.Value = False
         if not self.check_login_auto .Value: self.check_login_sync.Value = False
         self.check_login_auto.Enable(self.check_login_store.Value)
@@ -3252,6 +3284,10 @@ class DatabasePage(wx.Panel):
             conf.Login[self.db.filename].pop("sync",     None)
         if not self.check_login_sync.Value:
             conf.Login[self.db.filename].pop("sync",     None)
+        if self.check_sync_contacts.Value:
+            conf.Login[self.db.filename].pop("sync_contacts", None)
+        if self.check_sync_older.Value:
+            conf.Login[self.db.filename].pop("sync_older", None)
         if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
         util.run_once(conf.save)
 
@@ -3497,10 +3533,6 @@ class DatabasePage(wx.Panel):
 
                     if result.get("count"):
                         clabel = ", %s processed" % result["count"]
-                        if "total" in result:
-                            clabel = ", %s of %s processed" % (result["count"], result["total"])
-                            percent = min(100, math.ceil(100 * util.safedivf(result["count"], result["total"])))
-                            self.gauge_sync.Value = percent
                         for k in "new", "updated":
                             if result.get(k): clabel += ", %s %s" % (result[k], k)
                         plabel += clabel + "."
@@ -3509,7 +3541,6 @@ class DatabasePage(wx.Panel):
 
                     if result.get("end"):
                         slabel = "Synchronized %s" % result["table"]
-                        if self.worker_live.is_working(): self.gauge_sync.Pulse()
                         if "chats" == result["table"]:
                             slabel = "Synchronized %s%s: %s in total%s." % (
                                 util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
@@ -3517,6 +3548,14 @@ class DatabasePage(wx.Panel):
                                 util.plural("new message", result["message_count_new"], sep=","),
                                 ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                             )
+                            if result["contact_count_new"] or result["contact_count_updated"]:
+                                slabel += "\n%s." % ", ".join(filter(bool, [
+                                    util.plural("new contact", result["contact_count_new"], sep=",")
+                                    if result["contact_count_new"] else "",
+                                    util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
+                                    if result["contact_count_updated"] else "",
+                                ]))
+
                             self.chats = self.db.get_conversations(reload=True, log=False)
                             def after2():
                                 if self: self.db.get_conversations_stats(self.chats)
@@ -3573,6 +3612,12 @@ class DatabasePage(wx.Panel):
                     if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
                 self.check_login_auto.Enable(self.check_login_store.Value)
                 self.check_login_sync.Enable(self.check_login_auto .Value)
+            elif "info" == result["action"] and "message" in result:
+                self.label_sync_progress.Label = result["message"] or ""
+                if "index" in result and "count" in result:
+                    percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
+                    self.gauge_sync.Value = percent
+                self.gauge_sync.ContainingSizer.Layout()
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
@@ -4024,6 +4069,8 @@ class DatabasePage(wx.Panel):
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -4040,6 +4087,7 @@ class DatabasePage(wx.Panel):
             try: util.start_file(filepath)
             except Exception:
                 logger.exception("Error starting %s.", filepath)
+            wx.CallAfter(self.update_liveinfo)
         except Exception:
             logger.exception("Error saving %s.", filepath)
             guibase.status("Error saving %s.", filepath)
@@ -4204,6 +4252,8 @@ class DatabasePage(wx.Panel):
             format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
             media_folder = "html" == format and self.dialog_savefile.FilterIndex
 
+        if media_folder and not check_media_export_login(self.db): return
+
         msg = 'Exporting to %s.' % path if len(chats) == 1 and not do_singlefile \
         else  'Exporting %schats from "%s"\nas %s under %s.' % \
               ("all " if do_all else "", self.db.filename, format.upper(), path)
@@ -4222,6 +4272,7 @@ class DatabasePage(wx.Panel):
             errormsg = "Error exporting chats:\n\n%s" % \
                        traceback.format_exc()
         busy.Close()
+        wx.CallAfter(self.update_liveinfo)
         if not errormsg:
             if len(chats) == 1 and not do_singlefile:
                 guibase.status("Exported %s to %s.",
@@ -4253,6 +4304,8 @@ class DatabasePage(wx.Panel):
         filepath = self.dialog_savefile.GetPath()
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
 
@@ -4278,6 +4331,7 @@ class DatabasePage(wx.Panel):
                                util.plural("message", message_count, sep=","),
                                filepath, log=True)
                 util.start_file(filepath)
+                wx.CallAfter(self.update_liveinfo)
             else:
                 wx.MessageBox("Current filter leaves no data to export.",
                               conf.Title, wx.OK | wx.ICON_INFORMATION)
@@ -6290,6 +6344,8 @@ class MergerPage(wx.Panel):
         filepath = dialog.GetPath()
         format = export.CHAT_EXTS[dialog.FilterIndex]
         media_folder = "html" == format and dialog.FilterIndex
+        if media_folder and not check_media_export_login(self.db): return
+
         if not filepath.lower().endswith(".%s" % format):
             filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -7045,6 +7101,16 @@ class MergerPage(wx.Panel):
         Loads later data from the databases, like message counts and compared
         contacts, used as a background callback to speed up page opening.
         """
+
+        def find_contact(cmap, identity):
+            # Handle bot accounts synced before v4.5.1
+            c = cmap.get(identity)
+            if not c and identity.startswith(skypedata.ID_PREFIX_BOT):
+                c = cmap.get(identity[len(skypedata.ID_PREFIX_BOT):])
+            if not c and not identity.startswith(skypedata.ID_PREFIX_BOT):
+                c = cmap.get(skypedata.ID_PREFIX_BOT + identity)
+            return c
+
         try:
             chats1, chats2 = self.chats1, self.chats2
             self.db1.get_conversations_stats(chats1)
@@ -7099,14 +7165,14 @@ class MergerPage(wx.Panel):
             cg1map = dict((g["name"], g) for g in contactgroups1)
             cg2map = dict((g["name"], g) for g in contactgroups2)
             for c1 in contacts1:
-                c2 = con2map.get(c1["identity"])
+                c2 = find_contact(con2map, c1["identity"])
                 if not c2 and c1["identity"] not in con1new:
                     c = c1.copy()
                     c["c1"], c["c2"] = c1, c2
                     con1diff.append(c)
                     con1new[c1["identity"]] = True
             for c2 in contacts2:
-                c1 = con1map.get(c2["identity"])
+                c1 = find_contact(con1map, c2["identity"])
                 if not c1 and c2["identity"] not in con2new:
                     c = c2.copy()
                     c["c1"], c["c2"] = c1, c2
@@ -7449,6 +7515,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             menu_goto.Append(item_prev_month), menu_goto.Append(item_next_month)
 
             item_msg.Enabled = item_filter.Enabled = item_goto.Enabled = bool(msg)
+            if not self._auto_retrieve: item_filter.Enabled = False
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
             menu.Bind(wx.EVT_MENU, on_search,                id=item_search.GetId())
@@ -7505,7 +7572,10 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
 
     def SetAutoRetrieve(self, retrieve):
-        """Sets whether to auto-retrieve more messages."""
+        """
+        Sets whether to auto-retrieve more messages,
+        and allow date periods navigation and filtering.
+        """
         self._auto_retrieve = retrieve
 
 
@@ -7655,11 +7725,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._append_text("  (%s). " % util.plural(
                                   "message", self._messages_current, sep=","))
 
-            if self._chat["message_count"] and (not self._messages 
+            if self._chat["message_count"] and self._auto_retrieve and (not self._messages 
             or self._messages[0]["datetime"] > self._chat["first_message_datetime"]):
                 self._append_text("Scroll back more.", "link")
 
-            if self._chat["message_count"]:
+            if self._chat["message_count"] and self._auto_retrieve:
                 self._append_text("\nShow from:  ")
                 date_first = self._chat["first_message_datetime"].date()
                 date_last = self._chat["last_message_datetime"].date()
@@ -7759,8 +7829,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         """
         tagstyle_map = {"b": "bold", "i": "italic", "s": "strike",
                         "bodystatus": "special",  "quotefrom": "special",
-                        "a": "link", "ss": "default"}
-        other_tags = ["blink", "font", "bodystatus", "i", "span", "flag"]
+                        "a": "link", "ss": "default", "at": "bold"}
+        other_tags = ["blink", "font", "bodystatus", "i", "span", "flag", "pre"]
         to_skip = {} # {element to skip: True, }
         tails_new = {} if tails_new is None else tails_new
         linefeed_final = "\n\n" # Decreased if quotefrom is last
@@ -7802,6 +7872,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 text = "\n%s\n" % text
             elif e.tag in ["xml", "b"]:
                 linefeed_final = "\n\n"
+            elif "at" == e.tag:
+                if text and not text.startswith("@"): text = "@" + text
             elif "s" == e.tag:
                 text = "~%s~" % text # STC does not support strikethrough style
             elif e.tag not in other_tags:
@@ -7969,6 +8041,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 threshold, shifted = make_threshold(msg["datetime"], step=0), True
             idx += step
             msg, prevmsg = (mm[idx] if 0 <= idx < len(mm) else None), msg
+        if step < 0 and prevmsg and prevmsg["datetime"] >= threshold:
+            # Corner case: content starts with threshold
+            return self.FocusMessage(prevmsg["id"])
         label = "previous" if direction < 0 else "next"
         guibase.status("No %s %s found in current view.", label, unit)
 
@@ -8974,6 +9049,20 @@ class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
     Password = property(GetPassword)
 
 
+def check_media_export_login(db):
+    """
+    Returns whether db can login to download shared madia to subfolder for export
+    or whether user confirms to proceed without login information.
+    """
+    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
+    and not db.live.is_logged_in() \
+    and not conf.Login.get(db.filename, {}).get("password") and wx.OK != wx.MessageBox(
+        "You have selected to export HTML with shared media in subfolder, "
+        "but the database does not have login information "
+        "for downloading media.\n\nAre you sure you want to continue?",
+        conf.Title, wx.OK | wx.CANCEL | wx.ICON_INFORMATION
+    ): return False
+    return True
 
 
 def messageBox(message, title, style):

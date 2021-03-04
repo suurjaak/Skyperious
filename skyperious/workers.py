@@ -9,10 +9,11 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.02.2021
+@modified    23.02.2021
 ------------------------------------------------------------------------------
 """
 import datetime
+import functools
 import logging
 import Queue
 import re
@@ -28,6 +29,7 @@ from . lib import util
 from . lib.vendor import step
 
 from . import conf
+from . import live
 from . import searchparser
 from . import skypedata
 from . import templates
@@ -473,7 +475,7 @@ class MergeThread(WorkerThread):
             result["chatindex"] = index
             postback = dict((k, v) for k, v in result.items()
                             if k not in ["output", "chats", "params"])
-            diff = self.get_chat_diff_left(chat, db1, db2, postback)
+            diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
             if not self._is_working:
                 break # for index, chat
             if diff["messages"] \
@@ -543,11 +545,12 @@ class MergeThread(WorkerThread):
                 result["chatindex"] = index
                 postback = dict((k, v) for k, v in result.items()
                                 if k not in ["output", "chats", "params"])
-                diff = self.get_chat_diff_left(chat, db1, db2, postback)
+                diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
                 if not self._is_working:
                     break # for index, chat
                 if diff["messages"] \
                 or (chat["message_count"] and diff["participants"]):
+                    if diff.get("preprocess"): diff["preprocess"]()
                     chat1 = chat["c1"]
                     chat2 = chat["c2"]
                     new_chat = not chat2
@@ -556,8 +559,7 @@ class MergeThread(WorkerThread):
                         chat["c2"] = chat2
                         chat2["id"] = db2.insert_conversation(chat2, db1)
                     if diff["participants"]:
-                        db2.insert_participants(chat2, diff["participants"],
-                                                db1)
+                        db2.insert_participants(chat2, diff["participants"], db1)
                         count_participants += len(diff["participants"])
                     if diff["messages"]:
                         db2.insert_messages(chat2, diff["messages"], db1, chat1,
@@ -575,6 +577,7 @@ class MergeThread(WorkerThread):
                         info += ", no messages"
                     result["output"] = info + "."
                     result["diff"] = diff
+                    if diff.get("postprocess"): diff["postprocess"]()
                 result["index"] = postback["index"]
                 result["chats"].append(chat)
                 if not self._drop_results:
@@ -635,6 +638,7 @@ class MergeThread(WorkerThread):
                 else:
                     html += ", no messages"
                 html += "."
+                if chat_data["diff"].get("preprocess"): chat_data["diff"]["preprocess"]()
                 if not chat2:
                     chat2 = chat1.copy()
                     chat_data["chat"]["c2"] = chat2
@@ -646,6 +650,7 @@ class MergeThread(WorkerThread):
                     db2.insert_messages(chat2, messages, db1, chat1,
                                         self.yield_ui, self.REFRESH_COUNT)
                     count_messages += len(messages)
+                if chat_data["diff"].get("postprocess"): chat_data["diff"]["postprocess"]()
                 if not self._drop_results:
                     result.update(output=html, chatindex=index,
                                   chats=[chat_data["chat"]])
@@ -675,22 +680,44 @@ class MergeThread(WorkerThread):
                 self.postback(result)
 
 
-    def get_chat_diff_left(self, chat, db1, db2, postback=None):
+    def get_chat_diff_left(self, chat, db1, db2, postback=None, runcheck=False):
         """
         Compares the chat in the two databases and returns the differences from
         the left as {"messages": [message IDs different in db1],
                      "participants": [participants different in db1] }.
+        Additionally, can contain {"preprocess":  function to invoke before merge,
+                                   "postprocess": function to invoke after merge}.
 
         @param   postback  if {"count": .., "index": ..}, updates index
                            and posts the result at POSTBACK_COUNT intervals
+        @param   runcheck  if true, breaks when thread is no longer marked working
         """
         c = chat
         participants1 = c["c1"]["participants"] if c["c1"] else []
         participants2 = c["c2"]["participants"] if c["c2"] else []
+        c1p_map = dict((p["identity"], p) for p in participants1)
         c2p_map = dict((p["identity"], p) for p in participants2
                        if p["contact"].get("id"))
         c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
         c1m_diff = [] # [(id, datetime), ] messages different in chat 1
+        preprocess, postprocess = None, None
+
+        # Handle bot accounts synced before v4.5.1
+        # Bots without bot-prefix on the left but with on the right, and vice versa
+        botids1 = set(x for x in c1p_map if not x.startswith(skypedata.ID_PREFIX_BOT)
+                      and skypedata.ID_PREFIX_BOT + x in c2p_map)
+        botids2 = set(x for x in c2p_map if not x.startswith(skypedata.ID_PREFIX_BOT)
+                      and skypedata.ID_PREFIX_BOT + x in c1p_map)
+        if botids1: # Merge unprefixed bots to the right as-is and replace later
+            postprocess = functools.partial(live.fix_bot_identity, db2, *botids1)
+        if botids2: # Replace unprefixed bots on the right before starting merge
+            preprocess  = functools.partial(live.fix_bot_identity, db2, *botids2)
+        c1p_diff = [p for p in c1p_diff if p["identity"] not in botids1 | botids2]
+        is_identities_msg = lambda m: m["identities"] and m["type"] in [
+            skypedata.MESSAGE_TYPE_UPDATE_NEED, skypedata.MESSAGE_TYPE_UPDATE_DONE,
+            skypedata.MESSAGE_TYPE_PARTICIPANTS, skypedata.MESSAGE_TYPE_GROUP,
+            skypedata.MESSAGE_TYPE_BLOCK, skypedata.MESSAGE_TYPE_REMOVE,
+            skypedata.MESSAGE_TYPE_SHARE_DETAIL]
 
         db_account_ids = set(filter(bool, [db1.id, db1.username, db2.id, db2.username]))
 
@@ -713,13 +740,44 @@ class MergeThread(WorkerThread):
             for i, m in enumerate(messages2):
                 if not m.get("datetime"): continue # for i, m
 
-                mkey = (m["id"], m["datetime"])
+                mkey, akey = (m["id"], m["datetime"]), None
                 t = util.to_unicode(parser2.parse(m, output=parse_options), "utf-8")
-                if m["author"] in db_account_ids: ckey = (None, t)
-                else: ckey = (util.to_unicode(m["author"] or "", "utf-8"), t)
-                bucket = m2buckets.setdefault(m["datetime"].date(), {})
-                bucket.setdefault(ckey, []).append(mkey)
-                if not self._is_working:
+                if m["author"] not in db_account_ids:
+                    akey = util.to_unicode(m["author"] or "", "utf-8")
+                ckeys, akeys = [(akey, t)], [akey]
+
+                # Handle bot accounts synced before v4.5.1
+                if akey and akey.startswith(skypedata.ID_PREFIX_BOT) \
+                and skypedata.ID_PREFIX_BOT + akey in botids1:
+                    akeys.append(akey[len(skypedata.ID_PREFIX_BOT):])
+                    ckeys.append((akeys[-1], t))
+                if akey and m["author"] in botids2:
+                    akeys.append(skypedata.ID_PREFIX_BOT + akey)
+                    ckeys.append((akeys[-1], t))
+                if botids1 | botids2 and is_identities_msg(m):
+                    identities = m["identities"].split()
+                    if botids1 and any(skypedata.ID_PREFIX_BOT + x in identities
+                                       for x in botids1):
+                        # Make match-body with unprefixed identities
+                        ids2 = " ".join(x[len(skypedata.ID_PREFIX_BOT) 
+                                   if x[len(skypedata.ID_PREFIX_BOT):] in botids1 else 0:
+                        ] for x in identities)
+                        t2 = util.to_unicode(parser2.parse(dict(m, identities=ids2),
+                                                           output=parse_options), "utf-8")
+                        ckeys.extend((x, t2) for x in akeys)
+                    if set(identities) & botids2:
+                        # Make match-body with prefixed identities
+                        ids2 = " ".join((skypedata.ID_PREFIX_BOT if x in botids2 else "")
+                                        + x for x in identities)
+                        t2 = util.to_unicode(parser2.parse(dict(m, identities=ids2),
+                                                           output=parse_options), "utf-8")
+                        ckeys.extend((x, t2) for x in akeys)
+
+                for ckey in ckeys:
+                    bucket = m2buckets.setdefault(m["datetime"].date(), {})
+                    bucket.setdefault(ckey, []).append(mkey)
+
+                if runcheck and not self._is_working:
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
@@ -742,7 +800,7 @@ class MergeThread(WorkerThread):
                     potentials += m2buckets.get(mdate+delta, {}).get(ckey, [])
                 if not any(self.match_time(m["datetime"], x[1], 180) for x in potentials):
                     c1m_diff.append((m["id"], m["datetime"]))
-                if not self._is_working:
+                if runcheck and not self._is_working:
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
                     self.yield_ui()
@@ -752,6 +810,9 @@ class MergeThread(WorkerThread):
 
         message_ids1 = [x[0] for x in sorted(c1m_diff, key=lambda x: x[1])]
         result = {"messages": message_ids1, "participants": c1p_diff}
+        if preprocess:  result["preprocess"]  = preprocess
+        if postprocess: result["postprocess"] = postprocess
+
         return result
 
 

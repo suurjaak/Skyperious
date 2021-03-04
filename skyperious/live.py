@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    14.01.2021
+@modified    04.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -70,6 +70,7 @@ class SkypeLogin(object):
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
         self.populated    = False
+        self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
 
@@ -165,6 +166,7 @@ class SkypeLogin(object):
 
         @param   __retry  special keyword argument, does not retry if falsy
         @param   __raise  special keyword argument, does not raise if falsy
+        @param   __log    special keyword argument, does not log error if falsy
         """
         self.query_stamps.append(datetime.datetime.utcnow())
         while len(self.query_stamps) > self.RATE_LIMIT:
@@ -172,16 +174,17 @@ class SkypeLogin(object):
 
         dts = self.query_stamps
         delta = (dts[-1] - dts[0]) if len(dts) == self.RATE_LIMIT else 0
-        if delta and delta.total_seconds() < self.RATE_WINDOW:
-            time.sleep(self.RATE_WINDOW)
-        doretry, doraise = kwargs.pop("__retry", True), kwargs.pop("__raise", True)
+        if isinstance(delta, datetime.timedelta) and delta.total_seconds() < self.RATE_WINDOW:
+            time.sleep(self.RATE_WINDOW - delta.total_seconds())
+        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__retry", "__raise", "__log"))
+
         tries = 0
         while True:
             try: return func(*args, **kwargs)
             except Exception:
                 tries += 1
                 if tries > self.RETRY_LIMIT or not doretry:
-                    logger.exception("Error calling %r.", func)
+                    if dolog: logger.exception("Error calling %r.", func)
                     if doraise: raise
                     else: return
                 time.sleep(self.RETRY_DELAY)
@@ -200,31 +203,50 @@ class SkypeLogin(object):
         dbitem = self.convert(table, item, parent=parent)
         if dbitem is None: return self.SAVE.SKIP
         result, dbitem1, table = None, dict(dbitem), table.lower()
+        do_fix_bot = False
 
         identity = dbitem["skypename"] if table in ("accounts", "contacts") else \
                    dbitem["identity"]  if "chats" == table else dbitem.get("pk_id")
         dbitem0 = self.cache[table].get(identity)
+
+        if table in ("chats", "contacts") and not dbitem0 \
+        and (identity or "").startswith(skypedata.ID_PREFIX_BOT):
+            # Handle bot accounts synced before v4.5.1
+            dbitem0 = self.cache[table].get(identity[len(skypedata.ID_PREFIX_BOT):])
+            if dbitem0: self.cache[table].pop(dbitem0.get("identity"), None)
+            do_fix_bot = dbitem0 and "contacts" == table
+
+        if "contacts" == table and not dbitem0 \
+        and not (identity or "").startswith(skypedata.ID_PREFIX_BOT):
+            # Bot accounts from live are without bot prefix
+            dbitem0 = self.cache[table].get(skypedata.ID_PREFIX_BOT + identity)
+            if dbitem0:
+                identity = skypedata.ID_PREFIX_BOT + identity
+                dbitem["skypename"] = dbitem1["skypename"] = identity
+                dbitem["type"] = dbitem1["type"] = skypedata.CONTACT_TYPE_BOT
+
         if "messages" == table and dbitem.get("remote_id") \
         and not isinstance(item, (skpy.SkypeCallMsg, skpy.SkypeMemberMsg, skpy.msg.SkypePropertyMsg)):
             # Look up message by remote_id instead, to detect edited messages
             dbitem0 = next((v for v in self.cache[table].values()
                             if v.get("remote_id") == dbitem["remote_id"]
                             and v["convo_id"] == dbitem["convo_id"]), dbitem0)
+
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
         and not dbitem.get("displayname"):
             if dbitem0 and dbitem0["displayname"]:
                 dbitem["displayname"] = dbitem0["displayname"]
             else: # Assemble name from participants
-                for x in item.userIds[:4]: # Use up to 4 names
-                    if x not in self.cache["contacts"]:
-                        contact = self.request(self.skype.contacts.contact, x, __raise=False)
-                        try:
-                            if contact: self.save("contacts", contact)
-                        except Exception:
-                            logger.exception("Error saving contact %r.", contact)
-                cc = map(self.get_contact_name, item.userIds)
-                dbitem["displayname"] = ", ".join(cc[:4])
-                if len(cc) > 4: dbitem["displayname"] += ", ..."
+                names = []
+                for uid in item.userIds[:4]: # Use up to 4 names
+                    name = self.get_contact_name(uid)
+                    if not self.get_contact(uid) \
+                    or conf.Login.get(self.db.filename, {}).get("sync_contacts", True):
+                        user = self.request(self.skype.contacts.__getitem__, uid, __raise=False)
+                        if user and user.name: name = unicode(user.name)
+                    names.append(name)
+                dbitem["displayname"] = ", ".join(names)
+                if len(item.userIds) > 4: dbitem["displayname"] += ", ..."
             dbitem1 = dict(dbitem)
 
 
@@ -238,7 +260,8 @@ class SkypeLogin(object):
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
                 if dbitem["timestamp__ms"] <= self.msg_stamps[dbitem["remote_id"]]:
                     dbitem.pop("body_xml") # We have a later more valid content
-                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"], self.msg_stamps[dbitem["remote_id"]])
+                self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"],
+                                                           self.msg_stamps[dbitem["remote_id"]])
                 if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
                     dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp")})
                 result, dbitem1 = self.SAVE.SKIP, dict(dbitem)
@@ -246,9 +269,11 @@ class SkypeLogin(object):
             self.db.update_row(dbtable, dbitem, dbitem0, log=False)
             for k, v in dbitem0.items() if result is None else ():
                 if k not in dbitem: dbitem[k] = v
+            dbitem["__updated__"] = True
         else:
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
+            self.sync_counts["%s_new" % table] += 1
             result = self.SAVE.INSERT
 
         if "messages" == table and "remote_id" in dbitem1 \
@@ -265,6 +290,8 @@ class SkypeLogin(object):
             self.cache[table][identity] = cacheitem
             if "accounts" == table:
                 self.cache["contacts"][identity] = cacheitem # For name lookup
+
+        if do_fix_bot: fix_bot_identity(self.db, identity)
 
         if "chats" == table:
             self.insert_participants(item, dbitem, dbitem0)
@@ -289,6 +316,7 @@ class SkypeLogin(object):
                 warnings.simplefilter("ignore") # Swallow Unicode equality warnings
                 same = all(v == dbitem0[k] for k, v in dbitem1.items() if k in dbitem0)
                 result = self.SAVE.NOCHANGE if same else self.SAVE.UPDATE
+                if not same: self.sync_counts["%s_updated" % table] += 1
         return result
 
 
@@ -298,7 +326,8 @@ class SkypeLogin(object):
             t = dict(is_permanent=1, filename=msg.file.name, convo_id=row["convo_id"],
                      filesize=msg.file.size, starttime=row["timestamp"],
                      chatmsg_guid=row["guid"], chatmsg_index=0,
-                     type=skypedata.TRANSFER_TYPE_OUTBOUND, partner_handle=msg.userId,
+                     type=skypedata.TRANSFER_TYPE_OUTBOUND,
+                     partner_handle=self.prefixify(msg.userId),
                      partner_dispname=self.get_contact_name(msg.userId))
             existing = None
             if row0:
@@ -313,27 +342,48 @@ class SkypeLogin(object):
     def insert_participants(self, chat, row, row0):
         """Inserts Participants-rows for SkypeChat, if not already present."""
         try:
-            participants, newcontacts = [], []
-            usernames = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
-                        else set([self.skype.user.id, chat.userId])
-            for username in usernames:
-                p = dict(is_permanent=1, convo_id=row["id"], identity=username)
-                if isinstance(chat, skpy.SkypeGroupChat) and username == chat.creatorId:
+            participants, savecontacts = [], []
+
+            uids = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
+                   else set([self.skype.userId, chat.userId])
+            for uid in uids:
+                user = self.request(self.skype.contacts.__getitem__, uid)
+                uidentity = user.id
+                # Keep bot prefixes on bot accounts
+                if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
+                and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
+                    uidentity = skypedata.ID_PREFIX_BOT + user.id
+                p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
+                if isinstance(chat, skpy.SkypeGroupChat) and user.id == chat.creatorId:
                     p.update(rank=1)
                 participants.append(p)
+
             existing = set()
             if row0:
                 cursor = self.db.execute("SELECT identity FROM participants "
                                          "WHERE convo_id = :id", row0, log=False)
                 existing.update(x["identity"] for x in cursor)
+
             for p in participants:
-                if p["identity"] not in existing:
+                if p["identity"] not in existing \
+                and p["identity"].startswith(skypedata.ID_PREFIX_BOT) \
+                and p["identity"][len(skypedata.ID_PREFIX_BOT):] in existing:
+                    # Handle bot accounts synced before v4.5.1
+                    p0 = existing.get(p["identity"][len(skypedata.ID_PREFIX_BOT):])
+                    self.db.update_row("participants", p, p0, log=False)
+                elif p["identity"] not in existing:
                     self.db.insert_row("participants", p, log=False)
-                if p["identity"] not in self.cache["contacts"]:
-                    contact = self.request(self.skype.contacts.contact,
-                                           p["identity"], __raise=False)
-                    if contact: newcontacts.append(contact)
-            for c in newcontacts: self.save("contacts", c)
+                if p["identity"] not in self.cache["contacts"] \
+                or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
+                    and not self.cache["contacts"][p["identity"]].get("__updated__")
+                ):
+                    idx = len(skypedata.ID_PREFIX_BOT) \
+                          if p["identity"].startswith(skypedata.ID_PREFIX_BOT) else 0
+                    uidentity = p["identity"][idx:]
+                    contact = self.request(self.skype.contacts.__getitem__,
+                                           uidentity, __raise=False)
+                    if contact: savecontacts.append(contact)
+            for c in savecontacts: self.save("contacts", c)
         except Exception:
             logger.exception("Error inserting Participants-rows for chat %r.", chat)
 
@@ -388,7 +438,7 @@ class SkypeLogin(object):
             if item.name:
                 name = unicode(item.name)
                 result.update(displayname=name, fullname=name)
-            if item.birthday:
+            if getattr(item, "birthday", None): # Not all SkypeUsers have birthday
                 result.update(birthday=date_to_integer(item.birthday))
             if item.location and item.location.country:
                 result.update(country=item.location.country)
@@ -396,7 +446,7 @@ class SkypeLogin(object):
                 result.update(province=item.location.region)
             if item.location and item.location.city:
                 result.update(city=item.location.city)
-            for phone in item.phones or ():
+            for phone in getattr(item, "phones", ()) or ():
                 if skpy.SkypeContact.Phone.Type.Mobile == phone.type:
                     result.update(phone_mobile=phone.number)
                 elif skpy.SkypeContact.Phone.Type.Work == phone.type:
@@ -428,9 +478,12 @@ class SkypeLogin(object):
             if isinstance(item, skpy.SkypeSingleChat):
                 # SkypeSingleChat(id='8:username', alerts=True, userId='username')
 
-                result.update(identity=item.userId, type=skypedata.CHATS_TYPE_SINGLE)
-                if item.userId not in self.cache["contacts"]:
-                    citem = self.request(self.skype.contacts.contact, item.userId, __raise=False)
+                uidentity = item.userId
+                if item.id.startswith(skypedata.ID_PREFIX_BOT): uidentity = item.id # Bot chats have bot prefix
+                result.update(identity=uidentity, type=skypedata.CHATS_TYPE_SINGLE)
+
+                if uidentity not in self.cache["contacts"]:
+                    citem = self.request(self.skype.contacts.__getitem__, item.userId, __raise=False)
                     if citem: self.save("contacts", citem)
                 result.update(displayname=self.get_contact_name(item.userId))
 
@@ -451,8 +504,11 @@ class SkypeLogin(object):
             else: result = None
 
         elif "contacts" == table:
-            result.update(type=1, isblocked=item.blocked, # type 1: normal contact, 10: bot
-                          isauthorized=item.authorised)
+            result.update(type=skypedata.CONTACT_TYPE_BOT
+                          if isinstance(item, skpy.SkypeBotUser)
+                          else skypedata.CONTACT_TYPE_NORMAL,
+                          isblocked=getattr(item, "blocked", False),
+                          isauthorized=getattr(item, "authorised", False))
             if item.name and item.name.first:
                 result.update(firstname=item.name.first)
             if item.name and item.name.last:
@@ -461,18 +517,23 @@ class SkypeLogin(object):
                 result.update(mood_text=item.mood.plain, rich_mood_text=item.mood.rich)
             if item.avatar:
                 result.update(avatar_url=item.avatar)
+            if isinstance(item, skpy.SkypeBotUser) \
+            and not item.id.startswith(skypedata.ID_PREFIX_BOT):
+                result.update(skypename=skypedata.ID_PREFIX_BOT + item.id)
 
         elif "messages" == table:
 
             ts = util.datetime_to_epoch(item.time)
             pk_id, guid = make_message_ids(item.id)
-            result.update(is_permanent=1, timestamp=int(ts), author=item.userId,
-                          pk_id=pk_id, guid=guid,
+            result.update(is_permanent=1, timestamp=int(ts), pk_id=pk_id, guid=guid,
+                          author=self.prefixify(item.userId),
                           from_dispname=self.get_contact_name(item.userId),
                           body_xml=item.content, timestamp__ms=ts*1000)
 
             if parent:
-                identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) else parent.userId
+                identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
+                           or isinstance(parent.user, skpy.SkypeBotUser) \
+                           or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
                     self.save("chats", parent)
@@ -482,7 +543,7 @@ class SkypeLogin(object):
             if remote_id: result.update(remote_id=hash(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
-                result.update(dialog_partner=item.userId)
+                result.update(dialog_partner=result["author"])
 
             if isinstance(item, skpy.SkypeTextMsg):
                 # SkypeTextMsg(id='1594466183791', type='RichText', time=datetime.datetime(2020, 7, 11, 11, 16, 16, 392000), clientId='16811922854185209745', userId='username', chatId='8:username', content='<ss type="hi">(wave)</ss>')
@@ -532,7 +593,7 @@ class SkypeLogin(object):
 
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_CONTACTS,
                               type=skypedata.MESSAGE_TYPE_PARTICIPANTS,
-                              identities=item.memberId)
+                              identities=self.prefixify(item.memberId))
 
             elif isinstance(item, skpy.SkypeRemoveMemberMsg):
                 # SkypeRemoveMemberMsg(id='1594467133414', type='ThreadActivity/DeleteMember', time=datetime.datetime(2020, 7, 11, 11, 32, 13, 414000), userId='username', chatId='19:abcdef..@thread.skype', content='<deletemember><eventtime>1594467133727</eventtime><initiator>8:username</initiator><target>8:username2</target></deletemember>', memberId='username2')
@@ -543,7 +604,7 @@ class SkypeLogin(object):
                 else:
                     result.update(chatmsg_type=skypedata.CHATMSG_TYPE_REMOVE,
                                   type=skypedata.MESSAGE_TYPE_REMOVE,
-                                  identities=item.memberId)
+                                  identities=self.prefixify(item.memberId))
 
             elif isinstance(item, skpy.SkypeLocationMsg):
                 # SkypeLocationMsg(id='1594466687344', type='RichText/Location', time=datetime.datetime(2020, 7, 11, 11, 24, 0, 305000), clientId='12438271979076057148', userId='username', chatId='8:username', content='<location isUserLocation="0" latitude="59436810" longitude="24740695" timeStamp="1594466640235" timezone="Europe/Tallinn" locale="en-US" language="en" address="Kesklinn, Tallinn, 10146 Harju Maakond, Estonia" addressFriendlyName="Kesklinn, Tallinn, 10146 Harju Maakond, Estonia" shortAddress="Kesklinn, Tallinn, 10146 Harju Maakond, Estonia" userMri="8:username"><a href="https://www.bing.com/maps/default.aspx?cp=9.43681~24.740695&amp;dir=0&amp;lvl=15&amp;where1=Kesklinn,%20Tallinn,%2010137%20Harju%20Maakond,%20Estonia">Kesklinn, Tallinn, 10146 Harju Maakond, Estonia</a></location>', latitude=59.43681, longitude=24.740695, address='Kesklinn, Tallinn, 10146 Harju Maakond, Estonia', mapUrl='https://www.bing.com/maps/default.aspx?cp=59.43681~24.740695&dir=0&lvl=15&where1=Kesklinn,%20Tallinn,%2010146 %20Harju%20Maakond,%20Estonia')
@@ -588,10 +649,11 @@ class SkypeLogin(object):
             self.skype = None
             self.login() # Re-login to reset query cache
         self.build_cache()
+        self.sync_counts.clear()
         if not chats:
             try: self.save("accounts", self.skype.user)
             except Exception:
-                logger.exception("Error saving account %r.", self.skype.user)
+                logger.exception("Error saving account %r.", self.skype.userId)
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
@@ -610,51 +672,74 @@ class SkypeLogin(object):
         if self.progress and not self.progress(action="populate", table="chats", start=True):
             return
         if not self.cache: self.build_cache()
+        self.sync_counts.clear()
 
-        identities = map(identity_to_id, chats or ())
-        getter = lambda c: self.request(self.skype.chats.chat, c, __raise=False)
-        selchats = {k: v for (k, v) in ((x, getter(x)) for x in identities) if v}
+        def get_live_chats(identities, log=True):
+            """Yields skpy.SkypeChat instances for identities"""
+            for i, k in enumerate(map(identity_to_id, identities or ())):
+                if self.progress and not self.progress(
+                    action="info", message="Querying older chats..",
+                    index=i, count=len(identities),
+                ): break # for k
+                v = self.request(self.skype.chats.chat, k, __raise=False, __log=log)
+                if v: yield v
 
-        new, mtotalnew, mtotalupdated, run = 0, 0, 0, True
-        updateds, completeds, msgids = set(), set(), set()
+        selchats = get_live_chats(chats)
+        updateds, completeds, processeds, msgids = set(), set(), set(), set()
+        run = True
         while run:
-            mychats = selchats if chats else self.request(self.skype.chats.recent, __raise=False)
-            if not mychats: break # while run
-            for chat in mychats.values():
-                if chat.id.startswith("48:") or chat.id.startswith("28:"):
-                    # Skip specials like "48:calllogs" or "28:concierge"
+            if chats: mychats = selchats
+            else:
+                if self.progress and not self.progress(
+                    action="info", message="Querying recent chats.."
+                ):
+                    run = False
+                    break # while run
+                mychats = self.request(self.skype.chats.recent, __raise=False).values()
+            for chat in mychats:
+                if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
                     continue # for chat
                 if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
                     # Weird empty conversation, getMsgs raises 404
                     continue # for chat
-                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.user.id:
+                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.userId:
                     # Conversation with self?
                     continue # for chat
-                cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) else chat.userId
+                cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
+                            or isinstance(chat.user, skpy.SkypeBotUser) \
+                            or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
+                if cidentity in processeds: continue # for chat
+                processeds.add(cidentity)
 
-                if cidentity in updateds: continue # for chat
+                if self.progress and not self.progress(
+                    action="populate", table="messages", chat=cidentity, start=True
+                ):
+                    run = False
+                    break # while mrun
 
-                mcount, mnew, mupdated, mrun = 0, 0, 0, True
+                mcount, mnew, mupdated, mrun, mstart = 0, 0, 0, True, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
                     msgs = self.request(chat.getMsgs, __raise=False) or []
 
-                    if msgs and cidentity not in self.cache["chats"]:
-                        # Save chat only if there are any messages
+                    if msgs and (cidentity not in self.cache["chats"]
+                    or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
+                        and not self.cache["chats"][cidentity].get("__updated__"))):
+                        # Insert chat only if there are any messages, or update existing contacts
                         try: action = self.save("chats", chat)
                         except Exception:
                             logger.exception("Error saving chat %r.", chat)
-                            if self.progress and not self.progress(): run = False
-                            mrun = False
-                            break # while mrun
-                        if self.SAVE.INSERT == action: new += 1
-                        if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
-                            updateds.add(cidentity)
-                        if self.progress and not self.progress(
-                            action="populate", table="messages", chat=cidentity, start=True
-                        ):
-                            run = mrun = False
-                            break # while mrun
+                        else:
+                            if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                                updateds.add(cidentity)
+
+                    if self.progress and not self.progress(
+                        action="populate", table="messages", chat=cidentity,
+                        count=mcount, new=mnew, updated=mupdated, start=mstart
+                    ):
+                        run = mrun = False
+                        break # while mrun
+                    mstart = False
 
                     for msg in msgs:
                         try: action = self.save("messages", msg, parent=chat)
@@ -681,7 +766,6 @@ class SkypeLogin(object):
                         msgids.add(msg.id)
                     if not msgs:
                         break # while mrun
-                mtotalnew, mtotalupdated = mtotalnew + mnew, mtotalupdated + mupdated
                 if (mnew or mupdated):
                     updateds.add(cidentity)
                     if cidentity in self.cache["chats"]:
@@ -702,7 +786,13 @@ class SkypeLogin(object):
                     run = False
                     break # for chat
                 if not mrun: break # for chat
-            if chats: break # while run
+            if chats: break # while run; stop after processing specific chats
+            elif run and not mychats \
+            and conf.Login.get(self.db.filename, {}).get("sync_older", True):
+                # Exhausted recents: check other existing chats as well
+                chats = set(self.cache["chats"]) - processeds
+                selchats = get_live_chats(chats, log=False)
+            elif not mychats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
                if x in self.cache["chats"] and x not in completeds]
@@ -722,9 +812,14 @@ class SkypeLogin(object):
                                 "WHERE id = :convo_id", row)
 
         if self.progress: self.progress(
-            action="populate", table="chats", end=True, count=len(updateds), new=new,
-            message_count_new=mtotalnew, message_count_updated=mtotalupdated
+            action="populate", table="chats", end=True, count=len(updateds),
+            new=self.sync_counts["chats_new"],
+            message_count_new=self.sync_counts["messages_new"],
+            message_count_updated=self.sync_counts["messages_updated"],
+            contact_count_new=self.sync_counts["contacts_new"],
+            contact_count_updated=self.sync_counts["contacts_updated"],
         )
+
 
 
     def get_api_media(self, url, category=None):
@@ -756,14 +851,30 @@ class SkypeLogin(object):
         except Exception: pass
 
 
+    def get_contact(self, identity):
+        """Returns cached contact, if any."""
+        if not identity: return None
+        result = self.cache["contacts"].get(identity)
+        if not result: # Handle bot accounts synced before v4.5.1
+            result = self.cache["contacts"].get(skypedata.ID_PREFIX_BOT + identity)
+        if not result and identity and identity.startswith(skypedata.ID_PREFIX_BOT):
+            result = self.cache["contacts"].get(identity[len(skypedata.ID_PREFIX_BOT):])
+        return result
+
+
     def get_contact_name(self, identity):
         """Returns contact displayname or fullname or identity."""
-        result = None
-        contact = self.cache["contacts"].get(identity)
+        result, contact = None, self.get_contact(identity)
         if contact:
             result = contact.get("displayname") or contact.get("fullname")
         result = result or identity
         return result
+
+
+    def prefixify(self, identity):
+        """Adds bot prefix to contact identity if contact exists as bot."""
+        botidentity = (skypedata.ID_PREFIX_BOT + identity) if identity else identity
+        return botidentity if botidentity in self.cache["contacts"] else identity
 
 
 
@@ -953,12 +1064,12 @@ class SkypeExport(skypedata.SkypeDatabase):
 
                 elif "conversations.item.id" == prefix:
                     try:
-                        # Skip specials like "48:calllogs" or "28:concierge"
-                        skip_chat = value.startswith("48:") or value.startswith("28:")
+                        # Skip specials like "48:calllogs"
+                        skip_chat = value.startswith(skypedata.ID_PREFIX_SPECIAL)
                         chat["identity"] = value
                         chat["type"] = skypedata.CHATS_TYPE_GROUP
-                        if value.startswith("8:"):
-                            chat["identity"] = value[2:]
+                        if value.startswith(skypedata.ID_PREFIX_SINGLE):
+                            chat["identity"] = value[len(skypedata.ID_PREFIX_SINGLE):]
                             chat["type"] = skypedata.CHATS_TYPE_SINGLE 
                     except Exception:
                         logger.warn("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
@@ -979,6 +1090,8 @@ class SkypeExport(skypedata.SkypeDatabase):
                             if not identity: continue # for identity
                             if identity not in self.table_objects["contacts"] and identity != self.id:
                                 contact = dict(skypename=identity, is_permanent=1)
+                                if identity.startswith(skypedata.ID_PREFIX_BOT):
+                                    contact["type"] = skypedata.CONTACT_TYPE_NORMAL
                                 contact["id"] = self.insert_row("contacts", contact)
                                 self.table_objects["contacts"][identity] = contact
                             p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
@@ -1307,7 +1420,8 @@ def id_to_identity(chatid):
     if isinstance(result, dict): result = result.get("MemberMri")
     if not isinstance(result, basestring): result = None
     if result and not result.endswith("@thread.skype"):
-        result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
+        if not result.startswith(skypedata.ID_PREFIX_BOT):
+            result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
         if result.endswith("@p2p.thread.skype"):
             result = result[:-len("@p2p.thread.skype")]
             try: result = base64.b64decode(result)
@@ -1328,8 +1442,8 @@ def identity_to_id(identity):
     if result and not result.endswith("@thread.skype"):
         if result.startswith("#"):
             result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
-        elif not result.endswith("thread.skype"):
-            result = "8:%s" % result
+        elif not result.endswith("thread.skype") and not re.match(r"^\d+\:", result):
+            result = "%s%s" % (skypedata.ID_PREFIX_SINGLE, result)
     return result
 
 
@@ -1373,6 +1487,57 @@ def process_message_edit(msg):
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
     except Exception:
         if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
+
+
+def fix_bot_identity(db, *identities):
+    """
+    Replaces bot contact identity with "28:"-prefix in all possible tables,
+    for data synced before v4.5.1.
+
+    @param   db          SkypeDatabase instance
+    @param   identities  one or more bot identities, with or without bot-prefix
+    """
+    SIMPLES = {"alerts":             ["partner_name"],
+               "callmembers":        ["identity", "real_identity"],
+               "calls":              ["host_identity"],
+               "chats":              ["dialog_partner"],
+               "contacts":           ["skypename"],
+               "messageannotations": ["author"],
+               "messages":           ["author", "dialog_partner", "edited_by"],
+               "participants":       ["identity"],
+               "transfers":          ["partner_handle"], }
+    SPACEDS = {"chats":              ["posters", "participants", "activemembers"],
+               "messages":           ["identities"], }
+    changeds = set()
+    for identity2 in filter(bool, identities):
+        if not identity2.startswith(skypedata.ID_PREFIX_BOT):
+            identity1, identity2 = identity2, skypedata.ID_PREFIX_BOT + identity2
+        else: identity1 = identity2[len(skypedata.ID_PREFIX_BOT):]
+        for table, cols in SIMPLES.items():
+            if table not in db.tables: continue # for table, cols
+            for col in cols:
+                sql = "UPDATE %s SET %s = ? WHERE %s = ?" % (table, col, col)
+                args = (identity2, identity1)
+                if db.execute(sql, args).rowcount: changeds.add(table)
+        for table, cols in SPACEDS.items():
+            if table not in db.tables: continue # for table, cols
+            for col in cols:
+                args = ("%" + identity1 + "%", )
+                sql = "SELECT id, %s FROM %s WHERE %s LIKE ?" % (col, table, col)
+                for row in db.execute(sql, args).fetchall():
+                    vals = row[col].split()
+                    if identity1 in vals:
+                        v2 = " ".join(identity2 if v == identity1 else v for v in vals)
+                        args = (v2, row["id"])
+                        sql = "UPDATE %s SET %s = ? WHERE id = ?" % (table, col)
+                        db.execute(sql, args)
+                        changeds.add(table)
+        args = (skypedata.CONTACT_TYPE_BOT, identity2)
+        if db.execute("UPDATE contacts SET type = ? WHERE skypename = ?", args).rowcount:
+            changeds.add("contacts")
+    if changeds: changeds.add("conversations")
+    for table in changeds:
+        for d in (db.table_rows, db.table_objects): d.pop(table, None)
 
 
 def make_media_url(url, category=None):

@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    08.02.2021
+@modified    04.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -151,6 +151,21 @@ ARGUMENTS = {
              {"args": ["--store-password"], "dest": "store_password",
               "action": "store_true", "required": False,
               "help": "store given password in configuration"},
+             {"args": ["--contact-update"], "dest": "sync_contacts",
+              "action": "store_true", "required": False, "default": None,
+              "help": "update profile fields of existing contacts "
+                      "from online data (default)"},
+             {"args": ["--no-contact-update"], "dest": "sync_contacts",
+              "action": "store_false", "required": False, "default": None,
+              "help": "do not update profile fields of existing contacts "
+                      "from online data"},
+             {"args": ["--check-older"], "dest": "sync_older",
+              "action": "store_true", "required": False, "default": None,
+              "help": "check all older chats in database for messages to sync, "
+                      "may take a long time (default)"},
+             {"args": ["--no-check-older"], "dest": "sync_older",
+              "action": "store_false", "required": False, "default": None,
+              "help": "do not check all older chats in database for messages to sync"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -379,7 +394,8 @@ def run_search(filenames, query):
 
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, chatnames=(), authornames=(), truncate=False):
+             store_password=False, sync_contacts=None, sync_older=None,
+             chatnames=(), authornames=(), truncate=False):
     """Synchronizes history in specified databases from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
@@ -395,6 +411,10 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             if result.get("start"):
                 output("\nSynchronizing chats..")
             elif result.get("end"):
+                ns["bar"].pulse_pos = None
+                ns["bar"].value = ns["bar"].max
+                ns["bar"].afterword = " Complete."
+                ns["bar"].update()
                 ns["bar"] = ns["bar"].stop()
                 output("\n\nSynchronized %s%s in %s: %s in total%s." % (
                     util.plural("chat", result["count"]) if result["count"] else "chats",
@@ -403,6 +423,13 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     util.plural("new message", result["message_count_new"]),
                     ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                 ))
+                if result["contact_count_new"] or result["contact_count_updated"]:
+                    output("%s." % ", ".join(filter(bool, [
+                        util.plural("new contact", result["contact_count_new"], sep=",")
+                        if result["contact_count_new"] else "",
+                        util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
+                        if result["contact_count_updated"] else "",
+                    ])))
 
         elif "messages" == result.get("table"):
             if result.get("start"):
@@ -420,9 +447,11 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
                 ns["chat_title"] = title
                 if ns["bar"]:
+                    ns["bar"].pulse     = True
                     ns["bar"].pulse_pos = 0
-                    ns["bar"].pause = False
                     ns["bar"].afterword = " Synchronizing %s" % title
+                    ns["bar"].update()
+                    ns["bar"].pause = False
                 else:
                     ns["bar"] = ProgressBar(pulse=True, interval=0.05,
                                             afterword=" Synchronizing %s" % title)
@@ -434,9 +463,9 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     t += ": %s new" % result["new"]
                     if result["updated"]: t += ", %s updated" % result["updated"]
 
+                ns["bar"].pause = True
                 ns["bar"].afterword = " Synchronized %s%s." % (ns["chat_title"], t)
                 ns["bar"].pulse_pos = None
-                ns["bar"].pause = True
                 ns["bar"].update()
                 if t: output() # Force new line if chat got updated
 
@@ -446,6 +475,19 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                     if result.get(k): t += ", %s %s" % (result[k], k)
                 if t: t += "."
                 ns["bar"].afterword = " Synchronizing %s%s" % (ns["chat_title"], t)
+
+        elif "info" == result.get("action") and result.get("message"):
+            if not ns["bar"]:
+                ns["bar"] = ProgressBar(pulse=True, interval=0.05)
+                ns["bar"].start()
+            ns["bar"].afterword = " %s" % result["message"].strip()
+            ns["bar"].pulse_pos = 0
+            if "index" in result and "count" in result:
+                ns["bar"].pulse = False
+                ns["bar"].value = result["index"]
+                ns["bar"].max   = result["count"]
+            else: ns["bar"].update()
+            ns["bar"].pause = False
 
         return True
 
@@ -487,10 +529,22 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
             else: output(" success!")
 
-        if store_password:
-            conf.Login.setdefault(filename, {})
-            conf.Login[filename].update(store=True, password=util.obfuscate(password0))
+        if password and store_password:
+            conf.Login.setdefault(filepath, {})
+            conf.Login[filepath].update(store=True, password=util.obfuscate(password))
             conf.save()
+
+        if sync_contacts is not None:
+            if not sync_contacts:
+                conf.Login.setdefault(filepath, {})["sync_contacts"] = False
+            elif filepath in conf.Login:
+                conf.Login[filepath].pop("sync_contacts", None)
+
+        if sync_older is not None:
+            if not sync_older:
+                conf.Login.setdefault(filepath, {})["sync_older"] = False
+            elif filepath in conf.Login:
+                conf.Login[filepath].pop("sync_older", None)
 
         chats = []
         if chatnames or authornames:
@@ -777,8 +831,10 @@ def run(nogui=False):
         arguments.FILE = arguments.FILE1 + arguments.FILE2
     if arguments.FILE: # Expand wildcards to actual filenames
         arguments.FILE = sum([sorted(glob.glob(f)) if "*" in f else [f]
-                              for f in arguments.FILE], [])
-        arguments.FILE = list(set(util.to_unicode(f) for f in arguments.FILE))
+                             for f in arguments.FILE], [])
+        arguments.FILE = list(collections.OrderedDict(
+            (util.to_unicode(f), 1) for f in arguments.FILE[::-1]
+        ))[::-1] # Reverse and re-reverse to discard earlier duplicates
 
     conf.load()
     if "gui" == arguments.command and (nogui or not is_gui_possible):
@@ -826,6 +882,7 @@ def run(nogui=False):
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
+                 arguments.sync_contacts, arguments.sync_older,
                  arguments.chat, arguments.author)
     elif "gui" == arguments.command:
         run_gui(arguments.FILE)
@@ -1012,13 +1069,16 @@ class ProgressBar(threading.Thread):
             bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
             self.percent = percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
-        self.bar = bartext
-        if draw: self.draw()
+        self.bar, prevbar = bartext, self.bar
+        if draw and prevbar != self.bar: self.draw()
 
 
     def draw(self):
         """Prints the progress bar, from the beginning of the current line."""
         output("\r" + self.printbar, end=" ")
+        if len(self.printbar) != len(self.bar):
+            self.printbar = self.bar # Discard padding to clear previous
+            output("\r" + self.printbar, end=" ")
 
 
     def run(self):

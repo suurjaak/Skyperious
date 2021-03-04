@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    14.01.2021
+@modified    25.02.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -1461,13 +1461,15 @@ category = category if isdef("category") else None
 filename = filename if isdef("filename") else None
 if category not in ("audio", "video"): category = "image"
 src, mimetype, filetype = url, None, None
-if isdef("filename") and filename:
+if filename:
     filetype = os.path.splitext(filename)[-1][1:]
 if category in ("audio", "video"):
     mimetype = mimetypes.guess_type(filename or "")[0]
 else:
     filetype = imghdr.what("", content) or filetype or "image"
-filetype = filetype or "binary"
+if filename and filetype and not os.path.splitext(filename)[-1]:
+    filename = "%s.%s" % (filename, filetype)
+filetype = filetype or category
 mimetype = mimetype or "%s/%s" % (category, escape(filetype))
 
 caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
@@ -1478,7 +1480,7 @@ if isdef("media_folder") and media_folder:
     basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, basename))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:

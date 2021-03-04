@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    24.11.2020
+@modified    03.01.2021
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -209,6 +209,9 @@ def date_shift(dt, unit, count):
     elif "month" == unit:
         year, month = dt.year, dt.month + count
         if not (0 < month <= 12): year, month = year + month / 12, month % 12
+        if 0 == month:
+            month = 12
+            year = year - (1 if not (dt.month + count) or (dt.month + count) / 12.0 else 0)
         day = min(dt.day, calendar.monthrange(year, month)[1])
         result = dt.replace(year=year, month=month, day=day)
     elif "year"  == unit:
