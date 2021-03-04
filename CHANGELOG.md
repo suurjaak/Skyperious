@@ -2,8 +2,8 @@ CHANGELOG
 =========
 
 
-4.5.1, 2021-03-04
------------------
+4.6, 2021-03-04
+---------------
 - update existing contact information in database on live sync;
 - added flag to not update contact information in database from live;
 - sync older chats from live not just recent ones (issue #93);
