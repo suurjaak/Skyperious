@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    04.03.2021
+@modified    05.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -793,6 +793,7 @@ class SkypeLogin(object):
                 # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
                 selchats = get_live_chats(chats, log=False)
+                if not chats: break # while run
             elif not mychats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
