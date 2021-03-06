@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.03.2021
+@modified    06.03.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -8400,7 +8400,27 @@ class SqliteGridBase(wx.grid.GridTableBase):
 
     def GetRowIterator(self):
         """Returns a separate iterator producing all grid rows."""
-        return self.db.execute(self.sql)
+        """
+        Returns an iterator producing all grid rows, in current sort order and
+        matching current filter, making an extra query if all not retrieved yet.
+        """
+        if self.row_iterator is None: return iter(self.rows_current) # All retrieved
+
+        def generator(cursor):
+            try:
+                for row in self.rows_current: yield row
+
+                row, index = next(cursor), 0
+                while row and index < self.iterator_index + 1:
+                    row, index = next(cursor), index + 1
+                while row:
+                    while row and not self._is_row_unfiltered(row): row = next(cursor)
+                    if row: yield row
+                    row = next(cursor)
+            except GeneratorExit: pass
+
+        sql = self.sql if self.is_query else "SELECT * FROM %s" % self.table
+        return generator(self.db.execute(sql))
 
 
     def SetValue(self, row, col, val):
