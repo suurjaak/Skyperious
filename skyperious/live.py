@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    05.03.2021
+@modified    06.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -721,7 +721,10 @@ class SkypeLogin(object):
                 mcount, mnew, mupdated, mrun, mstart = 0, 0, 0, True, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
-                    msgs = self.request(chat.getMsgs, __raise=False) or []
+                    msgs, max_tries = [], 3
+                    while max_tries and not msgs: # First or second call can return nothing
+                        msgs = self.request(chat.getMsgs, __raise=False) or []
+                        max_tries -= 1
 
                     if msgs and (cidentity not in self.cache["chats"]
                     or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)

@@ -4,7 +4,8 @@ CHANGELOG
 
 4.7, 2021-03-06
 ---------------
-- fixed data grid export ignoring current filter.
+- fixed data grid export ignoring current filter;
+- request chat messages multiple times from online if first attempts returned nothing (issue #93).
 
 
 4.6, 2021-03-04
