@@ -1704,6 +1704,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 raise e, None, tb
         finally: busy.Close()
 
+        conf.Login.setdefault(filename, {})["sync_older"] = False
         self.load_database(filename, skype.db)
         self.update_database_list(filename)
         page = self.load_database_page(filename)
@@ -3036,7 +3037,7 @@ class DatabasePage(wx.Panel):
         label_progress   = wx.StaticText(panel_sync2)
         edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
         check_contacts   = wx.CheckBox(panel_sync2, label="Update existing &contact information")
-        check_older      = wx.CheckBox(panel_sync2, label="Check &older chats for messages to sync")
+        check_older      = wx.CheckBox(panel_sync2, label="Check &older database chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)

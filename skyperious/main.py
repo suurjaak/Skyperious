@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.03.2021
+@modified    06.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -524,15 +524,20 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             if ask_password or not password: password = get_password(username)
             passwords[username] = password
             output("Logging in to Skype as '%s'.." % username, end="")
-            try: db.live.login(username, password)
+            try: db.live.login(username, password, init_db=True)
             except Exception as e:
                 prompt = "\n%s\n%s" % (util.format_exc(e), prompt)
             else: output(" success!")
+        save_conf = False
+
+        if not file_existed:
+            conf.Login.setdefault(filepath, {})["sync_older"] = False
+            save_conf, sync_older = True, None
 
         if password and store_password:
             conf.Login.setdefault(filepath, {})
             conf.Login[filepath].update(store=True, password=util.obfuscate(password))
-            conf.save()
+            save_conf = True
 
         if sync_contacts is not None:
             if not sync_contacts:
@@ -545,6 +550,8 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 conf.Login.setdefault(filepath, {})["sync_older"] = False
             elif filepath in conf.Login:
                 conf.Login[filepath].pop("sync_older", None)
+
+        if save_conf: conf.save()
 
         chats = []
         if chatnames or authornames:
