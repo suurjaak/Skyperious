@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.02.2021
+@modified    09.03.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1887,7 +1887,7 @@ class MessageParser(object):
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
             names = sorted(get_contact_name(x) for x in filter(None,
-                           (message["identities"] or "").split(" ")))
+                           (message.get("identities") or "").split(" ")))
             dom.clear()
             dom.text = "Added "
             if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
@@ -1915,7 +1915,7 @@ class MessageParser(object):
                     dom.text = "Removed  from this conversation."
         elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE,
         MESSAGE_TYPE_SHARE_PHOTO, MESSAGE_TYPE_SHARE_VIDEO, MESSAGE_TYPE_SHARE_VIDEO2] \
-        and message["edited_timestamp"] and not message["body_xml"]:
+        and message.get("edited_timestamp") and not message["body_xml"]:
             elm_sub = ElementTree.SubElement(dom, "bodystatus")
             elm_sub.text = MESSAGE_REMOVED_TEXT
         elif MESSAGE_TYPE_SHARE_VIDEO == message["type"]:
@@ -1932,7 +1932,7 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
         MESSAGE_TYPE_UPDATE_DONE]:
             names = sorted(get_contact_name(x)
-                           for x in (message["identities"] or "").split(" "))
+                           for x in (message.get("identities") or "").split(" "))
             dom.clear()
             b = None
             for n in names:
@@ -1967,7 +1967,8 @@ class MessageParser(object):
             if url:
                 data = dict(url=url, author_name=get_author_name(message),
                             author=message["author"], success=False,
-                            datetime=message["datetime"])
+                            datetime=message.get("datetime")
+                                     or self.db.stamp_to_date(message["timestamp"]))
                 if filename: data.update(filename=filename)
 
                 try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))

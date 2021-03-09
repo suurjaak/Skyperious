@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    07.03.2021
+@modified    09.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -81,6 +81,7 @@ class SkypeLogin(object):
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
+        self.msg_parser   = None # skypedata.MessageParser instance
 
 
     def is_logged_in(self):
@@ -145,6 +146,7 @@ class SkypeLogin(object):
             self.db.live = self
         for table in self.db.CREATE_STATEMENTS:
             if table not in self.db.tables: self.db.create_table(table)
+        self.msg_parser = skypedata.MessageParser(self.db)
 
 
     def build_cache(self):
@@ -154,16 +156,17 @@ class SkypeLogin(object):
             key = "identity" if "chats" == table else \
                   "pk_id" if "messages" == table else "skypename"
             cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
-            where = " WHERE pk_id IS NOT NULL" if "messages" == table else ""
             dbtable = "conversations" if "chats" == table else table
-            for row in self.db.execute("SELECT %s FROM %s%s" % (cols, dbtable, where), log=False):
+            for row in self.db.execute("SELECT %s FROM %s" % (cols, dbtable), log=False):
                 for k in BINARIES: # Convert binary fields back from Unicode
                     if isinstance(row.get(k), unicode):
                         try:
                             row[k] = row[k].encode("latin1")
                         except Exception:
                             row[k] = row[k].encode("utf-8")
-                self.cache[table][row[key]] = dict(row)
+                row = dict(row)
+                if row[key] is not None:  self.cache[table][row[key]] = row
+                if "messages" == dbtable: self.cache["id_messages"][row["id"]] = row
         self.cache["contacts"].update(self.cache["accounts"]) # For name lookup
         self.msg_stamps.clear()
         for m in self.cache["messages"].values():
@@ -247,10 +250,17 @@ class SkypeLogin(object):
 
         if "messages" == table and not dbitem0:
             # See if there is a message with same data in key fields
-            MATCH = ["author", "body_xml", "chatmsg_type", "convo_id",
-                     "identities", "timestamp__ms", "type"]
-            dbitem0 = next((v for v in self.cache[table].values()
-                            if all(v.get(k) == dbitem.get(k) for k in MATCH)), dbitem0)
+            MATCH = ["author", "convo_id", "identities", "timestamp__ms", "type"]
+            candidates = [v for v in self.cache["id_messages"].values()
+                          if all(v.get(k) == dbitem.get(k) for k in MATCH)]
+            dbitem0 = next((v for v in candidates
+                            if v["body_xml"] == dbitem["body_xml"]), None)
+            if not dbitem0 and candidates:
+                # body_xml can differ by whitespace formatting
+                parse_options = {"format": "text", "merge": True}
+                as_text = lambda m: self.msg_parser.parse(m, output=parse_options)
+                b2 = as_text(dbitem)
+                dbitem0 = next((v for v in candidates if as_text(v) == b2), None)
 
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
         and not dbitem.get("displayname"):
@@ -282,7 +292,8 @@ class SkypeLogin(object):
                                                            self.msg_stamps.get(dbitem["remote_id"],
                                                                                -sys.maxsize))
                 if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
-                    dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp", "timestamp__ms")})
+                    dbitem.update({k: dbitem0[k] if dbitem0[k] is not None else dbitem[k]
+                                   for k in ("pk_id", "guid", "timestamp", "timestamp__ms")})
                 else:
                     dbitem["body_xml"] = dbitem0["body_xml"]
                 dbitem1 = dict(dbitem)
@@ -304,6 +315,8 @@ class SkypeLogin(object):
         if identity is not None:
             cacheitem = dict(dbitem)
             self.cache[table][identity] = cacheitem
+            if "messages" == table:
+                self.cache["id_messages"][dbitem["id"]] = cacheitem
             if "accounts" == table:
                 self.cache["contacts"][identity] = cacheitem # For name lookup
 

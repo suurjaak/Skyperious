@@ -2,9 +2,10 @@ CHANGELOG
 =========
 
 
-4.7, 2021-03-06
+4.7, 2021-03-09
 ---------------
 - fixed data grid export ignoring current filter;
+- improved matching existing messages during sync from online;
 - request chat messages multiple times from online if first attempts returned nothing (issue #93).
 
 
