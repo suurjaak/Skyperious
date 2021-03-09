@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    03.01.2021
+@modified    07.03.2021
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -189,6 +189,15 @@ def datetime_to_epoch(dt):
         if isinstance(dt, datetime.datetime):
             x += dt.microsecond / 1e6
         if x >= 0: result = x if x % 1 else int(x)
+    return result
+
+
+def datetime_to_millis(dt):
+    """Returns datetime.datetime or .date as UNIX timestamp in milliseconds, or None if dt is None."""
+    result = None
+    if isinstance(dt, datetime.date):
+        result = int(calendar.timegm(dt.timetuple())) * 1000
+        if isinstance(dt, datetime.datetime): result += dt.microsecond / 1000
     return result
 
 

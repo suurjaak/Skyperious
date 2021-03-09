@@ -57,10 +57,12 @@ class SkypeLogin(object):
     SAVE = type('', (), dict(SKIP=0, INSERT=1, UPDATE=2, NOCHANGE=3))
 
     # Relevant columns in Messages-table
-    CACHE_COLS = {"messages": ["author", "body_xml", "chatmsg_type", "convo_id",
-                    "dialog_partner", "edited_by", "edited_timestamp",
-                    "from_dispname", "guid", "id", "identities", "is_permanent",
-                    "pk_id", "remote_id", "timestamp", "timestamp__ms", "type"], }
+    CACHE_COLS = {"messages": [
+        "author", "body_xml", "chatmsg_type", "convo_id", "dialog_partner",
+        "edited_by", "edited_timestamp", "from_dispname", "guid", "id",
+        "identities", "is_permanent", "pk_id", "remote_id", "timestamp",
+        "timestamp__ms", "type"
+    ]}
 
 
     def __init__(self, db=None, progress=None):
@@ -242,6 +244,13 @@ class SkypeLogin(object):
             dbitem0 = next((v for v in self.cache[table].values()
                             if v.get("remote_id") == dbitem["remote_id"]
                             and v["convo_id"] == dbitem["convo_id"]), dbitem0)
+
+        if "messages" == table and not dbitem0:
+            # See if there is a message with same data in key fields
+            MATCH = ["author", "body_xml", "chatmsg_type", "convo_id",
+                     "identities", "timestamp__ms", "type"]
+            dbitem0 = next((v for v in self.cache[table].values()
+                            if all(v.get(k) == dbitem.get(k) for k in MATCH)), dbitem0)
 
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
         and not dbitem.get("displayname"):
@@ -533,12 +542,12 @@ class SkypeLogin(object):
 
         elif "messages" == table:
 
-            ts = util.datetime_to_epoch(item.time)
+            ts__ms = util.datetime_to_millis(item.time)
             pk_id, guid = make_message_ids(item.id)
-            result.update(is_permanent=1, timestamp=int(ts), pk_id=pk_id, guid=guid,
+            result.update(is_permanent=1, timestamp=ts__ms / 1000, pk_id=pk_id, guid=guid,
                           author=self.prefixify(item.userId),
                           from_dispname=self.get_contact_name(item.userId),
-                          body_xml=item.content, timestamp__ms=ts*1000)
+                          body_xml=item.content, timestamp__ms=ts__ms)
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
@@ -553,7 +562,8 @@ class SkypeLogin(object):
             if remote_id: result.update(remote_id=hash(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
-                result.update(dialog_partner=result["author"])
+                partner = result["author"] if result["author"] != self.skype.userId else parent.userId
+                result.update(dialog_partner=partner)
 
             if isinstance(item, skpy.SkypeTextMsg):
                 # SkypeTextMsg(id='1594466183791', type='RichText', time=datetime.datetime(2020, 7, 11, 11, 16, 16, 392000), clientId='16811922854185209745', userId='username', chatId='8:username', content='<ss type="hi">(wave)</ss>')
@@ -1147,9 +1157,9 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.MessageList.item.originalarrivaltime" == prefix:
                     if skip_chat or skip_msg: continue # while True
                     try:
-                        ts = self.export_parse_timestamp(value)
-                        msg["timestamp"] = int(ts)
-                        msg["timestamp__ms"] = ts * 1000
+                        ts__ms = self.export_parse_timestamp(value)
+                        msg["timestamp"] = ts__ms / 1000
+                        msg["timestamp__ms"] = ts__ms
                     except Exception:
                         logger.warn("Error parsing message timestamp %r for chat %s.", value, chat, exc_info=True)
                         skip_msg = True
@@ -1212,6 +1222,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         if "edited_timestamp" in msg: msg["edited_by"] = msg["author"]
 
         if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
+            partner = msg["author"] if msg["author"] != self.id else chat["identity"]
             msg["dialog_partner"] = msg["author"]
 
         msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_MESSAGE,
@@ -1366,7 +1377,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     @staticmethod
     def export_parse_timestamp(value):
         """
-        Returns UNIX timestamp from datetime string like "2020-07-06T17:20:30.609Z".
+        Returns UNIX timestamp in millis from datetime string like "2020-07-06T17:20:30.609Z".
         """
         v, suf = value.replace("T", " ").rstrip("Z"), ""
         if "." in v: v, suf = v.split(".")
@@ -1376,7 +1387,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 suf = re.sub(r"[\D]", "", suf).ljust(6, "0")
                 dt = dt.replace(microsecond=int(suf))
             except Exception: pass
-        return util.datetime_to_epoch(dt)
+        return util.datetime_to_millis(dt)
 
 
     @staticmethod
