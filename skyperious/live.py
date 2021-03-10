@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    09.03.2021
+@modified    10.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -81,6 +81,7 @@ class SkypeLogin(object):
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
+        self.msg_lookups  = collections.defaultdict(list) # {timestamp__ms: [{msg}, ]}
         self.msg_parser   = None # skypedata.MessageParser instance
 
 
@@ -152,23 +153,49 @@ class SkypeLogin(object):
     def build_cache(self):
         """Fills in local cache."""
         BINARIES = "avatar_image", "guid", "meta_picture"
-        for table in "accounts", "chats", "contacts", "messages":
-            key = "identity" if "chats" == table else \
-                  "pk_id" if "messages" == table else "skypename"
+        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
+
+        for table in "accounts", "chats", "contacts":
+            key = "identity" if "chats" == table else "skypename"
             cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
             dbtable = "conversations" if "chats" == table else table
-            for row in self.db.execute("SELECT %s FROM %s" % (cols, dbtable), log=False):
+            where = " WHERE %s IS NOT NULL" % key
+            for row in self.db.execute("SELECT %s FROM %s%s" % (cols, dbtable, where), log=False):
                 for k in BINARIES: # Convert binary fields back from Unicode
                     if isinstance(row.get(k), unicode):
                         try:
                             row[k] = row[k].encode("latin1")
                         except Exception:
                             row[k] = row[k].encode("utf-8")
-                row = dict(row)
-                if row[key] is not None:  self.cache[table][row[key]] = row
-                if "messages" == dbtable: self.cache["id_messages"][row["id"]] = row
+                self.cache[table][row[key]] = row
         self.cache["contacts"].update(self.cache["accounts"]) # For name lookup
-        self.msg_stamps.clear()
+
+
+    def build_msg_cache(self, identity):
+        """Fills in message cache for chat."""
+        BINARIES = "guid",
+        for dct in (self.msg_lookups, self.msg_stamps): dct.clear()
+
+        chats = self.db.get_conversations(chatidentities=[identity], reload=True, log=False)
+        if not chats: return
+
+        cc = [x for x in (chats[0], chats[0].get("__link")) if x]
+        ff = [":convo_id%s" % i for i in range(len(cc))]
+        where = " WHERE convo_id IN (%s)" % ", ".join(ff)
+        params = {"convo_id%s" % i: c["id"] for i, c in enumerate(cc)}
+
+        table, key = "messages", "pk_id"
+        cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
+        for row in self.db.execute("SELECT %s FROM %s%s" % (cols, table, where), params, log=False):
+            for k in BINARIES: # Convert binary fields back from Unicode
+                if isinstance(row.get(k), unicode):
+                    try:
+                        row[k] = row[k].encode("latin1")
+                    except Exception:
+                        row[k] = row[k].encode("utf-8")
+            if row[key] is not None:  self.cache[table][row[key]] = row
+            if row["timestamp__ms"] is not None:
+                self.msg_lookups[row["timestamp__ms"]].append(row)
         for m in self.cache["messages"].values():
             if m.get("remote_id") is not None and m.get("timestamp__ms") is not None:
                 self.msg_stamps[m["remote_id"]] = max(m["timestamp__ms"],
@@ -250,13 +277,13 @@ class SkypeLogin(object):
 
         if "messages" == table and not dbitem0:
             # See if there is a message with same data in key fields
-            MATCH = ["author", "convo_id", "identities", "timestamp__ms", "type"]
-            candidates = [v for v in self.cache["id_messages"].values()
+            MATCH = ["type", "author", "identities"]
+            candidates = [v for v in self.msg_lookups.get(dbitem["timestamp__ms"], [])
                           if all(v.get(k) == dbitem.get(k) for k in MATCH)]
             dbitem0 = next((v for v in candidates
                             if v["body_xml"] == dbitem["body_xml"]), None)
             if not dbitem0 and candidates:
-                # body_xml can differ by whitespace formatting
+                # body_xml can differ by whitespace formatting: match formatted
                 parse_options = {"format": "text", "merge": True}
                 as_text = lambda m: self.msg_parser.parse(m, output=parse_options)
                 b2 = as_text(dbitem)
@@ -315,10 +342,10 @@ class SkypeLogin(object):
         if identity is not None:
             cacheitem = dict(dbitem)
             self.cache[table][identity] = cacheitem
-            if "messages" == table:
-                self.cache["id_messages"][dbitem["id"]] = cacheitem
             if "accounts" == table:
                 self.cache["contacts"][identity] = cacheitem # For name lookup
+        if "messages" == table:
+            self.msg_lookups[dbitem["timestamp__ms"]].append(cacheitem)
 
         if do_fix_bot: fix_bot_identity(self.db, identity)
 
@@ -609,7 +636,7 @@ class SkypeLogin(object):
             elif isinstance(item, skpy.SkypeFileMsg):
                 # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
 
-                filename, filesize = (item.file.name, item.file.size) if file else (None, None)
+                filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
                                        (urllib.quote(util.to_unicode(filesize or 0)),
@@ -681,7 +708,7 @@ class SkypeLogin(object):
         """
         if self.populated:
             self.skype = None
-            self.login() # Re-login to reset query cache
+            self.login() # Re-login to reset skpy query cache
         self.build_cache()
         self.sync_counts.clear()
         if not chats:
@@ -692,7 +719,7 @@ class SkypeLogin(object):
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
         self.populate_history(chats)
-        self.cache.clear()
+        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
         self.populated = True
         logger.info("Finished syncing %s'%s'.", cstr, self.db)
 
@@ -769,6 +796,8 @@ class SkypeLogin(object):
                         else:
                             if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                                 updateds.add(cidentity)
+
+                    if mstart: self.build_msg_cache(cidentity)
 
                     if self.progress and not self.progress(
                         action="populate", table="messages", chat=cidentity,
@@ -1236,7 +1265,7 @@ class SkypeExport(skypedata.SkypeDatabase):
 
         if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
             partner = msg["author"] if msg["author"] != self.id else chat["identity"]
-            msg["dialog_partner"] = msg["author"]
+            msg["dialog_partner"] = partner
 
         msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_MESSAGE,
                    type=skypedata.MESSAGE_TYPE_MESSAGE)
