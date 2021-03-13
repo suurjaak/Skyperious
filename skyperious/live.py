@@ -310,8 +310,8 @@ class SkypeLogin(object):
         dbtable = "conversations" if "chats" == table else table
         if dbitem0:
             dbitem["id"] = dbitem1["id"] = dbitem0["id"]
-            if "messages" == table and dbitem0["pk_id"] != dbitem["pk_id"] \
-            and dbitem0.get("remote_id") == dbitem.get("remote_id"):
+            if "messages" == table and dbitem0.get("remote_id") == dbitem.get("remote_id") \
+            and (dbitem0["pk_id"] != dbitem["pk_id"] or dbitem0["body_xml"] != dbitem["body_xml"]):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
@@ -319,7 +319,8 @@ class SkypeLogin(object):
                 self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"],
                                                            self.msg_stamps.get(dbitem["remote_id"],
                                                                                -sys.maxsize))
-                if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
+                if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"] \
+                or (dbitem["timestamp__ms"] == dbitem0["timestamp__ms"] and dbitem["pk_id"] > dbitem0["pk_id"]):
                     dbitem.update({k: dbitem0[k] if dbitem0[k] is not None else dbitem[k]
                                    for k in ("pk_id", "guid", "timestamp", "timestamp__ms")})
                 else:
@@ -1549,8 +1550,8 @@ def process_message_edit(msg):
         ts_ms = int(tag.get("ts_ms"))
         msg["edited_timestamp"] = msg["timestamp"]
         msg["edited_by"] = msg["author"]
-        msg["timestamp"] = ts_ms / 1000
-        msg["timestamp__ms"] = ts_ms
+        msg["timestamp"] = min(msg.get("timestamp") or ts_ms / 1000, ts_ms / 1000)
+        msg["timestamp__ms"] = min(msg.get("timestamp__ms") or ts_ms, ts_ms)
         tag.unwrap() # Remove tag from soup
         if not bs.encode().strip():
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
