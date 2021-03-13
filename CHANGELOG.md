@@ -2,8 +2,9 @@ CHANGELOG
 =========
 
 
-4.7, 2021-03-09
+4.7, 2021-03-12
 ---------------
+- added command-line flag --no-terminal (issue #97);
 - fixed data grid export ignoring current filter;
 - improved matching existing messages during sync from online;
 - request chat messages multiple times from online if first attempts returned nothing (issue #93).
