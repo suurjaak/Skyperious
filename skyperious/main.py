@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.03.2021
+@modified    13.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -416,7 +416,7 @@ def run_search(filenames, query):
 
 def run_sync(filenames, username=None, password=None, ask_password=False,
              store_password=False, sync_contacts=None, sync_older=None,
-             chatnames=(), authornames=(), truncate=False):
+             chatnames=(), authornames=()):
     """Synchronizes history in specified databases from Skype online service."""
 
     ns = {"bar": None, "chat_title": None, "filename": None}
@@ -542,7 +542,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             output(prompt, end="")
             username = raw_input().strip()
 
-        db = skypedata.SkypeDatabase(filepath, truncate=not file_existed or truncate)
+        db = skypedata.SkypeDatabase(filepath, truncate=not file_existed)
         username = db.username or username
 
         prompt = "%s does not contain account information, enter Skype username: " % filename
@@ -615,17 +615,21 @@ def run_create(filenames, input=None, username=None, password=None,
     if not input and not username:
         output("Not enough arguments.")
         sys.exit(1)
-    if not input and username and (password or ask_password): return run_sync(
-        filenames, username, password, ask_password, store_password, truncate=True
-    )
 
     filename = os.path.realpath(filenames[0])
+    if os.path.exists(filename):
+        output("%s already exists." % filename)
+        sys.exit(1)
+
     if not input: # Create blank database, with just account username
         logger.info("Creating new blank database %s for user '%s'.", filename, username)
-        db = skypedata.SkypeDatabase(filename, truncate=True)
+        db = skypedata.SkypeDatabase(filename)
         for table in db.CREATE_STATEMENTS: db.create_table(table)
         db.insert_account({"skypename": username})
         output("Created blank database %s for user %s." % (filename, username))
+        db.close()
+        if username and (password or ask_password):
+            run_sync(filenames, username, password, ask_password, store_password)
         return
 
     counts = {}

@@ -5,9 +5,10 @@ CHANGELOG
 4.7, 2021-03-12
 ---------------
 - added command-line flag --no-terminal (issue #97);
-- fixed data grid export ignoring current filter;
 - improved matching existing messages during sync from online;
-- request chat messages multiple times from online if first attempts returned nothing (issue #93).
+- request chat messages multiple times from online if first attempts returned nothing (issue #93);
+- fixed data grid export ignoring current filter;
+- fixed command-line create overwriting existing file, and not creating file if password not given.
 
 
 4.6, 2021-03-04
@@ -34,7 +35,7 @@ CHANGELOG
 - added option to delete chats from the database;
 - improved detection of duplicate messages on merging (issue #93);
 - fixed new contacts not being inserted on merge (issue #93);
-- fixed inserting duplicate chats on command-line merge with 2+ databases (#issue 93).
+- fixed inserting duplicate chats on command-line merge with 2+ databases (issue #93).
 
 
 4.4, 2021-01-18
