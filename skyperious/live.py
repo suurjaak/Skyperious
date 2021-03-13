@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    10.03.2021
+@modified    13.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -174,7 +174,8 @@ class SkypeLogin(object):
     def build_msg_cache(self, identity):
         """Fills in message cache for chat."""
         BINARIES = "guid",
-        for dct in (self.msg_lookups, self.msg_stamps): dct.clear()
+        for dct in (self.msg_lookups, self.msg_stamps, self.cache["messages"]):
+            dct.clear()
 
         chats = self.db.get_conversations(chatidentities=[identity], reload=True, log=False)
         if not chats: return
