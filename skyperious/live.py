@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    13.03.2021
+@modified    14.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -836,7 +836,7 @@ class SkypeLogin(object):
                         break # while mrun
                 if (mnew or mupdated):
                     updateds.add(cidentity)
-                    if cidentity in self.cache["chats"]:
+                    if cidentity in self.cache["chats"] and self.db.is_open():
                         row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
                                               "MAX(timestamp) AS last "
                                               "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity]
@@ -864,7 +864,8 @@ class SkypeLogin(object):
             elif not mychats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
-               if x in self.cache["chats"] and x not in completeds]
+               if x in self.cache["chats"] and x not in completeds] \
+              if self.db.is_open() else []
         for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
             # Divide into chunks: SQLite can take up to 999 parameters.
             idstr = ", ".join(":id%s" % (j+1) for j in range(len(myids)))
