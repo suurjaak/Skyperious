@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2021
+@modified    14.03.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -726,7 +726,7 @@ class SkypeDatabase(object):
                 len(result), len(self.table_rows["contacts"]),
                 self.filename
             )
-            self.table_rows["conversations"] = result
+            if not args: self.table_rows["conversations"] = result
         else:
             result = self.table_rows["conversations"]
 
@@ -886,7 +886,7 @@ class SkypeDatabase(object):
                 pks = [c["name"] for c in col_data if c["pk"]]
                 pk = pks[0] if len(pks) == 1 else None
                 result = self.execute("SELECT * FROM %s" % table).fetchall()
-                self.table_rows[table] = result
+                if "messages" != table: self.table_rows[table] = result
                 self.table_objects[table] = {}
                 if pk:
                     for row in result:
@@ -2033,11 +2033,11 @@ class MessageParser(object):
                 try:
                     text = text.replace("&", "&amp;")
                     result = ElementTree.fromstring(TAG % text)
-                except Exception as e:
+                except Exception:
+                    logger.exception('Error parsing message %s, body "%s".', 
+                                     message.get("id", message), text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
-                    logger.error("Error parsing message %s, body \"%s\" (%s).", 
-                                 message["id"], text, e)
         return result
 
 
