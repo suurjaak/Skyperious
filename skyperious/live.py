@@ -744,7 +744,7 @@ class SkypeLogin(object):
                     action="info", index=i, count=len(identities),
                     message="Querying %s chats.." % ("older" if older else "selected"),
                 ): break # for k
-                v = self.request(self.skype.chats.chat, k, __raise=False, __log=older)
+                v = self.request(self.skype.chats.chat, k, __raise=False, __log=False)
                 if v: yield v
 
         selchats = get_live_chats(chats)
