@@ -776,8 +776,10 @@ def run_diff(filename1, filename2):
 
     args = {"db1": db1, "db2": db2, "chats": chats1, "type": "diff_left"}
     worker = workers.MergeThread(postbacks.put)
+    if conf.IsCLINonTerminal: output()
     try:
         worker.work(args)
+        TITLE_MAX = sys.maxsize if conf.IsCLINonTerminal else 25
         while True:
             result = postbacks.get()
             if "error" in result:
@@ -785,27 +787,35 @@ def run_diff(filename1, filename2):
                       (db1, db2, result["error"]))
                 break # while True
             if "done" in result:
-                bar.update()
                 break # while True
             if "chats" in result and result["chats"]:
                 counts[db1]["chats"] += 1
-                msgs = len(result["chats"][0]["diff"]["messages"])
-                msgs_text = util.plural("new message", msgs)
-                contacts_text = util.plural("new participant", 
-                                result["chats"][0]["diff"]["participants"])
+                new_chat = not result["chats"][0]["chat"]["c2"]
+                newstr   = "" if new_chat else "new "
+                msgs     = len(result["chats"][0]["diff"]["messages"])
+                contacts = len(result["chats"][0]["diff"]["participants"])
+                msgs_text = util.plural("%smessage" % newstr, msgs) if msgs else ""
+                contacts_text = util.plural("%sparticipant" % newstr, contacts) \
+                                if contacts else ""
                 text = ", ".join(filter(None, [msgs_text, contacts_text]))
-                bar.afterword = (" %s, %s." % (result["chats"][0]["chat"]["title"],
-                                    text))
+                title = result["chats"][0]["chat"]["title"]
+                if len(title) > TITLE_MAX: title = title[:TITLE_MAX] + ".."
+                if new_chat: title += " - new chat"
+                bar.afterword = " %s." % ", ".join(filter(bool, [title, text]))
                 counts[db1]["msgs"] += msgs
             if "index" in result:
                 bar.max = result["count"]
                 if not conf.IsCLINonTerminal: bar.update(result["index"])
             if result.get("output"):
+                if not conf.IsCLINonTerminal: output() # Push bar to next line
+                elif result.get("chats"): bar.update()
                 logger.info(result["output"])
+                bar.afterword = ""
     finally:
         worker and (worker.stop(), worker.join())
 
     bar.stop()
+    if conf.IsCLINonTerminal: output()
     bar.afterword = " Scanned %s and %s." % (db1, db2)
     bar.update(bar.max)
     output()
