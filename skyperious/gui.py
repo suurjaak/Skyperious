@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.03.2021
+@modified    15.03.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3305,14 +3305,6 @@ class DatabasePage(wx.Panel):
         and event.GetIndex() not in selecteds:
             chats = [self.list_chats.GetItemMappedData(event.GetIndex())]
         if not chats: return
-
-        def clipboard_copy(*a, **kw):
-            if wx.TheClipboard.Open():
-                d = wx.TextDataObject("\n".join(files))
-                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
-                guibase.status("Copied file path to clipboard.")
-        def open_folder(*a, **kw):
-            for f in files: util.select_file(f)
 
         name = ("Open %s " % chats[0]["title_long_lc"]) if len(chats) < 2 \
                else util.plural("chat", chats)

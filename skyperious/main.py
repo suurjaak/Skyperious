@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.03.2021
+@modified    15.03.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -785,8 +785,8 @@ def run_diff(filename1, filename2):
                       (db1, db2, result["error"]))
                 break # while True
             if "done" in result:
-                break # while True
                 bar.update()
+                break # while True
             if "chats" in result and result["chats"]:
                 counts[db1]["chats"] += 1
                 msgs = len(result["chats"][0]["diff"]["messages"])
