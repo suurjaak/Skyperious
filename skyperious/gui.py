@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.03.2021
+@modified    15.03.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1704,6 +1704,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 raise e, None, tb
         finally: busy.Close()
 
+        conf.Login.setdefault(filename, {})["sync_older"] = False
         self.load_database(filename, skype.db)
         self.update_database_list(filename)
         page = self.load_database_page(filename)
@@ -3036,7 +3037,7 @@ class DatabasePage(wx.Panel):
         label_progress   = wx.StaticText(panel_sync2)
         edit_sync_status = wx.TextCtrl(panel_sync2, size=(-1, 50), style=wx.TE_MULTILINE)
         check_contacts   = wx.CheckBox(panel_sync2, label="Update existing &contact information")
-        check_older      = wx.CheckBox(panel_sync2, label="Check &older chats for messages to sync")
+        check_older      = wx.CheckBox(panel_sync2, label="Check &older database chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
@@ -3304,14 +3305,6 @@ class DatabasePage(wx.Panel):
         and event.GetIndex() not in selecteds:
             chats = [self.list_chats.GetItemMappedData(event.GetIndex())]
         if not chats: return
-
-        def clipboard_copy(*a, **kw):
-            if wx.TheClipboard.Open():
-                d = wx.TextDataObject("\n".join(files))
-                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
-                guibase.status("Copied file path to clipboard.")
-        def open_folder(*a, **kw):
-            for f in files: util.select_file(f)
 
         name = ("Open %s " % chats[0]["title_long_lc"]) if len(chats) < 2 \
                else util.plural("chat", chats)
@@ -8400,7 +8393,27 @@ class SqliteGridBase(wx.grid.GridTableBase):
 
     def GetRowIterator(self):
         """Returns a separate iterator producing all grid rows."""
-        return self.db.execute(self.sql)
+        """
+        Returns an iterator producing all grid rows, in current sort order and
+        matching current filter, making an extra query if all not retrieved yet.
+        """
+        if self.row_iterator is None: return iter(self.rows_current) # All retrieved
+
+        def generator(cursor):
+            try:
+                for row in self.rows_current: yield row
+
+                row, index = next(cursor), 0
+                while row and index < self.iterator_index + 1:
+                    row, index = next(cursor), index + 1
+                while row:
+                    while row and not self._is_row_unfiltered(row): row = next(cursor)
+                    if row: yield row
+                    row = next(cursor)
+            except GeneratorExit: pass
+
+        sql = self.sql if self.is_query else "SELECT * FROM %s" % self.table
+        return generator(self.db.execute(sql))
 
 
     def SetValue(self, row, col, val):

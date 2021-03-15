@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    04.03.2021
+@modified    14.03.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -56,6 +56,14 @@ class SkypeLogin(object):
     # Enum for save() results
     SAVE = type('', (), dict(SKIP=0, INSERT=1, UPDATE=2, NOCHANGE=3))
 
+    # Relevant columns in Messages-table
+    CACHE_COLS = {"messages": [
+        "author", "body_xml", "chatmsg_type", "convo_id", "dialog_partner",
+        "edited_by", "edited_timestamp", "from_dispname", "guid", "id",
+        "identities", "is_permanent", "pk_id", "remote_id", "timestamp",
+        "timestamp__ms", "type"
+    ]}
+
 
     def __init__(self, db=None, progress=None):
         """
@@ -73,6 +81,8 @@ class SkypeLogin(object):
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
+        self.msg_lookups  = collections.defaultdict(list) # {timestamp__ms: [{msg}, ]}
+        self.msg_parser   = None # skypedata.MessageParser instance
 
 
     def is_logged_in(self):
@@ -137,17 +147,19 @@ class SkypeLogin(object):
             self.db.live = self
         for table in self.db.CREATE_STATEMENTS:
             if table not in self.db.tables: self.db.create_table(table)
+        self.msg_parser = skypedata.MessageParser(self.db)
 
 
     def build_cache(self):
         """Fills in local cache."""
         BINARIES = "avatar_image", "guid", "meta_picture"
-        for table in "accounts", "chats", "contacts", "messages":
-            key = "identity" if "chats" == table else \
-                  "pk_id" if "messages" == table else "skypename"
-            cols  = "id, guid, pk_id, remote_id, convo_id, timestamp" if "messages" == table else "*"
-            where = " WHERE pk_id IS NOT NULL" if "messages" == table else ""
+        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
+
+        for table in "accounts", "chats", "contacts":
+            key = "identity" if "chats" == table else "skypename"
+            cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
             dbtable = "conversations" if "chats" == table else table
+            where = " WHERE %s IS NOT NULL" % key
             for row in self.db.execute("SELECT %s FROM %s%s" % (cols, dbtable, where), log=False):
                 for k in BINARIES: # Convert binary fields back from Unicode
                     if isinstance(row.get(k), unicode):
@@ -155,8 +167,40 @@ class SkypeLogin(object):
                             row[k] = row[k].encode("latin1")
                         except Exception:
                             row[k] = row[k].encode("utf-8")
-                self.cache[table][row[key]] = dict(row)
+                self.cache[table][row[key]] = row
         self.cache["contacts"].update(self.cache["accounts"]) # For name lookup
+
+
+    def build_msg_cache(self, identity):
+        """Fills in message cache for chat."""
+        BINARIES = "guid",
+        for dct in (self.msg_lookups, self.msg_stamps, self.cache["messages"]):
+            dct.clear()
+
+        chats = self.db.get_conversations(chatidentities=[identity], reload=True, log=False)
+        if not chats: return
+
+        cc = [x for x in (chats[0], chats[0].get("__link")) if x]
+        ff = [":convo_id%s" % i for i in range(len(cc))]
+        where = " WHERE convo_id IN (%s)" % ", ".join(ff)
+        params = {"convo_id%s" % i: c["id"] for i, c in enumerate(cc)}
+
+        table, key = "messages", "pk_id"
+        cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
+        for row in self.db.execute("SELECT %s FROM %s%s" % (cols, table, where), params, log=False):
+            for k in BINARIES: # Convert binary fields back from Unicode
+                if isinstance(row.get(k), unicode):
+                    try:
+                        row[k] = row[k].encode("latin1")
+                    except Exception:
+                        row[k] = row[k].encode("utf-8")
+            if row[key] is not None:  self.cache[table][row[key]] = row
+            if row["timestamp__ms"] is not None:
+                self.msg_lookups[row["timestamp__ms"]].append(row)
+        for m in self.cache["messages"].values():
+            if m.get("remote_id") is not None and m.get("timestamp__ms") is not None:
+                self.msg_stamps[m["remote_id"]] = max(m["timestamp__ms"],
+                                                      self.msg_stamps.get(m["remote_id"], -sys.maxsize))
 
 
     def request(self, func, *args, **kwargs):
@@ -232,6 +276,20 @@ class SkypeLogin(object):
                             if v.get("remote_id") == dbitem["remote_id"]
                             and v["convo_id"] == dbitem["convo_id"]), dbitem0)
 
+        if "messages" == table and not dbitem0:
+            # See if there is a message with same data in key fields
+            MATCH = ["type", "author", "identities"]
+            candidates = [v for v in self.msg_lookups.get(dbitem["timestamp__ms"], [])
+                          if all(v.get(k) == dbitem.get(k) for k in MATCH)]
+            dbitem0 = next((v for v in candidates
+                            if v["body_xml"] == dbitem["body_xml"]), None)
+            if not dbitem0 and candidates:
+                # body_xml can differ by whitespace formatting: match formatted
+                parse_options = {"format": "text", "merge": True}
+                as_text = lambda m: self.msg_parser.parse(m, output=parse_options)
+                b2 = as_text(dbitem)
+                dbitem0 = next((v for v in candidates if as_text(v) == b2), None)
+
         if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
         and not dbitem.get("displayname"):
             if dbitem0 and dbitem0["displayname"]:
@@ -249,25 +307,28 @@ class SkypeLogin(object):
                 if len(item.userIds) > 4: dbitem["displayname"] += ", ..."
             dbitem1 = dict(dbitem)
 
-
         dbtable = "conversations" if "chats" == table else table
         if dbitem0:
             dbitem["id"] = dbitem1["id"] = dbitem0["id"]
-            if "messages" == table and dbitem0["pk_id"] != dbitem["pk_id"] \
-            and dbitem0.get("remote_id") == dbitem.get("remote_id"):
+            if "messages" == table and dbitem0.get("remote_id") == dbitem.get("remote_id") \
+            and (dbitem0["pk_id"] != dbitem["pk_id"] or dbitem0["body_xml"] != dbitem["body_xml"]):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
-                if dbitem["timestamp__ms"] <= self.msg_stamps[dbitem["remote_id"]]:
-                    dbitem.pop("body_xml") # We have a later more valid content
+                dbitem["edited_timestamp"] = max(dbitem["edited_timestamp"], dbitem0.get("edited_timestamp", 0))
                 self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"],
-                                                           self.msg_stamps[dbitem["remote_id"]])
-                if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"]:
-                    dbitem.update({k: dbitem0[k] for k in ("pk_id", "guid", "timestamp")})
-                result, dbitem1 = self.SAVE.SKIP, dict(dbitem)
+                                                           self.msg_stamps.get(dbitem["remote_id"],
+                                                                               -sys.maxsize))
+                if dbitem["timestamp__ms"] > dbitem0["timestamp__ms"] \
+                or (dbitem["timestamp__ms"] == dbitem0["timestamp__ms"] and dbitem["pk_id"] > dbitem0["pk_id"]):
+                    dbitem.update({k: dbitem0[k] if dbitem0[k] is not None else dbitem[k]
+                                   for k in ("pk_id", "guid", "timestamp", "timestamp__ms")})
+                else:
+                    dbitem["body_xml"] = dbitem0["body_xml"]
+                dbitem1 = dict(dbitem)
 
             self.db.update_row(dbtable, dbitem, dbitem0, log=False)
-            for k, v in dbitem0.items() if result is None else ():
+            for k, v in dbitem0.items():
                 if k not in dbitem: dbitem[k] = v
             dbitem["__updated__"] = True
         else:
@@ -276,20 +337,17 @@ class SkypeLogin(object):
             self.sync_counts["%s_new" % table] += 1
             result = self.SAVE.INSERT
 
-        if "messages" == table and "remote_id" in dbitem1 \
+        if "messages" == table and dbitem1.get("remote_id") is not None \
         and dbitem1["remote_id"] not in self.msg_stamps:
             self.msg_stamps[dbitem1["remote_id"]] = dbitem1["timestamp__ms"]
 
         if identity is not None:
             cacheitem = dict(dbitem)
-            if "messages" == table: # Retain certain fields only, sparing memory
-                cacheitem = dict((k, dbitem[k]) for k in (
-                    "id", "guid", "pk_id", "remote_id", "convo_id",
-                    "timestamp", "timestamp__ms"
-                ) if k in dbitem)
             self.cache[table][identity] = cacheitem
             if "accounts" == table:
                 self.cache["contacts"][identity] = cacheitem # For name lookup
+        if "messages" == table:
+            self.msg_lookups[dbitem["timestamp__ms"]].append(cacheitem)
 
         if do_fix_bot: fix_bot_identity(self.db, identity)
 
@@ -329,11 +387,13 @@ class SkypeLogin(object):
                      type=skypedata.TRANSFER_TYPE_OUTBOUND,
                      partner_handle=self.prefixify(msg.userId),
                      partner_dispname=self.get_contact_name(msg.userId))
-            existing = None
-            if row0:
-                cursor = self.db.execute("SELECT 1 FROM transfers WHERE "
-                                         "convo_id = :convo_id AND chatmsg_guid = :guid", row0, log=False)
-                existing = cursor.fetchone()
+            args = {"convo_id": (row0 or row)["convo_id"], "chatmsg_guid": (row0 or row)["guid"]}
+            args = self.db.blobs_to_binary(args, list(args),
+                                           self.db.get_table_columns("transfers"))
+            cursor = self.db.execute("SELECT 1 FROM transfers WHERE "
+                                     "convo_id = :convo_id "
+                                     "AND chatmsg_guid = :chatmsg_guid", args, log=False)
+            existing = cursor.fetchone()
             if not existing: self.db.insert_row("transfers", t, log=False)
         except Exception:
             logger.exception("Error inserting Transfers-row for message %r.", msg)
@@ -373,10 +433,11 @@ class SkypeLogin(object):
                     self.db.update_row("participants", p, p0, log=False)
                 elif p["identity"] not in existing:
                     self.db.insert_row("participants", p, log=False)
-                if p["identity"] not in self.cache["contacts"] \
-                or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
-                    and not self.cache["contacts"][p["identity"]].get("__updated__")
-                ):
+                if p["identity"] != self.skype.userId \
+                and (p["identity"] not in self.cache["contacts"]
+                     or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
+                         and not self.cache["contacts"][p["identity"]].get("__updated__")
+                )):
                     idx = len(skypedata.ID_PREFIX_BOT) \
                           if p["identity"].startswith(skypedata.ID_PREFIX_BOT) else 0
                     uidentity = p["identity"][idx:]
@@ -523,12 +584,12 @@ class SkypeLogin(object):
 
         elif "messages" == table:
 
-            ts = util.datetime_to_epoch(item.time)
+            ts__ms = util.datetime_to_millis(item.time)
             pk_id, guid = make_message_ids(item.id)
-            result.update(is_permanent=1, timestamp=int(ts), pk_id=pk_id, guid=guid,
+            result.update(is_permanent=1, timestamp=ts__ms / 1000, pk_id=pk_id, guid=guid,
                           author=self.prefixify(item.userId),
                           from_dispname=self.get_contact_name(item.userId),
-                          body_xml=item.content, timestamp__ms=ts*1000)
+                          body_xml=item.content, timestamp__ms=ts__ms)
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
@@ -543,7 +604,8 @@ class SkypeLogin(object):
             if remote_id: result.update(remote_id=hash(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
-                result.update(dialog_partner=result["author"])
+                partner = result["author"] if result["author"] != self.skype.userId else parent.userId
+                result.update(dialog_partner=partner)
 
             if isinstance(item, skpy.SkypeTextMsg):
                 # SkypeTextMsg(id='1594466183791', type='RichText', time=datetime.datetime(2020, 7, 11, 11, 16, 16, 392000), clientId='16811922854185209745', userId='username', chatId='8:username', content='<ss type="hi">(wave)</ss>')
@@ -576,10 +638,11 @@ class SkypeLogin(object):
             elif isinstance(item, skpy.SkypeFileMsg):
                 # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
 
+                filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s">%s</file></files>' % 
-                                       (urllib.quote(util.to_unicode(item.file.size or 0)),
-                                        util.to_unicode(item.file.name or "file").replace("<", "&lt;").replace(">", "&gt;")))
+                                       (urllib.quote(util.to_unicode(filesize or 0)),
+                                        util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
                 # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='username', chatId='19:abcdef..@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:username</initiator><value>The Topic</value></topicupdate>', topic='The Topic')
@@ -647,7 +710,7 @@ class SkypeLogin(object):
         """
         if self.populated:
             self.skype = None
-            self.login() # Re-login to reset query cache
+            self.login() # Re-login to reset skpy query cache
         self.build_cache()
         self.sync_counts.clear()
         if not chats:
@@ -658,7 +721,7 @@ class SkypeLogin(object):
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
         self.populate_history(chats)
-        self.cache.clear()
+        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
         self.populated = True
         logger.info("Finished syncing %s'%s'.", cstr, self.db)
 
@@ -674,14 +737,14 @@ class SkypeLogin(object):
         if not self.cache: self.build_cache()
         self.sync_counts.clear()
 
-        def get_live_chats(identities, log=True):
+        def get_live_chats(identities, older=False):
             """Yields skpy.SkypeChat instances for identities"""
             for i, k in enumerate(map(identity_to_id, identities or ())):
                 if self.progress and not self.progress(
-                    action="info", message="Querying older chats..",
-                    index=i, count=len(identities),
+                    action="info", index=i, count=len(identities),
+                    message="Querying %s chats.." % ("older" if older else "selected"),
                 ): break # for k
-                v = self.request(self.skype.chats.chat, k, __raise=False, __log=log)
+                v = self.request(self.skype.chats.chat, k, __raise=False, __log=False)
                 if v: yield v
 
         selchats = get_live_chats(chats)
@@ -720,7 +783,10 @@ class SkypeLogin(object):
                 mcount, mnew, mupdated, mrun, mstart = 0, 0, 0, True, True
                 mfirst, mlast = datetime.datetime.max, datetime.datetime.min
                 while mrun:
-                    msgs = self.request(chat.getMsgs, __raise=False) or []
+                    msgs, max_tries = [], 3 if mstart else 1
+                    while max_tries and not msgs: # First or second call can return nothing
+                        msgs = self.request(chat.getMsgs, __raise=False) or []
+                        max_tries -= 1
 
                     if msgs and (cidentity not in self.cache["chats"]
                     or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
@@ -732,6 +798,8 @@ class SkypeLogin(object):
                         else:
                             if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                                 updateds.add(cidentity)
+
+                    if mstart: self.build_msg_cache(cidentity)
 
                     if self.progress and not self.progress(
                         action="populate", table="messages", chat=cidentity,
@@ -768,7 +836,7 @@ class SkypeLogin(object):
                         break # while mrun
                 if (mnew or mupdated):
                     updateds.add(cidentity)
-                    if cidentity in self.cache["chats"]:
+                    if cidentity in self.cache["chats"] and self.db.is_open():
                         row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
                                               "MAX(timestamp) AS last "
                                               "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity]
@@ -791,11 +859,13 @@ class SkypeLogin(object):
             and conf.Login.get(self.db.filename, {}).get("sync_older", True):
                 # Exhausted recents: check other existing chats as well
                 chats = set(self.cache["chats"]) - processeds
-                selchats = get_live_chats(chats, log=False)
+                selchats = get_live_chats(chats, older=True)
+                if not chats: break # while run
             elif not mychats: break # while run
 
         ids = [self.cache["chats"][x]["id"] for x in updateds
-               if x in self.cache["chats"] and x not in completeds]
+               if x in self.cache["chats"] and x not in completeds] \
+              if self.db.is_open() else []
         for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
             # Divide into chunks: SQLite can take up to 999 parameters.
             idstr = ", ".join(":id%s" % (j+1) for j in range(len(myids)))
@@ -1132,9 +1202,9 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.MessageList.item.originalarrivaltime" == prefix:
                     if skip_chat or skip_msg: continue # while True
                     try:
-                        ts = self.export_parse_timestamp(value)
-                        msg["timestamp"] = int(ts)
-                        msg["timestamp__ms"] = ts * 1000
+                        ts__ms = self.export_parse_timestamp(value)
+                        msg["timestamp"] = ts__ms / 1000
+                        msg["timestamp__ms"] = ts__ms
                     except Exception:
                         logger.warn("Error parsing message timestamp %r for chat %s.", value, chat, exc_info=True)
                         skip_msg = True
@@ -1197,7 +1267,8 @@ class SkypeExport(skypedata.SkypeDatabase):
         if "edited_timestamp" in msg: msg["edited_by"] = msg["author"]
 
         if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
-            msg["dialog_partner"] = msg["author"]
+            partner = msg["author"] if msg["author"] != self.id else chat["identity"]
+            msg["dialog_partner"] = partner
 
         msg.update(chatmsg_type=skypedata.CHATMSG_TYPE_MESSAGE,
                    type=skypedata.MESSAGE_TYPE_MESSAGE)
@@ -1351,7 +1422,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     @staticmethod
     def export_parse_timestamp(value):
         """
-        Returns UNIX timestamp from datetime string like "2020-07-06T17:20:30.609Z".
+        Returns UNIX timestamp in millis from datetime string like "2020-07-06T17:20:30.609Z".
         """
         v, suf = value.replace("T", " ").rstrip("Z"), ""
         if "." in v: v, suf = v.split(".")
@@ -1361,7 +1432,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 suf = re.sub(r"[\D]", "", suf).ljust(6, "0")
                 dt = dt.replace(microsecond=int(suf))
             except Exception: pass
-        return util.datetime_to_epoch(dt)
+        return util.datetime_to_millis(dt)
 
 
     @staticmethod
@@ -1480,8 +1551,8 @@ def process_message_edit(msg):
         ts_ms = int(tag.get("ts_ms"))
         msg["edited_timestamp"] = msg["timestamp"]
         msg["edited_by"] = msg["author"]
-        msg["timestamp"] = ts_ms / 1000
-        msg["timestamp__ms"] = ts_ms
+        msg["timestamp"] = min(msg.get("timestamp") or ts_ms / 1000, ts_ms / 1000)
+        msg["timestamp__ms"] = min(msg.get("timestamp__ms") or ts_ms, ts_ms)
         tag.unwrap() # Remove tag from soup
         if not bs.encode().strip():
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message

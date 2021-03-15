@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.02.2021
+@modified    14.03.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -726,7 +726,7 @@ class SkypeDatabase(object):
                 len(result), len(self.table_rows["contacts"]),
                 self.filename
             )
-            self.table_rows["conversations"] = result
+            if not args: self.table_rows["conversations"] = result
         else:
             result = self.table_rows["conversations"]
 
@@ -886,7 +886,7 @@ class SkypeDatabase(object):
                 pks = [c["name"] for c in col_data if c["pk"]]
                 pk = pks[0] if len(pks) == 1 else None
                 result = self.execute("SELECT * FROM %s" % table).fetchall()
-                self.table_rows[table] = result
+                if "messages" != table: self.table_rows[table] = result
                 self.table_objects[table] = {}
                 if pk:
                     for row in result:
@@ -1574,6 +1574,9 @@ class MessageParser(object):
     """HTML entities in the body to be replaced before feeding to xml.etree."""
     REPLACE_ENTITIES = {"&apos;": "'"}
 
+    """HTML entities in the body to check for not being replaced into emoticons."""
+    COMMON_ENTITIES = ["&quot;", "&lt;", "&gt;", "&amp;", "&apos;", "&#39;"]
+
     """Regex for replacing raw emoticon texts with emoticon tags."""
     EMOTICON_RGX = re.compile("(%s)" % "|".join(
                               s for i in emoticons.EmoticonData.values()
@@ -1590,6 +1593,8 @@ class MessageParser(object):
         and re.match(r"^%s*[%s]*(\s|$)" % (self.EMOTICON_RGX.pattern,
                                            re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
+        and not any(e in m.string[m.start(1) - len(e) + 1:m.end(1) + len(e) - 1]
+                    for e in MessageParser.COMMON_ENTITIES)
         else m.group(1)
     )
 
@@ -1887,7 +1892,7 @@ class MessageParser(object):
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
             names = sorted(get_contact_name(x) for x in filter(None,
-                           (message["identities"] or "").split(" ")))
+                           (message.get("identities") or "").split(" ")))
             dom.clear()
             dom.text = "Added "
             if MESSAGE_TYPE_SHARE_DETAIL == message["type"]:
@@ -1915,7 +1920,7 @@ class MessageParser(object):
                     dom.text = "Removed  from this conversation."
         elif message["type"] in [MESSAGE_TYPE_INFO, MESSAGE_TYPE_MESSAGE,
         MESSAGE_TYPE_SHARE_PHOTO, MESSAGE_TYPE_SHARE_VIDEO, MESSAGE_TYPE_SHARE_VIDEO2] \
-        and message["edited_timestamp"] and not message["body_xml"]:
+        and message.get("edited_timestamp") and not message["body_xml"]:
             elm_sub = ElementTree.SubElement(dom, "bodystatus")
             elm_sub.text = MESSAGE_REMOVED_TEXT
         elif MESSAGE_TYPE_SHARE_VIDEO == message["type"]:
@@ -1932,7 +1937,7 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_UPDATE_NEED,
         MESSAGE_TYPE_UPDATE_DONE]:
             names = sorted(get_contact_name(x)
-                           for x in (message["identities"] or "").split(" "))
+                           for x in (message.get("identities") or "").split(" "))
             dom.clear()
             b = None
             for n in names:
@@ -1967,7 +1972,8 @@ class MessageParser(object):
             if url:
                 data = dict(url=url, author_name=get_author_name(message),
                             author=message["author"], success=False,
-                            datetime=message["datetime"])
+                            datetime=message.get("datetime")
+                                     or self.db.stamp_to_date(message["timestamp"]))
                 if filename: data.update(filename=filename)
 
                 try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
@@ -2032,11 +2038,11 @@ class MessageParser(object):
                 try:
                     text = text.replace("&", "&amp;")
                     result = ElementTree.fromstring(TAG % text)
-                except Exception as e:
+                except Exception:
+                    logger.exception('Error parsing message %s, body "%s".', 
+                                     message.get("id", message), text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
-                    logger.error("Error parsing message %s, body \"%s\" (%s).", 
-                                 message["id"], text, e)
         return result
 
 

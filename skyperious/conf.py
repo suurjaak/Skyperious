@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.03.2021
+@modified    15.03.2021
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.6"
-VersionDate = "04.03.2021"
+Version = "4.7.dev14"
+VersionDate = "15.03.2021"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -81,6 +81,12 @@ IsCLI = False
 
 """Is command-line interface verbose."""
 IsCLIVerbose = False
+
+"""
+Is command-line interface using output suitable for non-terminals 
+like piping to a file, skips progress bars and user interaction.
+"""
+IsCLINonTerminal = True
 
 """Index of last active page in database tab, {db path: index}."""
 LastActivePage = {}
