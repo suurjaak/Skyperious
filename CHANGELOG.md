@@ -6,8 +6,9 @@ CHANGELOG
 ---------------
 - added command-line flag --no-terminal (issue #97);
 - improved detetcing existing messages during online sync;
-- improved obtaining more messages from online sync previously unavailable (issue #93);
+- improved querying Skype online service for more messages to sync (issue #93);
 - fixed data grid export ignoring current filter;
+- fixed parsing parts of HTML entities into emoticons;
 - fixed command-line create overwriting existing file, and not creating file if password not given.
 
 

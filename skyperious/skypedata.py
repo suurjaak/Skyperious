@@ -1574,6 +1574,9 @@ class MessageParser(object):
     """HTML entities in the body to be replaced before feeding to xml.etree."""
     REPLACE_ENTITIES = {"&apos;": "'"}
 
+    """HTML entities in the body to check for not being replaced into emoticons."""
+    COMMON_ENTITIES = ["&quot;", "&lt;", "&gt;", "&amp;", "&apos;", "&#39;"]
+
     """Regex for replacing raw emoticon texts with emoticon tags."""
     EMOTICON_RGX = re.compile("(%s)" % "|".join(
                               s for i in emoticons.EmoticonData.values()
@@ -1590,6 +1593,8 @@ class MessageParser(object):
         and re.match(r"^%s*[%s]*(\s|$)" % (self.EMOTICON_RGX.pattern,
                                            re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
+        and not any(e in m.string[m.start(1) - len(e) + 1:m.end(1) + len(e) - 1]
+                    for e in MessageParser.COMMON_ENTITIES)
         else m.group(1)
     )
 
