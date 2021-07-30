@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    06.07.2021
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -247,18 +247,10 @@ class SkypeLogin(object):
         dbitem = self.convert(table, item, parent=parent)
         if dbitem is None: return self.SAVE.SKIP
         result, dbitem1, table = None, dict(dbitem), table.lower()
-        do_fix_bot = False
 
         identity = dbitem["skypename"] if table in ("accounts", "contacts") else \
                    dbitem["identity"]  if "chats" == table else dbitem.get("pk_id")
         dbitem0 = self.cache[table].get(identity)
-
-        if table in ("chats", "contacts") and not dbitem0 \
-        and (identity or "").startswith(skypedata.ID_PREFIX_BOT):
-            # Handle bot accounts synced before v4.5.1
-            dbitem0 = self.cache[table].get(identity[len(skypedata.ID_PREFIX_BOT):])
-            if dbitem0: self.cache[table].pop(dbitem0.get("identity"), None)
-            do_fix_bot = dbitem0 and "contacts" == table
 
         if "contacts" == table and not dbitem0 \
         and not (identity or "").startswith(skypedata.ID_PREFIX_BOT):
@@ -348,9 +340,6 @@ class SkypeLogin(object):
                 self.cache["contacts"][identity] = cacheitem # For name lookup
         if "messages" == table:
             self.msg_lookups[dbitem["timestamp__ms"]].append(cacheitem)
-
-        if do_fix_bot: fix_bot_identity(self.db, identity)
-
         if "chats" == table:
             self.insert_participants(item, dbitem, dbitem0)
             self.insert_chats(item, dbitem, dbitem0)
@@ -425,13 +414,7 @@ class SkypeLogin(object):
                 existing.update(x["identity"] for x in cursor)
 
             for p in participants:
-                if p["identity"] not in existing \
-                and p["identity"].startswith(skypedata.ID_PREFIX_BOT) \
-                and p["identity"][len(skypedata.ID_PREFIX_BOT):] in existing:
-                    # Handle bot accounts synced before v4.5.1
-                    p0 = existing.get(p["identity"][len(skypedata.ID_PREFIX_BOT):])
-                    self.db.update_row("participants", p, p0, log=False)
-                elif p["identity"] not in existing:
+                if p["identity"] not in existing:
                     self.db.insert_row("participants", p, log=False)
                 if p["identity"] != self.skype.userId \
                 and (p["identity"] not in self.cache["contacts"]
@@ -923,13 +906,7 @@ class SkypeLogin(object):
 
     def get_contact(self, identity):
         """Returns cached contact, if any."""
-        if not identity: return None
-        result = self.cache["contacts"].get(identity)
-        if not result: # Handle bot accounts synced before v4.5.1
-            result = self.cache["contacts"].get(skypedata.ID_PREFIX_BOT + identity)
-        if not result and identity and identity.startswith(skypedata.ID_PREFIX_BOT):
-            result = self.cache["contacts"].get(identity[len(skypedata.ID_PREFIX_BOT):])
-        return result
+        return self.cache["contacts"].get(identity) if identity else None
 
 
     def get_contact_name(self, identity):
@@ -1558,57 +1535,6 @@ def process_message_edit(msg):
             msg["body_xml"] = "" # Only had <e_m>-tag: deleted message
     except Exception:
         if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
-
-
-def fix_bot_identity(db, *identities):
-    """
-    Replaces bot contact identity with "28:"-prefix in all possible tables,
-    for data synced before v4.5.1.
-
-    @param   db          SkypeDatabase instance
-    @param   identities  one or more bot identities, with or without bot-prefix
-    """
-    SIMPLES = {"alerts":             ["partner_name"],
-               "callmembers":        ["identity", "real_identity"],
-               "calls":              ["host_identity"],
-               "chats":              ["dialog_partner"],
-               "contacts":           ["skypename"],
-               "messageannotations": ["author"],
-               "messages":           ["author", "dialog_partner", "edited_by"],
-               "participants":       ["identity"],
-               "transfers":          ["partner_handle"], }
-    SPACEDS = {"chats":              ["posters", "participants", "activemembers"],
-               "messages":           ["identities"], }
-    changeds = set()
-    for identity2 in filter(bool, identities):
-        if not identity2.startswith(skypedata.ID_PREFIX_BOT):
-            identity1, identity2 = identity2, skypedata.ID_PREFIX_BOT + identity2
-        else: identity1 = identity2[len(skypedata.ID_PREFIX_BOT):]
-        for table, cols in SIMPLES.items():
-            if table not in db.tables: continue # for table, cols
-            for col in cols:
-                sql = "UPDATE %s SET %s = ? WHERE %s = ?" % (table, col, col)
-                args = (identity2, identity1)
-                if db.execute(sql, args).rowcount: changeds.add(table)
-        for table, cols in SPACEDS.items():
-            if table not in db.tables: continue # for table, cols
-            for col in cols:
-                args = ("%" + identity1 + "%", )
-                sql = "SELECT id, %s FROM %s WHERE %s LIKE ?" % (col, table, col)
-                for row in db.execute(sql, args).fetchall():
-                    vals = row[col].split()
-                    if identity1 in vals:
-                        v2 = " ".join(identity2 if v == identity1 else v for v in vals)
-                        args = (v2, row["id"])
-                        sql = "UPDATE %s SET %s = ? WHERE id = ?" % (table, col)
-                        db.execute(sql, args)
-                        changeds.add(table)
-        args = (skypedata.CONTACT_TYPE_BOT, identity2)
-        if db.execute("UPDATE contacts SET type = ? WHERE skypename = ?", args).rowcount:
-            changeds.add("contacts")
-    if changeds: changeds.add("conversations")
-    for table in changeds:
-        for d in (db.table_rows, db.table_objects): d.pop(table, None)
 
 
 def make_media_url(url, category=None):

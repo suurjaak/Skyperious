@@ -7088,15 +7088,6 @@ class MergerPage(wx.Panel):
         contacts, used as a background callback to speed up page opening.
         """
 
-        def find_contact(cmap, identity):
-            # Handle bot accounts synced before v4.5.1
-            c = cmap.get(identity)
-            if not c and identity.startswith(skypedata.ID_PREFIX_BOT):
-                c = cmap.get(identity[len(skypedata.ID_PREFIX_BOT):])
-            if not c and not identity.startswith(skypedata.ID_PREFIX_BOT):
-                c = cmap.get(skypedata.ID_PREFIX_BOT + identity)
-            return c
-
         try:
             chats1, chats2 = self.chats1, self.chats2
             self.db1.get_conversations_stats(chats1)
@@ -7151,14 +7142,14 @@ class MergerPage(wx.Panel):
             cg1map = dict((g["name"], g) for g in contactgroups1)
             cg2map = dict((g["name"], g) for g in contactgroups2)
             for c1 in contacts1:
-                c2 = find_contact(con2map, c1["identity"])
+                c2 = con2map.get(c1["identity"])
                 if not c2 and c1["identity"] not in con1new:
                     c = c1.copy()
                     c["c1"], c["c2"] = c1, c2
                     con1diff.append(c)
                     con1new[c1["identity"]] = True
             for c2 in contacts2:
-                c1 = find_contact(con1map, c2["identity"])
+                c1 = con1map.get(c2["identity"])
                 if not c1 and c2["identity"] not in con2new:
                     c = c2.copy()
                     c["c1"], c["c2"] = c1, c2
