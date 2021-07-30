@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    14.03.2021
+@modified    06.07.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -1097,7 +1097,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                     else:
                         try:
                             chat = self.export_finalize_chat(chat)
-                            self.update_row("conversations", chat, chat, log=False)
+                            self.update_row("conversations", chat, {"id": chat["id"]}, log=False)
                         except Exception:
                             logger.warn("Error updating chat %s.", chat, exc_info=True)
                     edited_msgs.clear()

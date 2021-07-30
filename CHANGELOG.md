@@ -2,10 +2,15 @@ CHANGELOG
 =========
 
 
+4.8, 2021-06-07
+---------------
+- fixed chats not being shown on importing Skype export (issue #100).
+
+
 4.7, 2021-03-15
 ---------------
 - added command-line flag --no-terminal (issue #97);
-- improved detetcing existing messages during online sync;
+- improved detecting existing messages during online sync;
 - improved querying Skype online service for more messages to sync (issue #93);
 - fixed data grid export ignoring current filter;
 - fixed parsing parts of HTML entities into emoticons;
