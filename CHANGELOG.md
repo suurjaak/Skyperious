@@ -2,9 +2,10 @@ CHANGELOG
 =========
 
 
-4.8, 2021-06-07
+4.8, 2021-07-30
 ---------------
-- fixed chats not being shown on importing Skype export (issue #100).
+- fixed chats not being shown on importing Skype export (issue #100);
+- fixed feedback screenshot not updating on Linux.
 
 
 4.7, 2021-03-15

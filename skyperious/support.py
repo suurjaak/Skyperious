@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    27.08.2020
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -188,6 +188,7 @@ def take_screenshot(fullscreen=True):
             rect.height       += title_bar_height + border_width
 
     dc = wx.ScreenDC()
+    dc.Clear()
     bmp = wx.Bitmap(rect.width, rect.height)
     dc_bmp = wx.MemoryDC()
     dc_bmp.SelectObject(bmp)
