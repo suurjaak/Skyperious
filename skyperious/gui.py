@@ -175,6 +175,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                      "All files|*.*",
             style=wx.FD_FILE_MUST_EXIST | wx.FD_OPEN | wx.RESIZE_BORDER)
         self.dialog_savefile = wx.FileDialog(
+            parent=self, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT | wx.RESIZE_BORDER)
+        # Need separate dialog w/o overwrite prompt, cannot swap style in Linux
+        self.dialog_savefile_ow = wx.FileDialog(
             parent=self, style=wx.FD_SAVE | wx.RESIZE_BORDER)
         self.dialog_search = controls.EntryDialog(
             parent=self, title="Find in %s" % conf.Title, label="Search:",
@@ -1310,22 +1313,22 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         focused_control = self.FindFocus()
         self.button_export.Enabled = False
-        self.dialog_savefile.Message = "Choose folder where to save chat files"
-        self.dialog_savefile.Filename = "Filename will be ignored"
-        self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
-        self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
+
+        dialog = self.dialog_savefile if do_singlefile else self.dialog_savefile_ow
+        dialog.Message = "Choose folder where to save chat files"
+        dialog.Filename = "Filename will be ignored"
+        dialog.Wildcard = export.CHAT_WILDCARD
         if do_singlefile:
             db = self.load_database(self.db_filename)
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db_filename)
             if db and db.account: formatargs.update(db.account)
             default = util.safe_filename(conf.ExportDbTemplate % formatargs)
-            self.dialog_savefile.Filename = default
-            self.dialog_savefile.Message = "Save chats file"
-            self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
-            self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
+            dialog.Filename = default
+            dialog.Message = "Save chats file"
+            dialog.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
 
-        if wx.ID_OK != self.dialog_savefile.ShowModal():
+        if wx.ID_OK != dialog.ShowModal():
             self.button_export.Enabled = True
             if focused_control: focused_control.SetFocus()
             return
@@ -1334,15 +1337,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
-        path = controls.get_savedialog_path(self.dialog_savefile)
+        path = controls.get_savedialog_path(dialog)
         if not db:
             error = True
         elif "conversations" not in db.tables:
             error = True
             errormsg = "Cannot export %s. Not a valid Skype database?" % db
         if not error and not do_singlefile:
-            format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            media_folder = "html" == format and self.dialog_savefile.FilterIndex
+            format = export.CHAT_EXTS[dialog.FilterIndex]
+            media_folder = "html" == format and dialog.FilterIndex
             if media_folder and not check_media_export_login(db):
                 self.button_export.Enabled = True
                 if focused_control: focused_control.SetFocus()
@@ -1362,7 +1365,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                            (path, traceback.format_exc())
                 error = True
         elif not error:
-            format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
+            format = export.CHAT_EXTS_SINGLEFILE[dialog.FilterIndex]
 
 
         if not error:
@@ -2398,6 +2401,9 @@ class DatabasePage(wx.Panel):
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
         self.dialog_savefile = wx.FileDialog(
+            parent=self, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT | wx.RESIZE_BORDER)
+        # Need separate dialog w/o overwrite prompt, cannot swap style in Linux
+        self.dialog_savefile_ow = wx.FileDialog(
             parent=self, style=wx.FD_SAVE | wx.RESIZE_BORDER)
 
         self.TopLevelParent.page_db_latest = self
@@ -3649,7 +3655,6 @@ class DatabasePage(wx.Panel):
                 self.dialog_savefile.Filename = "%s (recovered)" % base
                 self.dialog_savefile.Message = "Save recovered data as"
                 self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db|All files|*.*"
-                self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
                 if wx.ID_OK == self.dialog_savefile.ShowModal():
                     newfile = controls.get_savedialog_path(self.dialog_savefile)
                     if newfile != self.db.filename:
@@ -4056,7 +4061,6 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Filename = default
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
-        self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
         filepath = controls.get_savedialog_path(self.dialog_savefile)
@@ -4214,34 +4218,34 @@ class DatabasePage(wx.Panel):
                 selected = self.list_chats.GetNextSelected(selected)
         if not chats: return
 
-        self.dialog_savefile.Message = "Choose folder where to save chat files"
-        self.dialog_savefile.Filename = "Filename will be ignored"
-        self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
-        self.dialog_savefile.WindowStyle ^= wx.FD_OVERWRITE_PROMPT
-        if chats and do_singlefile:
+        dialog = self.dialog_savefile if do_singlefile or len(chats) == 1 \
+                 else self.dialog_savefile_ow
+
+        dialog.Message = "Choose folder where to save chat files"
+        dialog.Filename = "Filename will be ignored"
+        dialog.Wildcard = export.CHAT_WILDCARD
+        if do_singlefile:
             formatargs = collections.defaultdict(str)
             formatargs["skypename"] = os.path.basename(self.db.filename)
             formatargs.update(self.db.account or {})
             default = util.safe_filename(conf.ExportDbTemplate % formatargs)
-            self.dialog_savefile.Filename = default
-            self.dialog_savefile.Message = "Save chats file"
-            self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-            self.dialog_savefile.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
-        elif len(chats) == 1 and not do_singlefile:
+            dialog.Filename = default
+            dialog.Message = "Save chats file"
+            dialog.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
+        elif len(chats) == 1:
             formatargs = collections.defaultdict(str); formatargs.update(chats[0])
             default = util.safe_filename(conf.ExportChatTemplate % formatargs)
-            self.dialog_savefile.Filename = default
-            self.dialog_savefile.Message = "Save chat"
-            self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
-        if wx.ID_OK != self.dialog_savefile.ShowModal(): return
+            dialog.Filename = default
+            dialog.Message = "Save chat"
+        if wx.ID_OK != dialog.ShowModal(): return
 
-        path, media_folder = controls.get_savedialog_path(self.dialog_savefile), False
+        path, media_folder = controls.get_savedialog_path(dialog), False
         if do_singlefile:
-            format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
+            format = export.CHAT_EXTS_SINGLEFILE[dialog.FilterIndex]
         else:
             if len(chats) > 1: path = os.path.dirname(path)
-            format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
-            media_folder = "html" == format and self.dialog_savefile.FilterIndex
+            format = export.CHAT_EXTS[dialog.FilterIndex]
+            media_folder = "html" == format and dialog.FilterIndex
 
         if media_folder and not check_media_export_login(self.db): return
 
@@ -4289,7 +4293,6 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Filename = util.safe_filename(default)
         self.dialog_savefile.Message = "Save chat"
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
-        self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
         filepath = controls.get_savedialog_path(self.dialog_savefile)
@@ -5114,7 +5117,6 @@ class DatabasePage(wx.Panel):
                 grid_source.Table.SeekAhead(True)
             self.dialog_savefile.Filename = util.safe_filename(title)
             self.dialog_savefile.Message = "Save table as"
-            self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
             if wx.ID_OK == self.dialog_savefile.ShowModal():
                 filename = controls.get_savedialog_path(self.dialog_savefile)
                 exts = export.TABLE_EXTS if grid_source is self.grid_table \
