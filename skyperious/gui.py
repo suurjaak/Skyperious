@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.03.2021
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3433,7 +3433,7 @@ class DatabasePage(wx.Panel):
         local database from Skype online service.
         """
         FIELDS = ["identity", "title", "title_long", "type"]
-        chats = sorted(self.chats, key=lambda x: (x["type"], x["title"]))
+        chats = sorted(self.chats, key=lambda x: (x["type"], x["title"].lower()))
         chats = [{k: x.get(k) for k in FIELDS} for x in chats]
         for x in chats:
             t = x["title"] if skypedata.CHATS_TYPE_SINGLE == x["type"] else x["title_long"]
