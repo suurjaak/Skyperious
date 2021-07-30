@@ -423,11 +423,11 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             wildcard=wildcard,
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER)
         if wx.ID_OK == dialog.ShowModal() and dialog.GetPath():
-            frmt = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
-            filename = dialog.GetPath()
+            format = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
+            filename = controls.get_savedialog_path(dialog)
             def callback():
                 try:
-                    self.screenshot.SaveFile(filename, frmt)
+                    self.screenshot.SaveFile(filename, format)
                     guibase.status("Saved screenshot %s.", filename, log=True)
                     util.start_file(filename)
                 except Exception:

@@ -4,8 +4,9 @@ CHANGELOG
 
 4.8, 2021-07-30
 ---------------
-- show selection of chats to sync on online-page in case-insensitive order;
 - fixed chats not being shown on importing Skype export (issue #100);
+- fixed export on Linux not using selected format (issue #101);
+- show selection of chats to sync on online-page in case-insensitive order;
 - fixed feedback screenshot not updating on Linux;
 - fixed help texts in advanced options dialog showing ampersands as accelerators.
 

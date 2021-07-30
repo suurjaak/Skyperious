@@ -1228,7 +1228,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        newpath = dialog.GetPath()
+        newpath = controls.get_savedialog_path(dialog)
         success = False
         try:
             shutil.copyfile(original, newpath)
@@ -1334,7 +1334,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
-        path = self.dialog_savefile.GetPath()
+        path = controls.get_savedialog_path(self.dialog_savefile)
         if not db:
             error = True
         elif "conversations" not in db.tables:
@@ -1625,7 +1625,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = dialog2.GetPath()
+        filename = controls.get_savedialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -1671,7 +1671,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = dialog2.GetPath()
+        filename = controls.get_savedialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -1742,7 +1742,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = dialog2.GetPath()
+        filename = controls.get_savedialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -3651,7 +3651,7 @@ class DatabasePage(wx.Panel):
                 self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db|All files|*.*"
                 self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
                 if wx.ID_OK == self.dialog_savefile.ShowModal():
-                    newfile = self.dialog_savefile.GetPath()
+                    newfile = controls.get_savedialog_path(self.dialog_savefile)
                     if newfile != self.db.filename:
                         guibase.status("Recovering data from %s to %s.",
                                        self.db.filename, newfile)
@@ -4059,13 +4059,11 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        filepath = self.dialog_savefile.GetPath()
+        filepath = controls.get_savedialog_path(self.dialog_savefile)
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
 
-        if not filepath.lower().endswith(".%s" % format):
-            filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
         guibase.status("Exporting to %s.", filepath)
         try:
@@ -4237,7 +4235,7 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        path, media_folder = self.dialog_savefile.GetPath(), False
+        path, media_folder = controls.get_savedialog_path(self.dialog_savefile), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[self.dialog_savefile.FilterIndex]
         else:
@@ -4294,13 +4292,10 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        filepath = self.dialog_savefile.GetPath()
+        filepath = controls.get_savedialog_path(self.dialog_savefile)
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
-
-        if not filepath.lower().endswith(".%s" % format):
-            filepath += ".%s" % format
 
         busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' % 
                                   self.chat["title"])
@@ -5121,12 +5116,10 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.Message = "Save table as"
             self.dialog_savefile.WindowStyle |= wx.FD_OVERWRITE_PROMPT
             if wx.ID_OK == self.dialog_savefile.ShowModal():
-                filename = self.dialog_savefile.GetPath()
+                filename = controls.get_savedialog_path(self.dialog_savefile)
                 exts = export.TABLE_EXTS if grid_source is self.grid_table \
                        else export.QUERY_EXTS
                 format = exts[self.dialog_savefile.FilterIndex]
-                if not filename.lower().endswith(".%s" % format):
-                    filename += ".%s" % format
                 busy = controls.BusyPanel(self, "Exporting \"%s\"." % filename)
                 guibase.status("Exporting \"%s\".", filename)
                 try:
@@ -6334,13 +6327,11 @@ class MergerPage(wx.Panel):
         dialog.Wildcard = export.CHAT_WILDCARD
         if wx.ID_OK != dialog.ShowModal(): return
 
-        filepath = dialog.GetPath()
+        filepath = controls.get_savedialog_path(dialog.GetPath)
         format = export.CHAT_EXTS[dialog.FilterIndex]
         media_folder = "html" == format and dialog.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
 
-        if not filepath.lower().endswith(".%s" % format):
-            filepath += ".%s" % format
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
         guibase.status("Exporting to %s.", filepath, log=True)
         try:

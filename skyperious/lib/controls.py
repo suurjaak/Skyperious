@@ -4738,3 +4738,20 @@ def get_controls(window):
         if isinstance(c, wx.Control): result.append(c)
         cc.extend(c.Children)
     return result
+
+
+
+def get_savedialog_path(savedialog):
+    """
+    Returns full path of selected file, with extension.
+    Helper for Linux dialog not appending selected file type to file path.
+    """
+    result = savedialog.GetPath()
+    if "linux2" == sys.platform:
+        # Wildcard is like "SQLite database (*.db)|*.db|All files|*.*"
+        formats = [x.replace("*", "").replace(".", "")
+                   for x in savedialog.Wildcard.split("|")[1::2]]
+        format = formats[savedialog.FilterIndex]
+        if format and not result.lower().endswith(".%s" % format):
+            result += ".%s" % format
+    return result
