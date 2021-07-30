@@ -82,7 +82,7 @@ ARGUMENTS = {
              {"args": ["-t", "--type"], "dest": "type",
               "choices": ["html", "xlsx", "csv", "txt", "xlsx_single"]
                          if export.xlsxwriter else ["html", "csv", "txt"],
-              "default": "html", "required": False, "type" : str.lower,
+              "default": "html", "required": False, "type": str.lower,
               "help": "export type: HTML files (default), Excel workbooks, "
                       "CSV spreadsheets, text files, or a single Excel "
                       "workbook with separate sheets" if export.xlsxwriter
