@@ -5,7 +5,8 @@ CHANGELOG
 4.8, 2021-07-30
 ---------------
 - fixed chats not being shown on importing Skype export (issue #100);
-- fixed feedback screenshot not updating on Linux.
+- fixed feedback screenshot not updating on Linux;
+- fixed help texts in advanced options dialog showing ampersands as accelerators.
 
 
 4.7, 2021-03-15

@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.02.2021
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1253,7 +1253,7 @@ class PropertyDialog(wx.Dialog):
             ctrl = wx.TextCtrl(self.panel, style=wx.BORDER_SIMPLE)
             ctrl_flag = wx.GROW | wx.ALIGN_CENTER_VERTICAL
             label_handler = lambda e: (ctrl.SetFocus(), ctrl.SelectAll())
-        tip = wx.StaticText(self.panel, label=help)
+        tip = wx.StaticText(self.panel, label=help.replace("&", "&&"))
 
         ctrl.Value = self._GetValueForCtrl(value, typeclass)
         ctrl.ToolTip = label.ToolTip = "Value of type %s%s." % (
