@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.03.2021
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -687,7 +687,8 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
     for db in dbs:
 
         if ask_password and db.username \
-        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
+        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
+             or conf.SharedFileAutoDownload and media_folder) \
         and "html" == format:
             while not db.live.is_logged_in():
                 password = get_password(db.username)

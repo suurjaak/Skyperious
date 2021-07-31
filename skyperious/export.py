@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    13.02.2020
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 import collections
@@ -49,7 +49,7 @@ except Exception: # Fall back to a simple mono-spaced calculation if no PIL
 """FileDialog wildcard strings, matching extensions lists and default names."""
 XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|" if xlsxwriter else ""
 CHAT_WILDCARD = ("HTML document (*.html)|*.html|"
-                 "HTML document with shared media in subfolder (*.html)|*.html|"
+                 "HTML document with shared files in subfolder (*.html)|*.html|"
                  "Text document (*.txt)|*.txt|"
                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
 CHAT_EXTS = ["html", "html", "txt", "xlsx", "csv"] if xlsxwriter \
@@ -116,7 +116,8 @@ def export_chats(chats, path, format, db, opts=None):
                        export_chat_template)
 
         if "html" == format \
-        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
+        and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
+             or conf.SharedFileAutoDownload and opts.get("media_folder")) \
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared media

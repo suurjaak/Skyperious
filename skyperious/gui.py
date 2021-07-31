@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.07.2021
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -9048,13 +9048,14 @@ class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
 
 def check_media_export_login(db):
     """
-    Returns whether db can login to download shared madia to subfolder for export
+    Returns whether db can login to download shared files to subfolder for export
     or whether user confirms to proceed without login information.
     """
-    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload) \
+    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
+        or conf.SharedFileAutoDownload) \
     and not db.live.is_logged_in() \
     and not conf.Login.get(db.filename, {}).get("password") and wx.OK != wx.MessageBox(
-        "You have selected to export HTML with shared media in subfolder, "
+        "You have selected to export HTML with shared files in subfolder, "
         "but the database does not have login information "
         "for downloading media.\n\nAre you sure you want to continue?",
         conf.Title, wx.OK | wx.CANCEL | wx.ICON_INFORMATION

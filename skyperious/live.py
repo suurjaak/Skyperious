@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    30.07.2021
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -303,7 +303,10 @@ class SkypeLogin(object):
         if dbitem0:
             dbitem["id"] = dbitem1["id"] = dbitem0["id"]
             if "messages" == table and dbitem0.get("remote_id") == dbitem.get("remote_id") \
-            and (dbitem0["pk_id"] != dbitem["pk_id"] or dbitem0["body_xml"] != dbitem["body_xml"]):
+            and (dbitem0["pk_id"] != dbitem["pk_id"] or dbitem0["body_xml"] != dbitem["body_xml"]) \
+            and not (isinstance(item, skpy.SkypeFileMsg) # body_xml contains url, starting from v4.9
+                     and dbitem0["pk_id"] == dbitem["pk_id"]
+                     and dbitem0["timestamp__ms"] == dbitem["timestamp__ms"]):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
@@ -506,7 +509,7 @@ class SkypeLogin(object):
                 result.update(emails=" ".join(item.raw["emails"]))
 
             if item.avatar: # https://avatar.skype.com/v1/avatars/username/public
-                raw = self.download_media(item.avatar)
+                raw = self.download_content(item.avatar)
                 # main.db has NULL-byte in front of image binary
                 if raw: result.update(avatar_image="\0" + raw)
 
@@ -542,7 +545,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_media(item.picture, category="avatar")
+                    raw = self.get_api_content(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw)
             else: result = None
@@ -622,9 +625,11 @@ class SkypeLogin(object):
                 # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
 
                 filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
+                fileurl = item.file.urlFull
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
-                              body_xml='<files><file index="0" size="%s">%s</file></files>' % 
+                              body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' % 
                                        (urllib.quote(util.to_unicode(filesize or 0)),
+                                        urllib.quote(util.to_unicode(fileurl or ""), ":/"),
                                         util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
@@ -875,31 +880,33 @@ class SkypeLogin(object):
 
 
 
-    def get_api_media(self, url, category=None):
+    def get_api_content(self, url, category=None):
         """
-        Returns media raw binary from Skype API URL via login, or None.
+        Returns content raw binary from Skype API URL via login, or None.
 
-        @param   category  type of media, e.g. "avatar" for avatar image
+        @param   category  type of content, e.g. "avatar" for avatar image,
+                           "file" for shared file
         """
-        url = make_media_url(url, category)
+        url = make_content_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
         for url in urls:
-            raw = self.download_media(url)
+            raw = self.download_content(url, category)
             if raw: return raw
 
 
-    def download_media(self, url):
+    def download_content(self, url, category=None):
         """Downloads and returns media raw binary from Skype URL via login, or None."""
         try:
             r = self.request(self.skype.conn, "GET", url,
                              auth=skpy.SkypeConnection.Auth.Authorize,
                              __retry=False)
             hdr = lambda r: r.headers.get("content-type", "")
-            if r.ok and r.content and any(x in hdr(r) for x in ("image", "audio", "video")):
+            if r.ok and r.content \
+            and ("file" == category or any(x in hdr(r) for x in ("image", "audio", "video"))):
                 return r.content
         except Exception: pass
 
@@ -1537,13 +1544,13 @@ def process_message_edit(msg):
         if BeautifulSoup: logger.warn("Error parsing edited timestamp from %s.", msg, exc_info=True)
 
 
-def make_media_url(url, category=None):
+def make_content_url(url, category=None):
     """
-    Returns URL with appropriate path appended if Skype shared media URL,
+    Returns URL with appropriate path appended if Skype shared content URL,
     e.g. "https://api.asm.skype.com/v1/objects/0-weu-d11-../views/imgpsh_fullsize"
     for  "https://api.asm.skype.com/v1/objects/0-weu-d11-..".
 
-    @param   category  type of media, e.g. "avatar" for avatar image
+    @param   category  type of content, e.g. "avatar" for avatar image
     """
     if not url or "api.asm.skype.com/" not in url: return url
 
@@ -1555,6 +1562,8 @@ def make_media_url(url, category=None):
         url += "/views/video"
     elif "sticker" == category and not url.endswith("/views/thumbnail"):
         url += "/views/thumbnail"
+    elif "file"    == category and not url.endswith("/views/original"):
+        url += "/views/original"
     elif "/views/" not in url:
         url += "/views/imgpsh_fullsize"
 

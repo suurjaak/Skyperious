@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.02.2021
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -1523,6 +1523,42 @@ except Exception: pass
     %endif
 %endif
 </div>
+"""
+
+
+
+"""
+HTML chat history export template for shared files message body.
+
+@param   files         [{filename, filepath, fileurl, content}]
+@param   media_folder  path to save files under
+"""
+CHAT_MESSAGE_FILE = """<%
+import logging, os, urllib
+from skyperious import conf
+from skyperious.lib import util
+
+punct = lambda i: "." if i == len(files) - 1 else ","
+%>
+Sent {{ util.plural("file", files, numbers=False) }}
+%for i, file in enumerate(files):
+<%
+if file["content"]
+    basename = util.safe_filename(file["filename"])
+    filepath = util.unique_path(os.path.join(media_folder, basename))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    try:
+        with util.create_file(filepath, "wb", handle=True) as f:
+            f.write(file["content"])
+    except Exception:
+        logger = logging.getLogger(conf.Title.lower())
+        logger.exception("Error saving export file %s.", filepath)
+        src = util.path_to_url(file["filepath"] or file["filename"])
+else:
+    src = util.path_to_url(file["filepath"] or file["filename"])
+%>
+  <a href="{{ src }}" target="_blank">{{ file["filename"] }}</a>{{ punct(i) }}
+%endfor
 """
 
 
