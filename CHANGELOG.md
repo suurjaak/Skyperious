@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-4.8, 2021-07-31
+4.8, 2021-08-01
 ---------------
 - added shared files download for HTML export with subfolder;
 - fixed chats not being shown on importing Skype export (issue #100);
@@ -10,7 +10,8 @@ CHANGELOG
 - fixed certain save-dialog overwrite prompts not working on Linux;
 - fixed feedback screenshot not updating on Linux;
 - fixed help texts in advanced options dialog showing ampersands as accelerators;
-- show selection of chats to sync on online-page in case-insensitive order.
+- show selection of chats to sync on online-page in case-insensitive order;
+- upgraded ijson from 3.1.3 to 3.1.4.
 
 
 4.7, 2021-03-15

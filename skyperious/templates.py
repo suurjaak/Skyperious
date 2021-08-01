@@ -2516,7 +2516,7 @@ under the MIT License.
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>ijson{{ " 3.1.3" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
+  <li>ijson{{ " 3.1.4" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
       <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
   <li>Pillow{{ " 6.2.2" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
