@@ -2526,7 +2526,7 @@ under the MIT License.
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>
-  <li>XlsxWriter{{ " 1.3.7" if getattr(sys, 'frozen', False) else "" }},
+  <li>XlsxWriter{{ " 1.4.5" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{ conf.LinkColour }}">
           pypi.org/project/XlsxWriter</font></a></li>
   <li>jsOnlyLightbox{{ " 0.5.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">

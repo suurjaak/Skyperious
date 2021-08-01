@@ -122,7 +122,7 @@ Skyperious has been built using the following open-source software:
 - pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
 - SkPy 0.10.4 (https://pypi.org/project/SkPy)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 1.3.7 (https://pypi.org/project/XlsxWriter)
+- XlsxWriter 1.4.5 (https://pypi.org/project/XlsxWriter)
 
 
 Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
