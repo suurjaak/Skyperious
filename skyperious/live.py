@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    31.07.2021
+@modified    01.08.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -41,6 +41,9 @@ from . import skypedata
 
 
 logger = logging.getLogger(__name__)
+
+# Avoid BeautifulSoup popup warnings like MarkupResemblesLocatorWarning
+warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 
 
 class SkypeLogin(object):
