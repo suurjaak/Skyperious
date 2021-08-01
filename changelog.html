@@ -40,19 +40,34 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.7_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.7_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.7-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
 
+        <h4>v4.8, 2021-08-01:</h4>
+        <ul>
+          <li>added shared files download for HTML export with subfolder</li>
+          <li>fixed chats not being shown on importing Skype export (issue #100)</li>
+          <li>fixed export on Linux not using selected format (issue #101)</li>
+          <li>fixed certain save-dialog overwrite prompts not working on Linux</li>
+          <li>fixed feedback screenshot not updating on Linux</li>
+          <li>fixed help texts in advanced options dialog showing ampersands as accelerators</li>
+          <li>show selection of chats to sync on online-page in case-insensitive order</li>
+          <li>upgraded ijson from 3.1.3 to 3.1.4</li>
+          <li>upgraded skpy from 0.10.2 to 0.10.4</li>
+          <li>upgraded XlsxWriter from 1.3.7 to 1.4.5</li>
+        </ul>
+        <br />
+
         <h4>v4.7, 2021-03-15:</h4>
         <ul>
           <li>added command-line flag --no-terminal (issue #97)</li>
-          <li>improved detetcing existing messages during online sync</li>
+          <li>improved detecting existing messages during online sync</li>
           <li>improved querying Skype online service for more messages to sync (issue #93)</li>
           <li>fixed data grid export ignoring current filter</li>
           <li>fixed parsing parts of HTML entities into emoticons</li>
