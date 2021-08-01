@@ -11,7 +11,8 @@ CHANGELOG
 - fixed feedback screenshot not updating on Linux;
 - fixed help texts in advanced options dialog showing ampersands as accelerators;
 - show selection of chats to sync on online-page in case-insensitive order;
-- upgraded ijson from 3.1.3 to 3.1.4.
+- upgraded ijson from 3.1.3 to 3.1.4;
+- upgraded skpy from 0.10.2 to 0.10.4.
 
 
 4.7, 2021-03-15
