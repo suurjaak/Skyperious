@@ -117,7 +117,7 @@ Python packages are installed.
 If running from pip installation, run `skyperious` from the command-line. 
 If running from straight source code, launch `skyperious.sh` where shell 
 scripts are supported, or launch `skyperious.bat` under Windows, or open 
-a terminal and run `python -m skyperious` in Skyperious directory.
+a terminal and run `python2 -m skyperious` in Skyperious directory.
 
 
 Installation
