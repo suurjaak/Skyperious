@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    27.08.2020
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -188,6 +188,7 @@ def take_screenshot(fullscreen=True):
             rect.height       += title_bar_height + border_width
 
     dc = wx.ScreenDC()
+    dc.Clear()
     bmp = wx.Bitmap(rect.width, rect.height)
     dc_bmp = wx.MemoryDC()
     dc_bmp.SelectObject(bmp)
@@ -422,11 +423,11 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             wildcard=wildcard,
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER)
         if wx.ID_OK == dialog.ShowModal() and dialog.GetPath():
-            frmt = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
-            filename = dialog.GetPath()
+            format = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
+            filename = controls.get_savedialog_path(dialog)
             def callback():
                 try:
-                    self.screenshot.SaveFile(filename, frmt)
+                    self.screenshot.SaveFile(filename, format)
                     guibase.status("Saved screenshot %s.", filename, log=True)
                     util.start_file(filename)
                 except Exception:

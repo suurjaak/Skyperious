@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.02.2021
+@modified    31.07.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -1528,6 +1528,42 @@ except Exception: pass
 
 
 """
+HTML chat history export template for shared files message body.
+
+@param   files         [{filename, filepath, fileurl, content}]
+@param   media_folder  path to save files under
+"""
+CHAT_MESSAGE_FILE = """<%
+import logging, os, urllib
+from skyperious import conf
+from skyperious.lib import util
+
+punct = lambda i: "." if i == len(files) - 1 else ","
+%>
+Sent {{ util.plural("file", files, numbers=False) }}
+%for i, file in enumerate(files):
+<%
+if file["content"]:
+    basename = util.safe_filename(file["filename"])
+    filepath = util.unique_path(os.path.join(media_folder, basename))
+    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    try:
+        with util.create_file(filepath, "wb", handle=True) as f:
+            f.write(file["content"])
+    except Exception:
+        logger = logging.getLogger(conf.Title.lower())
+        logger.exception("Error saving export file %s.", filepath)
+        src = util.path_to_url(file["filepath"] or file["filename"])
+else:
+    src = util.path_to_url(file["filepath"] or file["filename"])
+%>
+  <a href="{{ src }}" target="_blank">{{ file["filename"] }}</a>{{ punct(i) }}
+%endfor
+"""
+
+
+
+"""
 TXT chat history export template.
 
 @param   chat               chat data dictionary
@@ -2480,17 +2516,17 @@ under the MIT License.
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>ijson{{ " 3.1.3" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
+  <li>ijson{{ " 3.1.4" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
       <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
   <li>Pillow{{ " 6.2.2" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
   <li>pyparsing{{ " 2.4.7" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
-  <li>SkPy{{ " 0.10.2" if getattr(sys, 'frozen', False) else "" }},
+  <li>SkPy{{ " 0.10.4" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>
-  <li>XlsxWriter{{ " 1.3.7" if getattr(sys, 'frozen', False) else "" }},
+  <li>XlsxWriter{{ " 1.4.5" if getattr(sys, 'frozen', False) else "" }},
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{ conf.LinkColour }}">
           pypi.org/project/XlsxWriter</font></a></li>
   <li>jsOnlyLightbox{{ " 0.5.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">

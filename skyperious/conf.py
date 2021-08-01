@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.03.2021
+@modified    01.08.2021
 ------------------------------------------------------------------------------
 """
 from ConfigParser import RawConfigParser
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.7"
-VersionDate = "15.03.2021"
+Version = "4.8.dev10"
+VersionDate = "01.08.2021"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -56,9 +56,9 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedImageAutoDownload", "StatisticsPlotWidth", "StatusFlashLength",
-    "UpdateCheckInterval", "WordCloudLengthMin", "WordCloudCountMin", 
-    "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "SharedFileAutoDownload", "SharedImageAutoDownload", "StatisticsPlotWidth",
+    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
+    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -340,6 +340,9 @@ EmoticonsPlotWidth = 200
 
 """Download shared audio & video from Skype online service for HTML export."""
 SharedAudioVideoAutoDownload = True
+
+"""Download shared files from Skype online service for HTML export."""
+SharedFileAutoDownload = True
 
 """Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True

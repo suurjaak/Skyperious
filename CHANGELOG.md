@@ -2,10 +2,24 @@ CHANGELOG
 =========
 
 
+4.8, 2021-08-01
+---------------
+- added shared files download for HTML export with subfolder;
+- fixed chats not being shown on importing Skype export (issue #100);
+- fixed export on Linux not using selected format (issue #101);
+- fixed certain save-dialog overwrite prompts not working on Linux;
+- fixed feedback screenshot not updating on Linux;
+- fixed help texts in advanced options dialog showing ampersands as accelerators;
+- show selection of chats to sync on online-page in case-insensitive order;
+- upgraded ijson from 3.1.3 to 3.1.4;
+- upgraded skpy from 0.10.2 to 0.10.4;
+- upgraded XlsxWriter from 1.3.7 to 1.4.5.
+
+
 4.7, 2021-03-15
 ---------------
 - added command-line flag --no-terminal (issue #97);
-- improved detetcing existing messages during online sync;
+- improved detecting existing messages during online sync;
 - improved querying Skype online service for more messages to sync (issue #93);
 - fixed data grid export ignoring current filter;
 - fixed parsing parts of HTML entities into emoticons;

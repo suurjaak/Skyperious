@@ -25,10 +25,10 @@ Skyperious is a Skype chat history tool, written in Python.
 
 You can open Skype SQLite databases and work with their contents:
 
+- import messages from Skype online service and Skype export archives
 - search across all messages and contacts
 - read chat history in full, see chat statistics and word clouds
 - export chats as HTML, text or spreadsheet
-- synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -117,7 +117,7 @@ Python packages are installed.
 If running from pip installation, run `skyperious` from the command-line. 
 If running from straight source code, launch `skyperious.sh` where shell 
 scripts are supported, or launch `skyperious.bat` under Windows, or open 
-a terminal and run `python -m skyperious` in Skyperious directory.
+a terminal and run `python2 -m skyperious` in Skyperious directory.
 
 
 Installation

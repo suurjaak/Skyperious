@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.03.2021
+@modified    01.08.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -1789,19 +1789,27 @@ class MessageParser(object):
         or (MESSAGE_TYPE_INFO == message["type"]
         and "<files" in message["body_xml"]):
             transfers = self.db.get_transfers()
-            files = dict((f["chatmsg_index"], f) for f in transfers
+            files = dict((f["chatmsg_index"], dict(f)) for f in transfers
                          if f["chatmsg_guid"] == message["guid"])
-            if not files:
+
+            domfiles = {}
+            for f in dom.findall("*/file"):
+                domfiles[int(f.get("index"))] = {
+                    "filename": f.text, "filepath": "",
+                    "filesize": f.get("size", 0),
+                    "fileurl": live.make_content_url(f.get("url", None), "file"),
+                    "partner_handle": message["author"],
+                    "partner_dispname": get_author_name(message),
+                    "starttime": message["timestamp"],
+                    "type": TRANSFER_TYPE_OUTBOUND}
+            if files and domfiles:
+                # Attach file URLs if available
+                for i, f in files.items():
+                    f.update(fileurl=domfiles.get(i, {}).get("fileurl"))
+            elif not files:
                 # No rows in Transfers, try to find data from message body
                 # and create replacements for Transfers fields
-                for f in dom.findall("*/file"):
-                    files[int(f.get("index"))] = {
-                        "filename": f.text, "filepath": "",
-                        "filesize": f.get("size", 0),
-                        "partner_handle": message["author"],
-                        "partner_dispname": get_author_name(message),
-                        "starttime": message["timestamp"],
-                        "type": TRANSFER_TYPE_OUTBOUND}
+                files = domfiles
             message["__files"] = [f for i, f in sorted(files.items())]
             dom.clear()
             dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
@@ -1810,7 +1818,7 @@ class MessageParser(object):
             for i, f in enumerate(files[i] for i in sorted(files)):
                 if len(dom) > 0:
                     a.tail = ", "
-                h = util.path_to_url(f["filepath"] or f["filename"])
+                h = f["fileurl"] or util.path_to_url(f["filepath"] or f["filename"])
                 a = ElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
                 a.tail = "" if i < len(files) - 1 else "."
@@ -1845,7 +1853,7 @@ class MessageParser(object):
                 tag = next(dom.iter("value"), None)
                 url = tag is not None and (tag.text or "").replace("URL@", "")
                 if url:
-                    data = dict(url=live.make_media_url(url, "avatar"),
+                    data = dict(url=live.make_content_url(url, "avatar"),
                                 author_name=get_author_name(message),
                                 author=message["author"], success=False,
                                 datetime=message["datetime"], category="avatar")
@@ -1990,12 +1998,12 @@ class MessageParser(object):
                         if "message/card" == pkg["type"]:
                             # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
                             url = pkg["attachments"][0]["content"]["images"][0]["url"]
-                            data.update(category="card", url=live.make_media_url(url, "card"))
+                            data.update(category="card", url=live.make_content_url(url, "card"))
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' % 
                                                 (urllib.quote(url, ":/=?&#"), url), message)
                     except Exception: pass
 
-                url = data["url"] = live.make_media_url(data["url"], data.get("category"))
+                url = data["url"] = live.make_content_url(data["url"], data.get("category"))
                 a = next(dom.iter("a"), None)
                 if a is not None: a.set("href", url); a.text = url
 
@@ -2089,6 +2097,14 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
+        if message.get("__files") and output.get("export") and output.get("media_folder") \
+        and any(f.get("fileurl") for f in message["__files"]) \
+        and conf.SharedFileAutoDownload and self.db.live.is_logged_in():
+            files = [dict(f, content=self.db.live.get_api_content(f.get("fileurl"), "file"))
+                     for f in message["__files"]]
+            ns = dict(files=files)
+            return step.Template(templates.CHAT_MESSAGE_FILE).expand(ns, **output)
+
         media = self.stats.get("shared_media", {}).get(message["id"])
         if media and output.get("export") \
         and (conf.SharedImageAutoDownload      and media.get("category") not in ("audio", "video") or
@@ -2096,7 +2112,7 @@ class MessageParser(object):
         and self.db.live.is_logged_in():
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
-            raw = self.db.live.get_api_media(media["url"], category)
+            raw = self.db.live.get_api_content(media["url"], category)
             if raw is not None:
                 media.update(success=True, filesize=len(raw))
                 ns = dict(media, content=raw, message=message)
@@ -2157,8 +2173,10 @@ class MessageParser(object):
                 elif "a" == subelem.tag:
                     subelem.set("target", "_blank")
                     if output.get("export"):
-                        href = subelem.get("href").encode("utf-8")
-                        subelem.set("href", urllib.quote(href, ":/=?&#"))
+                        try:
+                            href = urllib.unquote(subelem.get("href").encode("utf-8"))
+                            subelem.set("href", urllib.quote(href, ":/=?&#"))
+                        except Exception: pass
                     else: # Wrap content in system link colour
                         t = "<font color='%s'></font>" % conf.SkypeLinkColour
                         span = ElementTree.fromstring(t)
@@ -2678,9 +2696,10 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
     if raw:
         try:
             img = wx.Image(cStringIO.StringIO(raw))
-            if size and list(size) != list(img.GetSize()):
-                img = util.img_wx_resize(img, size, aspect_ratio)
-            result = img.ConvertToBitmap()
+            if img:
+                if size and list(size) != list(img.GetSize()):
+                    img = util.img_wx_resize(img, size, aspect_ratio)
+                result = img.ConvertToBitmap()
         except Exception:
             logger.exception("Error loading avatar image for %s.",
                              datadict["skypename"])

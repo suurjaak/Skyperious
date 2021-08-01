@@ -25,10 +25,10 @@ Skyperious is a Skype chat history tool, written in Python.
 
 You can open Skype SQLite databases and work with their contents:
 
+- import messages from Skype online service and Skype export archives
 - search across all messages and contacts
 - read chat history in full, see chat statistics and word clouds
 - export chats as HTML, text or spreadsheet
-- synchronize messages from Skype online service
 - view any database table and export their data, fix database corruption
 - change, add or delete data in any table
 - execute direct SQL queries
@@ -117,12 +117,12 @@ Skyperious has been built using the following open-source software:
 - wxPython 4.1.0 (http://www.wxpython.org)
 - appdirs 1.4.4 (https://pypi.org/project/appdirs)
 - beautifulsoup4 4.9.3 (https://pypi.org/project/beautifulsoup4)
-- ijson 3.1.3 (https://pypi.org/project/ijson)
+- ijson 3.1.4 (https://pypi.org/project/ijson)
 - Pillow 6.2.2 (https://pypi.org/project/Pillow)
 - pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
-- SkPy 0.10.2 (https://pypi.org/project/SkPy)
+- SkPy 0.10.4 (https://pypi.org/project/SkPy)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 1.3.7 (https://pypi.org/project/XlsxWriter)
+- XlsxWriter 1.4.5 (https://pypi.org/project/XlsxWriter)
 
 
 Shared images slideshow in HTML export implemented with jsOnlyLightbox, 

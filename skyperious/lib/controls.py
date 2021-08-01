@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.02.2021
+@modified    30.07.2021
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1253,7 +1253,7 @@ class PropertyDialog(wx.Dialog):
             ctrl = wx.TextCtrl(self.panel, style=wx.BORDER_SIMPLE)
             ctrl_flag = wx.GROW | wx.ALIGN_CENTER_VERTICAL
             label_handler = lambda e: (ctrl.SetFocus(), ctrl.SelectAll())
-        tip = wx.StaticText(self.panel, label=help)
+        tip = wx.StaticText(self.panel, label=help.replace("&", "&&"))
 
         ctrl.Value = self._GetValueForCtrl(value, typeclass)
         ctrl.ToolTip = label.ToolTip = "Value of type %s%s." % (
@@ -4737,4 +4737,21 @@ def get_controls(window):
         c = cc.pop(0)
         if isinstance(c, wx.Control): result.append(c)
         cc.extend(c.Children)
+    return result
+
+
+
+def get_savedialog_path(savedialog):
+    """
+    Returns full path of selected file, with extension.
+    Helper for Linux dialog not appending selected file type to file path.
+    """
+    result = savedialog.GetPath()
+    if "linux2" == sys.platform:
+        # Wildcard is like "SQLite database (*.db)|*.db|All files|*.*"
+        formats = [x.replace("*", "").replace(".", "")
+                   for x in savedialog.Wildcard.split("|")[1::2]]
+        format = formats[savedialog.FilterIndex]
+        if format and not result.lower().endswith(".%s" % format):
+            result += ".%s" % format
     return result

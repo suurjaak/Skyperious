@@ -1,7 +1,7 @@
 appdirs
 beautifulsoup4
 ijson
-Pillow<=6.2.2
+Pillow
 pyparsing
 SkPy
 XlsxWriter
