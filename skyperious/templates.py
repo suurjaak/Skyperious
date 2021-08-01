@@ -1543,7 +1543,7 @@ punct = lambda i: "." if i == len(files) - 1 else ","
 Sent {{ util.plural("file", files, numbers=False) }}
 %for i, file in enumerate(files):
 <%
-if file["content"]
+if file["content"]:
     basename = util.safe_filename(file["filename"])
     filepath = util.unique_path(os.path.join(media_folder, basename))
     src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
