@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2021
+@modified    01.08.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2696,9 +2696,10 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
     if raw:
         try:
             img = wx.Image(cStringIO.StringIO(raw))
-            if size and list(size) != list(img.GetSize()):
-                img = util.img_wx_resize(img, size, aspect_ratio)
-            result = img.ConvertToBitmap()
+            if img:
+                if size and list(size) != list(img.GetSize()):
+                    img = util.img_wx_resize(img, size, aspect_ratio)
+                result = img.ConvertToBitmap()
         except Exception:
             logger.exception("Error loading avatar image for %s.",
                              datadict["skypename"])

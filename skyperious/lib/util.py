@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    07.03.2021
+@modified    01.08.2021
 ------------------------------------------------------------------------------
 """
 import calendar
@@ -361,35 +361,38 @@ def divide_delta(td1, td2):
 
 
 def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
-    """Recodes and/or resizes the raw image, using wx or PIL."""
+    """Recodes and/or resizes the raw image, using PIL or wx."""
     result = raw
-    if wx:
-        img = wx.Image(io.BytesIO(raw))
-        if size: img = img_wx_resize(img, size, aspect_ratio)
-        result = img_wx_to_raw(img, format)
-    elif ImageFile:
+    if ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         img = imgparser.close()
         if size: img = img_pil_resize(img, size, aspect_ratio)
         stream = io.BytesIO()
         img.save(stream, format)
         result = stream.getvalue()
+    elif wx:
+        img = wx.Image(io.BytesIO(raw))
+        if img:
+            if size: img = img_wx_resize(img, size, aspect_ratio)
+            result = img_wx_to_raw(img, format)
     return result
 
 
 def img_size(raw):
-    """Returns the size of the as (width, height), using wx or PIL."""
+    """Returns the size of the as (width, height), using PIL or wx."""
     result = None
-    if wx:
-        result = tuple(wx.Image(io.BytesIO(raw)).GetSize())
-    elif ImageFile:
+    if ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         result = tuple(imgparser.close().size)
+    elif wx:
+        img = wx.Image(io.BytesIO(raw))
+        if img: result = tuple(img.GetSize())
     return result
 
 
 def img_wx_to_raw(img, format="PNG"):
     """Returns the wx.Image or wx.Bitmap as raw data of specified type."""
+    if not img: return None
     stream = io.BytesIO()
     img = img if isinstance(img, wx.Image) else img.ConvertToImage()
     fmttype = getattr(wx, "BITMAP_TYPE_" + format.upper(), wx.BITMAP_TYPE_PNG)
@@ -403,6 +406,7 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
     Returns a resized wx.Image or wx.Bitmap, centered if aspect ratio rescale
     resulted in free space on one axis.
     """
+    if not img: return img
     result = img if isinstance(img, wx.Image) else img.ConvertToImage()
     if size:
         size1, size2 = list(result.GetSize()), list(size)
