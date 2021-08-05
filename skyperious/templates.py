@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    31.07.2021
+@modified    05.08.2021
 ------------------------------------------------------------------------------
 """
 import re
@@ -494,7 +494,7 @@ from skyperious.lib.vendor import step
       z-index: 1;
     }
     #timeline h3 {
-      color: #3399FF;
+      color: {{ conf.ExportLinkColour }};
       margin: 0;
       padding: 5px 0;
     }
@@ -604,6 +604,9 @@ from skyperious.lib.vendor import step
     }
     span.gray {
       color: #999;
+    }
+    .message_content .filename {
+      color: {{ conf.ExportLinkColour }};
     }
     body.darkmode {
       background: black;
@@ -1551,13 +1554,17 @@ if file["content"]:
         with util.create_file(filepath, "wb", handle=True) as f:
             f.write(file["content"])
     except Exception:
+        src = None
         logger = logging.getLogger(conf.Title.lower())
         logger.exception("Error saving export file %s.", filepath)
-        src = util.path_to_url(file["filepath"] or file["filename"])
 else:
-    src = util.path_to_url(file["filepath"] or file["filename"])
+    src = util.path_to_url(file["filepath"]) if file["filepath"] else None
 %>
+%if src:
   <a href="{{ src }}" target="_blank">{{ file["filename"] }}</a>{{ punct(i) }}
+%else:
+  <span class="filename">{{ file["filename"] }}</span>{{ punct(i) }}
+%endif
 %endfor
 """
 

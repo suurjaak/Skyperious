@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.08.2021
+@modified    05.08.2021
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -2097,11 +2097,15 @@ class MessageParser(object):
 
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
-        if message.get("__files") and output.get("export") and output.get("media_folder") \
-        and any(f.get("fileurl") for f in message["__files"]) \
-        and conf.SharedFileAutoDownload and self.db.live.is_logged_in():
-            files = [dict(f, content=self.db.live.get_api_content(f.get("fileurl"), "file"))
-                     for f in message["__files"]]
+        if message.get("__files") and output.get("export"):
+            files = []
+            do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
+                          and output.get("media_folder")
+            for f in message["__files"]:
+                content = None
+                if do_download and f.get("fileurl"):
+                    content = self.db.live.get_api_content(f.get("fileurl"), "file")
+                files.append(dict(f, content=content))
             ns = dict(files=files)
             return step.Template(templates.CHAT_MESSAGE_FILE).expand(ns, **output)
 
