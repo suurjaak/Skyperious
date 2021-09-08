@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.8.1, 2021-08-05
+---------------
+- fixed audio/video messages imported from live as simple file transfers (issue #102).
+
+
 4.8, 2021-08-01
 ---------------
 - added shared files download for HTML export with subfolder;

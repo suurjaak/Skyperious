@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.08.2021
+@modified    05.08.2021
 ------------------------------------------------------------------------------
 """
 import base64
@@ -356,7 +356,8 @@ class SkypeLogin(object):
             if chat0:
                 result = self.SAVE.NOCHANGE
 
-        if "messages" == table and isinstance(item, skpy.SkypeFileMsg) and item.file:
+        # Use type() instead of isinstance() as image/audio/video are handled differently
+        if "messages" == table and type(item) is skpy.SkypeFileMsg and item.file:
             self.insert_transfers(item, dbitem, dbitem0)
 
         if "messages" == table and isinstance(item, skpy.SkypeCallMsg):
@@ -618,23 +619,6 @@ class SkypeLogin(object):
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
                               type=skypedata.MESSAGE_TYPE_CONTACTS)
 
-            elif isinstance(item, skpy.SkypeImageMsg):
-                # SkypeImageMsg(id='1594466401638', type='RichText/UriObject', time=datetime.datetime(2020, 7, 11, 11, 19, 13, 899000), clientId='566957100626477146', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/imgt1_anim" type="Picture.1" doc_id="0-weu-d3-abcdef.." width="1191" height="619">To view this shared photo, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..</a><OriginalName v="f.png"></OriginalName><FileSize v="108188"></FileSize><meta type="photo" originalName="f.png"></meta></URIObject>', file=File(name='f.png', size='108188', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/imgt1_anim', urlView='https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..'))
-
-                result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
-                              type=skypedata.MESSAGE_TYPE_SHARE_PHOTO)
-
-            elif isinstance(item, skpy.SkypeFileMsg):
-                # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
-
-                filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
-                fileurl = item.file.urlFull
-                result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
-                              body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' % 
-                                       (urllib.quote(util.to_unicode(filesize or 0)),
-                                        urllib.quote(util.to_unicode(fileurl or ""), ":/"),
-                                        util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
-
             elif isinstance(item, skpy.msg.SkypeTopicPropertyMsg):
                 # SkypeTopicPropertyMsg(id='1594466832242', type='ThreadActivity/TopicUpdate', time=datetime.datetime(2020, 7, 11, 11, 27, 12, 242000), userId='username', chatId='19:abcdef..@thread.skype', content='<topicupdate><eventtime>1594466832367</eventtime><initiator>8:username</initiator><value>The Topic</value></topicupdate>', topic='The Topic')
 
@@ -682,10 +666,27 @@ class SkypeLogin(object):
 
             elif "RichText/Media_Video"    == item.type \
             or   "RichText/Media_AudioMsg" == item.type:
-                # SkypeMsg(id='1594466637922', type='RichText/Media_Video', time=datetime.datetime(2020, 7, 11, 11, 23, 10, 45000), clientId='7459423203289210001', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef../views/thumbnail" type="Video.1/Message.1" doc_id="0-weu-d8-abcdef.." width="640" height="480">To view this video message, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..</a><OriginalName v="937029c3-6a12-4202-bdaf-aac9e341c63d.mp4"></OriginalName><FileSize v="103470"></FileSize></URIObject>')
+                # SkypeVideoMsg(id='1594466637922', type='RichText/Media_Video', time=datetime.datetime(2020, 7, 11, 11, 23, 10, 45000), clientId='7459423203289210001', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d8-abcdef../views/thumbnail" type="Video.1/Message.1" doc_id="0-weu-d8-abcdef.." width="640" height="480">To view this video message, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?vim=0-weu-d8-abcdef..</a><OriginalName v="937029c3-6a12-4202-bdaf-aac9e341c63d.mp4"></OriginalName><FileSize v="103470"></FileSize></URIObject>')
                 # For audio: type="Audio.1/Message.1", "To hear this voice message, go to: ", ../views/audio
 
                 result.update(type=skypedata.MESSAGE_TYPE_SHARE_VIDEO2)
+
+            elif isinstance(item, skpy.SkypeImageMsg):
+                # SkypeImageMsg(id='1594466401638', type='RichText/UriObject', time=datetime.datetime(2020, 7, 11, 11, 19, 13, 899000), clientId='566957100626477146', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/imgt1_anim" type="Picture.1" doc_id="0-weu-d3-abcdef.." width="1191" height="619">To view this shared photo, go to: <a href="https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..</a><OriginalName v="f.png"></OriginalName><FileSize v="108188"></FileSize><meta type="photo" originalName="f.png"></meta></URIObject>', file=File(name='f.png', size='108188', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/imgt1_anim', urlView='https://login.skype.com/login/sso?go=xmmfallback?pic=0-weu-d3-abcdef..'))
+
+                result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL,
+                              type=skypedata.MESSAGE_TYPE_SHARE_PHOTO)
+
+            elif isinstance(item, skpy.SkypeFileMsg):  # Superclass for SkypeImageMsg, SkypeAudioMsg, SkypeVideoMsg
+                # SkypeFileMsg(id='1594466346559', type='RichText/Media_GenericFile', time=datetime.datetime(2020, 7, 11, 11, 18, 19, 39000), clientId='8167024171841589273', userId='username', chatId='8:username', content='<URIObject uri="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef.." url_thumbnail="https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original" type="File.1" doc_id="0-weu-d3-abcdef..">To view this file, go to: <a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..">https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-abcdef..</a><OriginalName v="f.txt"></OriginalName><FileSize v="447"></FileSize></URIObject>', file=File(name='f.txt', size='447', urlFull='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef..', urlThumb='https://api.asm.skype.com/v1/objects/0-weu-d3-abcdef../views/original', urlView='https://login.skype.com/login/sso?go=webclient.xmm&docid=0-weu-d3-abcdef..'))
+
+                filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
+                fileurl = item.file.urlFull
+                result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
+                              body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' % 
+                                       (urllib.quote(util.to_unicode(filesize or 0)),
+                                        urllib.quote(util.to_unicode(fileurl or ""), ":/"),
+                                        util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             else: # SkypeCardMsg, SkypeChangeMemberMsg, ..
                 result = None
