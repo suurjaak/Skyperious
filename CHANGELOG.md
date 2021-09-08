@@ -2,9 +2,9 @@ CHANGELOG
 =========
 
 
-4.8.1, 2021-08-05
+4.8.1, 2021-09-08
 ---------------
-- fixed audio/video messages imported from live as simple file transfers (issue #102).
+- fixed audio/video messages being imported from live as simple file transfers (issue #102).
 
 
 4.8, 2021-08-01
