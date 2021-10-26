@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2021
+@modified    26.10.2021
 ------------------------------------------------------------------------------
 """
 import ast
@@ -24,6 +24,7 @@ import math
 import os
 import re
 import shutil
+import string
 import sys
 import textwrap
 import time
@@ -5490,7 +5491,12 @@ class DatabasePage(wx.Panel):
                     t = p["contact"]["name"]
                     if p["identity"] != p["contact"]["name"]:
                         t += " (%s)" % p["identity"]
-                    plist.InsertImageStringItem(index, t, b, it_kind=1)
+                    t = t.replace("\n", " ")
+                    try: plist.InsertImageStringItem(index, t, b, it_kind=1)
+                    except Exception:
+                        t = re.sub(r"[^\w %s]" % re.escape(string.punctuation),
+                                   lambda m: "#%s" % ord(m.group(0)), t, re.U)
+                        plist.InsertImageStringItem(index, t, b, it_kind=1)
                     plist.SetItemTextColour(index,       plist.ForegroundColour)
                     plist.SetItemBackgroundColour(index, plist.BackgroundColour)
                     c = plist.GetItem(index)

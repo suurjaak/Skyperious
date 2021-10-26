@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+4.8.2, 2021-10-26
+---------------
+- fixed error on opening chat with linefeeds in participant name (issue #103).
+
+
 4.8.1, 2021-08-05
 ---------------
 - fixed audio/video messages imported from live as simple file transfers (issue #102).
