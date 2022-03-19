@@ -9,17 +9,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    30.07.2021
+@modified    22.03.2022
 ------------------------------------------------------------------------------
 """
 import datetime
 import functools
 import logging
-import Queue
 import re
 import threading
 import traceback
 
+from six.moves import queue
 try:
     import wx
 except ImportError:
@@ -49,7 +49,7 @@ class WorkerThread(threading.Thread):
         self._is_running   = False # Flag whether thread is running
         self._is_working   = False # Flag whether thread is currently working
         self._drop_results = False # Flag to not post back obtained results
-        self._queue = Queue.Queue()
+        self._queue = queue.Queue()
 
 
     def work(self, data):
@@ -517,7 +517,7 @@ class MergeThread(WorkerThread):
         result = {"output": "", "index": 0, "count": 0, "chatindex": 0,
                   "chatcount": 0, "params": params, "chats": [],
                   "type": "diff_merge_left"}
-        error, e = None, None
+        error, exc = None, None
         compared = []
         db1, db2 = params["db1"], params["db2"]
         try:
@@ -586,6 +586,7 @@ class MergeThread(WorkerThread):
                     result = dict(result, output="", chats=[])
         except Exception as e:
             error = traceback.format_exc()
+            exc = e
         finally:
             if not self._drop_results:
                 if compared:
@@ -601,7 +602,7 @@ class MergeThread(WorkerThread):
                           "output": info, "params": params, "chats": [] }
                 if error:
                     result["error"] = error
-                    if e: result["error_short"] = repr(e)
+                    if exc: result["error_short"] = repr(exc)
                 self.postback(result)
 
 

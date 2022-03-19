@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.03.2022
+@modified    22.03.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -25,7 +25,6 @@ import locale
 import logging
 import io
 import itertools
-import Queue
 import os
 import re
 import shutil
@@ -36,6 +35,8 @@ import time
 import traceback
 import warnings
 
+import six
+from six.moves import queue
 try:
     import wx
     is_gui_possible = True
@@ -205,7 +206,7 @@ ARGUMENTS = {
               "action": "store_true", "required": False,
               "help": "store given password in configuration"},
              {"args": ["FILE"], "nargs": 1,
-              "help": "Skype database file to create. Overwritten if exists."},
+              "help": "Skype database file to create. Skipped if exists."},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
@@ -260,12 +261,27 @@ logger = logging.getLogger(__package__)
 window = None # Application main window instance
 
 
+class MainApp(wx.App):
+
+    def InitLocale(self):
+        self.ResetLocale()
+        if "win32" == sys.platform:  # Avoid dialog buttons in native language
+            mylocale = wx.Locale(wx.LANGUAGE_ENGLISH_US, wx.LOCALE_LOAD_DEFAULT)
+            mylocale.AddCatalog("wxstd")
+            self._initial_locale = mylocale  # Override wx.App._initial_locale
+            # Workaround for MSW giving locale as "en-US"; standard format is "en_US".
+            # Py3 provides "en[-_]US" in wx.Locale names and accepts "en" in locale.setlocale();
+            # Py2 provides "English_United States.1252" in wx.Locale.SysName and accepts only that.
+            name = mylocale.SysName if sys.version_info < (3, ) else mylocale.Name.split("_", 1)[0]
+            locale.setlocale(locale.LC_ALL, name)
+
+
 class LineSplitFormatter(argparse.HelpFormatter):
     """Formatter for argparse that retains newlines in help texts."""
 
     def _split_lines(self, text, width):
         return sum((textwrap.wrap(re.sub(r"\s+", " ", t).strip(), width)
-                    for t in text.split("\n")), [])
+                    for t in text.splitlines()), [])
 
 
 def except_hook(etype, evalue, etrace):
@@ -321,7 +337,7 @@ def run_merge(filenames, output_filename=None):
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     db_base = dbs.pop()
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
-    postbacks = Queue.Queue()
+    postbacks = queue.Queue()
 
     name, ext = os.path.splitext(os.path.basename(db_base.filename))
     now = datetime.datetime.now().strftime("%Y%m%d")
@@ -390,7 +406,7 @@ def run_merge(filenames, output_filename=None):
 def run_search(filenames, query):
     """Searches the specified databases for specified query."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
-    postbacks = Queue.Queue()
+    postbacks = queue.Queue()
     args = {"text": query, "table": "messages", "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
@@ -458,7 +474,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 chat = cc[0] if cc else None
 
                 title = chat["title_long_lc"] if chat else result["chat"]
-                if isinstance(title, unicode):
+                if isinstance(title, six.text_type):
                     # Use encoded title for length constraint to work,
                     # if output would introduce escape sequences.
                     title2 = title.encode(enc, errors="backslashreplace")
@@ -540,7 +556,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         prompt = "%s does not exist, enter Skype username: " % filename
         while not file_existed and not username:
             output(prompt, end="")
-            username = raw_input().strip()
+            username = six.moves.input().strip()
 
         db = skypedata.SkypeDatabase(filepath, truncate=not file_existed)
         username = db.username or username
@@ -548,7 +564,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         prompt = "%s does not contain account information, enter Skype username: " % filename
         while not username and not conf.IsCLINonTerminal:
             output(prompt, end="")
-            username = raw_input().strip()
+            username = six.moves.input().strip()
             if username: break # while not username
 
         if conf.IsCLINonTerminal and (not username or not password):
@@ -623,7 +639,7 @@ def run_create(filenames, input=None, username=None, password=None,
 
     if not input: # Create blank database, with just account username
         logger.info("Creating new blank database %s for user '%s'.", filename, username)
-        db = skypedata.SkypeDatabase(filename)
+        db = skypedata.SkypeDatabase(filename, truncate=True)
         db.ensure_schema()
         db.insert_account({"skypename": username})
         output("Created blank database %s for user %s." % (filename, username))
@@ -659,7 +675,7 @@ def run_create(filenames, input=None, username=None, password=None,
         logger.exception("Error importing Skype export archive %s.", filename)
         util.try_ignore(db.close)
         util.try_ignore(os.unlink, filename)
-        raise e, None, tb
+        six.reraise(type(e), e, tb)
 
     bar.stop()
     bar.pulse = False
@@ -681,7 +697,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
     if is_xlsx_single: format = "xlsx"
-    timerange = map(util.datetime_to_epoch, (start_date, end_date))
+    timerange = [util.datetime_to_epoch(x) for x in (start_date, end_date)]
     output_dir = output_dir or os.getcwd()
 
     for db in dbs:
@@ -763,7 +779,7 @@ def run_diff(filename1, filename2):
         return
     db1, db2 = map(skypedata.SkypeDatabase, [filename1, filename2])
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
-    postbacks = Queue.Queue()
+    postbacks = queue.Queue()
 
     AFTER_MAX = sys.maxsize if conf.IsCLINonTerminal else 20
     bar_text = " Scanning %s%s vs %s%s.." % ("..." if len(db1.filename) > AFTER_MAX else "",
@@ -798,7 +814,7 @@ def run_diff(filename1, filename2):
                 msgs_text = util.plural("%smessage" % newstr, msgs) if msgs else ""
                 contacts_text = util.plural("%sparticipant" % newstr, contacts) \
                                 if contacts else ""
-                text = ", ".join(filter(None, [msgs_text, contacts_text]))
+                text = ", ".join(filter(bool, [msgs_text, contacts_text]))
                 title = result["chats"][0]["chat"]["title"]
                 if len(title) > TITLE_MAX: title = title[:TITLE_MAX] + ".."
                 if new_chat: title += " - new chat"
@@ -834,10 +850,7 @@ def run_gui(filenames):
     sys.excepthook = except_hook
 
     # Create application main window
-    app = wx.App(redirect=True) # stdout and stderr redirected to wx popup
-    # Avoid dialog buttons in native language
-    mylocale = wx.Locale(wx.LANGUAGE_ENGLISH_US, wx.LOCALE_LOAD_DEFAULT)
-    mylocale.AddCatalog("wxstd")
+    app = MainApp(redirect=True) # stdout and stderr redirected to wx popup
     window = gui.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
 
@@ -884,7 +897,7 @@ def run(nogui=False):
             subparser.add_argument(*arg["args"], **kwargs)
 
     argv = sys.argv[:]
-    if "nt" == os.name: # Fix Unicode arguments, otherwise converted to ?
+    if "nt" == os.name and six.PY2: # Fix Unicode arguments, otherwise converted to ?
         argv = win32_unicode_argv(argv)
     argv = argv[1:]
     if not argv or (argv[0] not in subparsers.choices
@@ -917,10 +930,11 @@ def run(nogui=False):
         conf.IsCLI = True
         conf.IsCLIVerbose     = arguments.verbose
         conf.IsCLINonTerminal = arguments.no_terminal
-        # Avoid Unicode errors when printing to console.
-        enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
-        sys.stdout = codecs.getwriter(enc)(sys.stdout, "backslashreplace")
-        sys.stderr = codecs.getwriter(enc)(sys.stderr, "backslashreplace")
+        if six.PY2:
+            # Avoid Unicode errors when printing to console.
+            enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
+            sys.stdout = codecs.getwriter(enc)(sys.stdout, "backslashreplace")
+            sys.stderr = codecs.getwriter(enc)(sys.stderr, "backslashreplace")
 
         if conf.IsCLIVerbose:
             handler = logging.StreamHandler(sys.stderr)
@@ -1036,10 +1050,10 @@ class ConsoleWriter(object):
 
     def on_exe_exit(self):
         """atexit handler for compiled binary, keeps window open for a minute."""
-        q = Queue.Queue()
+        q = queue.Queue()
 
         def waiter():
-            raw_input()
+            six.moves.input()
             q.put(None)
 
         def ticker():
@@ -1117,7 +1131,7 @@ class ProgressBar(threading.Thread):
                                         self.forechar * (self.width - 2),
                                         self.afterword)
             else:
-                dash = self.forechar * max(1, (self.width - 2) / 7)
+                dash = self.forechar * max(1, (self.width - 2) // 7)
                 pos = self.pulse_pos
                 if pos < len(dash):
                     dash = dash[:pos]
@@ -1142,7 +1156,7 @@ class ProgressBar(threading.Thread):
                        self.backchar * (w_full - w_done), self.afterword)
             # Write percentage into the middle of the bar
             centertxt = " %2d%% " % percent
-            pos = len(self.foreword) + self.width / 2 - len(centertxt) / 2
+            pos = len(self.foreword) + self.width // 2 - len(centertxt) // 2
             bartext = bartext[:pos] + centertxt + bartext[pos + len(centertxt):]
             self.percent = percent
         self.printbar = bartext + " " * max(0, len(self.bar) - len(bartext))
@@ -1210,7 +1224,7 @@ def output(s="", **kwargs):
     try: print(s, **kwargs)
     except UnicodeError:
         try:
-            if isinstance(s, str): print(s.decode(errors="replace"), **kwargs)
+            if isinstance(s, six.binary_type): print(s.decode(errors="replace"), **kwargs)
         except Exception: pass
     try:
         sys.stdout.flush() # Uncatchable error otherwise if interrupted

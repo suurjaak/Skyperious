@@ -31,11 +31,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import re
 
 
+try:              text_type, string_types = unicode, (basestring, )  # Py2
+except NameError: text_type, string_types = str,     (str, )         # Py3
+
+
 class Template(object):
 
     COMPILED_TEMPLATES = {} # {(template string, compile options): code object}
     # Regex for stripping all leading, trailing and interleaving whitespace.
-    RE_STRIP = re.compile("(^[ \t]+|[ \t]+$|(?<=[ \t])[ \t]+|\A[\r\n]+|[ \t\r\n]+\Z)", re.M)
+    RE_STRIP = re.compile(r"(^[ \t]+|[ \t]+$|(?<=[ \t])[ \t]+|\A[\r\n]+|[ \t\r\n]+\Z)", re.M)
 
     def __init__(self, template, strip=True, escape=False):
         """Initialize class"""
@@ -55,7 +59,7 @@ class Template(object):
         """Return the expanded template string"""
         output = []
         namespace.update(kw, **self.builtins)
-        namespace["echo"]  = lambda s: output.append(s)
+        namespace["echo"]  = output.append
         namespace["isdef"] = lambda v: v in namespace
 
         eval(compile(self.code, "<string>", "exec"), namespace)
@@ -106,7 +110,7 @@ class Template(object):
             # Replace '<\%' and '%\>' escapes
             blk = re.sub(r"<\\%", "<%", re.sub(r"%\\>", "%>", blk))
             # Unescape '%{}' characters
-            blk = re.sub(r"\\(%|{|})", "\g<1>", blk)
+            blk = re.sub(r"\\(%|{|})", r"\g<1>", blk)
 
             if not (n % 2):
                 # Escape double-quote characters
@@ -145,13 +149,15 @@ class Template(object):
 def escape_html(x):
     """Escape HTML special characters &<> and quotes "'."""
     CHARS, ENTITIES = "&<>\"'", ["&amp;", "&lt;", "&gt;", "&quot;", "&#39;"]
-    string = x if isinstance(x, basestring) else str(x)
+    string = x if isinstance(x, text_type) else str(x)
     for c, e in zip(CHARS, ENTITIES): string = string.replace(c, e)
     return string
 
 
 def to_unicode(x, encoding="utf-8"):
     """Convert anything to Unicode."""
-    if not isinstance(x, unicode):
-        x = unicode(str(x), encoding, errors="replace")
+    if isinstance(x, bytes):
+        x = text_type(x, encoding, errors="replace")
+    elif not isinstance(x, string_types):
+        x = text_type(str(x))
     return x

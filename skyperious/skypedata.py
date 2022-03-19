@@ -8,14 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.03.2022
+@modified    22.03.2022
 ------------------------------------------------------------------------------
 """
-import cgi
 import collections
 import copy
-import cStringIO
 import datetime
+import io
 import json
 import logging
 import math
@@ -26,10 +25,11 @@ import shutil
 import sys
 import textwrap
 import time
-import urllib
 import warnings
 from xml.etree import cElementTree as ElementTree
 
+import six
+from six.moves import urllib
 try: import wx # For avatar bitmaps in GUI program
 except ImportError: pass
 
@@ -200,7 +200,7 @@ class SkypeDatabase(object):
             self.connection = sqlite3.connect(self.filename,
                                               check_same_thread=False)
             self.connection.row_factory = self.row_factory
-            self.connection.text_factory = str
+            self.connection.text_factory = six.binary_type
             rows = self.execute("SELECT name, sql FROM sqlite_master "
                                 "WHERE type = 'table'").fetchall()
             for row in rows:
@@ -209,7 +209,7 @@ class SkypeDatabase(object):
             _, e, tb = sys.exc_info()
             if log_error: logger.exception("Error opening database %s.", self.filename)
             self.close()
-            raise e, None, tb
+            six.reraise(type(e), e, tb)
         from . import live # Avoid circular import
         if not truncate: self.update_accountinfo(log_error=log_error)
         self.live = live.SkypeLogin(self)
@@ -583,15 +583,17 @@ class SkypeDatabase(object):
         for idx, col in enumerate(cursor.description):
             name = col[0]
             result[name] = row[idx]
-        for name in result.keys():
+        for name in list(result):
             datatype = type(result[name])
-            if datatype is buffer:
+            if sys.version_info < (3, ) and datatype is buffer:  # Py2
                 result[name] = str(result[name]).decode("latin1")
-            elif datatype is str or datatype is unicode:
+            elif datatype is memoryview:
+                result[name] = datatype.to_bytes().decode("latin1")
+            elif datatype is six.binary_type:
                 try:
-                    result[name] = str(result[name]).decode("utf-8")
+                    result[name] = result[name].decode("utf-8")
                 except Exception:
-                    result[name] = str(result[name]).decode("latin1")
+                    result[name] = result[name].decode("latin1")
         return result
 
 
@@ -669,7 +671,7 @@ class SkypeDatabase(object):
                 # Can contain old chat ID base64-encoded into new identity:
                 # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
                 pattern = r"(\d+:)([^@]+)(.*)"
-                repl = lambda x: x.group(2).decode("base64")
+                repl = lambda x: util.b64decode(x.group(2))
                 try:
                     oldid = re.sub(pattern, repl, str(c["identity"]))
                     if oldid in idmap:
@@ -1097,7 +1099,7 @@ class SkypeDatabase(object):
         map_columns = dict([(i["name"], i) for i in col_data])
         for i, val in enumerate(list_values):
             if "blob" == map_columns[list_columns[i]]["type"].lower() and val:
-                if isinstance(val, unicode):
+                if isinstance(val, six.text_type):
                     try:
                         val = val.encode("latin1")
                     except Exception:
@@ -1208,8 +1210,7 @@ class SkypeDatabase(object):
             chat_cols = ", ".join(chat_fields + ["conv_dbid"])
             chat_vals = ", ".join("?" * (len(chat_fields) + 1))
 
-            timestamp_earliest = source_chat["creation_timestamp"] \
-                                 or sys.maxint
+            timestamp_earliest = source_chat["creation_timestamp"] or sys.maxsize
 
             for i, m in enumerate(source_db.message_iterator(messages)):
                 # Insert corresponding Chats entry, if not present
@@ -1269,7 +1270,7 @@ class SkypeDatabase(object):
                 result.append(m_id)
                 if heartbeat and beatcount and i and not i % beatcount:
                     heartbeat()
-            if (timestamp_earliest
+            if (timestamp_earliest and chat["creation_timestamp"]
             and chat["creation_timestamp"] > timestamp_earliest):
                 # Conversations.creation_timestamp must not be later than the
                 # oldest message, Skype will not show messages older than that.
@@ -1631,7 +1632,7 @@ class MessageParser(object):
     SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 
     """Replacer callback for low bytes unusable in XML (\x00 etc)."""
-    SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape")
+    SAFEBYTE_REPL = lambda self, m: m.group(0).encode("unicode-escape").decode("latin1")
 
     """Mapping known failure reason codes to """
     FAILURE_REASONS = {"1": "Failed", "4": "Not enough Skype Credit."}
@@ -1741,7 +1742,7 @@ class MessageParser(object):
         elif dom is not None and "text" == output.get("format"):
             result = self.dom_to_text(dom)
             if output.get("wrap"):
-                linelists = map(self.textwrapfunc, result.split("\n"))
+                linelists = [self.textwrapfunc(x) for x in result.splitlines()]
                 ll = "\n".join(j if j else "" for i in linelists for j in i)
                 # Force DOS linefeeds
                 result = re.sub("([^\r])\n", lambda m: m.group(1) + "\r\n", ll)
@@ -1769,7 +1770,7 @@ class MessageParser(object):
 
         for entity, value in self.REPLACE_ENTITIES.items():
             body = body.replace(entity, value)
-        body = body.encode("utf-8")
+        if sys.version_info < (3, ): body = body.encode("utf-8")
         if (message["type"] == MESSAGE_TYPE_MESSAGE and "<" not in body
         and self.EMOTICON_CHARS_RGX.search(body)):
             # Replace emoticons with <ss> tags if message appears to
@@ -1925,7 +1926,7 @@ class MessageParser(object):
         elif message["type"] in [MESSAGE_TYPE_PARTICIPANTS,
         MESSAGE_TYPE_GROUP, MESSAGE_TYPE_BLOCK, MESSAGE_TYPE_REMOVE,
         MESSAGE_TYPE_SHARE_DETAIL]:
-            names = sorted(get_contact_name(x) for x in filter(None,
+            names = sorted(get_contact_name(x) for x in filter(bool,
                            (message.get("identities") or "").split(" ")))
             dom.clear()
             dom.text = "Added "
@@ -2020,13 +2021,14 @@ class MessageParser(object):
                 elif "swift"   in objtype:
                     # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
                     try:
-                        pkg = json.loads(next(dom0.iter("Swift")).get("b64").decode("base64"))
+                        val = next(dom0.iter("Swift")).get("b64")
+                        pkg = json.loads(util.b64decode(val))
                         if "message/card" == pkg["type"]:
                             # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
                             url = pkg["attachments"][0]["content"]["images"][0]["url"]
                             data.update(category="card", url=live.make_content_url(url, "card"))
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' % 
-                                                (urllib.quote(url, ":/=?&#"), url), message)
+                                                (urllib.parse.quote(url, ":/=?&#"), url), message)
                     except Exception: pass
 
                 url = data["url"] = live.make_content_url(data["url"], data.get("category"))
@@ -2175,19 +2177,17 @@ class MessageParser(object):
                     elem[index] = table # Replace <quote> element in parent
                 elif "ss" == subelem.tag: # Emoticon
                     if output.get("export"):
-                        emot, emot_type = subelem.text, subelem.get("type")
-                        template, vals = "<span>%s</span>", [emot]
+                        emot_type = subelem.get("type")
+                        span = ElementTree.Element("span")
+                        if subelem.text: span.text = subelem.text
+                        if subelem.tail: span.tail = subelem.tail
                         if hasattr(emoticons, emot_type):
                             data = emoticons.EmoticonData[emot_type]
                             title = data["title"]
                             if data["strings"][0] != data["title"]:
                                 title += " " + data["strings"][0]
-                            template = "<span class=\"emoticon %s\" " \
-                                       "title=\"%s\">%s</span>"
-                            vals = [emot_type, title, emot]
-                        span_str = template % tuple(map(cgi.escape, vals))
-                        span = ElementTree.fromstring(span_str)
-                        span.tail = subelem.tail
+                            span.attrib["title"] = title
+                            span.attrib["class"] = "emoticon " + emot_type
                         elem[index] = span # Replace <ss> element in parent
                 elif subelem.tag in ["msgstatus", "bodystatus"]:
                     subelem.tag = greytag
@@ -2204,8 +2204,8 @@ class MessageParser(object):
                     subelem.set("target", "_blank")
                     if output.get("export"):
                         try:
-                            href = urllib.unquote(subelem.get("href").encode("utf-8"))
-                            subelem.set("href", urllib.quote(href, ":/=?&#"))
+                            href = urllib.parse.unquote(subelem.get("href").encode("utf-8"))
+                            subelem.set("href", urllib.parse.quote(href, ":/=?&#"))
                         except Exception: pass
                     else: # Wrap content in system link colour
                         t = "<font color='%s'></font>" % conf.SkypeLinkColour
@@ -2228,9 +2228,16 @@ class MessageParser(object):
                 continue # for elem
             for i, v in enumerate([elem.text, elem.tail]):
                 v and setattr(elem, "tail" if i else "text", self.wrapfunc(v))
+
+        def dom_to_string(d, encoding="utf-8"):
+            """Returns XML element as string, unwrapped from <?xml ..?><xml> .. </xml>."""
+            result = ElementTree.tostring(d, encoding).decode(encoding)
+            if "<xml>" in result: result = result[result.index("<xml>") + 5:]
+            if result.endswith("</xml>"): result = result[:-6]
+            return result
+
         try:
-            # Discard <?xml ..?><xml> tags from start, </xml> from end
-            result = ElementTree.tostring(dom, "UTF-8")[44:-6]
+            result = dom_to_string(dom)
         except Exception as e:
             # If ElementTree.tostring fails, try converting all text
             # content from UTF-8 to Unicode.
@@ -2238,7 +2245,7 @@ class MessageParser(object):
             for elem in [dom] + dom.findall("*"):
                 for attr in ["text", "tail"]:
                     val = getattr(elem, attr)
-                    if val and isinstance(val, str):
+                    if val and isinstance(val, six.binary_type):
                         try:
                             setattr(elem, attr, val.decode("utf-8"))
                         except Exception as e:
@@ -2246,9 +2253,9 @@ class MessageParser(object):
                                          " of %s for \"%s\": %s", attr, val,
                                          type(val), elem, message["body_xml"], e)
             try:
-                result = ElementTree.tostring(dom, "UTF-8")[44:-6]
+                result = dom_to_string(dom)
             except Exception:
-                logger.error("Failed to parse the message \"%s\" from %s.",
+                logger.error('Failed to parse the message "%s" from %s.',
                              message["body_xml"], message["author"])
                 result = message["body_xml"] or ""
                 result = result.replace("<", "&lt;").replace(">", "&gt;")
@@ -2327,8 +2334,7 @@ class MessageParser(object):
             self.stats["counts"][author] = collections.defaultdict(lambda: 0)
         hourkey, daykey = message["datetime"].hour, message["datetime"].date()
         if not self.stats["workhist"]:
-            MAXSTAMP = MessageParser.MessageStamp(
-                datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
+            MAXSTAMP = MessageParser.MessageStamp(datetime.datetime.max, sys.maxsize)
             intdict   = lambda: collections.defaultdict(int)
             stampdict = lambda: collections.defaultdict(lambda: MAXSTAMP)
             self.stats["workhist"] = {
@@ -2394,9 +2400,9 @@ class MessageParser(object):
                 continue
             text = elem.text or ""
             tail = tails_new[elem] if elem in tails_new else (elem.tail or "")
-            if type(text) is str:
+            if isinstance(text, six.binary_type):
                 text = text.decode("utf-8")
-            if type(tail) is str:
+            if isinstance(tail, six.binary_type):
                 tail = tail.decode("utf-8")
             subitems = []
             if "quote" == elem.tag:
@@ -2508,8 +2514,7 @@ class MessageParser(object):
                     stats["hists"][author]["days"][bindate] = 0
             max_bindate = max(stats["totalhist"]["days"])
             # Fill total histogram and author days
-            MAXSTAMP = MessageParser.MessageStamp(
-                datetime.datetime(9999, 12, 31, 23, 59, 59), sys.maxint)
+            MAXSTAMP = MessageParser.MessageStamp(datetime.datetime.max, sys.maxsize)
             stampfactory = lambda: collections.defaultdict(lambda: MAXSTAMP)
             daystamps = collections.defaultdict(stampfactory)
             for date, counts in sorted(stats["workhist"]["days"].items()):
@@ -2647,10 +2652,10 @@ def is_sqlite_file(filename, path=None):
             result = bool(os.path.getsize(fullpath))
             if result:
                 result = False
-                SQLITE_HEADER = "SQLite format 3\00"
+                SQLITE_HEADER = b"SQLite format 3\00"
                 with open(fullpath, "rb") as f:
                     result = (f.read(len(SQLITE_HEADER)) == SQLITE_HEADER)
-        except Exception: pass
+        except Exception: raise
     return result
 
 
@@ -2673,7 +2678,7 @@ def detect_databases(progress):
     else:
         search_paths = [os.getenv("HOME"),
                         "/Users" if "mac" == os.name else "/home"]
-    search_paths = map(util.to_unicode, search_paths)
+    search_paths = [util.to_unicode(x) for x in search_paths]
 
     WINDOWS_APPDIRS = ["application data", "roaming"]
     for search_path in filter(os.path.exists, search_paths):
@@ -2725,7 +2730,7 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
                         datadict.get("profile_attachments") or "")
     if raw:
         try:
-            img = wx.Image(cStringIO.StringIO(raw))
+            img = wx.Image(io.BytesIO(raw.encode("latin1")))
             if img:
                 if size and list(size) != list(img.GetSize()):
                     img = util.img_wx_resize(img, size, aspect_ratio)
@@ -2759,19 +2764,19 @@ def get_avatar_raw(datadict, size=None, aspect_ratio=True, format="PNG"):
 
 def fix_image_raw(raw):
     """Returns the raw image bytestream with garbage removed from front."""
-    JPG_HEADER = "\xFF\xD8\xFF\xE0\x00\x10JFIF"
-    PNG_HEADER = "\x89PNG\r\n\x1A\n"
-    if isinstance(raw, unicode):
+    JPG_HEADER = b"\xFF\xD8\xFF\xE0\x00\x10JFIF"
+    PNG_HEADER = b"\x89PNG\r\n\x1A\n"
+    if isinstance(raw, six.text_type):
         raw = raw.encode("latin1")
     if JPG_HEADER in raw:
         raw = raw[raw.index(JPG_HEADER):]
     elif PNG_HEADER in raw:
         raw = raw[raw.index(PNG_HEADER):]
-    elif raw.startswith("\0"):
+    elif raw.startswith(b"\0"):
         raw = raw[1:]
-        if raw.startswith("\0"):
-            raw = "\xFF" + raw[1:]
-    return raw
+        if raw.startswith(b"\0"):
+            raw = b"\xFF" + raw[1:]
+    return raw.decode("latin1")
 
 
 

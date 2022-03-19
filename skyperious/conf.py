@@ -13,7 +13,8 @@ Released under the MIT License.
 @modified    19.03.2022
 ------------------------------------------------------------------------------
 """
-from ConfigParser import RawConfigParser
+try: from ConfigParser import RawConfigParser                 # Py2
+except ImportError: from configparser import RawConfigParser  # Py3
 import datetime
 import json
 import os
@@ -21,10 +22,9 @@ import sys
 
 import appdirs
 
-
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "4.8.2.dev1"
+Version = "5.0.dev0"
 VersionDate = "19.03.2022"
 
 if getattr(sys, "frozen", False):
@@ -374,6 +374,9 @@ def load():
     """Loads FileDirectives from ConfigFile into this module's attributes."""
     global Defaults, VarDirectory, ConfigFile
 
+    try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
+    except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
+
     configpaths = [ConfigFile]
     if not Defaults:
         # Instantiate OS- and user-specific paths
@@ -387,7 +390,6 @@ def load():
 
     section = "*"
     module = sys.modules[__name__]
-    VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))
     Defaults = {k: v for k, v in vars(module).items() if not k.startswith("_")
                 and isinstance(v, VARTYPES)}
 
@@ -435,7 +437,7 @@ def save():
         for path in configpaths:
             try: os.makedirs(os.path.dirname(path))
             except Exception: pass
-            try: f = open(path, "wb")
+            try: f = open(path, "w")
             except Exception: continue # for path
             else: break # for path
 

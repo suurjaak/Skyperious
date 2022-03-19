@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    05.08.2021
+@modified    25.03.2022
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import collections, base64, datetime, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, urllib, wx
+#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -23,7 +23,7 @@ import re
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 
 """Replacer callback for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
-SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
+SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape").decode("latin1")
 
 
 """
@@ -45,7 +45,9 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import base64, collections, datetime, json, urllib
+import collections, datetime, functools, json
+import six
+from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
 from skyperious.lib.vendor import step
@@ -664,7 +666,7 @@ from skyperious.lib.vendor import step
   </style>
   <script>
 <%
-MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.index(b)) for m in b["messages"]], a)[-1], timeline, {})
+MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.index(b)) for m in b["messages"]], a)[-1], timeline, {})
 %>
     var HIGHLIGHT_STYLES = 10;
     var TIMELINES = {{! json.dumps([x["datestr"] for x in timeline]) }};
@@ -939,7 +941,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <a title="Click to hide timeline" href="javascript:;" class="toggle" onclick="return toggle_element('timeline')">x</a>
 <ul>
 %for entry in timeline:
-  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.quote(entry["datestr"]) }}">
+  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.parse.quote(entry["datestr"]) }}">
     <a href="#message:{{ entry["messages"][0] }}" title="{{ entry["datestr"] }} : {{ util.plural("message", entry["messages"], sep=",") }}">
 %if entry["unit"] in ("month", "day"):
       <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
@@ -964,14 +966,14 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
       <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
 %elif chat_picture_raw:
-      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/png;base64,{{! base64.b64encode(chat_picture_raw) }}" />
+      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/png;base64,{{! util.b64encode(chat_picture_raw) }}" />
 %endif
     </td>
     <td id="header_center">
@@ -1019,7 +1021,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
       <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
@@ -1038,7 +1040,7 @@ filterer = lambda p: not stats["counts"] or p["identity"] == db.id or p["identit
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
+    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
     <span class="identity" title="{{ p["identity"] }}">
         {{ p["identity"] }}
 %if 1 == p.get("rank"):
@@ -1116,7 +1118,7 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
-        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -1219,7 +1221,7 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr><td>
-        <table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table>
+        <table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
@@ -1258,7 +1260,7 @@ smalltotal = sum(emoticon_counts.get(identity, {}).values())
       <tr>
 %if participant:
         <td><table><tr><td class="avatar">
-        <img title="{{ name }}" alt="{{ name }}" src="data:image/png;base64,{{! base64.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" />
+        <img title="{{ name }}" alt="{{ name }}" src="data:image/png;base64,{{! util.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" />
         </td><td><span>{{ name }}<br /><span class="identity">{{ identity }}</span></span></td></tr></table></td>
 %else:
         <td style="padding: 13px;">{{ name }}</td>
@@ -1413,7 +1415,7 @@ is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
 # with the author, as emoticons have an upper margin pushing the row higher
 text_plain = m.get("body_txt", content)
-emot_start = '<span class="emoticon '
+emot_start = ' class="emoticon '
 shift_row = emot_start in content and (("<br />" not in content and len(text_plain) < 140) or content.index(emot_start) < 140)
 author_class = "remote" if m["author"] != db.id else "local"
 %>
@@ -1456,7 +1458,8 @@ HTML chat history export template for shared media message body.
 @param   ?media_folder   path to save files under, if not embedding
 """
 CHAT_MESSAGE_MEDIA = """<%
-import base64, imghdr, logging, mimetypes, os, urllib
+import imghdr, logging, mimetypes, os
+from six.moves import urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
 
@@ -1483,14 +1486,14 @@ if isdef("media_folder") and media_folder:
     basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:
         logger = logging.getLogger(conf.Title.lower())
         logger.exception("Error saving export image %s.", filepath)
 else:
-    src = "data:%s;base64,%s" % (mimetype, base64.b64encode(content))
+    src = "data:%s;base64,%s" % (mimetype, util.b64encode(content))
 %>
 %if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
   Changed the conversation picture:<br />
@@ -1537,7 +1540,8 @@ HTML chat history export template for shared files message body.
 @param   media_folder  path to save files under
 """
 CHAT_MESSAGE_FILE = """<%
-import logging, os, urllib
+import logging, os
+from six.moves import urllib
 from skyperious import conf
 from skyperious.lib import util
 
@@ -1549,7 +1553,7 @@ Sent {{ util.plural("file", files, numbers=False) }}
 if file["content"]:
     basename = util.safe_filename(file["filename"])
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f:
             f.write(file["content"])
@@ -1784,11 +1788,10 @@ TXT SQL insert statements export template.
 @param   ?create_sql   CREATE TABLE SQL, if any
 """
 SQL_TXT = """<%
-import datetime, re, string
+import datetime
 from skyperious import conf
+from skyperious.lib import util
 
-UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.printable))
-RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
 str_cols = ", ".join(columns)
 %>-- {{ title }}.
 -- Source: {{ db.filename }}.
@@ -1801,32 +1804,7 @@ str_cols = ", ".join(columns)
 %endif
 
 %for row in rows:
-<%
-values = []
-%>
-%for col in columns:
-<%
-value = row[col]
-if isinstance(value, basestring):
-    if RE_UNPRINTABLE.search(value):
-        if isinstance(value, unicode):
-            try:
-                value = value.encode("latin1")
-            except UnicodeError:
-                value = value.encode("utf-8", errors="replace")
-        value = "X'%s'" % value.encode("hex").upper()
-    else:
-        if isinstance(value, unicode):
-            value = value.encode("utf-8")
-        value = '"%s"' % (value.encode("string-escape").replace('\"', '""'))
-elif value is None:
-    value = "NULL"
-else:
-    value = str(value)
-values.append(value)
-%>
-%endfor
-INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(values) }});
+INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
 %endfor
 """
 
@@ -1847,7 +1825,7 @@ HTML statistics template, for use with HtmlWindow.
 @param   expand           {clouds: bool, emoticons, shared_media}
 """
 STATS_HTML = """<%
-import urllib
+from six.moves import urllib
 from skyperious import conf, emoticons, skypedata
 from skyperious.lib import util
 
@@ -1983,7 +1961,7 @@ else:
     </td>
     <td valign="top">
 <%
-safe_id = urllib.quote(p["identity"])
+safe_id = urllib.parse.quote(p["identity"])
 %>
 %if "hours" in authorimages.get(p["identity"] , {}):
       <img src="memory:{{ authorimages[p["identity"]]["hours"] }}" usemap="#{{ safe_id }}-hours" />
@@ -2452,6 +2430,7 @@ HTML template for search result of DB table row, HTML table row.
 """
 SEARCH_ROW_TABLE_HTML = """<%
 import re
+from skyperious.lib import util
 from skyperious import conf, templates
 
 %>
@@ -2461,7 +2440,7 @@ from skyperious import conf, templates
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
-value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(value))
 %>
 <td valign="top">{{! pattern_replace.sub(wrap_b, escape(value)) }}</td>
 %endfor
@@ -2479,6 +2458,7 @@ TXT template for search result of DB table row.
 """
 SEARCH_ROW_TABLE_TXT = """<%
 import re
+from skyperious.lib import util
 from skyperious import conf, templates
 
 %>
@@ -2487,7 +2467,7 @@ from skyperious import conf, templates
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
-value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(value))
 %>
 {{ pattern_replace.sub(wrap_b, value) }}
 %endfor

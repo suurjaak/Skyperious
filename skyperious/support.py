@@ -8,21 +8,19 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    30.07.2021
+@modified    22.03.2022
 ------------------------------------------------------------------------------
 """
-import base64
 import datetime
-import HTMLParser
 import logging
 import os
 import platform
 import re
+import ssl
 import sys
 import tempfile
-import urllib
-import urllib2
-import urlparse
+
+from six.moves import html_parser, urllib
 import wx
 import wx.adv
 
@@ -40,8 +38,10 @@ update_window = None
 """Feedback window reusable instance."""
 feedback_window = None
 
-"""URL-opener with Skyperious useragent."""
-url_opener = urllib2.build_opener()
+"""URL-opener given Skyperious user-agent."""
+url_opener = urllib.request.build_opener(
+    urllib.request.HTTPSHandler(context=ssl._create_unverified_context())
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def check_newest_version(callback=None):
     update_window = True
     try:
         logger.info("Checking for new version at %s.", conf.DownloadURL)
-        html = url_opener.open(conf.DownloadURL).read()
+        html = util.to_unicode(url_opener.open(conf.DownloadURL).read())
         links = re.findall("<a[^>]*\\shref=['\"](.+)['\"][^>]*>", html, re.I)
         if links:
             # Determine release types
@@ -94,14 +94,14 @@ def check_newest_version(callback=None):
                         ul = html[match.end(0):html.find("</ul", match.end(0))]
                         lis = re.findall("(<li[^>]*>(.+)</li\\s*>)+", ul, re.I)
                         items = [re.sub("<[^>]+>", "", x[1]) for x in lis]
-                        items = map(HTMLParser.HTMLParser().unescape, items)
+                        items = list(map(html_parser.HTMLParser().unescape, items))
                         changes = "\n".join("- " + i.strip() for i in items)
                         if changes:
                             title = match.group(1)
                             changes = "Changes in %s\n\n%s" % (title, changes)
                 except Exception:
                     logger.exception("Failed to read changelog.")
-                url = urlparse.urljoin(conf.DownloadURL, link)
+                url = urllib.parse.urljoin(conf.DownloadURL, link)
                 result = (version, url, changes)
     except Exception:
         logger.exception("Failed to retrieve new version from %s.",
@@ -130,7 +130,7 @@ def download_and_install(url):
         urlfile = url_opener.open(url)
         filepath = os.path.join(tmp_dir, filename)
         logger.info("Downloading %s to %s.", url, filepath)
-        filesize = int(urlfile.headers.get("content-length", sys.maxint))
+        filesize = int(urlfile.headers.get("content-length", sys.maxsize))
         with open(filepath, "wb") as f:
             BLOCKSIZE = 65536
             bytes_downloaded = 0
@@ -214,9 +214,9 @@ def send_report(content, type, screenshot=""):
     result = False
     try:
         data = {"content": content.encode("utf-8"), "type": type,
-                "screenshot": base64.b64encode(screenshot),
+                "screenshot": util.b64encode(screenshot),
                 "version": "%s-%s" % (conf.Version, get_install_type())}
-        url_opener.open(conf.ReportURL, urllib.urlencode(data))
+        url_opener.open(conf.ReportURL, urllib.parse.urlencode(data).encode("utf-8"))
         logger.info("Sent %s report to %s (%s).", type, conf.ReportURL, content)
         result = True
     except Exception:
@@ -242,7 +242,7 @@ def canonic_version(v):
     nums[0:0] = [0] * (3 - len(nums)) # Zero-pad if version like 1.4 or just 2
     # Like 1.4a: subtract 1 and add fractions to last number to make < 1.4
     if re.findall("\\d+([\\D]+)$", v):
-        ords = map(ord, re.findall("\\d+([\\D]+)$", v)[0])
+        ords = [ord(x) for x in re.findall("\\d+([\\D]+)$", v)[0]]
         nums[0] += sum(x / (65536. ** (i + 1)) for i, x in enumerate(ords)) - 1
     return sum((x * 100 ** i) for i, x in enumerate(nums))
 
@@ -424,7 +424,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER)
         if wx.ID_OK == dialog.ShowModal() and dialog.GetPath():
             format = (wx.BITMAP_TYPE_PNG, wx.BITMAP_TYPE_BMP)[dialog.FilterIndex]
-            filename = controls.get_savedialog_path(dialog)
+            filename = controls.get_dialog_path(dialog)
             def callback():
                 try:
                     self.screenshot.SaveFile(filename, format)
