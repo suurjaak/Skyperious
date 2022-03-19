@@ -2,9 +2,10 @@ CHANGELOG
 =========
 
 
-4.8.2, 2021-10-26
+4.8.2, 2022-03-19
 ---------------
-- fixed error on opening chat with linefeeds in participant name (issue #103).
+- fixed error on opening chat with linefeeds in participant name (issue #103);
+- ensure database has required tables and fields before starting live sync (issue #106).
 
 
 4.8.1, 2021-08-05

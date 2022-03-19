@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    05.08.2021
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -148,8 +148,7 @@ class SkypeLogin(object):
             truncate = truncate or not os.path.exists(path)
             self.db = skypedata.SkypeDatabase(path, truncate=truncate)
             self.db.live = self
-        for table in self.db.CREATE_STATEMENTS:
-            if table not in self.db.tables: self.db.create_table(table)
+        self.db.ensure_schema(create_only=True)
         self.msg_parser = skypedata.MessageParser(self.db)
 
 
@@ -703,6 +702,7 @@ class SkypeLogin(object):
         if self.populated:
             self.skype = None
             self.login() # Re-login to reset skpy query cache
+        self.db.ensure_schema()
         self.build_cache()
         self.sync_counts.clear()
         if not chats:
@@ -1004,7 +1004,7 @@ class SkypeExport(skypedata.SkypeDatabase):
             fh, dbfilename = tempfile.mkstemp(".db")
             os.close(fh)
         super(SkypeExport, self).__init__(dbfilename, truncate=not self.is_temporary)
-        for table in self.CREATE_STATEMENTS: self.create_table(table)
+        db.ensure_schema()
 
 
     def __str__(self):

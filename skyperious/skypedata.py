@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.08.2021
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 import cgi
@@ -293,7 +293,7 @@ class SkypeDatabase(object):
         """Clears all the currently cached rows."""
         self.table_rows.clear()
         self.table_objects.clear()
-        self.get_tables(True)
+        self.get_tables(refresh=True)
 
 
     def update_accountinfo(self, log_error=True):
@@ -1060,6 +1060,32 @@ class SkypeDatabase(object):
                 self.backup_created = True
 
 
+    def ensure_schema(self, create_only=False):
+        """
+        Adds Skype schema tables and columns not present.
+
+        @param   create_only  create missing tables only, skip missing columns
+        """
+        refresh = False
+        self.get_tables(refresh=True)
+        for t, sql in ((t, self.CREATE_STATEMENTS[t]) for t in self.tables
+                       if not create_only and t in self.CREATE_STATEMENTS):
+            existing = [x["name"] for x in self.get_table_columns(t)]
+            coldefs = next((x.group(1).split(",") for x in [re.match(r".+\((.+)\)", sql)] if x), [])
+            for name, coldef in ((x.split(" ", 1) + [""])[:2] for x in coldefs for x in [x.strip()]):
+                if name not in existing:
+                    self.ensure_backup()
+                    self.execute("ALTER TABLE %s ADD COLUMN %s %s" % (t, name, coldef))
+                    self.connection.commit()
+                    refresh = True
+        for t, sql in self.CREATE_STATEMENTS.items():
+            if t not in self.tables:
+                self.ensure_backup()
+                self.create_table(t, sql)
+                refresh = True
+        if refresh: self.get_tables(refresh=True)
+
+
     def blobs_to_binary(self, values, list_columns, col_data):
         """
         Converts blob columns in the list to sqlite3.Binary, suitable
@@ -1183,7 +1209,7 @@ class SkypeDatabase(object):
             chat_vals = ", ".join("?" * (len(chat_fields) + 1))
 
             timestamp_earliest = source_chat["creation_timestamp"] \
-                                 or sys.maxsize
+                                 or sys.maxint
 
             for i, m in enumerate(source_db.message_iterator(messages)):
                 # Insert corresponding Chats entry, if not present

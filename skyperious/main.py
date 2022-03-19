@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2021
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -624,7 +624,7 @@ def run_create(filenames, input=None, username=None, password=None,
     if not input: # Create blank database, with just account username
         logger.info("Creating new blank database %s for user '%s'.", filename, username)
         db = skypedata.SkypeDatabase(filename)
-        for table in db.CREATE_STATEMENTS: db.create_table(table)
+        db.ensure_schema()
         db.insert_account({"skypename": username})
         output("Created blank database %s for user %s." % (filename, username))
         db.close()
