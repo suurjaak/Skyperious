@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.10.2021
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1639,7 +1639,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         try:
             logger.info("Creating new blank database %s for user '%s'.", filename, user)
             db = skypedata.SkypeDatabase(filename, truncate=True)
-            for table in db.CREATE_STATEMENTS: db.create_table(table)
+            db.ensure_schema()
             db.insert_account({"skypename": user})
             db.tables_list = None # Force reload
             db.update_accountinfo()
