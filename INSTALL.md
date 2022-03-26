@@ -74,5 +74,5 @@ To run from source if Python, pip and git are installed:
     cd Skyperious
     pip install -r requirements.txt
     ./skyperious.sh
-    # or: python -m skyperious
+    # or: cd src && python -m skyperious
 ```

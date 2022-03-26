@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   26.01.2014
-@modified  22.03.2022
+@modified  26.03.2022
 """
 import datetime
 import io
@@ -19,10 +19,10 @@ import zipfile
 
 
 """Target Python script to write."""
-PYTARGET = os.path.join("..", "skyperious", "emoticons.py")
+PYTARGET = os.path.join("..", "src", "skyperious", "emoticons.py")
 
 """Target ZIP file to write."""
-ZIPTARGET = os.path.join("..", "skyperious", "res", "emoticons.zip")
+ZIPTARGET = os.path.join("..", "src", "skyperious", "res", "emoticons.zip")
 
 Q3 = '"""'
 

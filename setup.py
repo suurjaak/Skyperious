@@ -8,10 +8,15 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    19.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
+import os
+import sys
 import setuptools
+
+ROOTPATH  = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(ROOTPATH, "src"))
 
 from skyperious import conf
 
@@ -31,7 +36,8 @@ setuptools.setup(
                       "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
     entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
-    packages=setuptools.find_packages(),
+    package_dir={"": "src"},
+    packages=[conf.Title.lower()],
     include_package_data=True, # Use MANIFEST.in for data files
     classifiers=[
         "Development Status :: 5 - Production/Stable",

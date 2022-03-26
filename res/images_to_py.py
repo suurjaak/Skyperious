@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  22.03.2022
+@modified  26.03.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -18,7 +18,7 @@ import io
 import os
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "skyperious", "images.py")
+TARGET = os.path.join("..", "src", "skyperious", "images.py")
 
 Q3 = '"""'
 

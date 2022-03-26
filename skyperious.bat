@@ -1,1 +1,1 @@
-@start pythonw -m skyperious %*
+@cd src && start pythonw -m skyperious %*

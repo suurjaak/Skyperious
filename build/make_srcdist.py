@@ -4,7 +4,7 @@ skyperious\. Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  22.03.2022
+@modified  26.03.2022
 """
 import glob
 import os
@@ -15,10 +15,10 @@ import zipfile
 
 if "__main__" == __name__:
     INITIAL_DIR = os.getcwd()
-    PACKAGING_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__)))
-    os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-    sys.path.append("skyperious")
-    import conf
+    ROOT_DIR    = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    SRC_DIR     = "src"
+    sys.path.insert(0, os.path.join(ROOT_DIR, SRC_DIR))
+    from skyperious import conf
 
     BASE_DIR = ""
     ZIP_DIR = "skyperious_%s" % conf.Version
@@ -48,14 +48,19 @@ if "__main__" == __name__:
             size += os.path.getsize(fullpath)
         return size
 
+    os.chdir(ROOT_DIR)
     with zipfile.ZipFile(os.path.join(INITIAL_DIR, DEST_FILE), mode="w") as zf:
         size = 0
-        for subdir, wildcard in [("res", "*"),
-        (pathjoin("res", "emoticons"), "*"), ("skyperious", "*.py"),
-        ("skyperious", "skyperious.ini"),
-        ("build", "*"), (pathjoin("skyperious", "lib"), "*.py"),
-        (pathjoin("skyperious", "lib", "vendor"), "*.py"),
-        (pathjoin("skyperious", "res"), "*")]:
+        for subdir, wildcard in [
+            ("build",                                          "*"),
+            ("res",                                            "*"),
+            (pathjoin("res", "emoticons"),                     "*"),
+            (pathjoin(SRC_DIR, "skyperious"),                  "*.py"),
+            (pathjoin(SRC_DIR, "skyperious"),                  "skyperious.ini"),
+            (pathjoin(SRC_DIR, "skyperious", "lib"),           "*.py"),
+            (pathjoin(SRC_DIR, "skyperious", "lib", "vendor"), "*.py"),
+            (pathjoin(SRC_DIR, "skyperious", "res"),           "*")
+        ]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)

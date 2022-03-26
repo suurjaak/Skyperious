@@ -1,2 +1,2 @@
 #!/bin/bash
-exec >/dev/null 2>&1 python -m skyperious "$@"
+cd src && exec >/dev/null 2>&1 python3 -m skyperious "$@"

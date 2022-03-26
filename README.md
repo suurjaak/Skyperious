@@ -117,7 +117,7 @@ Python packages are installed.
 If running from pip installation, run `skyperious` from the command-line. 
 If running from straight source code, launch `skyperious.sh` where shell 
 scripts are supported, or launch `skyperious.bat` under Windows, or open 
-a terminal and run `python2 -m skyperious` in Skyperious directory.
+a terminal to Skyperious src-directory and run `python -m skyperious`.
 
 
 Installation
@@ -139,7 +139,7 @@ Skyperious has a [Dockerfile](build/Dockerfile), see
 Source Dependencies
 -------------------
 
-If running from source code, Skyperious needs Python 2.7 or Python 3.5+,
+If running from source code, Skyperious needs Python 3.5+ or Python 2.7,
 and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
 The following are also listed in `requirements.txt` for pip:

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2497,31 +2497,32 @@ under the MIT License.
 
 {{ conf.Title }} has been built using the following open source software:
 <ul>
-  <li>wxPython{{ " 4.1.0" if getattr(sys, 'frozen', False) else "" }},
+  <li>wxPython,
       <a href="http://wxpython.org"><font color="{{ conf.LinkColour }}">wxpython.org</font></a></li>
-  <li>appdirs{{ " 1.4.4" if getattr(sys, 'frozen', False) else "" }},
+  <li>appdirs,
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
-  <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
+  <li>beautifulsoup4,
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>ijson{{ " 3.1.4" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
-      <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
-  <li>Pillow{{ " 6.2.2" if getattr(sys, 'frozen', False) else "" }},
+  <li>ijson,
+      <a href="https://pypi.org/project/ijson"><font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
+  <li>Pillow,
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
-  <li>pyparsing{{ " 2.4.7" if getattr(sys, 'frozen', False) else "" }},
+  <li>pyparsing,
       <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
-  <li>SkPy{{ " 0.10.4" if getattr(sys, 'frozen', False) else "" }},
+  <li>SkPy,
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>
-  <li>XlsxWriter{{ " 1.4.5" if getattr(sys, 'frozen', False) else "" }},
+  <li>XlsxWriter,
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{ conf.LinkColour }}">
           pypi.org/project/XlsxWriter</font></a></li>
-  <li>jsOnlyLightbox{{ " 0.5.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
-      <font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
+  <li>jsOnlyLightbox,
+      <a href="https://github.com/felixhagspiel/jsOnlyLightbox"><font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
-  <li>PyInstaller, <a href="https://www.pyinstaller.org">
-      <font color="{{ conf.LinkColour }}">www.pyinstaller.org</font></a></li>
+  <li>Python,
+      <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
+  <li>PyInstaller,
+      <a href="https://www.pyinstaller.org"><font color="{{ conf.LinkColour }}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br />
 

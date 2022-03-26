@@ -113,17 +113,17 @@ Attribution
 -----------
 
 Skyperious has been built using the following open-source software:
-- Python 2.7.18 (http://www.python.org)
-- wxPython 4.1.0 (http://www.wxpython.org)
-- appdirs 1.4.4 (https://pypi.org/project/appdirs)
-- beautifulsoup4 4.9.3 (https://pypi.org/project/beautifulsoup4)
-- ijson 3.1.4 (https://pypi.org/project/ijson)
-- Pillow 6.2.2 (https://pypi.org/project/Pillow)
-- pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
-- six 1.16.0 (https://pypi.org/project/six)
-- SkPy 0.10.4 (https://pypi.org/project/SkPy)
+- Python (http://www.python.org)
+- wxPython (http://www.wxpython.org)
+- appdirs (https://pypi.org/project/appdirs)
+- beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
+- ijson (https://pypi.org/project/ijson)
+- Pillow (https://pypi.org/project/Pillow)
+- pyparsing (https://pypi.org/project/pyparsing)
+- six (https://pypi.org/project/six)
+- SkPy (https://pypi.org/project/SkPy)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
-- XlsxWriter 1.4.5 (https://pypi.org/project/XlsxWriter)
+- XlsxWriter (https://pypi.org/project/XlsxWriter)
 
 
 Shared images slideshow in HTML export implemented with jsOnlyLightbox, 

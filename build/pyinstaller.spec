@@ -6,7 +6,7 @@ depending on Python environment.
 Pyinstaller-provided names and variables: Analysis, EXE, PYZ, SPEC, TOC.
 
 @created   03.04.2012
-@modified  23.11.2020
+@modified  26.03.2022
 """
 import os
 import struct
@@ -17,12 +17,12 @@ DO_DEBUGVER = False
 DO_64BIT    = (struct.calcsize("P") * 8 == 64)
 
 BUILDPATH = os.path.dirname(os.path.abspath(SPEC))
-APPPATH   = os.path.join(os.path.dirname(BUILDPATH), NAME)
-ROOTPATH  = os.path.dirname(APPPATH)
+ROOTPATH  = os.path.dirname(BUILDPATH)
+APPPATH   = os.path.join(ROOTPATH, "src")
 os.chdir(ROOTPATH)
-sys.path.append(APPPATH)
+sys.path.insert(0, APPPATH)
 
-import conf
+from skyperious import conf
 
 app_file = "%s_%s%s%s" % (NAME, conf.Version, "_x64" if DO_64BIT else "",
                           ".exe" if "nt" == os.name else "")
@@ -38,10 +38,10 @@ a = Analysis(
     hiddenimports=["imghdr", "mimetypes",   # Imported within templates
                    "ijson.backends.python"] # ijson imports backends indirectly
 )
-a.datas += [("conf.py",             "%s/conf.py" % NAME,             "DATA"), # For configuration docstrings
-            ("res/Carlito.ttf",     "%s/res/Carlito.ttf" % NAME,     "DATA"),
-            ("res/CarlitoBold.ttf", "%s/res/CarlitoBold.ttf" % NAME, "DATA"),
-            ("res/emoticons.zip",   "%s/res/emoticons.zip" % NAME,   "DATA"), ]
+a.datas += [("conf.py",             "src/%s/conf.py"             % NAME, "DATA"), # For configuration docstrings
+            ("res/Carlito.ttf",     "src/%s/res/Carlito.ttf"     % NAME, "DATA"),
+            ("res/CarlitoBold.ttf", "src/%s/res/CarlitoBold.ttf" % NAME, "DATA"),
+            ("res/emoticons.zip",   "src/%s/res/emoticons.zip"   % NAME, "DATA"), ]
 a.binaries = a.binaries - TOC([
     ('tcl85.dll', None, None), ('tk85.dll',  None, None), ('_tkinter',  None, None)
 ])
@@ -59,7 +59,7 @@ exe = EXE(
     strip=False,  # EXE and all shared libraries run through cygwin's strip, tends to render Win32 DLLs unusable
     upx=True, # Using Ultimate Packer for eXecutables
     icon=os.path.join(ROOTPATH, "res", "Icon.ico"),
-    console=False, # Use the Windows subsystem executable instead of the console one
+    console=DO_DEBUGVER, # Use the Windows subsystem executable instead of the console one
 )
 
 try: os.remove(entrypoint)
