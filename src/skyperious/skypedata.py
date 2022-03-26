@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1997,12 +1997,12 @@ class MessageParser(object):
             if not url and link:
                 url = link.get("href")
             elif not url: # Parse link from message contents
-                text = ElementTree.tostring(dom, "utf-8", "text")
+                text = ElementTree.tostring(dom, "unicode", "text")
                 match = re.search(r"(https?://[^\s<]+)", text)
                 if match: # Make link clickable
                     url = match.group(0)
                     a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
-                    text2 = text.replace(url, a.encode("utf-8"))
+                    text2 = text.replace(url, a.encode("utf-8").decode("latin1"))
                     dom = self.make_xml(text2, message) or dom
             if url:
                 data = dict(url=url, author_name=get_author_name(message),

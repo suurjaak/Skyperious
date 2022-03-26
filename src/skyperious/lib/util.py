@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    25.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -403,6 +403,7 @@ def divide_delta(td1, td2):
 def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
     """Recodes and/or resizes the raw image, using PIL or wx."""
     result = raw
+    if isinstance(raw, six.text_type): raw = raw.encode("latin1")
     if ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         img = imgparser.close()
@@ -421,6 +422,7 @@ def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
 def img_size(raw):
     """Returns the size of the as (width, height), using PIL or wx."""
     result = None
+    if isinstance(raw, six.text_type): raw = raw.encode("latin1")
     if ImageFile:
         imgparser = ImageFile.Parser(); imgparser.feed(raw)
         result = tuple(imgparser.close().size)
