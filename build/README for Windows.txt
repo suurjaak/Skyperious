@@ -120,6 +120,7 @@ Skyperious has been built using the following open-source software:
 - ijson 3.1.4 (https://pypi.org/project/ijson)
 - Pillow 6.2.2 (https://pypi.org/project/Pillow)
 - pyparsing 2.4.7 (https://pypi.org/project/pyparsing)
+- six 1.16.0 (https://pypi.org/project/six)
 - SkPy 0.10.4 (https://pypi.org/project/SkPy)
 - step, Simple Template Engine for Python (https://github.com/dotpy/step)
 - XlsxWriter 1.4.5 (https://pypi.org/project/XlsxWriter)

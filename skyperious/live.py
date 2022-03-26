@@ -11,7 +11,6 @@ Released under the MIT License.
 @modified    19.03.2022
 ------------------------------------------------------------------------------
 """
-import base64
 import collections
 import datetime
 import json
@@ -23,7 +22,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import urllib
 import warnings
 
 BeautifulSoup = skpy = ijson = None
@@ -33,6 +31,8 @@ try: import skpy
 except ImportError: pass
 try: import ijson
 except ImportError: pass
+import six
+from six.moves import urllib
 
 from . lib import util
 
@@ -136,7 +136,7 @@ class SkypeLogin(object):
                 logger.exception("Error logging in to Skype as '%s'.", self.username)
                 try: os.unlink(path)
                 except Exception: pass
-                raise e, None, tb
+                six.reraise(type(e), e, tb)
             else: break # for kwargs
         if init_db: self.init_db()
 
@@ -164,7 +164,7 @@ class SkypeLogin(object):
             where = " WHERE %s IS NOT NULL" % key
             for row in self.db.execute("SELECT %s FROM %s%s" % (cols, dbtable, where), log=False):
                 for k in BINARIES: # Convert binary fields back from Unicode
-                    if isinstance(row.get(k), unicode):
+                    if isinstance(row.get(k), six.text_type):
                         try:
                             row[k] = row[k].encode("latin1")
                         except Exception:
@@ -191,7 +191,7 @@ class SkypeLogin(object):
         cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
         for row in self.db.execute("SELECT %s FROM %s%s" % (cols, table, where), params, log=False):
             for k in BINARIES: # Convert binary fields back from Unicode
-                if isinstance(row.get(k), unicode):
+                if isinstance(row.get(k), six.text_type):
                     try:
                         row[k] = row[k].encode("latin1")
                     except Exception:
@@ -295,7 +295,7 @@ class SkypeLogin(object):
                     if not self.get_contact(uid) \
                     or conf.Login.get(self.db.filename, {}).get("sync_contacts", True):
                         user = self.request(self.skype.contacts.__getitem__, uid, __raise=False)
-                        if user and user.name: name = unicode(user.name)
+                        if user and user.name: name = util.to_unicode(user.name)
                     names.append(name)
                 dbitem["displayname"] = ", ".join(names)
                 if len(item.userIds) > 4: dbitem["displayname"] += ", ..."
@@ -486,7 +486,7 @@ class SkypeLogin(object):
 
             result.update(is_permanent=1, skypename=item.id, languages=item.language)
             if item.name:
-                name = unicode(item.name)
+                name = util.to_unicode(item.name)
                 result.update(displayname=name, fullname=name)
             if getattr(item, "birthday", None): # Not all SkypeUsers have birthday
                 result.update(birthday=date_to_integer(item.birthday))
@@ -514,11 +514,11 @@ class SkypeLogin(object):
             if item.avatar: # https://avatar.skype.com/v1/avatars/username/public
                 raw = self.download_content(item.avatar)
                 # main.db has NULL-byte in front of image binary
-                if raw: result.update(avatar_image="\0" + raw)
+                if raw: result.update(avatar_image="\0" + raw.decode("latin1"))
 
         if "accounts" == table:
             if item.mood:
-                result.update(mood_text=unicode(item.mood))
+                result.update(mood_text=util.to_unicode(item.mood))
             if re.match(".+@.+", self.username or ""):
                 result.update(liveid_membername=self.username)
 
@@ -575,7 +575,7 @@ class SkypeLogin(object):
 
             ts__ms = util.datetime_to_millis(item.time)
             pk_id, guid = make_message_ids(item.id)
-            result.update(is_permanent=1, timestamp=ts__ms / 1000, pk_id=pk_id, guid=guid,
+            result.update(is_permanent=1, timestamp=ts__ms // 1000, pk_id=pk_id, guid=guid,
                           author=self.prefixify(item.userId),
                           from_dispname=self.get_contact_name(item.userId),
                           body_xml=item.content, timestamp__ms=ts__ms)
@@ -683,8 +683,8 @@ class SkypeLogin(object):
                 fileurl = item.file.urlFull
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' % 
-                                       (urllib.quote(util.to_unicode(filesize or 0)),
-                                        urllib.quote(util.to_unicode(fileurl or ""), ":/"),
+                                       (urllib.parse.quote(util.to_unicode(filesize or 0)),
+                                        urllib.parse.quote(util.to_unicode(fileurl or ""), ":/"),
                                         util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             else: # SkypeCardMsg, SkypeChangeMemberMsg, ..
@@ -1134,11 +1134,11 @@ class SkypeExport(skypedata.SkypeDatabase):
                         skip_chat = True
 
                 elif "conversations.item.displayName" == prefix:
-                    if isinstance(value, basestring):
+                    if isinstance(value, six.string_types):
                         chat["displayname"] = value
 
                 elif "conversations.item.threadProperties.topic" == prefix:
-                    if isinstance(value, basestring):
+                    if isinstance(value, six.string_types):
                         chat["meta_topic"] = value
 
                 elif "conversations.item.threadProperties.members" == prefix:
@@ -1180,7 +1180,7 @@ class SkypeExport(skypedata.SkypeDatabase):
 
                 elif "conversations.item.MessageList.item.displayName" == prefix:
                     if skip_chat or skip_msg: continue # while True
-                    if value and isinstance(value, basestring):
+                    if value and isinstance(value, six.string_types):
                         msg["from_dispname"] = value
 
                 elif "conversations.item.MessageList.item.content" == prefix:
@@ -1191,7 +1191,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                     if skip_chat or skip_msg: continue # while True
                     try:
                         ts__ms = self.export_parse_timestamp(value)
-                        msg["timestamp"] = ts__ms / 1000
+                        msg["timestamp"] = ts__ms // 1000
                         msg["timestamp__ms"] = ts__ms
                     except Exception:
                         logger.warn("Error parsing message timestamp %r for chat %s.", value, chat, exc_info=True)
@@ -1200,7 +1200,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.MessageList.item.properties.edittime" == prefix:
                     if skip_chat or skip_msg: continue # while True
                     try:
-                        msg["edited_timestamp"] = int(value) / 1000
+                        msg["edited_timestamp"] = int(value) // 1000
                     except Exception:
                         logger.warn("Error parsing message edited timestamp %r for chat %s.", value, chat, exc_info=True)
                         skip_msg = True
@@ -1208,7 +1208,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.MessageList.item.properties.deletetime" == prefix:
                     if skip_chat or skip_msg: continue # while True
                     try:
-                        msg["edited_timestamp"] = int(value) / 1000
+                        msg["edited_timestamp"] = int(value) // 1000
                         msg["body_xml"] = ""
                     except Exception:
                         logger.warn("Error parsing message deleted timestamp %r for chat %s.", value, chat, exc_info=True)
@@ -1287,7 +1287,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                 name = bs.find("originalname").get("v")
                 size = bs.find("filesize").get("v")
                 msg["body_xml"] = '<files><file index="0" size="%s">%s</file></files>' % (
-                                  urllib.quote(util.to_unicode(size or 0)),
+                                  urllib.parse.quote(util.to_unicode(size or 0)),
                                   util.to_unicode(name or "file").replace("<", "&lt;").replace(">", "&gt;"))
             except Exception:
                 if BeautifulSoup: logger.warn("Error parsing file from %s.", msg, exc_info=True)
@@ -1477,13 +1477,13 @@ def id_to_identity(chatid):
     """
     result = chatid
     if isinstance(result, dict): result = result.get("MemberMri")
-    if not isinstance(result, basestring): result = None
+    if not isinstance(result, six.string_types): result = None
     if result and not result.endswith("@thread.skype"):
         if not result.startswith(skypedata.ID_PREFIX_BOT):
             result = re.sub(r"^\d+\:", "", result) # Strip numeric prefix
         if result.endswith("@p2p.thread.skype"):
             result = result[:-len("@p2p.thread.skype")]
-            try: result = base64.b64decode(result)
+            try: result = util.b64decode(result)
             except Exception: pass
     return result
 
@@ -1500,7 +1500,7 @@ def identity_to_id(identity):
     result = identity
     if result and not result.endswith("@thread.skype"):
         if result.startswith("#"):
-            result = "19:%s@p2p.thread.skype" % base64.b64encode(result)
+            result = "19:%s@p2p.thread.skype" % util.b64encode(result)
         elif not result.endswith("thread.skype") and not re.match(r"^\d+\:", result):
             result = "%s%s" % (skypedata.ID_PREFIX_SINGLE, result)
     return result
@@ -1518,7 +1518,7 @@ def make_message_ids(msg_id):
     try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else hash(msg_id)
     except Exception: pk_id = hash(msg_id) # Ensure fit into INTEGER-column
     guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
-    guid *= 32 / len(guid)
+    guid *= 32 // len(guid)
     return (pk_id, guid)
 
 
@@ -1539,7 +1539,7 @@ def process_message_edit(msg):
         ts_ms = int(tag.get("ts_ms"))
         msg["edited_timestamp"] = msg["timestamp"]
         msg["edited_by"] = msg["author"]
-        msg["timestamp"] = min(msg.get("timestamp") or ts_ms / 1000, ts_ms / 1000)
+        msg["timestamp"] = min(msg.get("timestamp") or ts_ms // 1000, ts_ms // 1000)
         msg["timestamp__ms"] = min(msg.get("timestamp__ms") or ts_ms, ts_ms)
         tag.unwrap() # Remove tag from soup
         if not bs.encode().strip():

@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    25.07.2020
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 import functools
@@ -122,7 +122,7 @@ def collect_shortcuts(control, use_heuristics=True):
                     tool = ctrl.FindToolForPosition(i * ctrl.ToolSize[0], 0)
                     toolsmap[repr(tool)] = tool
                 except Exception: pass # FindTool not implemented in GTK
-            for tool in filter(None, toolsmap.values()):
+            for tool in filter(bool, toolsmap.values()):
                 text = ctrl.GetToolShortHelp(tool.GetId())
                 parts = re.split("\\(Alt-(.)\\)", text, maxsplit=1)
                 if len(parts) > 1:
@@ -321,7 +321,7 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
                         tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
                         toolsmap[repr(tool)] = tool
                     except Exception: pass # FindTool not implemented in GTK
-                for tool in filter(None, toolsmap.values()):
+                for tool in filter(bool, toolsmap.values()):
                     id = tool.GetId()
                     text = tb.GetToolShortHelp(id)
                     parts = re.split("\\(Alt-(%s)\\)" % key, text,

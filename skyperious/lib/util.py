@@ -8,10 +8,12 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    01.08.2021
+@modified    25.03.2022
 ------------------------------------------------------------------------------
 """
+import base64
 import calendar
+import codecs
 import ctypes
 import datetime
 import io
@@ -24,7 +26,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib
 import warnings
 
 Image = ImageFile = wx = None # For image resize, most functions work without
@@ -32,11 +33,13 @@ try: from PIL import Image, ImageFile
 except ImportError: pass
 try: import wx
 except ImportError: pass
+import six
+from six.moves import urllib
 
 
 def m(o, name, case_insensitive=True):
     """Returns the members of the object or dict, filtered by name."""
-    members = o.keys() if isinstance(o, dict) else dir(o)
+    members = o if isinstance(o, dict) else dir(o)
     if case_insensitive:
         return [i for i in members if name.lower() in i.lower()]
     else:
@@ -113,7 +116,7 @@ def format_seconds(seconds, insert=""):
         for unit, count in zip(["hour", "minute", "second"], [3600, 60, 1]):
             if seconds >= count:
                 label = "%s%s" % (insert if not formatted else "", unit)
-                formatted += inter + plural(label, seconds / count)
+                formatted += inter + plural(label, seconds // count)
                 seconds %= count
                 inter = ", "
     return formatted
@@ -127,6 +130,42 @@ def format_exc(e):
               else "(%s)" % ", ".join(map(to_unicode, e.args)) if e.args else ""
     result = u"%s%s" % (type(e).__name__, ": " + msg if msg else "")
     return result
+
+
+def format_sql_value(value):
+    """Formats value to be suitable for use in an SQL expression."""
+    UNPRINTABLES = "".join(set(six.unichr(i) for i in range(128)).difference(string.printable))
+    RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
+
+    if isinstance(value, six.string_types):
+        if RE_UNPRINTABLE.search(value):
+            if isinstance(value, six.text_type):
+                try:
+                    value = value.encode("latin1")
+                except UnicodeError:
+                    value = value.encode("utf-8", errors="backslashreplace")
+            value = "X'%s'" % codecs.encode(value, "hex").decode("latin1").upper()
+        else:
+            if isinstance(value, six.text_type):
+                value = value.encode("utf-8")
+            value = '"%s"' % codecs.encode(value.decode("latin1"), "unicode-escape").decode("latin1")
+    elif value is None:
+        value = "NULL"
+    else:
+        value = str(value)
+    return value
+
+
+def b64encode(s):
+    """Returns Base64-encoded value as text; input may be text or bytes."""
+    if isinstance(s, six.text_type): s = s.encode("latin1")
+    return base64.b64encode(s).decode("latin1")
+
+
+def b64decode(s):
+    """Returns value decoded from Base64 as text; input may be text or bytes."""
+    if isinstance(s, six.text_type): s = s.encode("latin1")
+    return base64.b64decode(s).decode("latin1")
 
 
 def plural(word, items=None, numbers=True, single="1", sep="", pref="", suf=""):
@@ -170,14 +209,14 @@ def xor(text, key):
 
 def obfuscate(text, key=string.punctuation):
     """Returns text obfuscated with key."""
-    if not isinstance(key, basestring): key = str(key)
-    return xor(text, key).encode("base64").strip()
+    if not isinstance(key, six.string_types): key = str(key)
+    return b64encode(xor(text, key))
 
 
 def deobfuscate(text, key=string.punctuation):
     """Returns deobfuscated text obfuscated with key ."""
-    if not isinstance(key, basestring): key = str(key)
-    try: return xor(text.decode("base64"), key)
+    if not isinstance(key, six.string_types): key = str(key)
+    try: return xor(b64decode(text), key)
     except Exception: return ""
 
 
@@ -197,7 +236,7 @@ def datetime_to_millis(dt):
     result = None
     if isinstance(dt, datetime.date):
         result = int(calendar.timegm(dt.timetuple())) * 1000
-        if isinstance(dt, datetime.datetime): result += dt.microsecond / 1000
+        if isinstance(dt, datetime.datetime): result += dt.microsecond // 1000
     return result
 
 
@@ -217,7 +256,7 @@ def date_shift(dt, unit, count):
         result = dt + count * datetime.timedelta(days=7)
     elif "month" == unit:
         year, month = dt.year, dt.month + count
-        if not (0 < month <= 12): year, month = year + month / 12, month % 12
+        if not (0 < month <= 12): year, month = year + month // 12, month % 12
         if 0 == month:
             month = 12
             year = year - (1 if not (dt.month + count) or (dt.month + count) / 12.0 else 0)
@@ -281,7 +320,7 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    if "linux2" == sys.platform and isinstance(result, unicode) \
+    if "linux2" == sys.platform and isinstance(result, six.text_type) \
     and "utf-8" != sys.getfilesystemencoding():
         result = result.encode("utf-8") # Linux has trouble if locale not UTF-8
     path, name = os.path.split(result)
@@ -324,18 +363,19 @@ def start_file(filepath):
     return success, error
 
 
-def create_file(filepath, mode="w", handle=False):
+def create_file(filepath, mode="w", handle=False, **kwargs):
     """
     Creates or overwrites the file, making any lacking parent directories.
 
     @param   mode    file creation mode, relevant if returning file handle
     @param   handle  whether to return open file handle
+    @param   kwargs  additional keyword arguments to open()
     """
     try: os.makedirs(os.path.dirname(filepath))
     except Exception: pass
-    if handle: return open(filepath, mode)
+    if handle: return open(filepath, mode, **kwargs)
     else:
-        with open(filepath, mode): pass
+        with open(filepath, mode, **kwargs): pass
 
 
 def is_os_64bit():
@@ -357,7 +397,7 @@ def divide_delta(td1, td2):
     us1 = td1.microseconds + 1000000 * (td1.seconds + 86400 * td1.days)
     us2 = td2.microseconds + 1000000 * (td2.seconds + 86400 * td2.days)
     # Integer division, fractional division would be float(us1) / us2
-    return us1 / us2
+    return us1 // us2
 
 
 def img_recode(raw, format="PNG", size=None, aspect_ratio=True):
@@ -414,11 +454,11 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
             align_pos = None
             if size1[0] < size[0] and size1[1] < size[1]:
                 size2 = tuple(size1)
-                align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+                align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
             elif aspect_ratio:
                 ratio = safedivf(*size1[:2])
-                size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
-                align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+                size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
+                align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
             if size1[0] > size[0] or size1[1] > size[1]:
                 if result is not img: result = result.Copy()
                 result.Rescale(*size2)
@@ -438,11 +478,11 @@ def img_pil_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
         size2, align_pos = list(size), None
         if result.size[0] < size[0] and img.size[1] < size[1]:
             size2 = result.size
-            align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+            align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
         elif aspect_ratio:
             ratio = safedivf(*result.size[:2])
-            size2[ratio > 1] *= ratio if ratio < 1 else 1 / ratio
-            align_pos = [(a - b) / 2 for a, b in zip(size, size2)]
+            size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
+            align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
         if result.size[0] > size[0] or result.size[1] > size[1]:
             result.thumbnail(tuple(map(int, size2)), Image.ANTIALIAS)
         if align_pos:
@@ -477,7 +517,7 @@ def timedelta_seconds(timedelta):
     return result
 
 
-def add_unique(lst, item, direction=1, maxlen=sys.maxint):
+def add_unique(lst, item, direction=1, maxlen=sys.maxsize):
     """
     Adds the item to the list from start or end. If item is already in list,
     removes it first. If list is longer than maxlen, shortens it.
@@ -511,38 +551,40 @@ def path_to_url(path, encoding="utf-8"):
     """
     Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
     """
-    path = path.encode(encoding) if isinstance(path, unicode) else path
+    if isinstance(path, six.text_type): path = path.encode(encoding).decode("latin1")
     if ":" not in path:
         # No drive specifier, just convert slashes and quote the name
         if path[:2] == "\\\\":
             path = "\\\\" + path
-        url = urllib.quote("/".join(path.split("\\")))
+        url = urllib.parse.quote("/".join(path.split("\\")))
     else:
         url, parts = "", path.split(":")
         if len(parts[0]) == 1: # Looks like a proper drive, e.g. C:\
-            url = "///" + urllib.quote(parts[0].upper()) + ":"
+            url = "///" + urllib.parse.quote(parts[0].upper()) + ":"
             parts = parts[1:]
         components = ":".join(parts).split("\\")
-        for part in filter(None, components):
-            url += "/" + urllib.quote(part)
+        for part in filter(bool, components):
+            url += "/" + urllib.parse.quote(part)
     url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
     return url
 
 
-def to_unicode(value, encoding=None):
+def to_unicode(value, encoding=None, errors="strict"):
     """
-    Returns the value as a Unicode string. Tries decoding as UTF-8 if 
-    locale encoading fails.
+    Returns the value as a Unicode string.
+    
+    Tries decoding as UTF-8 if locale encoading fails.
     """
     result = value
-    if not isinstance(value, unicode):
-        encoding = encoding or locale.getpreferredencoding()
-        if not isinstance(value, str):
-            try: value = str(value)
-            except Exception: value = repr(value)
-        try: result = unicode(value, encoding)
+    if isinstance(result, six.binary_type):
+        try: result = six.text_type(result, encoding, errors)
         except Exception:
-            result = unicode(value, "utf-8", errors="backslashreplace")
+            result = six.text_type(result, "utf-8", errors="backslashreplace")
+    elif not isinstance(result, six.text_type):
+        try: result = str(result)
+        except Exception: result = repr(result)
+    if not isinstance(result, six.text_type):
+        result = six.text_type(result)
     return result
 
 
@@ -552,11 +594,11 @@ def longpath(path):
     try:
         buf = ctypes.create_unicode_buffer(65536)
         GetLongPathNameW = ctypes.windll.kernel32.GetLongPathNameW
-        if GetLongPathNameW(unicode(path), buf, 65536):
+        if GetLongPathNameW(to_unicode(path), buf, 65536):
             result = buf.value
         else:
             head, tail = os.path.split(path)
-            if GetLongPathNameW(unicode(head), buf, 65536):
+            if GetLongPathNameW(to_unicode(head), buf, 65536):
                 result = os.path.join(buf.value, tail)
     except Exception: pass
     return result

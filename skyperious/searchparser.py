@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    01.08.2020
+@modified    19.03.2022
 """
 import calendar
 import collections
@@ -37,6 +37,8 @@ try:
     ParserElement.enablePackrat() # Speeds up recursive grammar significantly
 except ImportError:
     ParserElement = None
+import six
+from six import unichr
 
 from . lib import util
 
@@ -168,7 +170,7 @@ class SearchQueryParser(object):
         to argument dictionaries.
         """
         result = ""
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             words.append(item)
             safe = self._escape(item, ("*" if "QUOTES" != parent_name else ""))
             if not table:
@@ -266,7 +268,7 @@ class SearchQueryParser(object):
                         # Date range given: use timestamp matching
                         date_words = word.split("..", 1)
                     for i, d in ((i, d) for i, d in enumerate(date_words) if d):
-                        parts = filter(None, d.split("-")[:3])
+                        parts = list(filter(bool, d.split("-")[:3]))
                         ymd = list(map(util.to_int, parts))
                         if not ymd or ymd[0] is None:
                             continue # continue for i, d in filter(..
@@ -304,7 +306,7 @@ class SearchQueryParser(object):
         e.g. [[['a', 'b']]] to ['a', 'b'].
         """
         result = items
-        while len(result) == 1 and not isinstance(result, basestring):
+        while len(result) == 1 and not isinstance(result, six.string_types):
             result = result[0]
         result = [result]
         return result

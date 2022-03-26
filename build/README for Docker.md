@@ -16,12 +16,12 @@ build and run the Docker image:
     docker run -it --rm --net=host --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious
 ```
 
-`docker build . -t skyperious` will prepare an Ubuntu 18.04 Docker image
+`docker build . -t skyperious` will prepare an Ubuntu 20.04 Docker image
 and install Skyperious and its dependencies within the container.
 
 `xhost +` will allow the container to access the X Window System display.
 
-Add `sudo` before docker commands if not running as root user.
+Add `sudo` before docker commands if current user does not have rights for Docker.
 
 Add `--mount src="path to host directory",target=/etc/skyperious` after `docker run`
 to retain Skyperious configuration in a host directory between runs.

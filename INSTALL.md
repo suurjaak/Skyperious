@@ -7,9 +7,8 @@ Download and launch the latest setup from
 https://suurjaak.github.io/Skyperious/downloads.html.
 
 or, to run from source code:
-* install [Python 2](https://www.python.org/downloads/)
-* install [wxPython](http://wxpython.org/download.php)
-* Install [pip](https://pip.pypa.io/en/latest/installing/)
+* install [Python](https://www.python.org/downloads/)
+* Install [pip](https://pip.pypa.io/en/latest/installing/) if not installed
 * run `pip install skyperious`
 * run `skyperious`
 
@@ -17,7 +16,7 @@ or, to run from source code:
 ### Mac ###
 
 * install [Homebrew](http://brew.sh)
-* install Python 2: open a terminal and run `brew install python`
+* install Python: open a terminal and run `brew install python`
 * install wxPython: run `brew install wxpython`
   (or use a suitable binary from http://wxpython.org/download.php)
 * run `sudo easy_install pip`
@@ -27,22 +26,22 @@ or, to run from source code:
 
 ### Linux ###
 
-Easiest to get wxPython installed for the graphical interface, is to use one of
-the prepared wheels available at https://extras.wxpython.org/wxPython4/extras/linux.
+The graphical interface needs wxPython, best installed with one of the prepared
+Python wheels available at https://extras.wxpython.org/wxPython4/extras/linux.
 
-E.g. installing Skyperious for Ubuntu 18.04:
+E.g. installing Skyperious for Ubuntu 20.04:
 
-* run `sudo apt-get install python python-pip libsdl2-2.0`
-* run `sudo pip install -U -f --no-cache-dir https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 wxPython`
+* run `sudo apt-get install libgtk-3-0 libsdl2-2.0 libwebkit2gtk-4.0 python3 python3-pip`
+* run `sudo pip install wxPython --find-links \`
+      `https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04`
 * run `sudo pip install skyperious`
 * run `skyperious`
 
 Another option is to have wxPython built locally, e.g. for Ubuntu 20.04:
 
-* run `sudo apt-get install build-essential libgtk-3-dev libwxgtk3.0-gtk3-dev python`
-* run `wget https://bootstrap.pypa.io/get-pip.py`
-* run `sudo python get-pip.py`
-* run `sudo pip install skyperious`
+* run `sudo apt-get install build-essential libgtk-3-dev libsdl2-dev \`
+      `libwebkit2gtk-4.0-dev python3 python3-pip`
+* run `pip install skyperious`
 * run `skyperious`
 
 If pip scripts-folder is not yet in path, run before reopening terminal:
@@ -60,8 +59,7 @@ Skyperious has a [Dockerfile](Dockerfile), see
 
 ### General remarks ###
 
-If running from source code, Skyperious needs Python 2.7.
-Python 3 is yet unsupported.
+If running from source code, Skyperious needs Python 3.5+ or Python 2.7.
 
 The graphical user interface needs wxPython 4.0 or later.
 
@@ -76,5 +74,5 @@ To run from source if Python, pip and git are installed:
     cd Skyperious
     pip install -r requirements.txt
     ./skyperious.sh
-    # or: python2 -m skyperious
+    # or: python -m skyperious
 ```

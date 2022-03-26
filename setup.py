@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    01.08.2021
+@modified    19.03.2022
 ------------------------------------------------------------------------------
 """
 import setuptools
@@ -27,7 +27,8 @@ setuptools.setup(
     platforms=["any"],
     keywords="skype sqlite merge export",
 
-    install_requires=["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow", "SkPy", "wxPython>=4.0", "XlsxWriter"],
+    install_requires=["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow",
+                      "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
     entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
     packages=setuptools.find_packages(),
@@ -45,6 +46,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
     ],
 
     long_description_content_type="text/markdown",
