@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-5.0, 2022-03-22
+5.0, 2022-03-26
 ---------------
 - full Python2 / Python3 compatibility;
 - fixed error on opening chat with linefeeds in participant name (issue #103);
