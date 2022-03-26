@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    22.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -122,6 +122,9 @@ except NameError:
 # Convenience methods for creating a wx.Brush and wx.Pen or returning cached.
 BRUSH = lambda c,      s=wx.BRUSHSTYLE_SOLID: wx.TheBrushList.FindOrCreateBrush(c,    s)
 PEN   = lambda c, w=1, s=wx.PENSTYLE_SOLID:   wx.ThePenList  .FindOrCreatePen  (c, w, s)
+
+# Multiplier for wx.ComboBox width ~100px ranges
+COMBO_WIDTH_FACTOR = 1.5 if "linux" in sys.platform else 1
 
 
 
@@ -4098,7 +4101,7 @@ class TabbedHtmlWindow(wx.Panel):
                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
                     wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
                     wx.lib.agw.flatnotebook.FNB_VC8)
-        if "linux2" == sys.platform and wx.VERSION[:3] == (4, 1, 1):
+        if "linux" in sys.platform and wx.VERSION[:3] == (4, 1, 1):
             # wxPython 4.1.1 on Linux crashes with FNB_VC8
             agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
         notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(

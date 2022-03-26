@@ -180,7 +180,7 @@ def take_screenshot(fullscreen=True):
 
         # adjust widths for Linux (figured out by John Torres 
         # http://article.gmane.org/gmane.comp.python.wxpython/67327)
-        if "linux2" == sys.platform:
+        if "linux" in sys.platform:
             client_x, client_y = window.ClientToScreen((0, 0))
             border_width       = client_x - rect.x
             title_bar_height   = client_y - rect.y

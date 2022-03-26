@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
 
-    TRAY_ICON = (images.Icon16x16_32bit if "linux2" != sys.platform 
+    TRAY_ICON = (images.Icon16x16_32bit if "linux" not in sys.platform 
                  else images.Icon24x24_32bit)
 
     def __init__(self):
@@ -2562,8 +2562,8 @@ class DatabasePage(wx.Panel):
         edit_filter.SetToolTip("Find messages containing the exact text")
         label_range = wx.StaticText(
             parent=panel_stc2, label="Show messages from time perio&d:")
-        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
-        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
+        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
+        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
         date1.Format = date2.Format = "%Y-%m-%d"
         date2.SetPopupAnchor(wx.RIGHT)
         date1.SetToolTip("Date in the form YYYY-MM-DD")
@@ -2807,8 +2807,6 @@ class DatabasePage(wx.Panel):
                      wx.ALIGN_CENTER_VERTICAL)
         sizer_tb.Add(tb)
         grid = self.grid_table = wx.grid.Grid(parent=panel2)
-        grid.SetToolTip("Double click on column header to sort, "
-                              "right click to filter.")
         ColourManager.Manage(grid, "DefaultCellBackgroundColour", wx.SYS_COLOUR_WINDOW)
         ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
         ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)

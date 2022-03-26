@@ -320,7 +320,7 @@ def unique_path(pathname):
     (e.g. "C:\config (2).sys" if ""C:\config.sys" already exists).
     """
     result = pathname
-    if "linux2" == sys.platform and isinstance(result, six.text_type) \
+    if "linux" in sys.platform and isinstance(result, six.text_type) \
     and "utf-8" != sys.getfilesystemencoding():
         result = result.encode("utf-8") # Linux has trouble if locale not UTF-8
     path, name = os.path.split(result)
