@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.03.2022
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2370,13 +2370,8 @@ class DatabasePage(wx.Panel):
                   border=5, flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW)
         sizer.Layout() # To avoid searchbox moving around during page creation
 
-        bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version_info.major == 2
-        and sys.version_info < (2, 7, 3)):
-            # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
-            bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
-            parent=self, agwStyle=bookstyle, style=wx.BORDER_STATIC)
+            parent=self, agwStyle=wx.lib.agw.fmresources.INB_LEFT, style=wx.BORDER_STATIC)
 
         il = wx.ImageList(32, 32)
         idx1 = il.Add(images.PageSearch.Bitmap)
@@ -5312,17 +5307,15 @@ class DatabasePage(wx.Panel):
                         self.tree_tables.SetItemBold(item,
                         self.grid_table.Table.IsChanged())
                 item = self.tree_tables.GetNextSibling(item)
-            # Refresh cell colours; without CallAfter wx 2.8 can crash
-            wx.CallLater(1, self.grid_table.ForceRefresh)
+            self.grid_table.ForceRefresh()  # Refresh cell colours
 
 
     def on_rollback_table(self, event):
         """Handler for clicking to rollback the changed database table."""
         self.grid_table.Table.UndoChanges()
         self.on_change_table(None)
-        # Refresh scrollbars and colours; without CallAfter wx 2.8 can crash
-        wx.CallLater(1, lambda: (self.grid_table.ContainingSizer.Layout(),
-                                 self.grid_table.ForceRefresh()))
+        self.grid_table.ContainingSizer.Layout()  # Refresh scrollbars
+        self.grid_table.ForceRefresh() # Refresh cell colours
 
 
     def on_insert_row(self, event):
@@ -5335,8 +5328,7 @@ class DatabasePage(wx.Panel):
         self.grid_table.Scroll(self.grid_table.GetScrollPos(wx.HORIZONTAL), 0)
         self.grid_table.Refresh()
         self.on_change_table(None)
-        # Refresh scrollbars; without CallAfter wx 2.8 can crash
-        wx.CallAfter(self.grid_table.ContainingSizer.Layout)
+        self.grid_table.ContainingSizer.Layout()  # Refresh scrollbars
 
 
     def on_delete_row(self, event):
@@ -6060,14 +6052,8 @@ class MergerPage(wx.Panel):
         sizer.Add(sizer_header, flag=wx.GROW)
         sizer.Layout() # To avoid header moving around during page creation
 
-        bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version_info[0:] == [2]
-        and sys.version_info < (2,7,3)):
-            # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
-            bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
-            parent=self, agwStyle=bookstyle,
-            style=wx.BORDER_STATIC)
+            parent=self, agwStyle=wx.lib.agw.fmresources.INB_LEFT, style=wx.BORDER_STATIC)
         sizer.Add(notebook, proportion=10, border=5,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT | wx.BOTTOM)
 
