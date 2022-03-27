@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.03.2022
+@modified    27.03.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -376,8 +376,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                 f.close()
                 if is_csv:
                     writer = csv_writer(filename)
-                    if sql_query:
-                        sql_query = sql_query.replace("\r", " ").replace("\n", " ")
+                    if sql_query: sql_query = sql_query.replace("\r", " ").replace("\n", " ")
                 else:
                     writer = xlsx_writer(filename, table or "SQL Query")
                     writer.set_header(True)
@@ -389,6 +388,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                 for row in grid.Table.GetRowIterator():
                     writer.writerow(["" if row[c] is None else row[c] for c in columns])
                 writer.close()
+                writer = None
             else:
                 namespace = {
                     "db":        db,
@@ -422,9 +422,9 @@ class csv_writer(object):
     """Convenience wrapper for csv.Writer, with Python2/3 compatbility."""
 
     def __init__(self, filename):
+        self._file = open(filename, "wb") if six.PY2 else codecs.open(filename, "w", "utf-8")
         # csv.excel.delimiter default "," is not actually used by Excel.
         # Default linefeed "\r\n" would cause another "\r" to be written.
-        self._file = open(filename, "wb") if six.PY2 else codecs.open(filename, "w", "utf-8")
         self._writer = csv.writer(self._file, csv.excel, delimiter=";", lineterminator="\r")
 
 

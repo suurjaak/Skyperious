@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.03.2022
+@modified    27.03.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1722,7 +1722,7 @@ class RangeSlider(wx.Panel):
                                + delta.seconds * 1000000 + delta.microseconds
 
         # Clear area and init data
-        left_label, right_label = list(map(self.FormatLabel, self._rng))
+        left_label, right_label = map(self.FormatLabel, self._rng)
         # GetFullTextExtent returns (width, height, descent, leading)
         left_extent  = self.GetFullTextExtent(left_label)
         right_extent = self.GetFullTextExtent(right_label)
@@ -2679,9 +2679,9 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         #--- Internationalization of string sorting with locale module
         if isinstance(item1, text_type) and isinstance(item2, text_type):
             cmpVal = locale.strcoll(item1.lower(), item2.lower())
-        elif isinstance(item1, str) or isinstance(item2, str):
-            item1 = item1.lower() if isinstance(item1, str) else str(item1).lower()
-            item2 = item2.lower() if isinstance(item2, str) else str(item2).lower()
+        elif isinstance(item1, bytes) or isinstance(item2, bytes):
+            item1 = item1.lower() if isinstance(item1, bytes) else str(item1).encode("latin1").lower()
+            item2 = item2.lower() if isinstance(item2, bytes) else str(item2).encode("latin1").lower()
             cmpVal = locale.strcoll(text_type(item1), text_type(item2))
         else:
             if item1 is None:
@@ -3288,9 +3288,9 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         #--- Internationalization of string sorting with locale module
         if isinstance(item1, text_type) and isinstance(item2, text_type):
             cmpVal = locale.strcoll(item1.lower(), item2.lower())
-        elif isinstance(item1, str) or isinstance(item2, str):
-            item1 = item1.lower() if isinstance(item1, str) else str(item1).lower()
-            item2 = item2.lower() if isinstance(item2, str) else str(item2).lower()
+        elif isinstance(item1, bytes) or isinstance(item2, bytes):
+            item1 = item1.lower() if isinstance(item1, bytes) else str(item1).encode("latin1").lower()
+            item2 = item2.lower() if isinstance(item2, bytes) else str(item2).encode("latin1").lower()
             cmpVal = locale.strcoll(text_type(item1), text_type(item2))
         else:
             if item1 is None:
