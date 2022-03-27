@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    26.03.2022
+@modified    27.03.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2509,6 +2509,8 @@ under the MIT License.
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
   <li>pyparsing,
       <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
+  <li>six,
+      <a href="https://pypi.org/project/six/"><font color="{{ conf.LinkColour }}">pypi.org/project/six</font></a></li>
   <li>SkPy,
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
