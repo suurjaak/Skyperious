@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    22.03.2022
+@modified    27.03.2022
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -87,7 +87,7 @@ def check_newest_version(callback=None):
                 changes = ""
                 try:
                     logger.info("Reading changelog from %s.", conf.ChangelogURL)
-                    html = url_opener.open(conf.ChangelogURL).read()
+                    html = util.to_unicode(url_opener.open(conf.ChangelogURL).read())
                     match = re.search("<h4[^>]*>(v%s,.*)</h4\\s*>" % version,
                                       html, re.I)
                     if match:

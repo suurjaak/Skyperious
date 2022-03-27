@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2022
+@modified    27.03.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2655,7 +2655,7 @@ def is_sqlite_file(filename, path=None):
                 SQLITE_HEADER = b"SQLite format 3\00"
                 with open(fullpath, "rb") as f:
                     result = (f.read(len(SQLITE_HEADER)) == SQLITE_HEADER)
-        except Exception: raise
+        except Exception: pass
     return result
 
 
