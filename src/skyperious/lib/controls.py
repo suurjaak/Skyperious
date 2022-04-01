@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.03.2022
+@modified    01.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -4065,7 +4065,7 @@ class SearchableStyledTextCtrl(wx.Panel):
         """Wraps all access to StyledTextCtrl transparently."""
         attr = None
         if hasattr(SearchableStyledTextCtrl, name):
-            attr = getattr(self, name)
+            attr = object.__getattribute__(self, name)
         elif hasattr(self._stc, name):
             attr = getattr(self._stc, name)
         else:

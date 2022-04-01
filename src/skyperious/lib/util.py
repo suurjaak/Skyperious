@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    26.03.2022
+@modified    01.04.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -553,7 +553,8 @@ def path_to_url(path, encoding="utf-8"):
     """
     Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
     """
-    if isinstance(path, six.text_type): path = path.encode(encoding).decode("latin1")
+    if isinstance(path, six.text_type): path = path.encode(encoding)
+    if not isinstance(path, six.string_types): path = path.decode("latin1")
     if ":" not in path:
         # No drive specifier, just convert slashes and quote the name
         if path[:2] == "\\\\":

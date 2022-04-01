@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    27.03.2022
+@modified    01.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -550,7 +550,7 @@ class SkypeLogin(object):
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
                     raw = self.get_api_content(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
-                    if raw: result.update(meta_picture="\0" + raw)
+                    if raw: result.update(meta_picture="\0" + raw.decode("latin1"))
             else: result = None
 
         elif "contacts" == table:
