@@ -1904,7 +1904,10 @@ class MessageParser(object):
                 else:
                     # Fallback, message content is in <sms alt="content"
                     body = dom.find("sms").get("alt")
-                body = body.encode("utf-8")
+                if isinstance(body, six.text_type):
+                    body = body.encode("utf-8")
+                if not isinstance(body, six.string_types):
+                    body = body.decode("latin1")
             # Replace text emoticons with <ss>-tags if body not XML.
             if "<" not in body and self.EMOTICON_CHARS_RGX.search(body):
                 body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
