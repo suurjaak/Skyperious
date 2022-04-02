@@ -2651,9 +2651,9 @@ from skyperious import conf
 <font face="{{ conf.HistoryFontName }}" size="2" color="{{ conf.FgColour }}">
 <center>
 <h5><font color="{{ conf.SkypeLinkColour }}">Overview</font></h5>
-<table cellpadding="10" cellspacing="0">
+<table cellpadding="0" cellspacing="0">
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2666,7 +2666,7 @@ from skyperious import conf
         <a href="page:#search"><b><font color="{{ conf.FgColour }}">Search</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:tables"><img src="memory:HelpTables.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2678,7 +2678,7 @@ from skyperious import conf
   </td>
 </tr>
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:chats"><img src="memory:HelpChats.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2690,7 +2690,7 @@ from skyperious import conf
         <a href="page:chats"><b><font color="{{ conf.FgColour }}">Chats</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:sql"><img src="memory:HelpSQL.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2702,18 +2702,18 @@ from skyperious import conf
   </td>
 </tr>
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
-        <a href="page:info"><img src="memory:HelpInfo.png" /></a>
+        <a href="page:chats"><img src="memory:HelpContacts.png" /></a>
       </td><td width="10"></td><td valign="center">
-        See information about the Skype account in this file,<br />
-        view general database statistics,<br />
-        check database integrity for corruption and recovery.
+        See Skype contacts, <br />
+        statistics on chats they have participated in,<br />
+        export contacts and chats.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:info"><b><font color="{{ conf.FgColour }}">Information</font></b></a>
+        <a href="page:chats"><b><font color="{{ conf.FgColour }}">Contacts</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:live"><img src="memory:HelpOnline.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2722,6 +2722,19 @@ from skyperious import conf
         and download shared media in HTML export. 
       </td></tr><tr><td nowrap align="center">
         <a href="page:live"><b><font color="{{ conf.FgColour }}">Online</font></b></a>
+    </td></tr></table>
+  </td>
+</tr>
+<tr>
+  <td valign="top">
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:info"><img src="memory:HelpInfo.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        See information about the Skype account in this file,<br />
+        view general database statistics,<br />
+        check database integrity for corruption and recovery.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:info"><b><font color="{{ conf.FgColour }}">Information</font></b></a>
     </td></tr></table>
   </td>
 </tr>
