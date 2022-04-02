@@ -45,7 +45,7 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import collections, datetime, functools, json
+import collections, datetime, functools, imghdr, json
 import six
 from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
@@ -58,7 +58,7 @@ from skyperious.lib.vendor import step
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
   <title>Skype {{ chat["title_long_lc"] }}</title>
-  <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
+  <link rel="shortcut icon" type="image/png" href="data:image/png;base64,{{! images.Icon16x16_8bit.data }}"/>
   <style>
     .highlight1  { background-color: #FFFF66; }
     .highlight2  { background-color: #A0FFFF; }
@@ -973,7 +973,11 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
       </div>
 %endfor
 %elif chat_picture_raw:
-      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/png;base64,{{! util.b64encode(chat_picture_raw) }}" />
+<%
+try: filetype = imghdr.what("", chat_picture_raw[:100].encode("latin1")) or "png"
+except Exception: filetype = "png"
+%>
+      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/{{ filetype }};base64,{{! util.b64encode(chat_picture_raw) }}" />
 %endif
     </td>
     <td id="header_center">
@@ -1661,7 +1665,7 @@ from skyperious.lib import util
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
     <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
     <title>{{ title }}</title>
-    <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
+    <link rel="shortcut icon" type="image/png" href="data:image/png;base64,{{! images.Icon16x16_8bit.data }}"/>
     <style>
         * { font-family: {{ conf.HistoryFontName }}; font-size: 11px; }
         body {
@@ -2076,7 +2080,7 @@ text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 18) else "
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %>
         <tr>
-          <td><img src="memory:emoticon_{{ emoticon if hasattr(emoticons, emoticon) else "transparent" }}.png" width="19" height="19"/></td>
+          <td><img src="memory:emoticon_{{ emoticon if hasattr(emoticons, emoticon) else "transparent" }}.gif" width="19" height="19"/></td>
           <td><table cellpadding="0" cellspacing="0" width="{{ conf.EmoticonsPlotWidth }}">
 
             <td bgcolor="{{ conf.PlotMessagesColour }}" width="{{ int(round(ratio * conf.EmoticonsPlotWidth)) }}" align="center">

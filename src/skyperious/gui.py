@@ -732,15 +732,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Loads content to MemoryFS."""
         if not self: return
         abouticon = "%s.png" % conf.Title.lower() # Program icon shown in About window
-        img = images.Icon48x48_32bit
+        img = images.Icon48x48_32bit.Image
         if abouticon in self.memoryfs["files"]:
             self.memoryfs["handler"].RemoveFile(abouticon)
-        self.memoryfs["handler"].AddFile(abouticon, img.Image, wx.BITMAP_TYPE_PNG)
+        self.memoryfs["handler"].AddFile(abouticon, img, wx.BITMAP_TYPE_PNG)
         self.memoryfs["files"][abouticon] = 1
 
         fn = "blank.gif"
         if fn not in self.memoryfs["files"]:
-            self.memoryfs["handler"].AddFile(fn, images.TransparentPixel.Image, wx.BITMAP_TYPE_GIF)
+            img = images.TransparentPixel.Image
+            self.memoryfs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_GIF)
             self.memoryfs["files"][fn] = 1
 
         # Screenshots look better with colouring if system has off-white colour
@@ -5814,10 +5815,11 @@ class DatabasePage(wx.Panel):
 
         avatar_path, avatar_size, avatar_raw = None, None, skypedata.get_avatar_raw(contact)
         if skypedata.get_avatar_data(contact):
-            vals = (contact["identity"], self.db.filename.encode("utf-8"))
-            fn = "%s_%s_fullsize.jpg" % tuple(map(urllib.parse.quote, vals))
             imgkey = ("avatar", contact["id"])
             img = self.imagecache.get(imgkey) or skypedata.get_avatar(contact)
+            ext = next((k for k, v in export.IMAGE_FORMATS.items() if img and v == img.Type), "jpg")
+            vals = (contact["identity"], self.db.filename.encode("utf-8"), ext)
+            fn = "%s_%s_fullsize.%s" % tuple(map(urllib.parse.quote, vals))
             if img and fn not in self.memoryfs["files"]:
                 self.memoryfs["handler"].AddFile(fn, img, img.Type)
                 self.memoryfs["files"][fn] = 1
@@ -5851,10 +5853,10 @@ class DatabasePage(wx.Panel):
                     "imagemaps": {}, "authorimagemaps": {},
                     "expand": self.stats_expand}
             # Fill avatar images
-            fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
+            fs, defaultavatar = self.memoryfs, "avatar__default.png"
             if defaultavatar not in fs["files"]:
-                bmp = images.AvatarDefault.Bitmap
-                fs["handler"].AddFile(defaultavatar, bmp, wx.BITMAP_TYPE_BMP)
+                img = images.AvatarDefault.Image
+                fs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
                 fs["files"][defaultavatar] = 1
             contacts = dict((c["skypename"], c) for c in self.db.get_contacts())
             partics = dict((p["identity"], p) for p in self.chat["participants"])
@@ -5865,7 +5867,7 @@ class DatabasePage(wx.Panel):
                 contact = contact or {"identity": author, "name": author}
                 if "avatar_bitmap" in contact:
                     vals = (author, self.db.filename.encode("utf-8"))
-                    fn = "%s_%s.jpg" % tuple(map(urllib.parse.quote, vals))
+                    fn = "%s_%s.bmp" % tuple(map(urllib.parse.quote, vals))
                     if fn not in fs["files"]:
                         bmp = contact["avatar_bitmap"]
                         fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
@@ -5889,8 +5891,8 @@ class DatabasePage(wx.Panel):
                 if fn in fs["files"]:
                     fs["handler"].RemoveFile(fn)
                 bardata = sorted(histdata.items())
-                bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
-                fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                img, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
+                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
                 fs["files"][fn] = 1
                 data["images"][histtype] = fn
                 areas, msgs = [], stats["totalhist"]["%s-firsts" % histtype]
@@ -5908,8 +5910,8 @@ class DatabasePage(wx.Panel):
                     if fn in fs["files"]:
                         fs["handler"].RemoveFile(fn)
                     bardata = sorted(histdata.items())
-                    bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
-                    fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                    img, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
+                    fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn
                     areas, msgs = [], hists["%s-firsts" % histtype]
@@ -5920,17 +5922,17 @@ class DatabasePage(wx.Panel):
                         data["authorimagemaps"][author] = {}
                     data["authorimagemaps"][author][histtype] = areas
             # Fill emoticon images
-            fn = "emoticon_transparent.png"
+            fn = "emoticon_transparent.gif"
             if fn not in fs["files"]:
                 img = images.TransparentPixel.Image
-                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_GIF)
                 fs["files"][fn] = 1
             for emoticon in stats["emoticons"]:
                 if not hasattr(emoticons, emoticon): continue # for emoticon
-                img = getattr(emoticons, emoticon).Image
-                fn = "emoticon_%s.png" % emoticon
+                img = getattr(emoticons, emoticon)
+                fn = "emoticon_%s.gif" % emoticon
                 if img and fn not in fs["files"]:
-                    fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                    fs["handler"].AddFile(fn, img.Image, wx.BITMAP_TYPE_GIF)
                     fs["files"][fn] = 1
 
             html = step.Template(templates.STATS_HTML, escape=True).expand(data)

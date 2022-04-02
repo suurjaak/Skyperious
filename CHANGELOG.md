@@ -8,6 +8,7 @@ CHANGELOG
 - full Python2 / Python3 compatibility;
 - moved to src-layout;
 - ensure DOS linefeeds in Windows;
+- fixed HTML exports not showing page icon;
 - fixed error on opening chat with linefeeds in participant name (issue #103);
 - ensure database has required tables and fields before starting live sync (issue #106).
 
