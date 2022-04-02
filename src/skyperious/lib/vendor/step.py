@@ -26,6 +26,10 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+------------------------------------------------------------------------------
+
+Supplemented with escape and newline options, by Erki Suurjaak.
 """
 
 import re
@@ -65,15 +69,23 @@ class Template(object):
         eval(compile(self.code, "<string>", "exec"), namespace)
         return self._postprocess("".join(map(to_unicode, output)))
 
-    def stream(self, buffer, namespace={}, encoding="utf-8", **kw):
-        """Expand the template and stream it to a file-like buffer."""
+    def stream(self, buffer, namespace={}, encoding="utf-8", newline=None, **kw):
+        """
+        Expand the template and stream it to a file-like buffer.
 
+        @param   newline     if specified, converts \r \n \r\n linefeeds to given
+        """
+        lfrgx, blfrgx = "(\r(?!\n))|((?<!\r)\n)|(\r\n)", b"(\r(?!\n))|((?<!\r)\n)|(\r\n)"
+        bnewline = None if newline is None else newline.encode("latin1")
         def write_buffer(s, flush=False, cache=[""]):
             # Cache output as a single string and write to buffer.
             cache[0] += to_unicode(s)
             if flush and cache[0] or len(cache[0]) > 65536:
-                buffer.write(postprocess(cache[0]))
-                cache[0] = ""
+                s, cache[0] = postprocess(cache[0]), ""
+                if newline is not None:
+                    rgx, lf = (blfrgx, bnewline) if isinstance(s, bytes) else (lfrgx, newline)
+                    s = re.sub(rgx, lf, s)
+                buffer.write(s)
 
         namespace.update(kw, **self.builtins)
         namespace["echo"]  = write_buffer

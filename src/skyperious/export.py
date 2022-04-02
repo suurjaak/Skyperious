@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    01.04.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -324,7 +324,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), b"")
         with util.create_file(filename, "wb", handle=True) as f:
             t = templates.CHAT_HTML if is_html else templates.CHAT_TXT
-            step.Template(t, strip=False, escape=is_html).stream(f, namespace)
+            step.Template(t, strip=False, escape=is_html).stream(f, namespace, newline=os.linesep)
         count = bool(namespace["message_count"])
         message_count = namespace["message_count"]
     finally:
@@ -450,7 +450,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
 
                 template = step.Template(templates.GRID_HTML if is_html else 
                            templates.SQL_TXT, strip=False, escape=is_html)
-                template.stream(f, namespace)
+                template.stream(f, namespace, newline=os.linesep)
 
             result = True
     finally:
