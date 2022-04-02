@@ -2206,6 +2206,8 @@ if avatar_size[0] > 300:
 %>
     <img src="memory:{{ avatar }}" {{! 'width="%s" height="%s" ' % sz if sz else "" }}/><br />
     <a href="avatar"><font color="{{ conf.LinkColour }}">Save image</font></a>
+%else:
+    <img src="memory:avatar__default__large.png" /><br />
 %endif
   </td>
   <td>

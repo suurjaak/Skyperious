@@ -5820,6 +5820,11 @@ class DatabasePage(wx.Panel):
             if img:
                 self.imagecache[imgkey] = img
                 avatar_size = tuple(img.GetSize())
+            defaultavatar = "avatar__default__large.png"
+            if defaultavatar not in self.memoryfs["files"]:
+                img = images.AvatarDefaultLarge.Image
+                self.memoryfs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
+                self.memoryfs["files"][defaultavatar] = 1
 
         data = {"contact": contact, "avatar": avatar_path, "avatar_size": avatar_size,
                 "db": self.db, "sort_by": self.contact_sort_field}
