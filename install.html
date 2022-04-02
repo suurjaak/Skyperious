@@ -47,9 +47,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8.1_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8.1_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_4.8.1-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.0_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.0_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.0-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -62,8 +62,8 @@
 
         or, to run from source code:
         <ul>
-        <li>install <a href="https://www.python.org/downloads/">Python 2</a></li>
-        <li>open a command prompt in Skyperious directory</li>
+        <li>install <a href="https://www.python.org/downloads/">Python</a></li>
+        <li>install <a href="https://pip.pypa.io/en/latest/installing/">pip</a> if not installed</li>
         <li>run <code>pip install skyperious</code></li>
         <li>run <code>skyperious</code></li>
         </ul>
@@ -84,24 +84,21 @@
 
         <a name="linux"><h3>Linux</h3></a>
 
-        <p>Easiest to get wxPython installed for the graphical interface, is to use one of
-        the prepared wheels available at
-        <a href="https://extras.wxpython.org/wxPython4/extras/linux">https://extras.wxpython.org/wxPython4/extras/linux</a>.</p>
+        <p>The graphical interface needs wxPython, best installed with one of the prepared
+        Python wheels available at <a href="https://extras.wxpython.org/wxPython4/extras/linux">https://extras.wxpython.org/wxPython4/extras/linux</a>.</p>
 
-        <p>E.g. installing Skyperious for Ubuntu 18.04:</p>
+        <p>E.g. installing Skyperious for Ubuntu 20.04:</p>
         <ul>
-        <li>run <code>sudo apt-get install python python-pip libsdl2-2.0</code></li>
-        <li>run <code>sudo pip install -U -f --no-cache-dir https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 wxPython</code></li>
-        <li>run <code>sudo pip install skyperious</code></li>
+        <li>run <code>sudo apt-get install libgtk-3-0 libsdl2-2.0 libwebkit2gtk-4.0 python3 python3-pip</code></li>
+        <li>run <code>pip install wxPython --find-links https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04</code></li>
+        <li>run <code>pip install skyperious</code></li>
         <li>run <code>skyperious</code></li>
         </ul>
 
         <p>Another option is to have wxPython built locally, e.g. for Ubuntu 20.04:</p>
         <ul>
-        <li>run <code>sudo apt-get install build-essential libgtk-3-dev libwxgtk3.0-gtk3-dev python</code></li>
-        <li>run <code>wget https://bootstrap.pypa.io/get-pip.py</code></li>
-        <li>run <code>sudo python get-pip.py</code></li>
-        <li>run <code>sudo pip install skyperious</code></li>
+        <li>run <code>sudo apt-get install build-essential libgtk-3-dev libsdl2-dev libwebkit2gtk-4.0-dev python3 python3-pip</code></li>
+        <li>run <code>pip install skyperious</code></li>
         <li>run <code>skyperious</code></li>
         </ul>
 
@@ -122,7 +119,7 @@
         </p>
 
         <p>
-        If running from source code, Skyperious needs Python 2.7. Python 3 is not supported.
+        If running from source code, Skyperious needs Python 3.5+ or Python 2.7.
         </p>
 
         <p>
@@ -137,7 +134,15 @@
         search syntax.
         </p>
 
+        <p>To run from source if Python, pip and git are installed:</p>
 
+        <pre>
+<code>git clone https://github.com/suurjaak/Skyperious
+cd Skyperious
+pip install -r requirements.txt
+./skyperious.sh
+# or: cd src && python -m skyperious</code>
+        </pre>
 
         <a name="docker"><h3>Docker</h3></a>
         <p>Pre-requisites:</p>
@@ -153,15 +158,16 @@
 docker build . -t skyperious
 
 xhost +
-docker run -it --rm --net=host --mount src=/,target=/mnt/host,type=bind -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious</code>
+docker run -it --rm --net=host --mount src=/,target=/mnt/host,type=bind -e \
+DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ skyperious</code>
         </pre>
 
-        <p><code>docker build . -t skyperious</code> will prepare an Ubuntu 18.04 Docker image
+        <p><code>docker build . -t skyperious</code> will prepare an Ubuntu 20.04 Docker image
         and install Skyperious and its dependencies within the container.</p>
 
         <p><code>xhost +</code> will allow the container to access the X Window System display.</p>
 
-        <p>Add <code>sudo</code> before docker commands if not running as root user.</p>
+        <p>Add <code>sudo</code> before docker commands if current user does not have rights for Docker.</p>
 
         <p>Add <code>--mount src="path to host directory",target=/etc/skyperious</code> after <code>docker run</code>
         to retain Skyperious configuration in a host directory between runs.</p>
