@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.03.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -853,6 +853,7 @@ def run_gui(filenames):
     app = MainApp(redirect=True) # stdout and stderr redirected to wx popup
     window = gui.MainWindow()
     app.SetTopWindow(window) # stdout/stderr popup closes with MainWindow
+    wx.Log.SetLogLevel(wx.LOG_Error) # Swallow warning popups
 
     # Some debugging support
     window.run_console("import datetime, os, re, time, sys, wx")
