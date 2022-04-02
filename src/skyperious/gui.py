@@ -3771,8 +3771,9 @@ class DatabasePage(wx.Panel):
         sizer, panel = self.sizer_accountinfo, self.panel_accountinfo
         panel.Freeze()
         account = self.db.account or {}
-        img = skypedata.get_avatar(account) or images.AvatarDefaultLarge
-        self.bmp_account.SetBitmap(img.ConvertToBitmap())
+        img = skypedata.get_avatar(account)
+        img = img.ConvertToBitmap() if img else images.AvatarDefaultLarge.Bitmap
+        self.bmp_account.SetBitmap(img)
         ctrls = []
         for x in sizer.Children: ctrls.append(x.Window), sizer.Remove(0)
         for x in ctrls: x.Destroy()
