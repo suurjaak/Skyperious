@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    01.04.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2407,7 +2407,6 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 self.SetItem(index, i, col_value)
                 col_width = self.GetTextExtent(col_value)[0] + self.COL_PADDING
                 if col_width > self._col_widths.get(i, 0):
-                    self._col_widths[i] = col_width
                     self.SetColumnWidth(i, col_width)
             self.SetItemData(index, item_id)
             self.itemDataMap[item_id] = [data[c] for c in columns]
@@ -2440,6 +2439,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         Clears the list and inserts all unfiltered rows, auto-sizing the 
         columns.
         """
+        scrollpos = self.GetScrollPos(wx.VERTICAL)
         selected_ids, selected = [], self.GetFirstSelected()
         while selected >= 0:
             selected_ids.append(self.GetItemData(selected))
@@ -2457,6 +2457,9 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                     del self._row_colours[id][func]
             if id in self._row_colours and not self._row_colours[id]:
                 del self._row_colours[id]
+
+        # Store row fonts
+        row_fonts = {self.GetItemData(i): self.GetItemFont(i) for i in range(self.ItemCount)}
 
         self.Freeze()
         wx.ListView.DeleteAllItems(self)
@@ -2505,7 +2508,6 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             for i, (col_name, col_label) in enumerate(self._columns):
                 col_width = max(col_lengths[col_name], header_lengths[col_name])
                 self.SetColumnWidth(i, col_width)
-                self._col_widths[i] = col_width
                 #wx.LIST_AUTOSIZE, wx.LIST_AUTOSIZE_USEHEADER
         elif self._col_widths:
             for col, width in self._col_widths.items():
@@ -2513,15 +2515,17 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         if self.GetSortState()[0] >= 0:
             self.SortListItems(*self.GetSortState())
 
-        if selected_ids or self._row_colours:
-            idindx = dict((self.GetItemData(i), i)
-                          for i in range(self.ItemCount))
+        idindx = {self.GetItemData(i): i for i in range(self.ItemCount)}
+        for rowid, font in row_fonts.items():
+            if rowid in idindx:
+                self.SetItemFont(idindx[rowid], wx.Font(font))
         for item_id, attrs in self._row_colours.items(): # Re-colour rows
             if item_id not in idindx: continue
             [func(idindx[item_id], value) for func, value in attrs.items()]
         if selected_ids: # Re-select the previously selected items
             [self.Select(idindx[i]) for i in selected_ids if i in idindx]
 
+        self.ScrollLines(scrollpos)
         self.Thaw()
 
 
@@ -2573,10 +2577,16 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         for i, (name, label) in enumerate(columns):
             col_label = label + "  " # Keep space for sorting arrows.
             self.InsertColumn(i + 1, col_label)
-            self._col_widths[i] = max(self._col_widths.get(i, 0),
-                self.GetTextExtent(col_label)[0] + self.COL_PADDING)
-            self.SetColumnWidth(i, self._col_widths[i])
+            self.SetColumnWidth(i, max(self._col_widths.get(i, 0),
+                self.GetTextExtent(col_label)[0] + self.COL_PADDING))
         self._columns = columns
+
+
+    def SetColumnWidth(self, col, width):
+        """Sets the column width."""
+        result = super(SortableListView, self).SetColumnWidth(col, width)
+        if result: self._col_widths[col] = width
+        return result
 
 
     def GetItemMappedData(self, index):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    27.03.2022
+@modified    01.04.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -26,6 +26,10 @@ try: # ImageFont for calculating column widths in Excel export, not required.
     from PIL import ImageFont
 except ImportError:
     ImageFont = None
+try:
+    import wx
+except ImportError:
+    wx = None
 try:
     import xlsxwriter
 except ImportError:
@@ -69,6 +73,14 @@ TABLE_EXTS = ["html", "sql", "xlsx", "csv"] if xlsxwriter \
 QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
                   "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
 QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
+
+CONTACT_WILDCARD = "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
+CONTACT_EXTS = ["xlsx", "csv"] if xlsxwriter else ["csv"]
+
+IMAGE_EXTS = ["bmp", "jpg", "png"]
+IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
+IMAGE_FORMATS = {"bmp": wx.BITMAP_TYPE_BMP, "jpg": wx.BITMAP_TYPE_JPEG, "png": wx.BITMAP_TYPE_PNG} \
+                if wx else {}
 
 
 logger = logging.getLogger(__name__)
@@ -166,8 +178,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, opts=None):
     Exports the chats to a single XLSX file with chats on separate worksheets.
 
     @param   chats         list of chat dicts, as returned from SkypeDatabase
-    @param   path          export filename, or export directory if opts.multi
-    @param   format        export format (html|txt|xlsx|csv)
+    @param   filename      full path and filename of resulting file
     @param   db            SkypeDatabase instance
     @param   messages      list messages to export if not querying all
     @param   opts          export options dictionary
@@ -348,6 +359,37 @@ def export_chat_csv(chat, filename, db, messages, opts=None):
     finally:
         if writer: util.try_ignore(writer.close)
     return 1, count
+
+
+def export_contacts(contacts, filename, format, db):
+    """
+    Exports the contacts to a spreadsheet file.
+
+    @param   contacts      list of chat dicts, as returned from SkypeDatabase
+    @param   filename      full path and filename of resulting file
+    @param   format        export format (xlsx|csv)
+    @param   db            SkypeDatabase instance
+    """
+    is_csv  = ("csv"  == format)
+    is_xlsx = ("xlsx" == format)
+
+    writer = None
+    colnames, collabels = zip(*((k, "%s (%s)" % (v, k))
+                                for k, v in skypedata.CONTACT_FIELD_TITLES.items()))
+    try:
+        if is_csv:
+            writer = csv_writer(filename)
+        else:
+            writer = xlsx_writer(filename, "Skype contacts")
+            writer.set_header(True)
+        writer.writerow(*([collabels, "bold"] if is_xlsx else [collabels]))
+        writer.set_header(False) if is_xlsx else 0
+        for c in contacts:
+            writer.writerow(["" if c.get(n) is None else c[n] for n in colnames])
+        writer.close()
+        writer = None
+    finally:
+        if writer: util.try_ignore(writer.close)
 
 
 def export_grid(grid, filename, title, db, sql_query="", table=""):

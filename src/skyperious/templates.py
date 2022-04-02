@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    27.03.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2167,6 +2167,94 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 %endfor
 </table>
 %endif
+</font>
+"""
+
+
+"""
+Contact information template, for use with HtmlWindow.
+
+@param   db               SkypeDatabase instance
+@param   contact          contact data dictionary, including "conversations": [}
+@param   sort_by          the field that chats are currently sorted by
+@param   avatar           memoryfs filename
+"""
+CONTACT_HTML = """<%
+from skyperious import conf, skypedata
+from skyperious.lib import util
+
+CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
+             ("ratio", "Message ratio"),
+             ("first_message_datetime", "First message"),
+             ("last_message_datetime", "Last message")]
+datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+chats = {x["id"]: x for x in db.get_conversations()}
+%>
+<font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
+<table cellpadding="0" cellspacing="0" width="100%"><tr>
+  <td width="100" align="center" valign="top">
+%if avatar:
+<%
+sz = None
+if avatar_size[0] > 300:
+    ratio = 300. / avatar_size[0]
+    sz = tuple(int(x * ratio) for x in avatar_size)
+%>
+    <img src="memory:{{ avatar }}" {{! 'width="%s" height="%s" ' % sz if sz else "" }}/><br />
+    <a href="avatar"><font color="{{ conf.LinkColour }}">Save image</font></a>
+%endif
+  </td>
+  <td>
+    <img src="memory:blank.gif" width="1" height="100" />
+  </td>
+  <td valign="top">
+    <table>
+%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if contact.get(n) not in (b"", "", None)):
+      <tr><td nowrap valign="top"><b>{{ label }}:</b></td><td>{{ contact[name] }}</td></tr>
+%endfor
+    </table>
+  </td>
+</tr></table>
+
+<br /><br />
+
+<table cellpadding="2" cellspacing="2"><tr>
+%for i, (name, label) in enumerate(CHAT_COLS):
+    <td nowrap width="{{ 100 if i else 400 }}" align="{{ "right" if i in (1, 2) else "left" }}" valign="top">
+%if name == sort_by:
+        <font color="gray">
+%else:
+        <a href="sort://{{ name }}"><font color="{{ conf.LinkColour }}">
+%endif
+            {{ label }}
+%if name == sort_by:
+        </font>
+%else:
+        </font></a>
+%endif
+    </td>
+%endfor
+%for data in contact.get("conversations") or []:
+  <tr>
+    <td valign="top">{{ data["title_long"] }} <a href="chat://{{ data["id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a></td>
+    <td align="right" valign="top">{{ data["message_count"] }}</td>
+    <td align="right" valign="top">{{ util.round_float(data["ratio"], 0) + "%" if data.get("ratio") is not None else "" }}</td>
+    <td align="right" nowrap valign="top">{{ datefmt(data["first_message_datetime"]) }}
+%if data["first_message_datetime"]:
+        <a href="chat://{{ data["id"] }}/{{ data["first_message_id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a>
+%endif
+    </td>
+    <td align="right" nowrap valign="top">{{ datefmt(data["last_message_datetime"]) }}
+%if data["last_message_datetime"]:
+        <a href="chat://{{ data["id"] }}/{{ data["last_message_id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a>
+%endif
+    </td>
+    <td width="10"></td>
+    <td><a href="export://{{ data["id"] }}"><font color="{{ conf.LinkColour }}">Export</font></a></td>
+  </tr>
+%endfor
+</table>
+
 </font>
 """
 

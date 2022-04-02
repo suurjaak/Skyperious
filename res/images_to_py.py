@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  26.03.2022
+@modified  30.03.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -90,7 +90,7 @@ IMAGES = {
     "PageChats.png":
         "Icon for the Chats page in a database tab.",
     "PageContacts.png":
-        "Icon for the Merge Contacts page in a merger tab.",
+        "Icon for the Contacts page in a database tab.",
     "PageTables.png":
         "Icon for the Data tables page in a database tab.",
     "PageInfo.png":
@@ -99,6 +99,8 @@ IMAGES = {
         "Icon for the Merge All page in a merger tab.",
     "PageMergeChats.png":
         "Icon for the Merge Chats page in a merger tab.",
+    "PageMergeContacts.png":
+        "Icon for the Merge Contacts page in a merger tab.",
     "PageOnline.png":
         "Icon for the Online page in a database tab.",
     "PageSearch.png":

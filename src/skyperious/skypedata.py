@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.03.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -91,18 +91,19 @@ CONTACT_TYPE_NORMAL        =  1 # Normal Skype user contact
 CONTACT_TYPE_PHONE         =  2 # Phone number contact
 CONTACT_TYPE_BOT           = 10 # Bot user contact
 CONTACT_FIELD_TITLES = collections.OrderedDict([
+    ("skypename",    "Skype name"),
     ("displayname",  "Display name"),
-    ("skypename",    "Skype Name"),
-    ("province",     "State/Province"),
-    ("city",         "City"),
-    ("pstnnumber",   "Phone"),
+    ("given_displayname",   "Given display name"),
+    ("phone_mobile", "Mobile phone"),
     ("phone_home",   "Home phone"),
     ("phone_office", "Office phone"),
-    ("phone_mobile", "Mobile phone"),
-    ("homepage",     "Website"),
+    ("pstnnumber",   "Phone"),
     ("emails",       "Emails"),
+    ("homepage",     "Website"),
     ("about",        "About me"),
     ("mood_text",    "Mood"),
+    ("city",         "City"),
+    ("province",     "State/Province"),
     ("country",      "Country/Region"),
 ])
 ACCOUNT_FIELD_TITLES = collections.OrderedDict([
@@ -767,7 +768,7 @@ class SkypeDatabase(object):
             chat["message_count"] = 0
             cc = [x for x in (chat, chat.get("__link")) if x]
             datas = [stats[x["id"]] for x in cc if x["id"] in stats]
-            if not datas: continue
+            if not datas: continue # for chat
             for data in datas: # Initialize datetime objects
                 for n in ["first_message", "last_message"]:
                     if data[n + "_timestamp"]:
@@ -785,6 +786,105 @@ class SkypeDatabase(object):
 
         if log and chats:
             logger.info("Statistics collected (%s).", self.filename)
+
+
+    def get_contacts_stats(self, contacts, chats, log=True):
+        """
+        Collects statistics for all contacts and fills in the values:
+        {"first_message_datetime": datetime, "last_message_datetime": datetime,
+         "message_count_single": message count in 1:1 chat,
+         "message_count_group": message count in group chats,
+         "conversations": [{"id", "first_message_id", "last_message_id", ..}]}.
+
+        @param   contacts  list of contacts, as returned from get_contacts()
+        @param   chats     list of conversations, as returned from get_conversations_stats()
+        """
+        if log and contacts:
+            logger.info("Contact statistics collection starting (%s).", self.filename)
+        stats, chatmap, linkedchatmap, singlechatmap = {}, {}, {}, {} # {author: []}, {oldid: newid}, {id: {}}, {author: id}
+        firstmsgs, lastmsgs = {}, {} # {(id, author): {}}
+        if self.is_open() and all(x in self.tables for x in ("contacts", "messages", "conversations")):
+            and_str, and_val = "", []
+            if 1 == len(contacts):
+                and_str, and_val = " AND author = ?", [contacts[0]["identity"]]
+            sql = ("SELECT convo_id AS id, author AS identity, COUNT(*) AS message_count, "
+                   "MIN(timestamp) AS first_message_timestamp, "
+                   "MAX(timestamp) AS last_message_timestamp "
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
+            for row in self.execute(sql, and_val).fetchall():
+                stats.setdefault(row["identity"], []).append(row)
+
+            sql = ("SELECT id AS first_message_id, convo_id AS id, author AS identity, "
+                   "MIN(timestamp) AS first_message_timestamp "
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
+            for row in self.execute(sql, and_val).fetchall():
+                firstmsgs[(row["id"], row["identity"])] = row
+            sql = ("SELECT id AS last_message_id, convo_id AS id, author AS identity, "
+                   "MAX(timestamp) AS last_message_timestamp "
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
+            for row in self.execute(sql, and_val).fetchall():
+                lastmsgs[(row["id"], row["identity"])] = row
+
+            chatmap = {x["id"]: x for x in chats}
+            linkedchatmap = {x["__link"]["id"]: x["id"] for x in chats if x.get("__link")}
+            singlechatmap = {x["identity"]: x["id"] for x in chats
+                             if CHATS_TYPE_SINGLE == x["type"]}
+        for contact in contacts:
+            contact["message_count_single"] = 0
+            contact["message_count_group"] = 0
+            contact["conversations"] = []
+            datas, datas2 = stats.get(contact["identity"]), []
+            if not datas: continue # for contact
+
+            # First pass: add first/last message IDs, combine linked chats
+            datamap = {x["id"]: x for x in datas}
+            for data in datas:
+                data["first_message_id"] = firstmsgs[(data["id"], data["identity"])]["first_message_id"]
+                data["last_message_id"]  = lastmsgs [(data["id"], data["identity"])]["last_message_id"]
+                if data["id"] in linkedchatmap:
+                    newid = linkedchatmap[data["id"]]
+                    if newid in datamap:
+                        data2 = datamap[newid]
+                        for n, f in zip(["message_count", "first_message_timestamp", "first_message_timestamp"],
+                                        [sum, min, max]):
+                            data2[n] = f(d.get(n) for d in (data, data2)) # Combine
+                        for chatid in (data["id"], newid):
+                            firstdata = firstmsgs[(chatid, data["identity"])]
+                            if firstdata["first_message_timestamp"] == data2["first_message_timestamp"]:
+                                data2["first_message_id"] = firstdata["first_message_id"]
+                            lastdata = lastmsgs[(chatid, data["identity"])]
+                            if lastdata["last_message_timestamp"] == data2["last_message_timestamp"]:
+                                data2["last_message_id"] = lastdata["last_message_id"]
+                        continue  # for data
+                    else:
+                        data = dict(data, id=newid)
+                datas2.append(data)
+
+            # Second pass: populate ratios and datetimes
+            for data in datas2:
+                data["ratio"] = None
+                chat = chatmap.get(data["id"])
+                if chat and chat.get("message_count") is not None:
+                    data["ratio"] = 100. * data["message_count"] / chat["message_count"]
+                for n in ["first_message", "last_message"]: # Initialize datetime objects
+                    if data[n + "_timestamp"]:
+                        dt = self.stamp_to_date(data[n + "_timestamp"])
+                        data[n + "_datetime"] = dt
+
+            singlechat_id = singlechatmap.get(contact["identity"])
+            contact["message_count_single"] = next((x["message_count"] for x in datas2
+                                                    if x["id"] == singlechat_id), 0)
+            contact["message_count_group"] = sum((x["message_count"] for x in datas2
+                                                  if x["id"] != singlechat_id), 0)
+            for n, f in zip(["first_message_datetime", "last_message_datetime"], [min, max]):
+                contact[n] = f(d.get(n) for d in datas2) # Combine 
+            contact["conversations"] = datas2
+
+        if log and contacts:
+            logger.info("Contact statistics collected (%s).", self.filename)
 
 
     def get_contactgroups(self):
@@ -825,8 +925,10 @@ class SkypeDatabase(object):
         if reload or "contacts" not in self.table_rows:
             titlecol = self.make_title_col("contacts")
             rows = self.execute(
-                "SELECT *, COALESCE(skypename, pstnnumber, '') "
-                    "AS identity, "
+                "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
+                "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office) AS phone, "
+                "NULL AS first_message_datetime, NULL AS last_message_datetime, "
+                "NULL AS message_count_single, NULL AS message_count_group, "
                 "%s AS name FROM contacts ORDER BY name COLLATE NOCASE"
             % titlecol).fetchall()
             self.table_objects["contacts"] = {}
@@ -2715,10 +2817,14 @@ def find_databases(folder):
         for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)
 
+def get_avatar_data(datadict):
+    """Returns contact/account avatar raw data or ""."""
+    return datadict.get("avatar_image") or datadict.get("profile_attachments") or ""
+
 
 def get_avatar(datadict, size=None, aspect_ratio=True):
     """
-    Returns a wx.Bitmap for the contact/account avatar, if any.
+    Returns a wx.Image for the contact/account avatar, if any.
 
     @param   datadict      row from Contacts or Accounts
     @param   size          (width, height) to resize image to, if any
@@ -2734,7 +2840,7 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
             if img:
                 if size and list(size) != list(img.GetSize()):
                     img = util.img_wx_resize(img, size, aspect_ratio)
-                result = img.ConvertToBitmap()
+                result = img
         except Exception:
             logger.exception("Error loading avatar image for %s.",
                              datadict["skypename"])

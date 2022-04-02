@@ -2,10 +2,11 @@ CHANGELOG
 =========
 
 
-5.0, 2022-03-26
+5.0, 2022-04-02
 ---------------
+- added contacts-tab;
 - full Python2 / Python3 compatibility;
-- move to src-layout;
+- moved to src-layout;
 - fixed error on opening chat with linefeeds in participant name (issue #103);
 - ensure database has required tables and fields before starting live sync (issue #106).
 

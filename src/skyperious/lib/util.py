@@ -46,6 +46,11 @@ def m(o, name, case_insensitive=True):
         return [i for i in members if name in i]
 
 
+def coalesce(value, fallback):
+    """Returns fallback if value is None else value."""
+    return fallback if value is None else value
+
+
 def safedivf(a, b):
     """A zero-safe division, returns 0.0 if b is 0, a / float(b) otherwise."""
     return a / float(b) if b else 0.0
