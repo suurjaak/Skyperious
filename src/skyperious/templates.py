@@ -2225,6 +2225,7 @@ if avatar_size[0] > 300:
 
 <br /><br />
 
+%if contact.get("conversations"):
 <table cellpadding="2" cellspacing="2"><tr>
 %for i, (name, label) in enumerate(CHAT_COLS):
     <td nowrap width="{{ 100 if i else 400 }}" align="{{ "right" if i in (1, 2) else "left" }}" valign="top">
@@ -2241,7 +2242,7 @@ if avatar_size[0] > 300:
 %endif
     </td>
 %endfor
-%for data in contact.get("conversations") or []:
+%for data in contact["conversations"]:
   <tr>
     <td valign="top">{{ data["title_long"] }} <a href="chat://{{ data["id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a></td>
     <td align="right" valign="top">{{ data["message_count"] }}</td>
@@ -2261,6 +2262,7 @@ if avatar_size[0] > 300:
   </tr>
 %endfor
 </table>
+%endif
 
 </font>
 """
@@ -2366,7 +2368,9 @@ from skyperious import conf, skypedata
   <td align="right" valign="top">
     <font color="{{ conf.DisabledColour }}">{{ result_count }}</font>
   </td><td colspan="2">
-    <font color="{{ conf.DisabledColour }}">{{! pattern_replace.sub(wrap_b, contact["name"]) }}</font>
+    <a href="contact:{{ contact["id"] }}"><font color="{{ conf.LinkColour }}">
+      {{! pattern_replace.sub(wrap_b, contact["name"]) }}
+    </font></a>
     <br /><table>
 %for field in filter(lambda x: x in fields_filled, skypedata.CONTACT_FIELD_TITLES):
       <tr>

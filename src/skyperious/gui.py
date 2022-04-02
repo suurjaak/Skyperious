@@ -4836,6 +4836,12 @@ class DatabasePage(wx.Panel):
                 thepage = getattr(self, "page_" + page, None)
                 if thepage:
                     self.notebook.SetSelection(self.pageorder[thepage])
+        elif href.startswith("contact:"):
+            contactid = int(href[href.index(":") + 1:])
+            contact = next((x for x in self.contacts if x["id"] == contactid), None)
+            if contact:
+                self.notebook.SetSelection(self.pageorder[self.page_contacts])
+                self.load_contact(contact)
         elif href.startswith("#"): # In-page link
             event.Skip()
         elif not (href.startswith("chat:") or href.startswith("message:")
