@@ -9,18 +9,20 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   26.01.2014
-@modified  30.07.2020
+@modified  26.03.2022
 """
 import datetime
+import io
+import json
 import os
 import zipfile
 
 
 """Target Python script to write."""
-PYTARGET = os.path.join("..", "skyperious", "emoticons.py")
+PYTARGET = os.path.join("..", "src", "skyperious", "emoticons.py")
 
 """Target ZIP file to write."""
-ZIPTARGET = os.path.join("..", "skyperious", "res", "emoticons.zip")
+ZIPTARGET = os.path.join("..", "src", "skyperious", "res", "emoticons.zip")
 
 Q3 = '"""'
 
@@ -221,7 +223,7 @@ EMOTICONS = {
     "fire":                   {"title": "Fire", "file": "fire.gif", "strings": ["(fire)", "(Fire)"]},
     "fireworks":              {"title": "Fireworks", "file": "fireworks.gif", "strings": ["(fireworks)", "(Fireworks)"]},
     "fish":                   {"title": "Fish", "file": "fish.gif", "strings": ["(fish)", "(Fish)", "(tropicalfish)", "(fishtropical)"]},
-    "fistbump":               {"title": "Good work!", "file": "fistbump.gif", "strings": ["(fistbump)", "=\u018eE=", "p#d", "(Fistbump)"]},
+    "fistbump":               {"title": "Good work!", "file": "fistbump.gif", "strings": ["(fistbump)", u"=\u018eE=", "p#d", "(Fistbump)"]},
     "flaginhole":             {"title": "Flag in hole", "file": "flaginhole.gif", "strings": ["(flaginhole)", "(golfball)"]},
     "flushed":                {"title": "Flushed", "file": "flushed.gif", "strings": ["(flushed)", "(Flushed)"]},
     "footballfail":           {"title": "Football fail", "file": "footballfail.gif", "strings": ["(footballfail)", "(Footballfail)"]},
@@ -525,7 +527,8 @@ EMOTICONS = {
 }
 
 
-HEADER = '''"""
+HEADER = u'''# -*- coding: utf-8 -*-
+"""
 Contains Skype emoticon image loaders. Auto-generated.
 Skype emoticon images are property of Skype, released under the
 Skype Component License 1.0.
@@ -601,21 +604,21 @@ class LazyFileImage(object):
 
 def create_py(target):
     global HEADER, EMOTICONS
-    f = open(target, "w")
+    f = io.open(target, "w", encoding="utf-8")
     f.write(HEADER)
     for name, data in sorted(EMOTICONS.items()):
         if "file" not in data: continue # for name, data
-        f.write("\n\n%sSkype emoticon \"%s %s\".%s\n%s = LazyFileImage(\"%s\")" %
+        f.write(u"\n\n%sSkype emoticon \"%s %s\".%s\n%s = LazyFileImage(\"%s\")" %
                 (Q3, data["title"], data["strings"][0], Q3, name, data["file"]))
-    f.write("\n\n\n%sEmoticon metadata: name, strings, title.%s\n"
-            "EmoticonData = {\n" % (Q3, Q3))
+    f.write(u"\n\n\n%sEmoticon metadata: name, strings, title.%s\n"
+            u"EmoticonData = {\n" % (Q3, Q3))
     for name, data in sorted(EMOTICONS.items()):
-        data_py = {"title": data["title"], "strings": data["strings"]}
-        f.write("    \"%s\": %s,\n" % (name, data_py))
-    f.write("}\n")
-    f.write("\n\n%sMaps emoticon strings to emoticon names.%s\n" % (Q3, Q3))
-    f.write("EmoticonStrings = dict((s, k) for k, d in EmoticonData.items()"
-            " for s in d[\"strings\"])\n")
+        data_py = {"strings": data["strings"], "title": data["title"]}
+        f.write(u"    \"%s\": %s,\n" % (name, json.dumps(data_py)))
+    f.write(u"}\n")
+    f.write(u"\n\n%sMaps emoticon strings to emoticon names.%s\n" % (Q3, Q3))
+    f.write(u"EmoticonStrings = dict((s, k) for k, d in EmoticonData.items()"
+            u" for s in d[\"strings\"])\n")
     f.close()
 
 

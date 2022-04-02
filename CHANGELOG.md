@@ -2,7 +2,18 @@ CHANGELOG
 =========
 
 
-4.8.1, 2021-09-08
+5.0, 2022-04-02
+---------------
+- added contacts-tab;
+- full Python2 / Python3 compatibility;
+- moved to src-layout;
+- ensure DOS linefeeds in Windows;
+- fixed HTML exports not showing page icon;
+- fixed error on opening chat with linefeeds in participant name (issue #103);
+- ensure database has required tables and fields before starting live sync (issue #106).
+
+
+4.8.1, 2021-08-05
 ---------------
 - fixed audio/video messages being imported from live as simple file transfers (issue #102).
 

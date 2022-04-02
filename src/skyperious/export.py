@@ -8,9 +8,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    31.07.2021
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
+import codecs
 import collections
 import csv
 import datetime
@@ -18,11 +19,17 @@ import itertools
 import logging
 import os
 import re
+import sys
 
+import six
 try: # ImageFont for calculating column widths in Excel export, not required.
     from PIL import ImageFont
 except ImportError:
     ImageFont = None
+try:
+    import wx
+except ImportError:
+    wx = None
 try:
     import xlsxwriter
 except ImportError:
@@ -66,6 +73,14 @@ TABLE_EXTS = ["html", "sql", "xlsx", "csv"] if xlsxwriter \
 QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
                   "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
 QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
+
+CONTACT_WILDCARD = "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
+CONTACT_EXTS = ["xlsx", "csv"] if xlsxwriter else ["csv"]
+
+IMAGE_EXTS = ["bmp", "jpg", "png"]
+IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
+IMAGE_FORMATS = {"bmp": wx.BITMAP_TYPE_BMP, "jpg": wx.BITMAP_TYPE_JPEG, "png": wx.BITMAP_TYPE_PNG} \
+                if wx else {}
 
 
 logger = logging.getLogger(__name__)
@@ -163,8 +178,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, opts=None):
     Exports the chats to a single XLSX file with chats on separate worksheets.
 
     @param   chats         list of chat dicts, as returned from SkypeDatabase
-    @param   path          export filename, or export directory if opts.multi
-    @param   format        export format (html|txt|xlsx|csv)
+    @param   filename      full path and filename of resulting file
     @param   db            SkypeDatabase instance
     @param   messages      list messages to export if not querying all
     @param   opts          export options dictionary
@@ -212,7 +226,7 @@ def export_chats_xlsx(chats, filename, db, messages=None, opts=None):
         for m in msgs:
             text = parser.parse(m, output={"format": "text"})
             try: text = text.decode("utf-8")
-            except UnicodeError: pass
+            except Exception: pass
             values = [m["datetime"], db.get_author_name(m), text, m["author"]]
             style[1] = "local" if db.id == m["author"] else "remote"
             writer.writerow(values, style)
@@ -254,7 +268,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         # Cannot keep all messages in memory at once - very large chats
         # (500,000+ messages) can take gigabytes.
         tmpname = util.unique_path("%s.messages" % filename)
-        tmpfile = open(tmpname, "w+")
+        tmpfile = open(tmpname, "wb+")
         template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
                    templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
         template.stream(tmpfile, namespace)
@@ -307,10 +321,10 @@ def export_chat_template(chat, filename, db, messages, opts=None):
 
 
         tmpfile.flush(), tmpfile.seek(0)
-        namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), "")
-        with util.create_file(filename, handle=True) as f:
+        namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), b"")
+        with util.create_file(filename, "wb", handle=True) as f:
             t = templates.CHAT_HTML if is_html else templates.CHAT_TXT
-            step.Template(t, strip=False, escape=is_html).stream(f, namespace)
+            step.Template(t, strip=False, escape=is_html).stream(f, namespace, newline=os.linesep)
         count = bool(namespace["message_count"])
         message_count = namespace["message_count"]
     finally:
@@ -329,27 +343,53 @@ def export_chat_csv(chat, filename, db, messages, opts=None):
     @param   messages  list of message data dicts
     @return            (number of chats exported, number of messages exported)
     """
-    count, message_count = 0, 0
-    parser = skypedata.MessageParser(db, chat=chat, stats=False)
-    dialect = csv.excel
-    # csv.excel.delimiter default "," is not actually used by Excel.
-    # Default linefeed "\r\n" would cause another "\r" to be written.
-    dialect.delimiter, dialect.lineterminator = ";", "\r"
-    with util.create_file(filename, "wb", handle=True) as f:
-        writer = csv.writer(f, dialect)
-        writer.writerow(["Time", "Author", "Message"])
-        for m in messages:
-            text = parser.parse(m, output={"format": "text"})
-            try:
-                text = text.decode("utf-8")
-            except UnicodeError: pass
-            values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
-                      db.get_author_name(m), text ]
-            values = [v.encode("latin1", "replace") for v in values]
-            writer.writerow(values)
-            message_count += 1
-    count = bool(message_count)
-    return count, message_count
+    count = 0
+    parser, writer = skypedata.MessageParser(db, chat=chat, stats=False), None
+    try:
+        with util.create_file(filename, handle=True) as f:
+            f.close()
+            writer = csv_writer(filename)
+            writer.writerow(["Time", "Author", "Message"])
+            for m in messages:
+                text = parser.parse(m, output={"format": "text"})
+                values = [m["datetime"].strftime("%Y-%m-%d %H:%M:%S"),
+                          db.get_author_name(m), text]
+                writer.writerow(values)
+                count += 1
+    finally:
+        if writer: util.try_ignore(writer.close)
+    return 1, count
+
+
+def export_contacts(contacts, filename, format, db):
+    """
+    Exports the contacts to a spreadsheet file.
+
+    @param   contacts      list of chat dicts, as returned from SkypeDatabase
+    @param   filename      full path and filename of resulting file
+    @param   format        export format (xlsx|csv)
+    @param   db            SkypeDatabase instance
+    """
+    is_csv  = ("csv"  == format)
+    is_xlsx = ("xlsx" == format)
+
+    writer = None
+    colnames, collabels = zip(*((k, "%s (%s)" % (v, k))
+                                for k, v in skypedata.CONTACT_FIELD_TITLES.items()))
+    try:
+        if is_csv:
+            writer = csv_writer(filename)
+        else:
+            writer = xlsx_writer(filename, "Skype contacts")
+            writer.set_header(True)
+        writer.writerow(*([collabels, "bold"] if is_xlsx else [collabels]))
+        writer.set_header(False) if is_xlsx else 0
+        for c in contacts:
+            writer.writerow(["" if c.get(n) is None else c[n] for n in colnames])
+        writer.close()
+        writer = None
+    finally:
+        if writer: util.try_ignore(writer.close)
 
 
 def export_grid(grid, filename, title, db, sql_query="", table=""):
@@ -365,43 +405,32 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
     @param   table      name of the table producing the grid contents, if any
     """
     result = False
-    f = None
+    f, writer = None, None
     is_html = filename.lower().endswith(".html")
     is_csv  = filename.lower().endswith(".csv")
     is_sql  = filename.lower().endswith(".sql")
     is_xlsx = filename.lower().endswith(".xlsx")
     try:
-        with util.create_file(filename, handle=True) as f:
+        with util.create_file(filename, "wb", handle=True) as f:
             columns = [c["name"] for c in grid.Table.columns]
 
             if is_csv or is_xlsx:
+                f.close()
                 if is_csv:
-                    dialect = csv.excel
-                    dialect.delimiter, dialect.lineterminator = ";", "\r"
-                    writer = csv.writer(f, dialect)
-                    if sql_query:
-                        flat = sql_query.replace("\r", " ").replace("\n", " ")
-                        sql_query = flat.encode("latin1", "replace")
-                    header = [c.encode("latin1", "replace") for c in columns]
+                    writer = csv_writer(filename)
+                    if sql_query: sql_query = sql_query.replace("\r", " ").replace("\n", " ")
                 else:
                     writer = xlsx_writer(filename, table or "SQL Query")
                     writer.set_header(True)
-                    header = columns
                 if sql_query:
                     a = [[sql_query]] + (["bold", 0, False] if is_xlsx else [])
                     writer.writerow(*a)
-                writer.writerow(*([header, "bold"] if is_xlsx else [header]))
+                writer.writerow(*([columns, "bold"] if is_xlsx else [columns]))
                 writer.set_header(False) if is_xlsx else 0
                 for row in grid.Table.GetRowIterator():
-                    values = []
-                    for col in columns:
-                        val = "" if row[col] is None else row[col]
-                        if is_csv:
-                            val = val if isinstance(val, unicode) else str(val)
-                            val = val.encode("latin1", "replace")
-                        values.append(val)
-                    writer.writerow(values)
-                writer.close() if is_xlsx else 0
+                    writer.writerow(["" if row[c] is None else row[c] for c in columns])
+                writer.close()
+                writer = None
             else:
                 namespace = {
                     "db":        db,
@@ -421,13 +450,41 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
 
                 template = step.Template(templates.GRID_HTML if is_html else 
                            templates.SQL_TXT, strip=False, escape=is_html)
-                template.stream(f, namespace)
+                template.stream(f, namespace, newline=os.linesep)
 
             result = True
     finally:
         if f: util.try_ignore(f.close)
+        if writer: util.try_ignore(writer.close)
     return result
 
+
+
+class csv_writer(object):
+    """Convenience wrapper for csv.Writer, with Python2/3 compatbility."""
+
+    def __init__(self, filename):
+        self._file = open(filename, "wb") if six.PY2 else codecs.open(filename, "w", "utf-8")
+        # csv.excel.delimiter default "," is not actually used by Excel.
+        # Default linefeed "\r\n" would cause another "\r" to be written.
+        self._writer = csv.writer(self._file, csv.excel, delimiter=";", lineterminator="\r")
+
+
+    def writerow(self, sequence):
+        """Writes a CSV record from a sequence of fields."""
+        values = []
+        for v in sequence:
+            if six.PY2:
+                v = util.to_unicode(v).encode("utf-8", "backslashreplace")
+            if isinstance(v, six.string_types):
+                v = v.replace("\r", "\\r").replace("\n", "\\n").replace("\x00", "\\x00")
+            values.append(v)
+        self._writer.writerow(values)
+
+
+    def close(self):
+        """Closes CSV file writer."""
+        self._file.close()
 
 
 class xlsx_writer(object):
@@ -458,7 +515,7 @@ class xlsx_writer(object):
         self._sheetnames = {} # {xlsxwriter.Worksheet: original given name, }
         self._headers    = {} # {sheet name: [[values, style, merge_cols], ], }
         self._col_widths = {} # {sheet name: {col index: width in Excel units}}
-        self._autowrap   = [c for c in autowrap] # [column index to autowrap, ]
+        self._autowrap   = list(autowrap or ()) # [column index to autowrap, ]
         self._format     = None
 
         # Worksheet style formats
@@ -510,7 +567,7 @@ class xlsx_writer(object):
         self._writers = collections.defaultdict(lambda: sheet.write)
         self._writers[datetime.datetime] = sheet.write_datetime
         # Avoid using write_url: URLs are very limited in Excel (max len 256)
-        self._writers[str] = self._writers[unicode] = sheet.write_string
+        self._writers[six.binary_type] = self._writers[six.text_type] = sheet.write_string
 
 
     def set_header(self, start):
@@ -547,7 +604,7 @@ class xlsx_writer(object):
             values = values[0] if values else []
         for c, v in enumerate(values):
             writefunc = self._writers[type(v)]
-            fmt_name = style if isinstance(style, basestring) \
+            fmt_name = style if isinstance(style, six.string_types) \
                        else (style or {}).get(c, self._format)
             writefunc(self._row, c, v, self._formats[fmt_name])
             if (merge_cols or not autowidth or "wrap" == fmt_name
@@ -555,10 +612,10 @@ class xlsx_writer(object):
                 continue # continue for c, v in enumerate(Values)
 
             # Calculate and update maximum written column width
-            strval = (v.encode("latin1", "replace") if isinstance(v, unicode) 
-                      else v.strftime("%Y-%m-%d %H:%M") \
-                      if isinstance(v, datetime.datetime) else 
-                      v if isinstance(v, basestring) else str(v))
+            strval = (v.encode("latin1", "replace").decode("latin1")
+                      if isinstance(v, six.text_type)
+                      else v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime.datetime)
+                      else v if isinstance(v, six.string_types) else str(v))
             pixels = max(self._fonts[fmt_name].getsize(x)[0]
                          for x in strval.split("\n"))
             width = float(pixels) / self._unit_widths[fmt_name] + 1

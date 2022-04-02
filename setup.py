@@ -8,10 +8,15 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    01.08.2021
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
+import os
+import sys
 import setuptools
+
+ROOTPATH  = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(ROOTPATH, "src"))
 
 from skyperious import conf
 
@@ -27,10 +32,12 @@ setuptools.setup(
     platforms=["any"],
     keywords="skype sqlite merge export",
 
-    install_requires=["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow", "SkPy", "wxPython>=4.0", "XlsxWriter"],
+    install_requires=["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow",
+                      "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
     entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
 
-    packages=setuptools.find_packages(),
+    package_dir={"": "src"},
+    packages=[conf.Title.lower()],
     include_package_data=True, # Use MANIFEST.in for data files
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -45,6 +52,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
     ],
 
     long_description_content_type="text/markdown",

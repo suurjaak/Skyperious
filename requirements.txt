@@ -3,6 +3,7 @@ beautifulsoup4
 ijson
 Pillow
 pyparsing
+six
 SkPy
 XlsxWriter
 wxPython>=4.0

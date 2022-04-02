@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    31.07.2021
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -24,13 +24,15 @@ import math
 import os
 import re
 import shutil
+import string
 import sys
 import textwrap
 import time
 import traceback
-import urllib
 import webbrowser
 
+import six
+from six.moves import urllib
 import wx
 import wx.adv
 import wx.grid
@@ -76,7 +78,7 @@ logger = logging.getLogger(__name__)
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
 
-    TRAY_ICON = (images.Icon16x16_32bit if "linux2" != sys.platform 
+    TRAY_ICON = (images.Icon16x16_32bit if "linux" not in sys.platform 
                  else images.Icon24x24_32bit)
 
     def __init__(self):
@@ -186,7 +188,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.dialog_search.Bind(wx.EVT_COMMAND_ENTER, self.on_tray_search)
         if conf.SearchHistory and conf.SearchHistory[-1:] != [""]:
             self.dialog_search.Value = conf.SearchHistory[-1]
-        self.dialog_search.SetChoices(list(filter(None, conf.SearchHistory)))
+        self.dialog_search.SetChoices(list(filter(bool, conf.SearchHistory)))
         self.dialog_search.SetIcons(icons)
 
         # Memory file system for showing images in wx.HtmlWindow
@@ -438,7 +440,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_right.Sizer.Add(panel_main,   border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         panel_right.Sizer.Add(panel_detail, border=10, proportion=1, flag=wx.LEFT | wx.GROW)
         sizer.Add(splitter, border=10, proportion=1, flag=wx.ALL | wx.GROW)
-        splitter.SplitVertically(panel_left, panel_right, sashPosition=self.Size[0]*4/7)
+        splitter.SplitVertically(panel_left, panel_right, sashPosition=self.Size[0] * 4 // 7)
 
 
     def create_menu(self):
@@ -564,7 +566,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             except (TypeError, ValueError): pass
 
         # Schedule a check for next due date, should the program run that long.
-        millis = min(sys.maxint, util.timedelta_seconds(interval) * 1000)
+        millis = min(sys.maxsize, util.timedelta_seconds(interval) * 1000)
         wx.CallLater(millis, self.update_check)
 
 
@@ -730,17 +732,23 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Loads content to MemoryFS."""
         if not self: return
         abouticon = "%s.png" % conf.Title.lower() # Program icon shown in About window
-        img = images.Icon48x48_32bit
+        img = images.Icon48x48_32bit.Image
         if abouticon in self.memoryfs["files"]:
             self.memoryfs["handler"].RemoveFile(abouticon)
-        self.memoryfs["handler"].AddFile(abouticon, img.Image, wx.BITMAP_TYPE_PNG)
+        self.memoryfs["handler"].AddFile(abouticon, img, wx.BITMAP_TYPE_PNG)
         self.memoryfs["files"][abouticon] = 1
+
+        fn = "blank.gif"
+        if fn not in self.memoryfs["files"]:
+            img = images.TransparentPixel.Image
+            self.memoryfs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_GIF)
+            self.memoryfs["files"][fn] = 1
 
         # Screenshots look better with colouring if system has off-white colour
         tint_colour = wx.Colour(conf.BgColour)
         tint_factor = [((4 * x) % 256) / 255. for x in tint_colour]
         # Images shown on the default search content page
-        for name in ["HelpSearch", "HelpChats", "HelpInfo", "HelpTables",
+        for name in ["HelpSearch", "HelpChats", "HelpContacts", "HelpInfo", "HelpTables",
                      "HelpSQL", "HelpOnline"]:
             embedded = getattr(images, name, None)
             if not embedded: continue # for name
@@ -1231,7 +1239,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        newpath = controls.get_savedialog_path(dialog)
+        newpath = controls.get_dialog_path(dialog)
         success = False
         try:
             shutil.copyfile(original, newpath)
@@ -1337,7 +1345,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
-        path = controls.get_savedialog_path(dialog)
+        path = controls.get_dialog_path(dialog)
         if not db:
             error = True
         elif "conversations" not in db.tables:
@@ -1466,7 +1474,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 util.run_once(conf.save)
         elif db1 or db2:
             # Close DB with no owner
-            for db in filter(None, [db1, db2]):
+            for db in filter(bool, [db1, db2]):
                 if not db.has_consumers():
                     logger.info("Closed database %s.", db.filename)
                     self.dbs.pop(db.filename, None)
@@ -1542,15 +1550,16 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def get_field_doc(name, tree=ast.parse(source)):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
-                if i and ast.Assign == type(node) and node.targets[0].id == name:
+                if i and isinstance(node, ast.Assign) and node.targets[0].id == name:
                     prev = tree.body[i - 1]
-                    if ast.Expr == type(prev) and ast.Str == type(prev.value):
+                    if isinstance(prev, ast.Expr) \
+                    and isinstance(prev.value, (ast.Str, ast.Constant)):  # Py2: Str, Py3: Constant
                         return prev.value.s.strip()
             return ""
 
         def typelist(mytype):
             def convert(v):
-                v = ast.literal_eval(v) if isinstance(v, basestring) else v
+                v = ast.literal_eval(v) if isinstance(v, six.string_types) else v
                 if not isinstance(v, (list, tuple)): v = tuple([v])
                 if not v: raise ValueError("Empty collection")
                 return tuple(map(mytype, v))
@@ -1573,7 +1582,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK == dialog.ShowModal():
             for k, v in dialog.GetProperties():
                 # Keep numbers in sane regions
-                if type(v) in [int, long]: v = max(1, min(sys.maxint, v))
+                if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
                 setattr(conf, k, v)
             util.run_once(conf.save)
             self.MinSize = conf.MinWindowSize
@@ -1628,7 +1637,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = controls.get_savedialog_path(dialog2)
+        filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -1638,14 +1647,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         try:
             logger.info("Creating new blank database %s for user '%s'.", filename, user)
             db = skypedata.SkypeDatabase(filename, truncate=True)
-            for table in db.CREATE_STATEMENTS: db.create_table(table)
+            db.ensure_schema()
             db.insert_account({"skypename": user})
             db.tables_list = None # Force reload
             db.update_accountinfo()
         except Exception:
             _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise e, None, tb
+            six.reraise(type(e), e, tb)
         finally: busy.Close()
 
         self.load_database(filename, db)
@@ -1674,7 +1683,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = controls.get_savedialog_path(dialog2)
+        filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -1704,7 +1713,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 util.try_ignore(skype.db and skype.db.close)
                 util.try_ignore(os.unlink, filename)
                 logger.exception("Error saving account %r.", skype.skype.user)
-                raise e, None, tb
+                six.reraise(type(e), e, tb)
         finally: busy.Close()
 
         conf.Login.setdefault(filename, {})["sync_older"] = False
@@ -1745,7 +1754,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if wx.ID_OK != dialog2.ShowModal(): return
 
         wx.YieldIfNeeded() # Allow UI to refresh
-        filename = controls.get_savedialog_path(dialog2)
+        filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
             return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
@@ -1795,7 +1804,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         except Exception:
             _, e, tb = sys.exc_info()
             util.try_ignore(os.unlink, filename)
-            raise e, None, tb
+            six.reraise(type(e), e, tb)
 
         dlg = controls.ProgressWindow(self, "Import progress",
                                       cancel=on_cancel, agwStyle=wx.ALIGN_CENTER)
@@ -2327,6 +2336,10 @@ class DatabasePage(wx.Panel):
             "text": "",             # Text in message content
             "participants": None    # Messages from [skype name, ]
         }
+        self.contact = None # Currently viewed contact
+        self.contacts = []  # All contacts in database
+        self.contact_sort_field = "last_message_datetime"
+        self.imagecache = {} # {("contact", contact ID): wx.Image}
         self.stats_sort_field = "name"
         self.stats_expand = {"clouds": False, "emoticons": False,
                              "shared_media": False}
@@ -2367,25 +2380,22 @@ class DatabasePage(wx.Panel):
                   border=5, flag=wx.LEFT | wx.RIGHT | wx.TOP | wx.GROW)
         sizer.Layout() # To avoid searchbox moving around during page creation
 
-        bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version_info.major == 2
-        and sys.version_info < (2, 7, 3)):
-            # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
-            bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
-            parent=self, agwStyle=bookstyle, style=wx.BORDER_STATIC)
+            parent=self, agwStyle=wx.lib.agw.fmresources.INB_LEFT, style=wx.BORDER_STATIC)
 
         il = wx.ImageList(32, 32)
         idx1 = il.Add(images.PageSearch.Bitmap)
         idx2 = il.Add(images.PageChats.Bitmap)
-        idx3 = il.Add(images.PageInfo.Bitmap)
-        idx4 = il.Add(images.PageTables.Bitmap)
-        idx5 = il.Add(images.PageSQL.Bitmap)
-        idx6 = il.Add(images.PageOnline.Bitmap)
+        idx3 = il.Add(images.PageContacts.Bitmap)
+        idx4 = il.Add(images.PageInfo.Bitmap)
+        idx5 = il.Add(images.PageTables.Bitmap)
+        idx6 = il.Add(images.PageSQL.Bitmap)
+        idx7 = il.Add(images.PageOnline.Bitmap)
         notebook.AssignImageList(il)
 
         self.create_page_search(notebook)
         self.create_page_chats(notebook)
+        self.create_page_contacts(notebook)
         self.create_page_info(notebook)
         self.create_page_tables(notebook)
         self.create_page_sql(notebook)
@@ -2397,6 +2407,7 @@ class DatabasePage(wx.Panel):
         notebook.SetPageImage(3, idx4)
         notebook.SetPageImage(4, idx5)
         notebook.SetPageImage(5, idx6)
+        notebook.SetPageImage(6, idx7)
 
         sizer.Add(notebook, proportion=1, border=5, flag=wx.GROW | wx.ALL)
 
@@ -2405,6 +2416,9 @@ class DatabasePage(wx.Panel):
         # Need separate dialog w/o overwrite prompt, cannot swap style in Linux
         self.dialog_savefile_ow = wx.FileDialog(
             parent=self, style=wx.FD_SAVE | wx.RESIZE_BORDER)
+        self.dialog_saveimage = wx.FileDialog(self,
+                message="Save image as", wildcard=export.IMAGE_WILDCARD,
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT | wx.FD_CHANGE_DIR | wx.RESIZE_BORDER)
 
         self.TopLevelParent.page_db_latest = self
         self.TopLevelParent.run_console(
@@ -2564,8 +2578,8 @@ class DatabasePage(wx.Panel):
         edit_filter.SetToolTip("Find messages containing the exact text")
         label_range = wx.StaticText(
             parent=panel_stc2, label="Show messages from time perio&d:")
-        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
-        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90, -1))
+        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
+        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
         date1.Format = date2.Format = "%Y-%m-%d"
         date2.SetPopupAnchor(wx.RIGHT)
         date1.SetToolTip("Date in the form YYYY-MM-DD")
@@ -2648,8 +2662,79 @@ class DatabasePage(wx.Panel):
 
         sizer.AddSpacer(10)
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
-        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1]/3)
+        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1] // 3)
         panel2.Enabled = False
+
+
+    def create_page_contacts(self, notebook):
+        """Creates a page for viewing contacts."""
+        page = self.page_contacts = wx.Panel(parent=notebook)
+        self.pageorder[page] = len(self.pageorder)
+        notebook.AddPage(page, "Contacts")
+        sizer = page.Sizer = wx.BoxSizer(wx.VERTICAL)
+        splitter = self.splitter_contacts = wx.SplitterWindow(
+            parent=page, style=wx.BORDER_NONE
+        )
+        splitter.SetMinimumPaneSize(100)
+
+        panel1 = self.panel_contacts1 = wx.Panel(parent=splitter)
+        sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_top = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_top.Add(
+            wx.StaticText(panel1, label="A&ll contacts in database:"),
+            proportion=1, border=5, flag=wx.ALIGN_BOTTOM)
+        list_contacts = self.list_contacts = controls.SortableListView(
+            parent=panel1, style=wx.LC_REPORT)
+        columns = [("identity", "Account"), ("name", "Name"), ("phone", "Phone"),
+                   ("first_message_datetime", "First message"),
+                   ("last_message_datetime", "Last message"),
+                   ("message_count_single", "1:1 messages"),
+                   ("message_count_group", "Group chat messages"), ]
+        frmt = lambda r, c: r[c].strftime("%Y-%m-%d %H:%M") if r.get(c) else ""
+        formatters = {"first_message_datetime": frmt,
+                      "last_message_datetime": frmt, }
+        list_contacts.SetColumns(columns)
+        list_contacts.SetColumnFormatters(formatters)
+        list_contacts.SetColumnsMaxWidth(300)
+        edit_contactfilter = self.edit_contactfilter = controls.HintedTextCtrl(
+            panel1, "Filter list", size=(75, -1))
+        edit_contactfilter.SetToolTip("Filter items in contacts list")
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_change_contactfilter, edit_contactfilter)
+        sizer_top.Add(edit_contactfilter, flag=wx.RIGHT, border=15)
+        button_export_contacts = self.button_export_contacts = \
+            wx.Button(parent=panel1, label="Exp&ort contacts")
+        sizer_top.Add(button_export_contacts)
+        self.Bind(wx.EVT_BUTTON, self.on_export_contacts, button_export_contacts)
+        sizer1.Add(sizer_top, border=5,
+                   flag=wx.RIGHT | wx.LEFT | wx.BOTTOM | wx.GROW)
+
+        panel2 = self.panel_contacts2 = wx.Panel(parent=splitter)
+        sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer2_top = wx.BoxSizer(wx.HORIZONTAL)
+        label_contact = self.label_contact = wx.StaticText(parent=panel2)
+        button_rename = self.button_rename_contacts = wx.Button(
+            parent=panel2, label="&Rename")
+        button_export = self.button_export_contact_chats = wx.Button(
+            parent=panel2, label="&Export contact chats")
+        html_contact = self.html_contact = wx.html.HtmlWindow(parent=panel2)
+        html_contact.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
+        panel2.Disable()
+        button_rename.Bind(wx.EVT_BUTTON, lambda e: self.on_rename_contact(self.contact, e))
+        button_export.Bind(wx.EVT_BUTTON, self.on_export_contact_chats_menu)
+        html_contact.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_contact)
+
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
+        sizer1.Add(list_contacts, proportion=1, border=5, flag=wx.GROW | wx.LEFT | wx.RIGHT)
+        sizer2_top.Add(label_contact, border=5, flag=wx.GROW | wx.TOP)
+        sizer2_top.AddStretchSpacer()
+        sizer2_top.Add(button_rename, border=5, flag=wx.BOTTOM | wx.RIGHT)
+        sizer2_top.Add(button_export, border=5, flag=wx.BOTTOM)
+        sizer2.Add(sizer2_top, border=5, flag=wx.GROW | wx.ALL ^ wx.BOTTOM)
+        sizer2.Add(html_contact,  border=5, flag=wx.GROW | wx.ALL ^ wx.TOP, proportion=1)
+
+        sizer.AddSpacer(10)
+        sizer.Add(splitter, proportion=1, flag=wx.GROW)
+        splitter.SplitHorizontally(panel1, panel2, sashPosition=self.Size[1] // 3)
 
 
     def create_page_search(self, notebook):
@@ -2809,8 +2894,6 @@ class DatabasePage(wx.Panel):
                      wx.ALIGN_CENTER_VERTICAL)
         sizer_tb.Add(tb)
         grid = self.grid_table = wx.grid.Grid(parent=panel2)
-        grid.SetToolTip("Double click on column header to sort, "
-                              "right click to filter.")
         ColourManager.Manage(grid, "DefaultCellBackgroundColour", wx.SYS_COLOUR_WINDOW)
         ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
         ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)
@@ -2912,7 +2995,7 @@ class DatabasePage(wx.Panel):
         sizer2.Add(label_help_grid, border=5, flag=wx.GROW | wx.LEFT | wx.TOP)
 
         sizer.Add(splitter, proportion=1, flag=wx.GROW)
-        sash_pos = self.Size[1] / 3
+        sash_pos = self.Size[1] // 3
         splitter.SplitHorizontally(panel1, panel2, sashPosition=sash_pos)
 
 
@@ -3186,7 +3269,7 @@ class DatabasePage(wx.Panel):
 
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
-        pos = self.Size[1] / 4
+        pos = self.Size[1] // 4
         splitter_sync.SplitHorizontally(panel_sync1, panel_sync2, sashPosition=pos)
 
 
@@ -3208,10 +3291,12 @@ class DatabasePage(wx.Panel):
             util.try_ignore(lambda: self.grid_table.Table.ClearAttrs())
             util.try_ignore(lambda: self.grid_sql.Table.ClearAttrs())
 
-            for lst in (self.list_chats, self.list_chats_sync, self.list_participants):
+            for lst in (self.list_chats, self.list_contacts,
+                        self.list_chats_sync, self.list_participants):
                 for i in range(lst.GetItemCount()):
                     lst.SetItemTextColour(i,       lst.ForegroundColour)
                     lst.SetItemBackgroundColour(i, lst.BackgroundColour)
+            self.load_contact(self.contact)
 
         wx.CallAfter(dorefresh) # Postpone to allow conf update
 
@@ -3373,7 +3458,7 @@ class DatabasePage(wx.Panel):
                 wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
 
         def exporter(do_singlefile=False, do_timerange=False):
-            self.on_export_chats(False, do_singlefile, do_timerange)
+            self.on_export_chats(chats, False, do_singlefile, do_timerange)
 
         menu.Bind(wx.EVT_MENU, lambda e: self.load_chat(chats[0]), item_name)
         menu.Bind(wx.EVT_MENU, lambda e: clipboardize("title"),    item_copy)
@@ -3656,7 +3741,7 @@ class DatabasePage(wx.Panel):
                 self.dialog_savefile.Message = "Save recovered data as"
                 self.dialog_savefile.Wildcard = "SQLite database (*.db)|*.db|All files|*.*"
                 if wx.ID_OK == self.dialog_savefile.ShowModal():
-                    newfile = controls.get_savedialog_path(self.dialog_savefile)
+                    newfile = controls.get_dialog_path(self.dialog_savefile)
                     if newfile != self.db.filename:
                         guibase.status("Recovering data from %s to %s.",
                                        self.db.filename, newfile)
@@ -3686,41 +3771,27 @@ class DatabasePage(wx.Panel):
         sizer, panel = self.sizer_accountinfo, self.panel_accountinfo
         panel.Freeze()
         account = self.db.account or {}
-        bmp = skypedata.get_avatar(account) or images.AvatarDefaultLarge.Bitmap
-        self.bmp_account.SetBitmap(bmp)
+        img = skypedata.get_avatar(account)
+        img = img.ConvertToBitmap() if img else images.AvatarDefaultLarge.Bitmap
+        self.bmp_account.SetBitmap(img)
         ctrls = []
         for x in sizer.Children: ctrls.append(x.Window), sizer.Remove(0)
         for x in ctrls: x.Destroy()
 
         for field in skypedata.ACCOUNT_FIELD_TITLES:
-            if not account.get(field): continue # for field
-            value = account[field]
-            if "emails" == field:
-                value = ", ".join(value.split(" "))
-            elif "gender" == field:
-                value = {1: "male", 2: "female"}.get(value, "")
-            elif "birthday" == field:
-                try:
-                    value = str(value)
-                    value = "-".join([value[:4], value[4:6], value[6:]])
-                except Exception: pass
-            if value:
-                if "skypeout_balance" == field:
-                    precision = account.get("skypeout_precision") or 2
-                    value = "%s %s" % (value / (10.0 ** precision),
-                            (account.get("skypeout_balance_currency") or ""))
-                if not isinstance(value, basestring):
-                    value = str(value) 
-                title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
-                lbltext = wx.StaticText(parent=panel, label="%s:" % title)
-                valtext = wx.TextCtrl(parent=panel, value=value,
-                    style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
-                ColourManager.Manage(valtext, "BackgroundColour", "BgColour")
-                valtext.MinSize = (-1, 35)
-                valtext.SetEditable(False)
-                ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
-                sizer.Add(lbltext, border=5, flag=wx.LEFT)
-                sizer.Add(valtext, proportion=1, flag=wx.GROW)
+            value = skypedata.format_contact_field(account, field)
+            if value is None: continue # for field
+
+            title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
+            lbltext = wx.StaticText(parent=panel, label="%s:" % title)
+            valtext = wx.TextCtrl(parent=panel, value=value,
+                style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+            ColourManager.Manage(valtext, "BackgroundColour", "BgColour")
+            valtext.MinSize = (-1, 35)
+            valtext.SetEditable(False)
+            ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
+            sizer.Add(lbltext, border=5, flag=wx.LEFT)
+            sizer.Add(valtext, proportion=1, flag=wx.GROW)
         panel.Layout()
         panel.Thaw()
 
@@ -3925,6 +3996,17 @@ class DatabasePage(wx.Panel):
                 break # for i
 
 
+    def on_change_contactfilter(self, event):
+        """Handler for changing text in chat filter box, filters chat list."""
+        clist = self.list_contacts
+        clist.SetFilter(event.String.strip())
+        for i in range(clist.ItemCount) if self.chat else ():
+            if clist.GetItemMappedData(i) == self.contact:
+                f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                clist.SetItemFont(i, f)
+                break # for i
+
+
     def on_rename_item(self, event):
         """
         Handler for clicking to rename the chat or a participant, opens a submenu.
@@ -4000,6 +4082,7 @@ class DatabasePage(wx.Panel):
         self.populate_chat_statistics()
         if self.html_stats.Shown:
             self.show_stats(True) # To restore scroll position
+        self.load_contact(self.contact)
 
 
     def on_rename_contact(self, contact, event):
@@ -4031,7 +4114,8 @@ class DatabasePage(wx.Panel):
             ): return
             v = None
 
-        self.db.update_row("contacts", {"given_displayname": v}, contact)
+        if contact["identity"] != self.db.id:
+            self.db.update_row("contacts", {"given_displayname": v}, contact)
         contact["given_displayname"] = v
         contact["name"] = v or name0
 
@@ -4045,10 +4129,12 @@ class DatabasePage(wx.Panel):
                     if self.list_participants.GetItemData(i)["contact"] is contact), None)
         if idx is not None:
             self.list_participants.SetItemText(idx, "%(name)s (%(identity)s)" % contact)
-        self.stc_history.RefreshMessages()
-        self.populate_chat_statistics()
-        if self.html_stats.Shown:
-            self.show_stats(True) # To restore scroll position
+            self.stc_history.RefreshMessages()
+            self.populate_chat_statistics()
+            if self.html_stats.Shown:
+                self.show_stats(True) # To restore scroll position
+        self.list_contacts.RefreshRows()
+        self.load_contact(self.contact)
 
 
     def on_export_chat(self, event):
@@ -4063,7 +4149,7 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        filepath = controls.get_savedialog_path(self.dialog_savefile)
+        filepath = controls.get_dialog_path(self.dialog_savefile)
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
@@ -4105,8 +4191,10 @@ class DatabasePage(wx.Panel):
             selected = self.list_chats.GetNextSelected(selected)
 
         def handler(do_all=False, do_singlefile=False, do_timerange=False):
+            chats = [self.list_chats.GetItemMappedData(i)
+                     for i in (range(self.list_chats.ItemCount) if do_all else selecteds)]
             return functools.partial(self.on_export_chats,
-                                     do_all, do_singlefile, do_timerange)
+                                     chats, do_all, do_singlefile, do_timerange)
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
         menu_sel  = wx.lib.agw.flatmenu.FlatMenu()
@@ -4184,13 +4272,70 @@ class DatabasePage(wx.Panel):
         menu.Popup(pt_btn, self)
 
 
-    def on_export_chats(self, do_all, do_singlefile, do_timerange, event=None):
+    def on_export_contact_chats_menu(self, event):
+        """
+        Handler for clicking to export contact chats, displays a submenu with choices.
+        """
+        def handler(do_singlefile=False):
+            chatmap = {x["id"]: x for x in self.chats}
+            chats = [chatmap[x["id"]] for x in self.contact.get("conversations") or []]
+            if do_singlefile:
+                do_singlefile = "Chats with %s" % (self.contact["name"] or self.contact["identity"])
+            return functools.partial(self.on_export_chats,
+                                     chats, False, do_singlefile, False)
+
+        menu = wx.lib.agw.flatmenu.FlatMenu()
+
+        item_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu, wx.ID_ANY, "Into individual &files")
+        menu.AppendItem(item_multi)
+        self.Bind(wx.EVT_MENU, handler(), item_multi)
+        if export.xlsxwriter:
+            item_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu, wx.ID_ANY, "Into a single &Excel workbook, with separate sheets")
+            menu.AppendItem(item_single)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_single)
+
+        sz_btn, pt_btn = event.EventObject.Size, event.EventObject.Position
+        pt_btn = event.EventObject.Parent.ClientToScreen(pt_btn)
+        menu.SetOwnerHeight(sz_btn.y)
+        if menu.Size.width < sz_btn.width:
+            menu.Size = sz_btn.width, menu.Size.height
+        menu.Popup(pt_btn, self)
+
+
+    def on_export_contacts(self, event):
+        """
+        Handler for clicking to export contacts, display file dialog and saves spreadsheet.
+        """
+        if not self.contacts: return
+
+        dialog = wx.FileDialog(parent=self, message="Save contacts",
+            defaultFile="Skype contact list",
+            style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
+        )
+        dialog.Wildcard = export.CONTACT_WILDCARD
+        if wx.ID_OK != dialog.ShowModal(): return
+
+        filepath = controls.get_dialog_path(dialog)
+        format = export.CONTACT_EXTS[dialog.FilterIndex]
+        guibase.status("Exporting %s.", filepath, log=True)
+        export.export_contacts(self.contacts, filepath, format, self.db)
+        util.start_file(filepath)
+
+
+    def on_export_chats(self, chats, do_all=False, do_singlefile=False, do_timerange=False, event=None):
         """
         Handler for clicking to export selected or all chats, displays a select
         folder dialog and exports chats to individual files under the folder.
+
+        @param   chats          list of conversations to export
+        @param   do_all         whether to export all chats, even those with no messages
+        @param   do_singlefile  whether to export a single-file XLSX,
+                                optionally containing the file name
+        @param   do_timerange   whether to pop up dialogs to select export date range
         """
-        chats = [self.list_chats.GetItemMappedData(i)
-                 for i in range(self.list_chats.ItemCount)]
+        if not chats: return
 
         timerange = None
         if do_timerange:
@@ -4211,13 +4356,6 @@ class DatabasePage(wx.Panel):
                                          conf.Title, wx.OK | wx.ICON_WARNING)
                 timerange.append(util.datetime_to_epoch(dt))
 
-        if not do_all:
-            selected, chats = self.list_chats.GetFirstSelected(), []
-            while selected >= 0:
-                chats.append(self.list_chats.GetItemMappedData(selected))
-                selected = self.list_chats.GetNextSelected(selected)
-        if not chats: return
-
         dialog = self.dialog_savefile if do_singlefile or len(chats) == 1 \
                  else self.dialog_savefile_ow
 
@@ -4225,11 +4363,14 @@ class DatabasePage(wx.Panel):
         dialog.Filename = "Filename will be ignored"
         dialog.Wildcard = export.CHAT_WILDCARD
         if do_singlefile:
-            formatargs = collections.defaultdict(str)
-            formatargs["skypename"] = os.path.basename(self.db.filename)
-            formatargs.update(self.db.account or {})
-            default = util.safe_filename(conf.ExportDbTemplate % formatargs)
-            dialog.Filename = default
+            if isinstance(do_singlefile, six.string_types):
+                default = do_singlefile
+            else:
+                formatargs = collections.defaultdict(str)
+                formatargs["skypename"] = os.path.basename(self.db.filename)
+                formatargs.update(self.db.account or {})
+                default = conf.ExportDbTemplate % formatargs
+            dialog.Filename = util.safe_filename(default)
             dialog.Message = "Save chats file"
             dialog.Wildcard = export.CHAT_WILDCARD_SINGLEFILE
         elif len(chats) == 1:
@@ -4239,7 +4380,7 @@ class DatabasePage(wx.Panel):
             dialog.Message = "Save chat"
         if wx.ID_OK != dialog.ShowModal(): return
 
-        path, media_folder = controls.get_savedialog_path(dialog), False
+        path, media_folder = controls.get_dialog_path(dialog), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[dialog.FilterIndex]
         else:
@@ -4295,7 +4436,7 @@ class DatabasePage(wx.Panel):
         self.dialog_savefile.Wildcard = export.CHAT_WILDCARD
         if wx.ID_OK != self.dialog_savefile.ShowModal(): return
 
-        filepath = controls.get_savedialog_path(self.dialog_savefile)
+        filepath = controls.get_dialog_path(self.dialog_savefile)
         format = export.CHAT_EXTS[self.dialog_savefile.FilterIndex]
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
@@ -4428,7 +4569,7 @@ class DatabasePage(wx.Panel):
             self.html_stats.ScrollToAnchor(href[1:])
             wx.CallAfter(self.store_html_stats_scroll)
         elif href.startswith("file://"):
-            filepath = urllib.url2pathname(href[5:])
+            filepath = urllib.request.url2pathname(href[5:])
             if filepath and os.path.exists(filepath):
                 util.start_file(filepath)
             else:
@@ -4454,6 +4595,48 @@ class DatabasePage(wx.Panel):
             self.show_stats(False)
             self.stc_history.Search(href, flags=wx.stc.STC_FIND_WHOLEWORD)
             self.stc_history.SetFocusSearch()
+
+
+    def on_click_html_contact(self, event):
+        """
+        Handler for clicking a link in contact page, sorts chats if sort link, goes to
+        specific message if chat link, saves image if image link.
+        """
+        href = event.GetLinkInfo().Href
+        if href == "avatar":
+            imgkey = ("avatar", self.contact["id"])
+            img = self.imagecache.get(imgkey)
+            if not img: return
+
+            self.dialog_saveimage.Filename = util.safe_filename(self.contact["name"])
+            fmt = next((k for k, v in export.IMAGE_FORMATS.items() if v == img.Type), None)
+            if fmt: self.dialog_saveimage.FilterIndex = export.IMAGE_EXTS.index(fmt)
+            if wx.ID_OK != self.dialog_saveimage.ShowModal(): return
+
+            filepath = controls.get_dialog_path(self.dialog_saveimage)
+            guibase.status('Exporting "%s".', filepath)
+            ext = os.path.splitext(filepath)[-1].lstrip(".").lower()
+            # Make copy as SaveFile() converts image format
+            img.Copy().SaveFile(filepath, export.IMAGE_FORMATS[ext])
+            util.start_file(filepath)
+        elif href.startswith("sort://"): # sort://field
+            self.contact_sort_field = href[7:]
+            self.load_contact(self.contact)
+        elif href.startswith("export://"): # export://id
+            chatid = int(href[href.index("://") + 3:])
+            chat = next(x for x in self.chats if x["id"] == chatid)
+            self.on_export_chats([chat])
+        elif href.startswith("chat://"): # chat://id or chat://id/messageid
+            path = href[href.index("://") + 3:]
+            if "/" in path:
+                chatid, messageid = map(int, path.split("/", 1))
+            else:
+                chatid, messageid = int(path), None
+            chat = next((x for x in self.chats if chatid == x["id"]), None)
+            if chat:
+                self.show_stats(False)
+                self.notebook.SetSelection(self.pageorder[self.page_chats])
+                self.load_chat(chat, center_message_id=messageid)
 
 
     def on_rightclick_searchall(self, event):
@@ -4537,13 +4720,12 @@ class DatabasePage(wx.Panel):
             else:
                 menutitle = "C&opy link location"
                 if href.startswith("file://"):
-                    href = urllib.url2pathname(href[5:])
+                    href = urllib.request.url2pathname(href[5:])
                     if any(href.startswith(x) for x in ["\\\\\\", "///"]):
                         href = href[3:] # Strip redundant filelink slashes
-                    if isinstance(href, unicode):
+                    if isinstance(href, six.text_type):
                         # Workaround for wx.html.HtmlWindow double encoding
-                        href = href.encode('latin1', errors="xmlcharrefreplace"
-                               ).decode("utf-8")
+                        href = href.encode('latin1', errors="xmlcharrefreplace").decode("utf-8")
                     menutitle = "C&opy file location"
                 elif href.startswith("mailto:"):
                     href = href[7:]
@@ -4576,7 +4758,7 @@ class DatabasePage(wx.Panel):
             msg_id = link_data.get("message")
             table_name, row = link_data.get("table"), link_data.get("row")
             if href.startswith("file://"):
-                filename = path = urllib.url2pathname(href[5:])
+                filename = path = urllib.request.url2pathname(href[5:])
                 if any(path.startswith(x) for x in ["\\\\\\", "///"]):
                     filename = href = path[3:]
                 if path and os.path.exists(path):
@@ -4634,8 +4816,8 @@ class DatabasePage(wx.Panel):
                             pagesize = grid.GetScrollPageSize(wx.VERTICAL)
                             pxls = grid.GetScrollPixelsPerUnit()
                             cell_coords = grid.CellToRect(i, 0)
-                            y = cell_coords.y / (pxls[1] or 15)
-                            x, y = 0, y - pagesize / 2
+                            y = cell_coords.y // (pxls[1] or 15)
+                            x, y = 0, y - pagesize // 2
                             grid.Scroll(x, y)
                             break # for i
         elif href.startswith("page:"):
@@ -4655,6 +4837,12 @@ class DatabasePage(wx.Panel):
                 thepage = getattr(self, "page_" + page, None)
                 if thepage:
                     self.notebook.SetSelection(self.pageorder[thepage])
+        elif href.startswith("contact:"):
+            contactid = int(href[href.index(":") + 1:])
+            contact = next((x for x in self.contacts if x["id"] == contactid), None)
+            if contact:
+                self.notebook.SetSelection(self.pageorder[self.page_contacts])
+                self.load_contact(contact)
         elif href.startswith("#"): # In-page link
             event.Skip()
         elif not (href.startswith("chat:") or href.startswith("message:")
@@ -4779,7 +4967,7 @@ class DatabasePage(wx.Panel):
             guibase.status("Searching for \"%s\" in %s.", text, self.db.filename)
             html = self.html_searchall
             data = {"id": self.counter(), "db": self.db, "text": text, "map": {},
-                    "width": html.Size.width * 5/9, "table": "",
+                    "width": html.Size.width * 5 // 9, "table": "",
                     "partial_html": ""}
             fromtext = "" # "Searching for "text" in fromtext"
             if conf.SearchInMessages:
@@ -4855,9 +5043,9 @@ class DatabasePage(wx.Panel):
                     tip = self.db.stamp_to_date(value).strftime(
                           "%Y-%m-%d %H:%M:%S")
                 except Exception:
-                    tip = unicode(value)
+                    tip = util.to_unicode(value)
             else:
-                tip = unicode(value)
+                tip = util.to_unicode(value)
             tip = tip if len(tip) < 1000 else tip[:1000] + ".."
         if (row, col) != prev_cell or not (event.EventObject.ToolTip) \
         or event.EventObject.ToolTip.Tip != tip:
@@ -4993,7 +5181,7 @@ class DatabasePage(wx.Panel):
             splitter.Unsplit(self.panel_chats1)
             shorthelp = "Restore chat panel to default size  (Alt-M)"
         else:
-            pos = getattr(splitter, "_sashPosition", self.Size[1] / 3)
+            pos = getattr(splitter, "_sashPosition", self.Size[1] // 3)
             splitter.SplitHorizontally(self.panel_chats1, self.panel_chats2,
                                        sashPosition=pos)
             shorthelp = "Maximize chat panel  (Alt-M)"
@@ -5118,7 +5306,7 @@ class DatabasePage(wx.Panel):
             self.dialog_savefile.Filename = util.safe_filename(title)
             self.dialog_savefile.Message = "Save table as"
             if wx.ID_OK == self.dialog_savefile.ShowModal():
-                filename = controls.get_savedialog_path(self.dialog_savefile)
+                filename = controls.get_dialog_path(self.dialog_savefile)
                 exts = export.TABLE_EXTS if grid_source is self.grid_table \
                        else export.QUERY_EXTS
                 format = exts[self.dialog_savefile.FilterIndex]
@@ -5310,17 +5498,15 @@ class DatabasePage(wx.Panel):
                         self.tree_tables.SetItemBold(item,
                         self.grid_table.Table.IsChanged())
                 item = self.tree_tables.GetNextSibling(item)
-            # Refresh cell colours; without CallAfter wx 2.8 can crash
-            wx.CallLater(1, self.grid_table.ForceRefresh)
+            self.grid_table.ForceRefresh()  # Refresh cell colours
 
 
     def on_rollback_table(self, event):
         """Handler for clicking to rollback the changed database table."""
         self.grid_table.Table.UndoChanges()
         self.on_change_table(None)
-        # Refresh scrollbars and colours; without CallAfter wx 2.8 can crash
-        wx.CallLater(1, lambda: (self.grid_table.ContainingSizer.Layout(),
-                                 self.grid_table.ForceRefresh()))
+        self.grid_table.ContainingSizer.Layout()  # Refresh scrollbars
+        self.grid_table.ForceRefresh() # Refresh cell colours
 
 
     def on_insert_row(self, event):
@@ -5333,8 +5519,7 @@ class DatabasePage(wx.Panel):
         self.grid_table.Scroll(self.grid_table.GetScrollPos(wx.HORIZONTAL), 0)
         self.grid_table.Refresh()
         self.on_change_table(None)
-        # Refresh scrollbars; without CallAfter wx 2.8 can crash
-        wx.CallAfter(self.grid_table.ContainingSizer.Layout)
+        self.grid_table.ContainingSizer.Layout()  # Refresh scrollbars
 
 
     def on_delete_row(self, event):
@@ -5414,6 +5599,11 @@ class DatabasePage(wx.Panel):
         self.stc_history.SetFocus()
 
 
+    def on_change_list_contacts(self, event):
+        """Handler for selecting an item in the contacts list, loads contact info."""
+        self.load_contact(self.list_contacts.GetItemMappedData(event.Index))
+
+
     def load_chat(self, chat, center_message_id=None):
         """Loads history of the specified chat (as returned from db)."""
         if not chat or (chat == self.chat and not center_message_id):
@@ -5423,8 +5613,8 @@ class DatabasePage(wx.Panel):
         if chat != self.chat:
             # Update chat list colours and scroll to the opened chat
             logger.info("Opening %s.", chat["title_long_lc"])
-            self.list_chats.Freeze()
-            scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
+            clist.Freeze()
+            scrollpos = clist.GetScrollPos(wx.VERTICAL)
             index_selected = -1
             for i in range(clist.ItemCount):
                 if clist.GetItemMappedData(i) == self.chat:
@@ -5436,7 +5626,7 @@ class DatabasePage(wx.Panel):
             if index_selected >= 0:
                 delta = index_selected - scrollpos
                 if delta < 0 or abs(delta) >= clist.CountPerPage:
-                    nudge = -clist.CountPerPage / 2
+                    nudge = -clist.CountPerPage // 2
                     clist.ScrollLines(delta + nudge)
             clist.Thaw()
             wx.YieldIfNeeded() # Allow display to refresh
@@ -5482,15 +5672,20 @@ class DatabasePage(wx.Panel):
                 for p in chat["participants"]:
                     b = 0
                     if not p["contact"].get("avatar_bitmap"):
-                        bmp = skypedata.get_avatar(p["contact"], sz_avatar)
-                        if bmp:
-                            p["contact"]["avatar_bitmap"] = bmp
+                        img = skypedata.get_avatar(p["contact"], sz_avatar)
+                        if img:
+                            p["contact"]["avatar_bitmap"] = img.ConvertToBitmap()
                     if "avatar_bitmap" in p["contact"]:
                         b = il.Add(p["contact"]["avatar_bitmap"])
                     t = p["contact"]["name"]
                     if p["identity"] != p["contact"]["name"]:
                         t += " (%s)" % p["identity"]
-                    plist.InsertImageStringItem(index, t, b, it_kind=1)
+                    t = t.replace("\n", " ")
+                    try: plist.InsertImageStringItem(index, t, b, it_kind=1)
+                    except Exception:
+                        t = re.sub(r"[^\w %s]" % re.escape(string.punctuation),
+                                   lambda m: "#%s" % ord(m.group(0)), t, re.U)
+                        plist.InsertImageStringItem(index, t, b, it_kind=1)
                     plist.SetItemTextColour(index,       plist.ForegroundColour)
                     plist.SetItemBackgroundColour(index, plist.BackgroundColour)
                     c = plist.GetItem(index)
@@ -5536,10 +5731,10 @@ class DatabasePage(wx.Panel):
             values = [self.stc_history.GetMessage(0)["datetime"],
                       self.stc_history.GetMessage(-1)["datetime"]]
             dates_values = [i.date() for i in values]
-            if not any(filter(None, dates_range)):
+            if not any(filter(bool, dates_range)):
                 dts = "first_message_datetime", "last_message_datetime"
                 dates_range = [chat[n].date() if chat[n] else None for n in dts]
-            if not any(filter(None, dates_range)):
+            if not any(filter(bool, dates_range)):
                 dates_range = dates_values
             self.chat_filter["daterange"] = dates_range
             if chat != self.chat or not all(self.chat_filter["startdaterange"]):
@@ -5563,6 +5758,88 @@ class DatabasePage(wx.Panel):
             self.show_stats(True) # To restore scroll position
 
 
+    def load_contact(self, contact):
+        """Loads contact information: avatar, profile, and chats data."""
+        busy, clist = None, self.list_contacts
+        if not contact:
+            self.label_contact.Label = ""
+            self.html_contact.SetPage("")
+            self.html_contact.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
+            self.html_contact.Parent.Disable()
+            for i in range(clist.ItemCount) if self.contact else ():
+                if clist.GetItemMappedData(i) == self.contact:
+                    clist.SetItemFont(i, clist.Font)
+            self.contact = None
+        if not contact:
+            return
+
+        # Update contact list colours and scroll to the opened contact
+        if contact != self.contact:
+            logger.info("Opening contact %s.", contact["name"])
+            clist.Freeze()
+            scrollpos = clist.GetScrollPos(wx.VERTICAL)
+            index_selected = -1
+            for i in range(clist.ItemCount):
+                if clist.GetItemMappedData(i) == self.contact:
+                    clist.SetItemFont(i, clist.Font)
+                elif clist.GetItemMappedData(i) == contact:
+                    index_selected = i
+                    f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                    clist.SetItemFont(i, f)
+            if index_selected >= 0:
+                delta = index_selected - scrollpos
+                if delta < 0 or abs(delta) >= clist.CountPerPage:
+                    nudge = -clist.CountPerPage // 2
+                    clist.ScrollLines(delta + nudge)
+            clist.Thaw()
+            wx.YieldIfNeeded() # Allow display to refresh
+            self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
+            self.label_contact.Parent.Layout()
+
+        titlemap = {x["id"]: x["title_long"] for x in self.chats}
+        for data in contact.get("conversations", []):
+            data["title_long"] = titlemap[data["id"]]
+        MINS = {"message_count": -sys.maxsize, "ratio": -sys.maxsize,
+                "first_message_datetime": datetime.datetime.min,
+                "last_message_datetime": datetime.datetime.min}
+        sortkey = lambda x: util.coalesce(x[self.contact_sort_field], MINS.get(self.contact_sort_field, ""))
+        contact.get("conversations", []).sort(key=sortkey, reverse=True)
+
+        avatar_path, avatar_size, avatar_raw = None, None, skypedata.get_avatar_raw(contact)
+        if skypedata.get_avatar_data(contact):
+            imgkey = ("avatar", contact["id"])
+            img = self.imagecache.get(imgkey) or skypedata.get_avatar(contact)
+            ext = next((k for k, v in export.IMAGE_FORMATS.items() if img and v == img.Type), "jpg")
+            vals = (contact["identity"], self.db.filename.encode("utf-8"), ext)
+            fn = "%s_%s_fullsize.%s" % tuple(map(urllib.parse.quote, vals))
+            if img and fn not in self.memoryfs["files"]:
+                self.memoryfs["handler"].AddFile(fn, img, img.Type)
+                self.memoryfs["files"][fn] = 1
+            if fn in self.memoryfs["files"]:
+                avatar_path = fn
+            if img:
+                self.imagecache[imgkey] = img
+                avatar_size = tuple(img.GetSize())
+            defaultavatar = "avatar__default__large.png"
+            if defaultavatar not in self.memoryfs["files"]:
+                img = images.AvatarDefaultLarge.Image
+                self.memoryfs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
+                self.memoryfs["files"][defaultavatar] = 1
+
+        data = {"contact": contact, "avatar": avatar_path, "avatar_size": avatar_size,
+                "db": self.db, "sort_by": self.contact_sort_field}
+        html = step.Template(templates.CONTACT_HTML, escape=True).expand(data)
+        scrollpos = [self.html_contact.GetScrollPos(x) for x in (wx.HORIZONTAL, wx.VERTICAL)]
+        self.html_contact.SetPage(html)
+        self.html_contact.Scroll(*scrollpos)
+        self.html_contact.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.html_contact.Parent.Enable()
+        self.html_contact.Parent.Layout()
+        self.contact = contact
+        if busy:
+            busy.Close()
+
+
     def populate_chat_statistics(self):
         """Populates html_stats with chat statistics and word cloud."""
         stats, html = self.stc_history.GetStatisticsData(), ""
@@ -5573,10 +5850,10 @@ class DatabasePage(wx.Panel):
                     "imagemaps": {}, "authorimagemaps": {},
                     "expand": self.stats_expand}
             # Fill avatar images
-            fs, defaultavatar = self.memoryfs, "avatar__default.jpg"
+            fs, defaultavatar = self.memoryfs, "avatar__default.png"
             if defaultavatar not in fs["files"]:
-                bmp = images.AvatarDefault.Bitmap
-                fs["handler"].AddFile(defaultavatar, bmp, wx.BITMAP_TYPE_BMP)
+                img = images.AvatarDefault.Image
+                fs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
                 fs["files"][defaultavatar] = 1
             contacts = dict((c["skypename"], c) for c in self.db.get_contacts())
             partics = dict((p["identity"], p) for p in self.chat["participants"])
@@ -5587,7 +5864,7 @@ class DatabasePage(wx.Panel):
                 contact = contact or {"identity": author, "name": author}
                 if "avatar_bitmap" in contact:
                     vals = (author, self.db.filename.encode("utf-8"))
-                    fn = "%s_%s.jpg" % tuple(map(urllib.quote, vals))
+                    fn = "%s_%s.bmp" % tuple(map(urllib.parse.quote, vals))
                     if fn not in fs["files"]:
                         bmp = contact["avatar_bitmap"]
                         fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
@@ -5607,12 +5884,12 @@ class DatabasePage(wx.Panel):
                 if histtype not in ("hours", "days"): continue # for histtype..
                 vals = (self.chat["identity"], histtype,
                         self.db.filename.encode("utf-8"))
-                fn = "%s_%s_%s.png" % tuple(map(urllib.quote, vals))
+                fn = "%s_%s_%s.png" % tuple(map(urllib.parse.quote, vals))
                 if fn in fs["files"]:
                     fs["handler"].RemoveFile(fn)
                 bardata = sorted(histdata.items())
-                bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
-                fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                img, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
+                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
                 fs["files"][fn] = 1
                 data["images"][histtype] = fn
                 areas, msgs = [], stats["totalhist"]["%s-firsts" % histtype]
@@ -5626,12 +5903,12 @@ class DatabasePage(wx.Panel):
                     if histtype not in ("hours", "days"): continue # for histtype..
                     vals = (author, histtype, self.chat["identity"],
                             self.db.filename.encode("utf-8"))
-                    fn = "%s_%s_%s_%s.png" % tuple(map(urllib.quote, vals))
+                    fn = "%s_%s_%s_%s.png" % tuple(map(urllib.parse.quote, vals))
                     if fn in fs["files"]:
                         fs["handler"].RemoveFile(fn)
                     bardata = sorted(histdata.items())
-                    bmp, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
-                    fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_PNG)
+                    img, rects = controls.BuildHistogram(bardata, *PLOTCONF[histtype])
+                    fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
                     fs["files"][fn] = 1
                     data["authorimages"][author][histtype] = fn
                     areas, msgs = [], hists["%s-firsts" % histtype]
@@ -5642,17 +5919,17 @@ class DatabasePage(wx.Panel):
                         data["authorimagemaps"][author] = {}
                     data["authorimagemaps"][author][histtype] = areas
             # Fill emoticon images
-            fn = "emoticon_transparent.png"
+            fn = "emoticon_transparent.gif"
             if fn not in fs["files"]:
                 img = images.TransparentPixel.Image
-                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_GIF)
                 fs["files"][fn] = 1
             for emoticon in stats["emoticons"]:
                 if not hasattr(emoticons, emoticon): continue # for emoticon
-                img = getattr(emoticons, emoticon).Image
-                fn = "emoticon_%s.png" % emoticon
+                img = getattr(emoticons, emoticon)
+                fn = "emoticon_%s.gif" % emoticon
                 if img and fn not in fs["files"]:
-                    fs["handler"].AddFile(fn, img, wx.BITMAP_TYPE_PNG)
+                    fs["handler"].AddFile(fn, img.Image, wx.BITMAP_TYPE_GIF)
                     fs["files"][fn] = 1
 
             html = step.Template(templates.STATS_HTML, escape=True).expand(data)
@@ -5714,8 +5991,8 @@ class DatabasePage(wx.Panel):
     def delete_chats(self, chats):
         """Asks for confirmation and deletes specified chats from database."""
         if not chats: return
-        ongoings = filter(bool, [self.worker_live.is_working() and "live sync",
-                                 self.workers_search and "search"])
+        ongoings = list(filter(bool, [self.worker_live.is_working() and "live sync",
+                                     self.workers_search and "search"]))
         if ongoings: return wx.MessageBox("%s is currently ongoing, cannot delete." %
                                           " and ".join(ongoings).capitalize(),
                                           conf.Title, wx.ICON_INFORMATION | wx.OK)
@@ -5821,7 +6098,7 @@ class DatabasePage(wx.Panel):
             # Remember scroll positions, as grid update loses them
             if row < 0: # Only react to clicks in the header
                 grid_data = grid.Table
-                current_filter = unicode(grid_data.filters[col]) \
+                current_filter = util.to_unicode(grid_data.filters[col]) \
                                  if col in grid_data.filters else ""
                 dialog = wx.TextEntryDialog(self,
                     "Filter column \"%s\" by:" % grid_data.columns[col]["name"],
@@ -5873,6 +6150,12 @@ class DatabasePage(wx.Panel):
             self.chats = self.db.get_conversations()
             self.list_chats.Populate(self.chats)
 
+            # Populate the contacts list
+            self.contacts = self.db.get_contacts()
+            self.list_contacts.Populate(self.contacts)
+            self.list_contacts.SetColumnWidth(0, 150)
+            self.list_contacts.SetColumnWidth(1, 250)
+
             wx.CallLater(100, self.load_later_data)
         except Exception:
             wx.CallAfter(self.update_tabheader)
@@ -5906,6 +6189,14 @@ class DatabasePage(wx.Panel):
                 self.range_date.SetRange(*date_range)
                 self.edit_filterdate1.Range = date_range
                 self.edit_filterdate2.Range = date_range
+            # Load contact statistics and update the contact list
+            self.db.get_contacts_stats(self.contacts, self.chats)
+            if self.contact:
+                # If the user already opened a contact while later data
+                # was loading, update the page
+                contact = next((x for x in self.contacts
+                                if x["identity"] == self.contact["identity"]), None)
+                if contact: self.load_contact(contact)
             guibase.status("Opened Skype database %s.", self.db)
         except Exception as e:
             if self:
@@ -5915,8 +6206,11 @@ class DatabasePage(wx.Panel):
         if self:
             # Refresh list from loaded data, sort by last message datetime
             sortfunc = lambda l: l and (l.ResetColumnWidths(),
-                                        l.SortListItems(4, 0))
+                                        l.SortListItems(4, 0),
+                                        (l.SetColumnWidth(0, 150), l.SetColumnWidth(1, 250))
+                                         if l is self.list_contacts else None)
             wx.CallLater(1, sortfunc, self.list_chats)
+            wx.CallLater(1, sortfunc, self.list_contacts)
             wx.CallAfter(self.update_tabheader)
 
 
@@ -6053,21 +6347,15 @@ class MergerPage(wx.Panel):
         sizer.Add(sizer_header, flag=wx.GROW)
         sizer.Layout() # To avoid header moving around during page creation
 
-        bookstyle = wx.lib.agw.fmresources.INB_LEFT
-        if (wx.version().startswith("2.8") and sys.version_info[0:] == [2]
-        and sys.version_info < (2,7,3)):
-            # wx 2.8 + Python below 2.7.3: labelbook can partly cover tab area
-            bookstyle |= wx.lib.agw.fmresources.INB_FIT_LABELTEXT
         notebook = self.notebook = wx.lib.agw.labelbook.FlatImageBook(
-            parent=self, agwStyle=bookstyle,
-            style=wx.BORDER_STATIC)
+            parent=self, agwStyle=wx.lib.agw.fmresources.INB_LEFT, style=wx.BORDER_STATIC)
         sizer.Add(notebook, proportion=10, border=5,
                   flag=wx.GROW | wx.LEFT | wx.RIGHT | wx.BOTTOM)
 
         il = wx.ImageList(32, 32)
         idx1 = il.Add(images.PageMergeAll.Bitmap)
         idx2 = il.Add(images.PageMergeChats.Bitmap)
-        idx3 = il.Add(images.PageContacts.Bitmap)
+        idx3 = il.Add(images.PageMergeContacts.Bitmap)
         notebook.AssignImageList(il)
 
         self.create_page_merge_all(notebook)
@@ -6245,7 +6533,7 @@ class MergerPage(wx.Panel):
         splitter_diff.SplitVertically(panel_stc1, panel_stc2,
                                       sashPosition=self.Size.width)
         splitter.SplitHorizontally(panel1, panel2,
-                                   sashPosition=self.Size.height / 3)
+                                   sashPosition=self.Size.height // 3)
         panel_stc2.SetupScrolling(scroll_x=False)
 
 
@@ -6329,7 +6617,7 @@ class MergerPage(wx.Panel):
         dialog.Wildcard = export.CHAT_WILDCARD
         if wx.ID_OK != dialog.ShowModal(): return
 
-        filepath = controls.get_savedialog_path(dialog.GetPath)
+        filepath = controls.get_dialog_path(dialog)
         format = export.CHAT_EXTS[dialog.FilterIndex]
         media_folder = "html" == format and dialog.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
@@ -6507,11 +6795,11 @@ class MergerPage(wx.Panel):
                 self.html_report.SetPage("<body bgcolor='%s'><font color='%s'><b>%s progress:"
                     "</b><br />" % (conf.MergeHtmlBackgroundColour, conf.FgColour, action))
                 db1, db2 = self.db1, self.db2
-                chats = filter(bool, selecteds)
+                chats = list(filter(bool, selecteds))
                 if self.is_scanned:
                     type = "merge_left"
                     cc = [self.chats_diffdata.get(c["identity"]) for c in chats]
-                    chats = list(filter(None, cc))
+                    chats = list(filter(bool, cc))
                 else:
                     type = "diff_merge_left"
                 params = locals()
@@ -6592,7 +6880,7 @@ class MergerPage(wx.Panel):
             if index_selected >= 0:
                 delta = index_selected - scrollpos
                 if delta < 0 or abs(delta) >= self.list_chats.CountPerPage:
-                    nudge = -self.list_chats.CountPerPage / 2
+                    nudge = -self.list_chats.CountPerPage // 2
                     self.list_chats.ScrollLines(delta + nudge)
             busy = controls.BusyPanel(
                 self, "Diffing messages for %s." % c["title_long_lc"])
@@ -7212,14 +7500,11 @@ class MergerPage(wx.Panel):
                               db.last_modified.strftime("%Y-%m-%d %H:%M:%S"))
                 chats = chats2 if i else chats1
                 if chats:
-                    t1 = list(filter(
-                         None, [c["message_count"] for c in chats]))
+                    t1 = list(filter(bool, [c["message_count"] for c in chats]))
                     count_messages = sum(t1) if t1 else 0
-                    t2 = list(filter(
-                         None, [c["first_message_datetime"] for c in chats]))
+                    t2 = list(filter(bool, [c["first_message_datetime"] for c in chats]))
                     datetime_first = min(t2) if t2 else None
-                    t3 = list(filter(
-                         None, [c["last_message_datetime"] for c in chats]))
+                    t3 = list(filter(bool, [c["last_message_datetime"] for c in chats]))
                     datetime_last = max(t3) if t3 else None
                     datetext_first = "" if not datetime_first \
                         else datetime_first.strftime("%Y-%m-%d %H:%M:%S")
@@ -7391,7 +7676,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             # Context menu event, pick focused or first visible message
             msg_id, _ = self.GetFocusedMessage()
             if msg_id is not None:
-                msg_idx = self._message_map.keys().index(msg_id)
+                msg_idx = list(self._message_map).index(msg_id)
         if msg_id is None and self._message_positions:
             m_id = self._messages_current[-1]["id"]
             if pos >= 0 and self._message_positions[m_id][1] < pos:
@@ -7413,8 +7698,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 url, urltype = self._filelinks[urlrange[0]], "file"
                 if any(url.startswith(x) for x in ["\\\\\\", "///"]):
                     url = url[3:] # Strip redundant filelink slashes
-                if not isinstance(url, unicode):
-                    url = unicode(url, "utf-8", errors="replace")
+                if not isinstance(url, six.text_type):
+                    url = util.to_unicode(url, "utf-8", errors="replace")
             elif urlrange[0] in self._urllinks:
                 url = self._urllinks[urlrange[0]]
             item_link = wx.MenuItem(menu, -1, "C&opy %s location" % urltype)
@@ -7592,7 +7877,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   count  maximum number of more messages to retrieve,
                         defaults to conf.MaxHistoryInitialMessages / 2
         """
-        if count is None: count = max(1, conf.MaxHistoryInitialMessages / 2)
+        if count is None: count = max(1, conf.MaxHistoryInitialMessages // 2)
         if not count: return
 
         center_id, stamp_from = None, None
@@ -7678,12 +7963,12 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     continue # for m
                 if self._center_message_index is not None \
                 and count < self._center_message_index \
-                - conf.MaxHistoryInitialMessages / 2:
+                - conf.MaxHistoryInitialMessages // 2:
                     # Skip messages before the range centered around a message
                     continue # for m
                 if self._center_message_index is not None \
                 and count > self._center_message_index \
-                + conf.MaxHistoryInitialMessages / 2:
+                + conf.MaxHistoryInitialMessages // 2:
                     # Skip messages after the range centered around a message
                     break # for m
 
@@ -7821,14 +8106,14 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             text = e.text or ""
             tail = tails_new[e] if e in tails_new else (e.tail or "")
             children = []
-            if type(text) is str:
+            if isinstance(text, six.binary_type):
                 text = text.decode("utf-8")
-            if type(tail) is str:
+            if isinstance(text, six.binary_type):
                 tail = tail.decode("utf-8")
             if "a" == e.tag:
                 href = e.get("href")
                 if href.startswith("file:"):
-                    pathname = urllib.url2pathname(e.get("href")[5:])
+                    pathname = urllib.request.url2pathname(e.get("href")[5:])
                     self._filelinks[self.STC.Length] = pathname
                 elif re.match("^[a-z]+%s" % re.escape("://"), href):
                     self._urllinks[self.STC.Length] = href
@@ -7875,7 +8160,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                                 in highlighted style
         """
         text = text or ""
-        if isinstance(text, unicode):
+        if isinstance(text, six.text_type):
             text = text.encode("utf-8")
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
@@ -7895,7 +8180,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         Appends text with new lines indented at the specified level.
         """
         if "\n" in text:
-            for line in text.split("\n"):
+            for line in text.splitlines():
                 self._append_text("%s\n" % line)
                 if self.USE_COLUMNS:
                     self.SetLineIndentation(self.LineCount - 1, indent)
@@ -7934,7 +8219,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                     center_message_i = i
 
                 if self._center_message_id is not None:
-                    if i + 1 - center_message_i >= conf.MaxHistoryInitialMessages / 2:
+                    if i + 1 - center_message_i >= conf.MaxHistoryInitialMessages // 2:
                         break # for i, m
                 elif i + 1 >= conf.MaxHistoryInitialMessages: break # for i, m
 
@@ -8270,8 +8555,8 @@ class SqliteGridBase(wx.grid.GridTableBase):
             # since there is no telling how much time it can take. Instead, we
             # update the row count chunk by chunk.
             self.row_count = self.SEEK_CHUNK_LENGTH
-            TYPES = dict((v, k) for k, vv in {"INTEGER": (int, long, bool),
-                         "REAL": (float,)}.items() for v in vv)
+            TYPES = dict((v, k) for k, vv in {"INTEGER": six.integer_types + (bool, ),
+                         "REAL": (float, )}.items() for v in vv)
             # Seek ahead on rows and get column information from first values
             try: self.SeekToRow(self.SEEK_CHUNK_LENGTH - 1)
             except Exception: pass
@@ -8326,7 +8611,7 @@ class SqliteGridBase(wx.grid.GridTableBase):
         while self.row_iterator and (self.iterator_index < row):
             rowdata = None
             try:
-                rowdata = self.row_iterator.next()
+                rowdata = next(self.row_iterator)
             except Exception:
                 pass
             if rowdata:
@@ -8356,12 +8641,12 @@ class SqliteGridBase(wx.grid.GridTableBase):
             self.SeekToRow(row)
             if row < len(self.rows_current):
                 value = self.rows_current[row][self.columns[col]["name"]]
-                if type(value) is buffer:
+                if sys.version_info < (3, ) and type(value) is buffer:  # Py2
                     value = str(value).decode("latin1")
         if value and "BLOB" == self.columns[col]["type"]:
             # Blobs need special handling, as the text editor does not
             # support control characters or null bytes.
-            value = value.encode("unicode-escape")
+            value = value.encode("unicode-escape").decode("latin1")
         return value if value is not None else ""
 
 
@@ -8394,7 +8679,7 @@ class SqliteGridBase(wx.grid.GridTableBase):
                     while row and not self._is_row_unfiltered(row): row = next(cursor)
                     if row: yield row
                     row = next(cursor)
-            except GeneratorExit: pass
+            except (GeneratorExit, StopIteration): pass
 
         sql = self.sql if self.is_query else "SELECT * FROM %s" % self.table
         return generator(self.db.execute(sql))
@@ -8647,15 +8932,15 @@ class SqliteGridBase(wx.grid.GridTableBase):
         self.SeekToRow(self.row_count - 1)
         self.sort_ascending = not self.sort_ascending
         self.sort_column = col
-        compare = cmp
         if 0 <= col < len(self.columns):
-            col_name = self.columns[col]["name"]
-            def compare(a, b):
-                aval, bval = a[col_name], b[col_name]
-                aval = aval.lower() if hasattr(aval, "lower") else aval
-                bval = bval.lower() if hasattr(bval, "lower") else bval
-                return cmp(aval, bval)
-        self.rows_current.sort(cmp=compare, reverse=self.sort_ascending)
+            name = self.columns[col]["name"]
+            types = set(type(x[name]) for x in self.rows_current)
+            if types - set(six.integer_types + (bool, type(None))):  # Not only numeric types
+                key = lambda x: x[name].lower() if isinstance(x[name], six.string_types) else \
+                                "" if x[name] is None else six.text_type(x[name])
+            else:  # Only numeric types
+                key = lambda x: -sys.maxsize if x[name] is None else x[name]
+            self.rows_current.sort(key=key, reverse=self.sort_ascending)
         if self.View:
             self.View.ForceRefresh()
 

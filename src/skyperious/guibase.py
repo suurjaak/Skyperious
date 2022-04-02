@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    11.01.2021
+@modified    19.03.2022
 """
 import datetime
 import logging
@@ -87,7 +87,7 @@ class GUILogHandler(logging.Handler):
                 text = text.replace("\n", "\n\t\t\t") # Indent linebreaks
                 text = re.sub(r"^\s+$", "", text, flags=re.M) # Unindent whitespaced lines
             msg = "%s.%03d\t%s" % (now.strftime("%Y-%m-%d %H:%M:%S"),
-                                   now.microsecond / 1000, text)
+                                   now.microsecond // 1000, text)
 
             window = wx.GetApp() and wx.GetApp().GetTopWindow()
             if window:
@@ -268,7 +268,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             # form, and position it immediately under the main form, or
             # covering its bottom if no room.
             self.frame_console_shown = True
-            size = wx.Size(self.Size.width, max(200, self.Size.height / 3))
+            size = wx.Size(self.Size.width, max(200, self.Size.height // 3))
             self.frame_console.Size = size
             display = wx.GetDisplaySize()
             y = 0
@@ -281,7 +281,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
                 self.Position.x, self.Position.y + self.Size.height + y
             )
         if show: self.console.ScrollToLine(self.console.LineCount + 3 - (
-            self.console.Size.height / self.console.GetTextExtent(" ")[1]
+            self.console.Size.height // self.console.GetTextExtent(" ")[1]
         )) # Scroll to the last line
         self.frame_console.Show(show)
         self.frame_console.Iconize(False)

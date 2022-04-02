@@ -9,17 +9,17 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    30.07.2021
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import datetime
 import functools
 import logging
-import Queue
 import re
 import threading
 import traceback
 
+from six.moves import queue
 try:
     import wx
 except ImportError:
@@ -49,7 +49,7 @@ class WorkerThread(threading.Thread):
         self._is_running   = False # Flag whether thread is running
         self._is_working   = False # Flag whether thread is currently working
         self._drop_results = False # Flag to not post back obtained results
-        self._queue = Queue.Queue()
+        self._queue = queue.Queue()
 
 
     def work(self, data):
@@ -163,6 +163,7 @@ class SearchThread(WorkerThread):
                 result = {"output": "", "map": {},
                           "search": search, "count": 0}
                 sql, params, match_words = query_parser.Parse(search["text"])
+                match_words = [x.lower() for x in match_words]
 
                 # Turn wildcard characters * into regex-compatible .*
                 match_words_re = [".*".join(map(re.escape, w.split("*")))
@@ -226,21 +227,13 @@ class SearchThread(WorkerThread):
                 and match_words:
                     count = 0
                     contacts = search["db"].get_contacts()
-                    # Possibly more: country (ISO code, need map), birthday
-                    # (base has YYYYMMDD in integer field).
-                    match_fields = [
-                        "given_displayname", "displayname", "skypename",
-                        "province", "city", "pstnnumber", "phone_home",
-                        "phone_office", "phone_mobile", "homepage", "emails",
-                        "about", "mood_text",
-                    ]
                     template_contact = FACTORY("contact")
                     for contact in contacts:
                         match = False
                         fields_filled = {}
-                        for field in match_fields:
-                            if contact[field]:
-                                val = contact[field]
+                        for field, _ in skypedata.CONTACT_FIELD_TITLES.items():
+                            val = skypedata.format_contact_field(contact, field)
+                            if val:
                                 if self.match_all(val, match_words):
                                     match = True
                                     val = pattern_replace.sub(wrap_b, val)
@@ -517,7 +510,7 @@ class MergeThread(WorkerThread):
         result = {"output": "", "index": 0, "count": 0, "chatindex": 0,
                   "chatcount": 0, "params": params, "chats": [],
                   "type": "diff_merge_left"}
-        error, e = None, None
+        error, exc = None, None
         compared = []
         db1, db2 = params["db1"], params["db2"]
         try:
@@ -586,6 +579,7 @@ class MergeThread(WorkerThread):
                     result = dict(result, output="", chats=[])
         except Exception as e:
             error = traceback.format_exc()
+            exc = e
         finally:
             if not self._drop_results:
                 if compared:
@@ -601,7 +595,7 @@ class MergeThread(WorkerThread):
                           "output": info, "params": params, "chats": [] }
                 if error:
                     result["error"] = error
-                    if e: result["error_short"] = repr(e)
+                    if exc: result["error_short"] = repr(exc)
                 self.postback(result)
 
 

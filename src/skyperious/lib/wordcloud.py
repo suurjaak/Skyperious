@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     17.01.2012
-@modified    02.06.2015
+@modified    18.03.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -161,15 +161,15 @@ class GroupCounter(object):
     def add_words(self, words, group=None):
         """Adds to group words counts."""
         for w in words: # Drop short or wholly numeric words
-            if len(w) >= self.minlen and re.search("\\D", w):
+            if len(w) >= self.minlen and re.search(r"\D", w):
                 self.data[w][group] += 1
 
 
     def add_text(self, text, group=None):
         """Splits the text into words and adds to group word counts."""
         words = []
-        words = re.findall("\\w{%s,}" % self.minlen, text.lower(), re.U)
-        words = [x for x in words if re.search("\\D", x)] # Drop numerics
+        words = re.findall(r"\w{%s,}" % self.minlen, text.lower(), re.U)
+        words = [x for x in words if re.search(r"\D", x)] # Drop numerics
         for w in words: self.data[w][group] += 1
 
 
@@ -197,9 +197,9 @@ class GroupCounter(object):
                             as [(word, count, font size 0..7), ]
         """
         global OPTIONS
-        options = dict(OPTIONS.items() + (options.items() if options else []))
+        options = dict(OPTIONS,  **(options or {}))
         if self.commons is None:
-            self.commons = find_commons(self.data.iterkeys())
+            self.commons = find_commons(self.data)
 
         # Build a flattened counts dictionary
         counts, top_counts = {}, [1]
@@ -257,7 +257,7 @@ def find_commons(words):
     result = []
     words = set(words)
     for commontext in COMMON_WORDS.values():
-        allcommons = set(re.findall("\\w+", commontext, re.UNICODE))
+        allcommons = set(re.findall(r"\w+", commontext, re.UNICODE))
         matches = allcommons & words
         if len(matches) > len(result):
             result = matches

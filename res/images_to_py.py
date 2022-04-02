@@ -9,15 +9,16 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  19.08.2020
+@modified  01.04.2022
 ------------------------------------------------------------------------------
 """
 import base64
 import datetime
+import io
 import os
 
 """Target Python script to write."""
-TARGET = os.path.join("..", "skyperious", "images.py")
+TARGET = os.path.join("..", "src", "skyperious", "images.py")
 
 Q3 = '"""'
 
@@ -74,6 +75,8 @@ IMAGES = {
         "Removed image icon for removed messages in exported chat HTML.",
     "HelpChats.png":
         "Help image on default search page for chats page.",
+    "HelpContacts.png":
+        "Help image on default search page for contacts page.",
     "HelpTables.png":
         "Help image on default search page for tables page.",
     "HelpInfo.png":
@@ -89,7 +92,7 @@ IMAGES = {
     "PageChats.png":
         "Icon for the Chats page in a database tab.",
     "PageContacts.png":
-        "Icon for the Merge Contacts page in a merger tab.",
+        "Icon for the Contacts page in a database tab.",
     "PageTables.png":
         "Icon for the Data tables page in a database tab.",
     "PageInfo.png":
@@ -98,6 +101,8 @@ IMAGES = {
         "Icon for the Merge All page in a merger tab.",
     "PageMergeChats.png":
         "Icon for the Merge Chats page in a merger tab.",
+    "PageMergeContacts.png":
+        "Icon for the Merge Contacts page in a merger tab.",
     "PageOnline.png":
         "Icon for the Online page in a database tab.",
     "PageSearch.png":
@@ -137,7 +142,7 @@ IMAGES = {
     "TransparentPixel.gif":
         "Transparent 1x1 GIF.",
 }
-HEADER = """# -*- coding: utf-8 -*-
+HEADER = u"""# -*- coding: utf-8 -*-
 %s
 Contains embedded image and icon resources for Skyperious. Auto-generated.
 
@@ -163,34 +168,34 @@ except ImportError:
 
 def create_py(target):
     global HEADER, APPICONS, IMAGES
-    f = open(target, "w")
+    f = io.open(target, "w", encoding="utf-8")
     f.write(HEADER)
     icons = [os.path.splitext(x)[0] for x, _ in APPICONS]
-    icon_parts = [", ".join(icons[4*i:4*i+4]) for i in range(len(icons) / 4)]
+    icon_parts = [", ".join(icons[4*i:4*i+4]) for i in range(len(icons) // 4)]
     iconstr = ",\n        ".join(icon_parts)
-    f.write("\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
-            "    [icons.AddIcon(i.Icon) "
-            "for i in [\n        %s\n    ]]\n    return icons\n" % (Q3,
+    f.write(u"\n\n%s%s%s\ndef get_appicons():\n    icons = wx.IconBundle()\n"
+            u"    [icons.AddIcon(i.Icon) "
+            u"for i in [\n        %s\n    ]]\n    return icons\n" % (Q3,
         "Returns the application icon bundle, "
         "for several sizes and colour depths.",
         Q3, iconstr.replace("'", "").replace("[", "").replace("]", "")
     ))
     for filename, desc in APPICONS:
         name = os.path.splitext(filename)[0]
-        f.write("\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
-        data = base64.b64encode(open(filename, "rb").read())
+        f.write(u"\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
+        data = base64.b64encode(open(filename, "rb").read()).decode("latin1")
         while data:
-            f.write("    \"%s\"\n" % data[:72])
+            f.write(u"    \"%s\"\n" % data[:72])
             data = data[72:]
-        f.write(")\n")
+        f.write(u")\n")
     for filename, desc in sorted(IMAGES.items()):
         name = os.path.splitext(filename)[0]
-        f.write("\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
-        data = base64.b64encode(open(filename, "rb").read())
+        f.write(u"\n\n%s%s%s\n%s = PyEmbeddedImage(\n" % (Q3, desc, Q3, name))
+        data = base64.b64encode(open(filename, "rb").read()).decode("latin1")
         while data:
-            f.write("    \"%s\"\n" % data[:72])
+            f.write(u"    \"%s\"\n" % data[:72])
             data = data[72:]
-        f.write(")\n")
+        f.write(u")\n")
     f.close()
 
 

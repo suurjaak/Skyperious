@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    05.08.2021
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import collections, base64, datetime, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, urllib, wx
+#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -23,7 +23,7 @@ import re
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
 
 """Replacer callback for low bytes unusable in wx.HtmlWindow (\x00 etc)."""
-SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape")
+SAFEBYTE_REPL = lambda m: m.group(0).encode("unicode-escape").decode("latin1")
 
 
 """
@@ -45,7 +45,9 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import base64, collections, datetime, json, urllib
+import collections, datetime, functools, imghdr, json
+import six
+from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
 from skyperious.lib.vendor import step
@@ -56,7 +58,7 @@ from skyperious.lib.vendor import step
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
   <title>Skype {{ chat["title_long_lc"] }}</title>
-  <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
+  <link rel="shortcut icon" type="image/png" href="data:image/png;base64,{{! images.Icon16x16_8bit.data }}"/>
   <style>
     .highlight1  { background-color: #FFFF66; }
     .highlight2  { background-color: #A0FFFF; }
@@ -664,7 +666,7 @@ from skyperious.lib.vendor import step
   </style>
   <script>
 <%
-MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.index(b)) for m in b["messages"]], a)[-1], timeline, {})
+MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.index(b)) for m in b["messages"]], a)[-1], timeline, {})
 %>
     var HIGHLIGHT_STYLES = 10;
     var TIMELINES = {{! json.dumps([x["datestr"] for x in timeline]) }};
@@ -939,7 +941,7 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <a title="Click to hide timeline" href="javascript:;" class="toggle" onclick="return toggle_element('timeline')">x</a>
 <ul>
 %for entry in timeline:
-  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.quote(entry["datestr"]) }}">
+  <li class="{{ entry["unit"] + (" root" if entry["unit"] == timeline_units[0] else "") }}" id="timeline:{{ urllib.parse.quote(entry["datestr"]) }}">
     <a href="#message:{{ entry["messages"][0] }}" title="{{ entry["datestr"] }} : {{ util.plural("message", entry["messages"], sep=",") }}">
 %if entry["unit"] in ("month", "day"):
       <span class="date">{{ entry["label"] }}</span> <span class="name">{{ entry["label2"] }}</span>
@@ -964,14 +966,18 @@ MESSAGE_TIMELINES = reduce(lambda a, b: ([a.setdefault(m, []).append(timeline.in
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
       <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
       </div>
 %endfor
 %elif chat_picture_raw:
-      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/png;base64,{{! base64.b64encode(chat_picture_raw) }}" />
+<%
+try: filetype = imghdr.what("", chat_picture_raw[:100].encode("latin1")) or "png"
+except Exception: filetype = "png"
+%>
+      <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/{{ filetype }};base64,{{! util.b64encode(chat_picture_raw) }}" />
 %endif
     </td>
     <td id="header_center">
@@ -1019,7 +1025,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 <%
 alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity"] else "")
 %>
-      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
+      <div><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><br /><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span>
 %if p["name"] != p["identity"]:
       <br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span>
 %endif
@@ -1038,7 +1044,7 @@ filterer = lambda p: not stats["counts"] or p["identity"] == db.id or p["identit
 <%
 alt = "%s (%s)" % (p["name"], p["identity"])
 %>
-    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
+    <span class="avatar_item"><span class="avatar_large"><img title="{{ alt }}" alt="{{ alt }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_large", "")) or images.AvatarDefaultLarge.data }}" /></span><span class="name" title="{{ p["name"] }}">{{ p["name"] }}</span><br />
     <span class="identity" title="{{ p["identity"] }}">
         {{ p["identity"] }}
 %if 1 == p.get("rank"):
@@ -1116,7 +1122,7 @@ svgdata = {"data": items, "links": links, "maxval": maxval,
 %endif
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr class="stats_row">
-        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
+        <td><table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span class="name" title="{{ p["name"] }}">{{ p["name"] }}<br /><span class="identity" title="{{ p["identity"] }}">{{ p["identity"] }}</span></span></td></tr></table></td>
         <td><table class="plot_table">
 <%
 stat_rows = [] # [(type, label, count, total)]
@@ -1219,7 +1225,7 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
       <table>
 %for p in filter(lambda p: p["identity"] in stats["counts"], sorted(participants, key=lambda p: p["name"].lower())):
       <tr><td>
-        <table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! base64.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table>
+        <table><tr><td class="avatar"><img title="{{ p["name"] }}" alt="{{ p["name"] }}" src="data:image/png;base64,{{! util.b64encode(p.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" /></td><td><span>{{ p["name"] }}<br /><span class="identity">{{ p["identity"] }}</span></span></td></tr></table>
       </td><td>
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
@@ -1258,7 +1264,7 @@ smalltotal = sum(emoticon_counts.get(identity, {}).values())
       <tr>
 %if participant:
         <td><table><tr><td class="avatar">
-        <img title="{{ name }}" alt="{{ name }}" src="data:image/png;base64,{{! base64.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" />
+        <img title="{{ name }}" alt="{{ name }}" src="data:image/png;base64,{{! util.b64encode(participant.get("avatar_raw_small", "")) or images.AvatarDefault.data }}" />
         </td><td><span>{{ name }}<br /><span class="identity">{{ identity }}</span></span></td></tr></table></td>
 %else:
         <td style="padding: 13px;">{{ name }}</td>
@@ -1413,7 +1419,7 @@ is_info = (skypedata.MESSAGE_TYPE_INFO == m["type"])
 # Kludge to get single-line messages with an emoticon to line up correctly
 # with the author, as emoticons have an upper margin pushing the row higher
 text_plain = m.get("body_txt", content)
-emot_start = '<span class="emoticon '
+emot_start = ' class="emoticon '
 shift_row = emot_start in content and (("<br />" not in content and len(text_plain) < 140) or content.index(emot_start) < 140)
 author_class = "remote" if m["author"] != db.id else "local"
 %>
@@ -1456,7 +1462,8 @@ HTML chat history export template for shared media message body.
 @param   ?media_folder   path to save files under, if not embedding
 """
 CHAT_MESSAGE_MEDIA = """<%
-import base64, imghdr, logging, mimetypes, os, urllib
+import imghdr, logging, mimetypes, os
+from six.moves import urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
 
@@ -1483,14 +1490,14 @@ if isdef("media_folder") and media_folder:
     basename = filename or "%s.%s" % (message["id"], filetype)
     basename = util.safe_filename(basename)
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
     except Exception:
         logger = logging.getLogger(conf.Title.lower())
         logger.exception("Error saving export image %s.", filepath)
 else:
-    src = "data:%s;base64,%s" % (mimetype, base64.b64encode(content))
+    src = "data:%s;base64,%s" % (mimetype, util.b64encode(content))
 %>
 %if skypedata.CHATMSG_TYPE_PICTURE == message["chatmsg_type"]:
   Changed the conversation picture:<br />
@@ -1537,7 +1544,8 @@ HTML chat history export template for shared files message body.
 @param   media_folder  path to save files under
 """
 CHAT_MESSAGE_FILE = """<%
-import logging, os, urllib
+import logging, os
+from six.moves import urllib
 from skyperious import conf
 from skyperious.lib import util
 
@@ -1549,7 +1557,7 @@ Sent {{ util.plural("file", files, numbers=False) }}
 if file["content"]:
     basename = util.safe_filename(file["filename"])
     filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.quote(os.path.basename(x)) for x in (media_folder, filepath))
+    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
     try:
         with util.create_file(filepath, "wb", handle=True) as f:
             f.write(file["content"])
@@ -1657,7 +1665,7 @@ from skyperious.lib import util
     <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
     <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
     <title>{{ title }}</title>
-    <link rel="shortcut icon" type="image/png" href="data:image/ico;base64,{{! images.Icon16x16_8bit.data }}"/>
+    <link rel="shortcut icon" type="image/png" href="data:image/png;base64,{{! images.Icon16x16_8bit.data }}"/>
     <style>
         * { font-family: {{ conf.HistoryFontName }}; font-size: 11px; }
         body {
@@ -1784,11 +1792,10 @@ TXT SQL insert statements export template.
 @param   ?create_sql   CREATE TABLE SQL, if any
 """
 SQL_TXT = """<%
-import datetime, re, string
+import datetime
 from skyperious import conf
+from skyperious.lib import util
 
-UNPRINTABLES = "".join(set(unichr(i) for i in range(128)).difference(string.printable))
-RE_UNPRINTABLE = re.compile("[%s]" % "".join(map(re.escape, UNPRINTABLES)))
 str_cols = ", ".join(columns)
 %>-- {{ title }}.
 -- Source: {{ db.filename }}.
@@ -1801,32 +1808,7 @@ str_cols = ", ".join(columns)
 %endif
 
 %for row in rows:
-<%
-values = []
-%>
-%for col in columns:
-<%
-value = row[col]
-if isinstance(value, basestring):
-    if RE_UNPRINTABLE.search(value):
-        if isinstance(value, unicode):
-            try:
-                value = value.encode("latin1")
-            except UnicodeError:
-                value = value.encode("utf-8", errors="replace")
-        value = "X'%s'" % value.encode("hex").upper()
-    else:
-        if isinstance(value, unicode):
-            value = value.encode("utf-8")
-        value = '"%s"' % (value.encode("string-escape").replace('\"', '""'))
-elif value is None:
-    value = "NULL"
-else:
-    value = str(value)
-values.append(value)
-%>
-%endfor
-INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(values) }});
+INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
 %endfor
 """
 
@@ -1847,7 +1829,7 @@ HTML statistics template, for use with HtmlWindow.
 @param   expand           {clouds: bool, emoticons, shared_media}
 """
 STATS_HTML = """<%
-import urllib
+from six.moves import urllib
 from skyperious import conf, emoticons, skypedata
 from skyperious.lib import util
 
@@ -1983,7 +1965,7 @@ else:
     </td>
     <td valign="top">
 <%
-safe_id = urllib.quote(p["identity"])
+safe_id = urllib.parse.quote(p["identity"])
 %>
 %if "hours" in authorimages.get(p["identity"] , {}):
       <img src="memory:{{ authorimages[p["identity"]]["hours"] }}" usemap="#{{ safe_id }}-hours" />
@@ -2098,7 +2080,7 @@ text_cell1 = "&nbsp;%d%%&nbsp;" % round(percent) if (round(percent) > 18) else "
 text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %>
         <tr>
-          <td><img src="memory:emoticon_{{ emoticon if hasattr(emoticons, emoticon) else "transparent" }}.png" width="19" height="19"/></td>
+          <td><img src="memory:emoticon_{{ emoticon if hasattr(emoticons, emoticon) else "transparent" }}.gif" width="19" height="19"/></td>
           <td><table cellpadding="0" cellspacing="0" width="{{ conf.EmoticonsPlotWidth }}">
 
             <td bgcolor="{{ conf.PlotMessagesColour }}" width="{{ int(round(ratio * conf.EmoticonsPlotWidth)) }}" align="center">
@@ -2194,6 +2176,101 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 
 
 """
+Contact information template, for use with HtmlWindow.
+
+@param   db               SkypeDatabase instance
+@param   contact          contact data dictionary, including "conversations": [}
+@param   sort_by          the field that chats are currently sorted by
+@param   avatar           memoryfs filename
+"""
+CONTACT_HTML = """<%
+from skyperious import conf, skypedata
+from skyperious.lib import util
+
+CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
+             ("ratio", "Message ratio"),
+             ("first_message_datetime", "First message"),
+             ("last_message_datetime", "Last message")]
+datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+chats = {x["id"]: x for x in db.get_conversations()}
+%>
+<font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
+<table cellpadding="0" cellspacing="0" width="100%"><tr>
+  <td width="100" align="center" valign="top">
+%if avatar:
+<%
+sz = None
+if avatar_size[0] > 300:
+    ratio = 300. / avatar_size[0]
+    sz = tuple(int(x * ratio) for x in avatar_size)
+%>
+    <img src="memory:{{ avatar }}" {{! 'width="%s" height="%s" ' % sz if sz else "" }}/><br />
+    <a href="avatar"><font color="{{ conf.LinkColour }}">Save image</font></a>
+%else:
+    <img src="memory:avatar__default__large.png" /><br />
+%endif
+  </td>
+  <td>
+    <img src="memory:blank.gif" width="1" height="100" />
+  </td>
+  <td valign="top">
+    <table>
+%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(contact, n)):
+      <tr>
+        <td nowrap valign="top"><b>{{ label }}:</b></td>
+        <td>{{ skypedata.format_contact_field(contact, name) }}</td>
+      </tr>
+%endfor
+    </table>
+  </td>
+</tr></table>
+
+<br /><br />
+
+%if contact.get("conversations"):
+<table cellpadding="2" cellspacing="2"><tr>
+%for i, (name, label) in enumerate(CHAT_COLS):
+    <td nowrap width="{{ 100 if i else 400 }}" align="{{ "right" if i in (1, 2) else "left" }}" valign="top">
+%if name == sort_by:
+        <font color="gray">
+%else:
+        <a href="sort://{{ name }}"><font color="{{ conf.LinkColour }}">
+%endif
+            {{ label }}
+%if name == sort_by:
+        </font>
+%else:
+        </font></a>
+%endif
+    </td>
+%endfor
+%for data in contact["conversations"]:
+  <tr>
+    <td valign="top">{{ data["title_long"] }} <a href="chat://{{ data["id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a></td>
+    <td align="right" valign="top">{{ data["message_count"] }}</td>
+    <td align="right" valign="top">{{ util.round_float(data["ratio"], 0) + "%" if data.get("ratio") is not None else "" }}</td>
+    <td align="right" nowrap valign="top">{{ datefmt(data["first_message_datetime"]) }}
+%if data["first_message_datetime"]:
+        <a href="chat://{{ data["id"] }}/{{ data["first_message_id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a>
+%endif
+    </td>
+    <td align="right" nowrap valign="top">{{ datefmt(data["last_message_datetime"]) }}
+%if data["last_message_datetime"]:
+        <a href="chat://{{ data["id"] }}/{{ data["last_message_id"] }}"><font color="{{ conf.LinkColour }}">&gt;</font></a>
+%endif
+    </td>
+    <td width="10"></td>
+    <td><a href="export://{{ data["id"] }}"><font color="{{ conf.LinkColour }}">Export</font></a></td>
+  </tr>
+%endfor
+</table>
+%endif
+
+</font>
+"""
+
+
+"""
 HTML template for search result row for a matched chat, HTML table row.
 
 @param   chat              chat data dictionary
@@ -2279,7 +2356,6 @@ HTML template for search result row of a matched contact, HTML table row.
 @param   count             index of current match
 @param   result_count      total number of results so far
 @param   fields_filled     {field: highlighted value}
-@param   match_fields      [contact field, ]
 @param   pattern_replace   re.RegexObject to find matching text
 @param   wrap_b            function(text) returning <b>text</b>
 """
@@ -2294,9 +2370,11 @@ from skyperious import conf, skypedata
   <td align="right" valign="top">
     <font color="{{ conf.DisabledColour }}">{{ result_count }}</font>
   </td><td colspan="2">
-    <font color="{{ conf.DisabledColour }}">{{! pattern_replace.sub(wrap_b, contact["name"]) }}</font>
+    <a href="contact:{{ contact["id"] }}"><font color="{{ conf.LinkColour }}">
+      {{! pattern_replace.sub(wrap_b, contact["name"]) }}
+    </font></a>
     <br /><table>
-%for field in filter(lambda x: x in fields_filled, match_fields):
+%for field in filter(lambda x: x in fields_filled, skypedata.CONTACT_FIELD_TITLES):
       <tr>
         <td nowrap valign="top"><font color="{{ conf.DisabledColour }}">{{ skypedata.CONTACT_FIELD_TITLES[field] }}</font></td>
         <td>&nbsp;</td><td>{{! fields_filled[field] }}</td>
@@ -2452,6 +2530,7 @@ HTML template for search result of DB table row, HTML table row.
 """
 SEARCH_ROW_TABLE_HTML = """<%
 import re
+from skyperious.lib import util
 from skyperious import conf, templates
 
 %>
@@ -2461,7 +2540,7 @@ from skyperious import conf, templates
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
-value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(value))
 %>
 <td valign="top">{{! pattern_replace.sub(wrap_b, escape(value)) }}</td>
 %endfor
@@ -2479,6 +2558,7 @@ TXT template for search result of DB table row.
 """
 SEARCH_ROW_TABLE_TXT = """<%
 import re
+from skyperious.lib import util
 from skyperious import conf, templates
 
 %>
@@ -2487,7 +2567,7 @@ from skyperious import conf, templates
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
-value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, unicode(value))
+value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(value))
 %>
 {{ pattern_replace.sub(wrap_b, value) }}
 %endfor
@@ -2517,31 +2597,34 @@ under the MIT License.
 
 {{ conf.Title }} has been built using the following open source software:
 <ul>
-  <li>wxPython{{ " 4.1.0" if getattr(sys, 'frozen', False) else "" }},
+  <li>wxPython,
       <a href="http://wxpython.org"><font color="{{ conf.LinkColour }}">wxpython.org</font></a></li>
-  <li>appdirs{{ " 1.4.4" if getattr(sys, 'frozen', False) else "" }},
+  <li>appdirs,
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
-  <li>beautifulsoup4{{ " 4.9.3" if getattr(sys, 'frozen', False) else "" }},
+  <li>beautifulsoup4,
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
-  <li>ijson{{ " 3.1.4" if getattr(sys, 'frozen', False) else "" }}, <a href="https://pypi.org/project/ijson">
-      <font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
-  <li>Pillow{{ " 6.2.2" if getattr(sys, 'frozen', False) else "" }},
+  <li>ijson,
+      <a href="https://pypi.org/project/ijson"><font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
+  <li>Pillow,
       <a href="https://pypi.org/project/Pillow"><font color="{{ conf.LinkColour }}">pypi.org/project/Pillow</font></a></li>
-  <li>pyparsing{{ " 2.4.7" if getattr(sys, 'frozen', False) else "" }},
+  <li>pyparsing,
       <a href="https://pypi.org/project/pyparsing"><font color="{{ conf.LinkColour }}">pypi.org/project/pyparsing</font></a></li>
-  <li>SkPy{{ " 0.10.4" if getattr(sys, 'frozen', False) else "" }},
+  <li>six,
+      <a href="https://pypi.org/project/six/"><font color="{{ conf.LinkColour }}">pypi.org/project/six</font></a></li>
+  <li>SkPy,
       <a href="https://pypi.org/project/SkPy"><font color="{{ conf.LinkColour }}">pypi.org/project/SkPy</font></a></li>
   <li>step, Simple Template Engine for Python,
       <a href="https://pypi.org/project/step-template"><font color="{{ conf.LinkColour }}">pypi.org/project/step-template</font></a></li>
-  <li>XlsxWriter{{ " 1.4.5" if getattr(sys, 'frozen', False) else "" }},
+  <li>XlsxWriter,
       <a href="https://pypi.org/project/XlsxWriter"><font color="{{ conf.LinkColour }}">
           pypi.org/project/XlsxWriter</font></a></li>
-  <li>jsOnlyLightbox{{ " 0.5.1" if getattr(sys, 'frozen', False) else "" }}, <a href="https://github.com/felixhagspiel/jsOnlyLightbox">
-      <font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
+  <li>jsOnlyLightbox,
+      <a href="https://github.com/felixhagspiel/jsOnlyLightbox"><font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
 %if getattr(sys, 'frozen', False):
-  <li>Python 2.7.18, <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
-  <li>PyInstaller, <a href="https://www.pyinstaller.org">
-      <font color="{{ conf.LinkColour }}">www.pyinstaller.org</font></a></li>
+  <li>Python,
+      <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
+  <li>PyInstaller,
+      <a href="https://www.pyinstaller.org"><font color="{{ conf.LinkColour }}">www.pyinstaller.org</font></a></li>
 %endif
 </ul><br /><br />
 
@@ -2580,9 +2663,9 @@ from skyperious import conf
 <font face="{{ conf.HistoryFontName }}" size="2" color="{{ conf.FgColour }}">
 <center>
 <h5><font color="{{ conf.SkypeLinkColour }}">Overview</font></h5>
-<table cellpadding="10" cellspacing="0">
+<table cellpadding="0" cellspacing="0">
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2595,7 +2678,7 @@ from skyperious import conf
         <a href="page:#search"><b><font color="{{ conf.FgColour }}">Search</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:tables"><img src="memory:HelpTables.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2607,7 +2690,7 @@ from skyperious import conf
   </td>
 </tr>
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:chats"><img src="memory:HelpChats.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2619,7 +2702,7 @@ from skyperious import conf
         <a href="page:chats"><b><font color="{{ conf.FgColour }}">Chats</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:sql"><img src="memory:HelpSQL.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2631,18 +2714,18 @@ from skyperious import conf
   </td>
 </tr>
 <tr>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
-        <a href="page:info"><img src="memory:HelpInfo.png" /></a>
+        <a href="page:chats"><img src="memory:HelpContacts.png" /></a>
       </td><td width="10"></td><td valign="center">
-        See information about the Skype account in this file,<br />
-        view general database statistics,<br />
-        check database integrity for corruption and recovery.
+        See Skype contacts, <br />
+        statistics on chats they have participated in,<br />
+        export contacts and chats.
       </td></tr><tr><td nowrap align="center">
-        <a href="page:info"><b><font color="{{ conf.FgColour }}">Information</font></b></a>
+        <a href="page:chats"><b><font color="{{ conf.FgColour }}">Contacts</font></b></a><br />
     </td></tr></table>
   </td>
-  <td>
+  <td valign="top">
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:live"><img src="memory:HelpOnline.png" /></a>
       </td><td width="10"></td><td valign="center">
@@ -2651,6 +2734,19 @@ from skyperious import conf
         and download shared media in HTML export. 
       </td></tr><tr><td nowrap align="center">
         <a href="page:live"><b><font color="{{ conf.FgColour }}">Online</font></b></a>
+    </td></tr></table>
+  </td>
+</tr>
+<tr>
+  <td valign="top">
+    <table cellpadding="0" cellspacing="2"><tr><td>
+        <a href="page:info"><img src="memory:HelpInfo.png" /></a>
+      </td><td width="10"></td><td valign="center">
+        See information about the Skype account in this file,<br />
+        view general database statistics,<br />
+        check database integrity for corruption and recovery.
+      </td></tr><tr><td nowrap align="center">
+        <a href="page:info"><b><font color="{{ conf.FgColour }}">Information</font></b></a>
     </td></tr></table>
   </td>
 </tr>

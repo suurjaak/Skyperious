@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    30.07.2021
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -112,9 +112,19 @@ import wx.lib.wordwrap
 import wx.stc
 
 
+
+try:
+    integer_types, string_types, text_type = (int, long), (basestring, ), unicode  # Py2
+except NameError:
+    integer_types, string_types, text_type = (int, ),     (str, ),        str      # Py3
+
+
 # Convenience methods for creating a wx.Brush and wx.Pen or returning cached.
 BRUSH = lambda c,      s=wx.BRUSHSTYLE_SOLID: wx.TheBrushList.FindOrCreateBrush(c,    s)
 PEN   = lambda c, w=1, s=wx.PENSTYLE_SOLID:   wx.ThePenList  .FindOrCreatePen  (c, w, s)
+
+# Multiplier for wx.ComboBox width ~100px ranges
+COMBO_WIDTH_FACTOR = 1.5 if "linux" in sys.platform else 1
 
 
 
@@ -169,7 +179,7 @@ class BusyPanel(wx.Window):
         self.Sizer.Add(label, border=15, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
         self.Fit()
 
-        maxsize = [self.Parent.Size.width / 2, self.Parent.Size.height * 2 / 3]
+        maxsize = [self.Parent.Size.width // 2, self.Parent.Size.height * 2 // 3]
         self.Size = tuple(min(a, b) for a, b in zip(self.Size, maxsize))
 
         self.Bind(wx.EVT_PAINT, lambda e: (e.Skip(), self.Refresh()))
@@ -304,7 +314,7 @@ class ColourManager(object):
     def GetColour(cls, colour):
         if isinstance(colour, wx.Colour): return colour
         return wx.Colour(getattr(cls.colourcontainer, colour)) \
-               if isinstance(colour, basestring) \
+               if isinstance(colour, string_types) \
                else wx.SystemSettings.GetColour(colour)
 
 
@@ -318,9 +328,9 @@ class ColourManager(object):
         @param   ratio    RGB channel adjustment ratio towards second colour
         """
         colour1 = wx.SystemSettings.GetColour(colour1) \
-                  if isinstance(colour1, (int, long)) else wx.Colour(colour1)
+                  if isinstance(colour1, integer_types) else wx.Colour(colour1)
         colour2 = wx.SystemSettings.GetColour(colour2) \
-                  if isinstance(colour2, (int, long)) else wx.Colour(colour2)
+                  if isinstance(colour2, integer_types) else wx.Colour(colour2)
         rgb1, rgb2 = tuple(colour1)[:3], tuple(colour2)[:3]
         delta  = tuple(a - b for a, b in zip(rgb1, rgb2))
         result = tuple(a - (d * ratio) for a, d in zip(rgb1, delta))
@@ -345,7 +355,7 @@ class ColourManager(object):
     @classmethod
     def UpdateControls(cls):
         """Updates all managed controls."""
-        for ctrl, props in cls.ctrlprops.items():
+        for ctrl, props in list(cls.ctrlprops.items()):
             if not ctrl: # Component destroyed
                 cls.ctrlprops.pop(ctrl)
                 continue # for ctrl, props
@@ -353,7 +363,7 @@ class ColourManager(object):
             for prop, colour in props.items():
                 cls.UpdateControlColour(ctrl, prop, colour)
 
-        for ctrl in cls.regctrls:
+        for ctrl in list(cls.regctrls):
             if not ctrl: cls.regctrls.discard(ctrl)
             elif isinstance(ctrl, wx.py.shell.Shell): cls.SetShellStyles(ctrl)
 
@@ -703,7 +713,7 @@ class DatePickerCtrl(wx.ComboCtrl):
         return self._value
     def SetValue(self, dt):
         """Sets current date value."""
-        if isinstance(dt, basestring): return self.SetText(dt)
+        if isinstance(dt, string_types): return self.SetText(dt)
         text = dt.strftime(self._format) if isinstance(dt, datetime.date) else ""
         super(DatePickerCtrl, self).SetValue(text)
         self._value = dt
@@ -920,7 +930,7 @@ class NoteButton(wx.Panel, wx.Button):
         if (self._align & wx.ALIGN_RIGHT):
             x = width - 10 - self._bmp.Size.width
         elif (self._align & wx.ALIGN_CENTER):
-            x = 10 + (width - self.DoGetBestSize().width) / 2
+            x = 10 + (width - self.DoGetBestSize().width) // 2
 
         dc.Font = self.Font
         dc.Brush = BRUSH(self.BackgroundColour)
@@ -1001,7 +1011,7 @@ class NoteButton(wx.Panel, wx.Button):
         if "&" in self._label:
             text_label, h = "", y - 1
             dc.Pen = wx.Pen(dc.TextForeground)
-            for line in self._text_label.split("\n"):
+            for line in self._text_label.splitlines():
                 i, chars = 0, ""
                 while i < len(line):
                     if "&" == line[i]:
@@ -1241,7 +1251,7 @@ class PropertyDialog(wx.Dialog):
 
 
     def AddProperty(self, name, value, help="", default=None,
-                    typeclass=unicode, page=""):
+                    typeclass=text_type, page=""):
         """Adds a property to the frame."""
         row = len(self.properties) * 2
         label = wx.StaticText(self.panel, label=name)
@@ -1321,9 +1331,9 @@ class PropertyDialog(wx.Dialog):
         """Returns value in type expected, or None on failure."""
         try:
             result = typeclass(value)
-            if isinstance(result, (int, long)) and result < 0:
+            if isinstance(result, integer_types) and result < 0:
                 raise ValueError() # Reject negative numbers
-            isinstance(result, basestring) and result.strip()[0] # Reject empty
+            isinstance(result, string_types) and result.strip()[0] # Reject empty
             return result
         except Exception:
             return None
@@ -1333,9 +1343,9 @@ class PropertyDialog(wx.Dialog):
         """Returns the value in type suitable for appropriate wx control."""
         value = tuple(value) if isinstance(value, list) else value
         if isinstance(value, tuple):
-            value = tuple(str(x) if isinstance(x, unicode) else x for x in value)
+            value = tuple(str(x) if isinstance(x, text_type) else x for x in value)
         return "" if value is None else value \
-               if isinstance(value, (basestring, bool)) else unicode(value)
+               if isinstance(value, string_types + (bool, )) else text_type(value)
 
 
 
@@ -1705,7 +1715,7 @@ class RangeSlider(wx.Panel):
         else:
             graycolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_GRAYTEXT)
             dc.SetTextForeground(graycolour)
-        if not any(filter(None, self._rng)):
+        if not any(filter(bool, self._rng)):
             return
 
         timedelta_micros = lambda delta: delta.days * 86400 * 1000000 \
@@ -1746,7 +1756,7 @@ class RangeSlider(wx.Panel):
 
         # Draw current selection background, edge and scrollbar
         self._bar_arrow_areas = None
-        if any(filter(None, self._vals)):
+        if any(filter(bool, self._vals)):
             value_rect = wx.Rect(-1, selection_top, -1, selection_height)
             for i in range(2):
                 marker_delta = self._vals[i] - self._rng[0]
@@ -1760,7 +1770,7 @@ class RangeSlider(wx.Panel):
                     marker_delta = timedelta_micros(marker_delta)
                     range_delta_local = timedelta_micros(range_delta) or 1
                 x = self._box_area.x \
-                    + self._box_area.width * marker_delta / range_delta_local
+                    + self._box_area.width * marker_delta // range_delta_local
                 value_rect[2 if i else 0] = (x - value_rect[0]) if i else x
             dc.SetBrush(BRUSH(range_colour))
             dc.SetPen(PEN(range_colour))
@@ -1786,20 +1796,20 @@ class RangeSlider(wx.Panel):
                 dc.DrawRectangle(*self._bar_arrow_areas[i])
             dc.SetBrush(BRUSH(self.BAR_ARROW_FG_COLOUR))
             dc.SetPen(PEN(self.BAR_ARROW_FG_COLOUR))
-            dc.DrawPolygon(((self.BAR_BUTTON_WIDTH / 2 + 1,
-                height - self.BAR_HEIGHT / 2 - 3), (
-                    self.BAR_BUTTON_WIDTH / 2 + 1, 
-                    height - self.BAR_HEIGHT / 2 + 1
-                ), (self.BAR_BUTTON_WIDTH / 2 - 1,
-                    height - self.BAR_HEIGHT / 2 - 1
+            dc.DrawPolygon(((self.BAR_BUTTON_WIDTH // 2 + 1,
+                height - self.BAR_HEIGHT // 2 - 3), (
+                    self.BAR_BUTTON_WIDTH // 2 + 1, 
+                    height - self.BAR_HEIGHT // 2 + 1
+                ), (self.BAR_BUTTON_WIDTH // 2 - 1,
+                    height - self.BAR_HEIGHT // 2 - 1
                 )
             ))
-            dc.DrawPolygon(((width - self.BAR_BUTTON_WIDTH / 2 - 2,
-                height - self.BAR_HEIGHT / 2 - 3), (
-                    width - self.BAR_BUTTON_WIDTH / 2 - 2,
-                    height - self.BAR_HEIGHT / 2 + 1
-                ), (width - self.BAR_BUTTON_WIDTH / 2,
-                    height - self.BAR_HEIGHT / 2 - 1
+            dc.DrawPolygon(((width - self.BAR_BUTTON_WIDTH // 2 - 2,
+                height - self.BAR_HEIGHT // 2 - 3), (
+                    width - self.BAR_BUTTON_WIDTH // 2 - 2,
+                    height - self.BAR_HEIGHT // 2 + 1
+                ), (width - self.BAR_BUTTON_WIDTH // 2,
+                    height - self.BAR_HEIGHT // 2 - 1
                 )
             ))
             # Draw scrollbar
@@ -1817,9 +1827,9 @@ class RangeSlider(wx.Panel):
             # Draw a few vertical dashes in the scrollbar center
             if bar_rect.width > 12:
                 dashes = [(
-                    bar_rect.x + bar_rect.width / 2 - 3 + i,
+                    bar_rect.x + bar_rect.width // 2 - 3 + i,
                     bar_rect.y + (3 if i % 2 else 2),
-                    bar_rect.x + bar_rect.width / 2 - 3 + i,
+                    bar_rect.x + bar_rect.width // 2 - 3 + i,
                     bar_rect.y + bar_rect.height - (1 if i % 2 else 2)
                 ) for i in range(8)]
                 pens = [PEN(self.BAR_COLOUR2), PEN(self.BAR_COLOUR1)] * 4
@@ -1839,7 +1849,7 @@ class RangeSlider(wx.Panel):
             dc.DrawLineList(edges)
 
         # Draw ticks and main ruler line
-        tick_count = self._box_area.width / self.TICK_STEP + 1
+        tick_count = self._box_area.width // self.TICK_STEP + 1
         lines = [(
             self._box_area.x + i * self.TICK_STEP,
             height - self.BAR_HEIGHT - self.TICK_HEIGHT,
@@ -1867,7 +1877,7 @@ class RangeSlider(wx.Panel):
         for i in range(1, label_count - 1):
             labels.append(self.FormatLabel(self._rng[0] + i * value_step))
             label_coords += [(self._box_area.x + i * self._box_area.width 
-                / label_count, selection_top + self.RANGE_LABEL_TOP_GAP)]
+                // label_count, selection_top + self.RANGE_LABEL_TOP_GAP)]
         labels.append(right_label)
         label_coords += [(self._box_area.right - right_extent[0],
                           selection_top + self.RANGE_LABEL_TOP_GAP)]
@@ -1889,13 +1899,13 @@ class RangeSlider(wx.Panel):
                 marker_delta = timedelta_micros(marker_delta)
                 range_delta_local = timedelta_micros(range_delta) or 1
             x = (self._box_area.x +
-                 self._box_area.width * marker_delta / range_delta_local)
+                 self._box_area.width * marker_delta // range_delta_local)
             self._marker_xs[i] = x
             label = self.FormatLabel(self._vals[i])
             # GetFullTextExtent returns (width, height, descent, leading)
             label_extent = self.GetFullTextExtent(label)
             # Center label on top of marker. +2 for padding
-            label_area = wx.Rect(x - label_extent[0] / 2, 0, 
+            label_area = wx.Rect(x - label_extent[0] // 2, 0, 
                 label_extent[0] + 2, sum(label_extent[1:2])
             )
             if not self.ClientRect.Contains(label_area):
@@ -1904,7 +1914,7 @@ class RangeSlider(wx.Panel):
                     else (width - label_area.width)
             marker_labels[i] = (label, label_area)
 
-            area = wx.Rect(x - self.MARKER_WIDTH / 2, box_top,
+            area = wx.Rect(x - self.MARKER_WIDTH // 2, box_top,
                 self.MARKER_WIDTH, height - box_top - self.BAR_HEIGHT)
             # Create a slightly larger highlight capture area for marker
             capture_area = self._capture_areas[i] = wx.Rect(*area)
@@ -1931,7 +1941,7 @@ class RangeSlider(wx.Panel):
                         button_area.x + button_radius + i * 2, 
                          button_area.y + button_area.height - button_radius
                     ) for i in range(
-                        (self.MARKER_BUTTON_WIDTH - 2 * button_radius + 1) / 2
+                        (self.MARKER_BUTTON_WIDTH - 2 * button_radius + 1) // 2
                     )
                 ]
                 dc.SetPen(PEN(self.SELECTION_LINE_COLOUR))
@@ -1941,7 +1951,7 @@ class RangeSlider(wx.Panel):
             rect1, rect2 = [x[1] for x in marker_labels]
             if rect1.Intersects(rect2):
                 overlap = wx.Rect(*rect1).Intersect(rect2).width
-                delta1 = (overlap / 2) + 1 # +1 for padding
+                delta1 = (overlap // 2) + 1 # +1 for padding
                 if (rect1.x - delta1 < 1):
                     delta1 = rect1.x - 1 # Left going over left edge: set to 1
                 delta2 = overlap - delta1
@@ -1956,7 +1966,7 @@ class RangeSlider(wx.Panel):
 
 
     def OnMouseEvent(self, event):
-        if not self.Enabled or not any(filter(None, self._rng)):
+        if not self.Enabled or not any(filter(bool, self._rng)):
             return
 
         if not self._box_area:
@@ -2005,7 +2015,7 @@ class RangeSlider(wx.Panel):
             and self._box_area and self._box_area.Contains(event.Position):
                 x_delta = abs(event.Position.x - self._box_area.x + 1)
                 range_delta = self._rng[1] - self._rng[0]
-                x_step = range_delta * x_delta / self._box_area.width
+                x_step = range_delta * x_delta // self._box_area.width
                 self.SetToolTip(self.FormatLabel(self._rng[0] + x_step))
         elif event.LeftDClick():
             if active_marker is not None:
@@ -2017,7 +2027,7 @@ class RangeSlider(wx.Panel):
                     if self._vals_prev[i] is None \
                     or self._vals_prev[i] == self._rng[i]:
                         center = self._rng[i] \
-                            + (self._rng[i] - self._vals[1 - i]) / 2
+                            + (self._rng[i] - self._vals[1 - i]) // 2
                         self.SetValue(i, center, False)
                     else:
                         self.SetValue(i, self._vals_prev[i], False)
@@ -2034,7 +2044,7 @@ class RangeSlider(wx.Panel):
                         if self._vals_prev[i] is None \
                         or self._vals_prev[i] == self._rng[i]:
                             center = self._rng[i] \
-                                + (self._rng[i] - self._vals[1 - i]) / 2
+                                + (self._rng[i] - self._vals[1 - i]) // 2
                             self.SetValue(i, center, False)
                         else:
                             self.SetValue(i, self._vals_prev[i], False)
@@ -2057,7 +2067,7 @@ class RangeSlider(wx.Panel):
                     # Nudge scrollbar in arrow direction
                     direction = [-1, 1][arrow]
                     step = self.SCROLL_STEP * (
-                        (self._rng[1] - self._rng[0]) / self.ClientSize.width
+                        (self._rng[1] - self._rng[0]) // self.ClientSize.width
                     )
                 else:
                     # Move scrollbar by its length
@@ -2088,7 +2098,7 @@ class RangeSlider(wx.Panel):
             or any(x.Contains(event.Position) for x in self._box_gap_areas)):
                 x_delta = abs(max(0, event.Position.x - self._box_area.x + 1))
                 range_delta = self._rng[1] - self._rng[0]
-                x_step = range_delta * x_delta / self._box_area.width
+                x_step = range_delta * x_delta // self._box_area.width
                 x_val = min(max(self._rng[0] + x_step, self._rng[0]), self._rng[1])
                 closest, _ = min(enumerate(abs(x - x_val) for x in self._vals),
                                  key=lambda x: x[1])
@@ -2116,14 +2126,13 @@ class RangeSlider(wx.Panel):
                     # if is_right_side XOR is_against_range
                     direction = -1 if (i ^ (self._vals[i] != self._rng[i])) \
                         else 1
-                    do_step = 0 <= \
-                        direction * cmp(event.Position.x, self._marker_xs[i])
+                    do_step = (0 <= direction * cmp(event.Position.x, self._marker_xs[i]))
                 if do_step:
                     self._dragging_markers[i] = True
                     x_delta = abs(event.Position.x - last_pos.x)
                     x_direction = 1 if (event.Position.x > last_pos.x) else -1
                     range_delta = self._rng[1] - self._rng[0]
-                    step = range_delta * x_delta / self.GetClientSize().width
+                    step = range_delta * x_delta // self.GetClientSize().width
                     if isinstance(self._rng[0], datetime.date) and step.days < 1:
                         # Enforce a minimum step of 1 day for date values
                         step = datetime.timedelta(days=1)
@@ -2158,7 +2167,7 @@ class RangeSlider(wx.Panel):
                     going_right = (event.Position.x > last_pos.x)
                     range_delta = self._rng[1] - self._rng[0]
                     range_width = self.GetClientSize().width
-                    step = range_delta * x_delta / range_width
+                    step = range_delta * x_delta // range_width
                     in_area = self._grip_area.Contains(
                         event.Position.x, self._grip_area.Top
                     )
@@ -2345,7 +2354,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         # SetItemBackgroundColour: y, }, }
         self._row_colours = collections.defaultdict(dict)
         # Default row column formatter function
-        frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
+        frmt = lambda: lambda r, c: "" if r.get(c) is None else text_type(r[c])
         self._formatters = collections.defaultdict(frmt)
         id_copy, id_selectall = wx.NewIdRef().Id, wx.NewIdRef().Id
         entries = [(wx.ACCEL_CTRL, x, id_copy)
@@ -2398,7 +2407,6 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                 self.SetItem(index, i, col_value)
                 col_width = self.GetTextExtent(col_value)[0] + self.COL_PADDING
                 if col_width > self._col_widths.get(i, 0):
-                    self._col_widths[i] = col_width
                     self.SetColumnWidth(i, col_width)
             self.SetItemData(index, item_id)
             self.itemDataMap[item_id] = [data[c] for c in columns]
@@ -2431,6 +2439,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         Clears the list and inserts all unfiltered rows, auto-sizing the 
         columns.
         """
+        scrollpos = self.GetScrollPos(wx.VERTICAL)
         selected_ids, selected = [], self.GetFirstSelected()
         while selected >= 0:
             selected_ids.append(self.GetItemData(selected))
@@ -2448,6 +2457,9 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
                     del self._row_colours[id][func]
             if id in self._row_colours and not self._row_colours[id]:
                 del self._row_colours[id]
+
+        # Store row fonts
+        row_fonts = {self.GetItemData(i): self.GetItemFont(i) for i in range(self.ItemCount)}
 
         self.Freeze()
         wx.ListView.DeleteAllItems(self)
@@ -2496,7 +2508,6 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
             for i, (col_name, col_label) in enumerate(self._columns):
                 col_width = max(col_lengths[col_name], header_lengths[col_name])
                 self.SetColumnWidth(i, col_width)
-                self._col_widths[i] = col_width
                 #wx.LIST_AUTOSIZE, wx.LIST_AUTOSIZE_USEHEADER
         elif self._col_widths:
             for col, width in self._col_widths.items():
@@ -2504,15 +2515,17 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         if self.GetSortState()[0] >= 0:
             self.SortListItems(*self.GetSortState())
 
-        if selected_ids or self._row_colours:
-            idindx = dict((self.GetItemData(i), i)
-                          for i in range(self.ItemCount))
+        idindx = {self.GetItemData(i): i for i in range(self.ItemCount)}
+        for rowid, font in row_fonts.items():
+            if rowid in idindx:
+                self.SetItemFont(idindx[rowid], wx.Font(font))
         for item_id, attrs in self._row_colours.items(): # Re-colour rows
             if item_id not in idindx: continue
             [func(idindx[item_id], value) for func, value in attrs.items()]
         if selected_ids: # Re-select the previously selected items
             [self.Select(idindx[i]) for i in selected_ids if i in idindx]
 
+        self.ScrollLines(scrollpos)
         self.Thaw()
 
 
@@ -2564,10 +2577,16 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         for i, (name, label) in enumerate(columns):
             col_label = label + "  " # Keep space for sorting arrows.
             self.InsertColumn(i + 1, col_label)
-            self._col_widths[i] = max(self._col_widths.get(i, 0),
-                self.GetTextExtent(col_label)[0] + self.COL_PADDING)
-            self.SetColumnWidth(i, self._col_widths[i])
+            self.SetColumnWidth(i, max(self._col_widths.get(i, 0),
+                self.GetTextExtent(col_label)[0] + self.COL_PADDING))
         self._columns = columns
+
+
+    def SetColumnWidth(self, col, width):
+        """Sets the column width."""
+        result = super(SortableListView, self).SetColumnWidth(col, width)
+        if result: self._col_widths[col] = width
+        return result
 
 
     def GetItemMappedData(self, index):
@@ -2668,11 +2687,12 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         item2 = self.itemDataMap[key2][col]
 
         #--- Internationalization of string sorting with locale module
-        if isinstance(item1, unicode) and isinstance(item2, unicode):
+        if isinstance(item1, text_type) and isinstance(item2, text_type):
             cmpVal = locale.strcoll(item1.lower(), item2.lower())
-        elif isinstance(item1, str) or isinstance(item2, str):
-            items = item1.lower(), item2.lower()
-            cmpVal = locale.strcoll(*map(unicode, items))
+        elif isinstance(item1, bytes) or isinstance(item2, bytes):
+            item1 = item1.lower() if isinstance(item1, bytes) else str(item1).encode("latin1").lower()
+            item2 = item2.lower() if isinstance(item2, bytes) else str(item2).encode("latin1").lower()
+            cmpVal = locale.strcoll(text_type(item1), text_type(item2))
         else:
             if item1 is None:
                 cmpVal = -1
@@ -2683,7 +2703,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
         # If items are equal, pick something else to make the sort value unique
         if cmpVal == 0:
-            cmpVal = apply(cmp, self.GetSecondarySortValues(col, key1, key2))
+            cmpVal = cmp(*self.GetSecondarySortValues(col, key1, key2))
 
         result = cmpVal if ascending else -cmpVal
         return result
@@ -2738,7 +2758,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         self.AssignImageList(self._CreateImageList(), wx.IMAGE_LIST_SMALL)
 
         # Default row column formatter function
-        frmt = lambda: lambda r, c: "" if r.get(c) is None else unicode(r[c])
+        frmt = lambda: lambda r, c: "" if r.get(c) is None else text_type(r[c])
         self._formatters = collections.defaultdict(frmt)
         id_copy = wx.NewIdRef().Id
         entries = [(wx.ACCEL_CMD, x, id_copy) for x in KEYS.INSERT + (ord("C"), )]
@@ -3090,8 +3110,8 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         if not selecteds: # Dragged beyond last item
             idx, selecteds = self.GetItemCount() - 1, [start]
 
-        datas     = map(self.GetItemMappedData, selecteds)
-        image_ids = map(self._id_images.get, map(self.GetItemData, selecteds))
+        datas     = [self.GetItemMappedData(x) for x in selecteds]
+        image_ids = [self._id_images.get(x) for x in map(self.GetItemData, selecteds)]
 
         self.Freeze()
         try:
@@ -3244,7 +3264,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
                 self.Select(idindx[item_id])
                 if idindx[item_id] >= self.GetCountPerPage():
                     lh = self.GetUserLineHeight()
-                    dy = (idindx[item_id] - self.GetCountPerPage() / 2) * lh
+                    dy = (idindx[item_id] - self.GetCountPerPage() // 2) * lh
                     self.ScrollList(0, dy)
 
 
@@ -3253,7 +3273,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         result = True
         if self._filter:
             result = False
-            patterns = map(re.escape, self._filter.split())
+            patterns = [re.escape(x) for x in self._filter.split()]
             for col_name, col_label in self._columns:
                 col_value = self._formatters[col_name](row, col_name)
                 if all(re.search(p, col_value, re.I | re.U) for p in patterns):
@@ -3276,11 +3296,12 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         item2 = self.itemDataMap[key2][col]
 
         #--- Internationalization of string sorting with locale module
-        if isinstance(item1, unicode) and isinstance(item2, unicode):
+        if isinstance(item1, text_type) and isinstance(item2, text_type):
             cmpVal = locale.strcoll(item1.lower(), item2.lower())
-        elif isinstance(item1, str) or isinstance(item2, str):
-            items = item1.lower(), item2.lower()
-            cmpVal = locale.strcoll(*map(unicode, items))
+        elif isinstance(item1, bytes) or isinstance(item2, bytes):
+            item1 = item1.lower() if isinstance(item1, bytes) else str(item1).encode("latin1").lower()
+            item2 = item2.lower() if isinstance(item2, bytes) else str(item2).encode("latin1").lower()
+            cmpVal = locale.strcoll(text_type(item1), text_type(item2))
         else:
             if item1 is None:
                 cmpVal = -1
@@ -3291,7 +3312,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
 
         # If items are equal, pick something else to make the sort value unique
         if cmpVal == 0:
-            cmpVal = apply(cmp, self.GetSecondarySortValues(col, key1, key2))
+            cmpVal = cmp(*self.GetSecondarySortValues(col, key1, key2))
 
         result = cmpVal if ascending else -cmpVal
         return result
@@ -3302,7 +3323,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
     """A StyledTextCtrl configured for SQLite syntax highlighting."""
 
     """SQLite reserved keywords."""
-    KEYWORDS = map(unicode, sorted([
+    KEYWORDS = list(map(text_type, sorted([
         "ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ANALYZE",
         "AND", "AS", "ASC", "ATTACH", "AUTOINCREMENT", "BEFORE",
         "BEGIN", "BETWEEN", "BINARY", "BY", "CASCADE", "CASE", "CAST",
@@ -3323,16 +3344,16 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         "TABLE", "TEMP", "TEMPORARY", "THEN", "TO", "TRANSACTION", "TRIGGER",
         "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM", "VALUES", "VIEW",
         "VIRTUAL", "WHEN", "WHERE", "WITHOUT",
-    ]))
+    ])))
     """SQLite data types."""
-    TYPEWORDS = map(unicode, sorted([
+    TYPEWORDS = list(map(text_type, sorted([
         "BLOB",
         "INTEGER", "BIGINT", "INT", "INT2", "INT8", "MEDIUMINT", "SMALLINT",
                    "TINYINT", "UNSIGNED",
         "NUMERIC", "BOOLEAN", "DATE", "DATETIME", "DECIMAL",
         "TEXT", "CHARACTER", "CLOB", "NCHAR", "NVARCHAR", "VARCHAR", "VARYING",
         "REAL", "DOUBLE", "FLOAT", "PRECISION",
-    ]))
+    ])))
     AUTOCOMP_STOPS = " .,;:([)]}'\"\\<>%^&+-=*/|`"
     """String length from which autocomplete starts."""
     AUTOCOMP_LEN = 2
@@ -3432,8 +3453,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         # A case-insensitive autocomp has to be sorted, will not work
         # properly otherwise. UserList would support arbitrarily sorting.
         self.autocomps_total = sorted(list(self.autocomps_added) +
-                                      map(unicode, self.KEYWORDS),
-                                      cmp=self.stricmp)
+                                      list(map(text_type, self.KEYWORDS)),
+                                      key=lambda x: x.lower())
 
 
     def AutoCompAddSubWords(self, word, subwords):
@@ -3441,7 +3462,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         Adds more subwords used in autocompletion, will be shown after the word
         and a dot.
         """
-        word, subwords = unicode(word), map(unicode, subwords)
+        word, subwords = text_type(word), list(map(text_type, subwords))
         if word not in self.autocomps_added:
             self.AutoCompAddWords([word])
         if subwords:
@@ -3486,7 +3507,8 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                 # Check if we have enough valid text to start autocomplete
                 char = None
                 try: # Not all keycodes can be chars
-                    char = chr(event.UnicodeKey).decode("latin1")
+                    char = chr(event.UnicodeKey)
+                    char = char.decode("latin1")
                 except Exception:
                     pass
                 if char not in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, 10, 13] \
@@ -3504,9 +3526,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
                         # User entered "word.", show subword autocompletion if
                         # defined for the text.
                         if text in self.autocomps_subwords:
-                            words = sorted(
-                                self.autocomps_subwords[text], cmp=self.stricmp
-                            )
+                            words = sorted(self.autocomps_subwords[text], key=lambda x: x.lower())
                             do_autocomp = True
                             skip = False
                             self.AddText(char)
@@ -3525,10 +3545,6 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
         elif self.AutoCompActive() and wx.WXK_DELETE == event.KeyCode:
             self.AutoCompCancel()
         if skip: event.Skip()
-
-
-    def stricmp(self, a, b):
-        return cmp(a.lower(), b.lower())
 
 
 
@@ -3889,7 +3905,7 @@ class SearchableStyledTextCtrl(wx.Panel):
             self.SetAnchor(pos)
             self.SearchAnchor()
             functions = {wx.DOWN: self.SearchNext, wx.UP: self.SearchPrev}
-            final = text if type(text) is unicode else text.decode("utf-8")
+            final = text if isinstance(text, text_type) else text.decode("utf-8")
             self._search_pos = functions[self._search_direction](flags, final)
             if (self._search_pos < 0):
                 # There are no more matches: clear selection and reset position
@@ -4059,7 +4075,7 @@ class SearchableStyledTextCtrl(wx.Panel):
         """Wraps all access to StyledTextCtrl transparently."""
         attr = None
         if hasattr(SearchableStyledTextCtrl, name):
-            attr = getattr(self, name)
+            attr = object.__getattribute__(self, name)
         elif hasattr(self._stc, name):
             attr = getattr(self._stc, name)
         else:
@@ -4095,7 +4111,7 @@ class TabbedHtmlWindow(wx.Panel):
                     wx.lib.agw.flatnotebook.FNB_MOUSE_MIDDLE_CLOSES_TABS |
                     wx.lib.agw.flatnotebook.FNB_NO_TAB_FOCUS |
                     wx.lib.agw.flatnotebook.FNB_VC8)
-        if "linux2" == sys.platform and wx.VERSION[:3] == (4, 1, 1):
+        if "linux" in sys.platform and wx.VERSION[:3] == (4, 1, 1):
             # wxPython 4.1.1 on Linux crashes with FNB_VC8
             agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
         notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
@@ -4566,7 +4582,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                 if self._value_last != self.Value:
                     self.Value = self._value_last
                     self.SelectAll()
-            elif event.CmdDown() and event.KeyCode in map(ord, "AH"):
+            elif event.CmdDown() and event.KeyCode in [ord(x) for x in "AH"]:
                 # Avoid opening dropdown on Ctrl-A (select all) or Ctrl-H (backspace)
                 self._ignore_textchange = True
         if skip: event.Skip()
@@ -4614,7 +4630,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
         if choices:
             lower = [i.lower() for i in choices]
             sorted_all = sorted(zip(lower, choices)) # [("a", "A"), ("b", "b")]
-            self._choices_lower, self._choices = map(list, zip(*sorted_all))
+            self._choices_lower, self._choices = [list(x) for x in zip(*sorted_all)]
         else:
             self._choices_lower, self._choices = [], []
 
@@ -4654,7 +4670,7 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             size = self._listwindow.GetSize()
             width, height = self.Size.width - 3, self.Size.height
             x, y = self.ClientToScreen(0, height - 2)
-            if size.GetWidth() <> width:
+            if size.GetWidth() != width:
                 size.SetWidth(width)
                 self._listwindow.SetSize(size)
                 self._listbox.SetSize(self._listwindow.GetClientSize())
@@ -4729,6 +4745,16 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
     return bmp, rects
 
 
+def cmp(x, y):
+    """Return negative if x<y, zero if x==y, positive if x>y."""
+    if x == y: return 0
+    if x is None: return -1
+    if y is None: return +1
+    try:
+        return -1 if x < y else +1
+    except TypeError:
+        return -1 if str(x) < str(y) else +1
+
 
 def get_controls(window):
     """Returns a list of all nested controls of given window."""
@@ -4740,18 +4766,23 @@ def get_controls(window):
     return result
 
 
+def get_dialog_path(dialog):
+    """
+    Returns the file path chosen in FileDialog, adding extension if dialog result
+    has none even though a filter has been selected, or if dialog result has a
+    different extension than what is available in selected filter.
+    """
+    result = dialog.GetPath()
 
-def get_savedialog_path(savedialog):
-    """
-    Returns full path of selected file, with extension.
-    Helper for Linux dialog not appending selected file type to file path.
-    """
-    result = savedialog.GetPath()
-    if "linux2" == sys.platform:
-        # Wildcard is like "SQLite database (*.db)|*.db|All files|*.*"
-        formats = [x.replace("*", "").replace(".", "")
-                   for x in savedialog.Wildcard.split("|")[1::2]]
-        format = formats[savedialog.FilterIndex]
-        if format and not result.lower().endswith(".%s" % format):
-            result += ".%s" % format
+    # "SQLite database (*.db;*.sqlite;*.sqlite3)|*.db;*.sqlite;*.sqlite3|All files|*.*"
+    wcs = dialog.Wildcard.split("|")
+    wcs = wcs[1::2] if len(wcs) > 1 else wcs
+    wcs = [[y.lstrip("*") for y in x.split(";")] for x in wcs] # [['.ext1', '.ext2'], ..]
+
+    extension = os.path.splitext(result)[-1].lower()
+    selexts = wcs[dialog.FilterIndex] if 0 <= dialog.FilterIndex < len(wcs) else None
+    if result and selexts and extension not in selexts and dialog.ExtraStyle & wx.FD_SAVE:
+        ext = next((x for x in selexts if "*" not in x), None)
+        if ext: result += ext
+
     return result

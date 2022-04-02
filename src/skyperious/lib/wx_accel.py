@@ -30,7 +30,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    25.07.2020
+@modified    26.03.2022
 ------------------------------------------------------------------------------
 """
 import functools
@@ -114,15 +114,9 @@ def collect_shortcuts(control, use_heuristics=True):
         result = []
         # wx.TextCtrl.Label is the same as its value, so must not use that
         if isinstance(ctrl, wx.ToolBar):
-            toolsmap = dict()
-            for i in range(ctrl.GetToolsCount() + 1):
-                # wx 2.8 has no functionality for getting tools by index, so
-                # need to gather them by layout position
-                try:
-                    tool = ctrl.FindToolForPosition(i * ctrl.ToolSize[0], 0)
-                    toolsmap[repr(tool)] = tool
-                except Exception: pass # FindTool not implemented in GTK
-            for tool in filter(None, toolsmap.values()):
+            for i in range(ctrl.GetToolsCount()):
+                tool = ctrl.GetToolByPos(i)
+                if not tool: continue  # for i
                 text = ctrl.GetToolShortHelp(tool.GetId())
                 parts = re.split("\\(Alt-(.)\\)", text, maxsplit=1)
                 if len(parts) > 1:
@@ -321,7 +315,7 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
                         tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
                         toolsmap[repr(tool)] = tool
                     except Exception: pass # FindTool not implemented in GTK
-                for tool in filter(None, toolsmap.values()):
+                for tool in filter(bool, toolsmap.values()):
                     id = tool.GetId()
                     text = tb.GetToolShortHelp(id)
                     parts = re.split("\\(Alt-(%s)\\)" % key, text,

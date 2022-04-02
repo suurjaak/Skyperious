@@ -4,7 +4,7 @@ skyperious\. Sets execute flag permission on .sh files.
 
 @author    Erki Suurjaak
 @created   12.12.2013
-@modified  19.09.2020
+@modified  26.03.2022
 """
 import glob
 import os
@@ -15,10 +15,10 @@ import zipfile
 
 if "__main__" == __name__:
     INITIAL_DIR = os.getcwd()
-    PACKAGING_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__)))
-    os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-    sys.path.append("skyperious")
-    import conf
+    ROOT_DIR    = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    SRC_DIR     = "src"
+    sys.path.insert(0, os.path.join(ROOT_DIR, SRC_DIR))
+    from skyperious import conf
 
     BASE_DIR = ""
     ZIP_DIR = "skyperious_%s" % conf.Version
@@ -40,28 +40,33 @@ if "__main__" == __name__:
             zi.date_time = time.localtime(os.path.getmtime(fullpath))[:6]
             zi.compress_type = zipfile.ZIP_DEFLATED
             zi.create_system = 3 # UNIX
-            zi.external_attr = 0644 << 16L # Permission flag -rw-r--r--
+            zi.external_attr = 0o644 << 16 # Permission flag -rw-r--r--
             if os.path.splitext(filename)[-1] in [".sh"]:
-                zi.external_attr = 0755 << 16L # Permission flag -rwxr-xr-x
+                zi.external_attr = 0o755 << 16 # Permission flag -rwxr-xr-x
             print("Adding %s, %s bytes" % (zi.filename, os.path.getsize(fullpath)))
             zf.writestr(zi, open(fullpath, "rb").read())
             size += os.path.getsize(fullpath)
         return size
 
+    os.chdir(ROOT_DIR)
     with zipfile.ZipFile(os.path.join(INITIAL_DIR, DEST_FILE), mode="w") as zf:
         size = 0
-        for subdir, wildcard in [("res", "*"),
-        (pathjoin("res", "emoticons"), "*"), ("skyperious", "*.py"),
-        ("skyperious", "skyperious.ini"),
-        ("build", "*"), (pathjoin("skyperious", "lib"), "*.py"),
-        (pathjoin("skyperious", "lib", "vendor"), "*.py"),
-        (pathjoin("skyperious", "res"), "*")]:
+        for subdir, wildcard in [
+            ("build",                                          "*"),
+            ("res",                                            "*"),
+            (pathjoin("res", "emoticons"),                     "*"),
+            (pathjoin(SRC_DIR, "skyperious"),                  "*.py"),
+            (pathjoin(SRC_DIR, "skyperious"),                  "skyperious.ini"),
+            (pathjoin(SRC_DIR, "skyperious", "lib"),           "*.py"),
+            (pathjoin(SRC_DIR, "skyperious", "lib", "vendor"), "*.py"),
+            (pathjoin(SRC_DIR, "skyperious", "res"),           "*")
+        ]:
             entries = glob.glob(os.path.join(BASE_DIR, subdir, wildcard))
             files = sorted([os.path.basename(x) for x in entries
                           if os.path.isfile(x)], key=str.lower)
-            files = filter(lambda x: not x.lower().endswith(".pyc"), files)
+            files = [f for f in files if not f.lower().endswith(".pyc")]
             if "res" not in subdir:
-                files = filter(lambda x: not x.lower().endswith(".zip"), files)
+                files = [f for f in files if not f.lower().endswith(".zip")]
             size += add_files(zf, files, subdir)
         rootfiles = ["CHANGELOG.md", "INSTALL.md", "LICENSE.md", "MANIFEST.in",
                      "README.md", "requirements.txt", "setup.py",

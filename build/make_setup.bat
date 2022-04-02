@@ -4,7 +4,7 @@
 ::
 :: @author    Erki Suurjaak
 :: @created   13.01.2013
-:: @modified  19.09.2020
+:: @modified  02.04.2022
 @echo off
 :: Expand variables at execution time rather than at parse time
 setlocal EnableDelayedExpansion
@@ -15,6 +15,7 @@ set SETUPDIR=%CD%
 cd ..
 for %%f in ("%CD%") do set NAME=%%~nxf
 
+if exist src cd src
 if exist "%NAME%\" cd %NAME%
 
 for /f %%I in ('python -c "import struct; print(struct.calcsize(chr(80)) * 8 == 64)"') do set IS_64=%%I
@@ -22,7 +23,7 @@ if [%IS_64%] == [True] (
     set SUFFIX64=_x64
 )
 if [%1] == [] (
-    for /f %%I in ('python -c "import conf; print conf.Version"') do set VERSION=%%I
+    for /f %%I in ('python -c "import conf; print(conf.Version)"') do set VERSION=%%I
     set EXEFILE=%INITIAL_DIR%\%NAME%_!VERSION!%SUFFIX64%.exe
 ) else (
     for /f "tokens=2 delims=_ " %%a in ("%~n1") do set VERSION=%%a
