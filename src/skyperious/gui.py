@@ -3778,34 +3778,19 @@ class DatabasePage(wx.Panel):
         for x in ctrls: x.Destroy()
 
         for field in skypedata.ACCOUNT_FIELD_TITLES:
-            if not account.get(field): continue # for field
-            value = account[field]
-            if "emails" == field:
-                value = ", ".join(value.split(" "))
-            elif "gender" == field:
-                value = {1: "male", 2: "female"}.get(value, "")
-            elif "birthday" == field:
-                try:
-                    value = str(value)
-                    value = "-".join([value[:4], value[4:6], value[6:]])
-                except Exception: pass
-            if value:
-                if "skypeout_balance" == field:
-                    precision = account.get("skypeout_precision") or 2
-                    value = "%s %s" % (value / (10.0 ** precision),
-                            (account.get("skypeout_balance_currency") or ""))
-                if not isinstance(value, six.string_types):
-                    value = str(value) 
-                title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
-                lbltext = wx.StaticText(parent=panel, label="%s:" % title)
-                valtext = wx.TextCtrl(parent=panel, value=value,
-                    style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
-                ColourManager.Manage(valtext, "BackgroundColour", "BgColour")
-                valtext.MinSize = (-1, 35)
-                valtext.SetEditable(False)
-                ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
-                sizer.Add(lbltext, border=5, flag=wx.LEFT)
-                sizer.Add(valtext, proportion=1, flag=wx.GROW)
+            value = skypedata.format_contact_field(account, field)
+            if value is None: continue # for field
+
+            title = skypedata.ACCOUNT_FIELD_TITLES.get(field, field)
+            lbltext = wx.StaticText(parent=panel, label="%s:" % title)
+            valtext = wx.TextCtrl(parent=panel, value=value,
+                style=wx.NO_BORDER | wx.TE_MULTILINE | wx.TE_RICH)
+            ColourManager.Manage(valtext, "BackgroundColour", "BgColour")
+            valtext.MinSize = (-1, 35)
+            valtext.SetEditable(False)
+            ColourManager.Manage(lbltext, "ForegroundColour", "DisabledColour")
+            sizer.Add(lbltext, border=5, flag=wx.LEFT)
+            sizer.Add(valtext, proportion=1, flag=wx.GROW)
         panel.Layout()
         panel.Thaw()
 

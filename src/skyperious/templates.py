@@ -2213,8 +2213,11 @@ if avatar_size[0] > 300:
   </td>
   <td valign="top">
     <table>
-%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if contact.get(n) not in (b"", "", None)):
-      <tr><td nowrap valign="top"><b>{{ label }}:</b></td><td>{{ contact[name] }}</td></tr>
+%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(contact, n)):
+      <tr>
+        <td nowrap valign="top"><b>{{ label }}:</b></td>
+        <td>{{ skypedata.format_contact_field(contact, name) }}</td>
+      </tr>
 %endfor
     </table>
   </td>
@@ -2349,7 +2352,6 @@ HTML template for search result row of a matched contact, HTML table row.
 @param   count             index of current match
 @param   result_count      total number of results so far
 @param   fields_filled     {field: highlighted value}
-@param   match_fields      [contact field, ]
 @param   pattern_replace   re.RegexObject to find matching text
 @param   wrap_b            function(text) returning <b>text</b>
 """
@@ -2366,7 +2368,7 @@ from skyperious import conf, skypedata
   </td><td colspan="2">
     <font color="{{ conf.DisabledColour }}">{{! pattern_replace.sub(wrap_b, contact["name"]) }}</font>
     <br /><table>
-%for field in filter(lambda x: x in fields_filled, match_fields):
+%for field in filter(lambda x: x in fields_filled, skypedata.CONTACT_FIELD_TITLES):
       <tr>
         <td nowrap valign="top"><font color="{{ conf.DisabledColour }}">{{ skypedata.CONTACT_FIELD_TITLES[field] }}</font></td>
         <td>&nbsp;</td><td>{{! fields_filled[field] }}</td>

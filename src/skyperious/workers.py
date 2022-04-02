@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.03.2022
+@modified    02.04.2022
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -163,6 +163,7 @@ class SearchThread(WorkerThread):
                 result = {"output": "", "map": {},
                           "search": search, "count": 0}
                 sql, params, match_words = query_parser.Parse(search["text"])
+                match_words = [x.lower() for x in match_words]
 
                 # Turn wildcard characters * into regex-compatible .*
                 match_words_re = [".*".join(map(re.escape, w.split("*")))
@@ -226,21 +227,13 @@ class SearchThread(WorkerThread):
                 and match_words:
                     count = 0
                     contacts = search["db"].get_contacts()
-                    # Possibly more: country (ISO code, need map), birthday
-                    # (base has YYYYMMDD in integer field).
-                    match_fields = [
-                        "given_displayname", "displayname", "skypename",
-                        "province", "city", "pstnnumber", "phone_home",
-                        "phone_office", "phone_mobile", "homepage", "emails",
-                        "about", "mood_text",
-                    ]
                     template_contact = FACTORY("contact")
                     for contact in contacts:
                         match = False
                         fields_filled = {}
-                        for field in match_fields:
-                            if contact[field]:
-                                val = contact[field]
+                        for field, _ in skypedata.CONTACT_FIELD_TITLES.items():
+                            val = skypedata.format_contact_field(contact, field)
+                            if val:
                                 if self.match_all(val, match_words):
                                     match = True
                                     val = pattern_replace.sub(wrap_b, val)

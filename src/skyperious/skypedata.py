@@ -91,20 +91,23 @@ CONTACT_TYPE_NORMAL        =  1 # Normal Skype user contact
 CONTACT_TYPE_PHONE         =  2 # Phone number contact
 CONTACT_TYPE_BOT           = 10 # Bot user contact
 CONTACT_FIELD_TITLES = collections.OrderedDict([
-    ("skypename",    "Skype name"),
-    ("displayname",  "Display name"),
+    ("skypename",           "Skype name"),
+    ("displayname",         "Display name"),
     ("given_displayname",   "Given display name"),
-    ("phone_mobile", "Mobile phone"),
-    ("phone_home",   "Home phone"),
-    ("phone_office", "Office phone"),
-    ("pstnnumber",   "Phone"),
-    ("emails",       "Emails"),
-    ("homepage",     "Website"),
-    ("about",        "About me"),
-    ("mood_text",    "Mood"),
-    ("city",         "City"),
-    ("province",     "State/Province"),
-    ("country",      "Country/Region"),
+    ("phone_mobile",        "Mobile phone"),
+    ("phone_home",          "Home phone"),
+    ("phone_office",        "Office phone"),
+    ("pstnnumber",          "Phone"),
+    ("emails",              "Emails"),
+    ("homepage",            "Website"),
+    ("about",               "About me"),
+    ("mood_text",           "Mood"),
+    ("birthday",            "Birth date"),
+    ("gender",              "Gender"),
+    ("city",                "City"),
+    ("province",            "State/Province"),
+    ("country",             "Country/Region"),
+    ("languages",           "Languages"),
 ])
 ACCOUNT_FIELD_TITLES = collections.OrderedDict([
     ("fullname",            "Full name"),
@@ -2886,6 +2889,31 @@ def fix_image_raw(raw):
         if raw.startswith(b"\0"):
             raw = b"\xFF" + raw[1:]
     return raw.decode("latin1")
+
+
+def format_contact_field(datadict, name):
+    """Returns contact/account field, or None if blank."""
+    value = datadict.get(name)
+    if "emails" == name and value:
+        value = ", ".join(value.split(" "))
+    elif "gender" == name:
+        value = {1: "male", 2: "female"}.get(value)
+    elif "birthday" == name:
+        try:
+            value = str(value) if value else None
+            value = "-".join([value[:4], value[4:6], value[6:]])
+        except Exception: pass
+    if value:
+        if "skypeout_balance" == name:
+            precision = datadict.get("skypeout_precision") or 2
+            value = "%s %s" % (value / (10.0 ** precision),
+                    (datadict.get("skypeout_balance_currency") or ""))
+    if isinstance(value, six.binary_type):
+        value = util.to_unicode(value, "latin1")
+    if value is not None and not isinstance(value, six.string_types):
+        value = str(value)
+
+    return None if value in (b"", "", None) else value
 
 
 
