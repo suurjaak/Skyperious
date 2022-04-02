@@ -2418,7 +2418,6 @@ class DatabasePage(wx.Panel):
         self.dialog_saveimage = wx.FileDialog(self,
                 message="Save image as", wildcard=export.IMAGE_WILDCARD,
                 style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT | wx.FD_CHANGE_DIR | wx.RESIZE_BORDER)
-        self.dialog_saveimage.FilterIndex = export.IMAGE_EXTS.index("jpg")
 
         self.TopLevelParent.page_db_latest = self
         self.TopLevelParent.run_console(
@@ -4623,13 +4622,15 @@ class DatabasePage(wx.Panel):
             if not img: return
 
             self.dialog_saveimage.Filename = util.safe_filename(self.contact["name"])
+            fmt = next((k for k, v in export.IMAGE_FORMATS.items() if v == img.Type), None)
+            if fmt: self.dialog_saveimage.FilterIndex = export.IMAGE_EXTS.index(fmt)
             if wx.ID_OK != self.dialog_saveimage.ShowModal(): return
 
             filepath = controls.get_dialog_path(self.dialog_saveimage)
             guibase.status('Exporting "%s".', filepath)
             ext = os.path.splitext(filepath)[-1].lstrip(".").lower()
-            img = self.imagecache[imgkey]
-            img.SaveFile(filepath, export.IMAGE_FORMATS[ext])
+            # Make copy as SaveFile() converts image format
+            img.Copy().SaveFile(filepath, export.IMAGE_FORMATS[ext])
             util.start_file(filepath)
         elif href.startswith("sort://"): # sort://field
             self.contact_sort_field = href[7:]
