@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    27.04.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -8160,9 +8160,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                                 in highlighted style
         """
         text = text or ""
-        if isinstance(text, six.text_type):
-            text = text.encode("utf-8")
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
+        if isinstance(text, six.text_type):
+            text_parts = [x.encode("utf-8") for x in text_parts]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
         len_self = self.GetTextLength()
         self.STC.AppendText(text)

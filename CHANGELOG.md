@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+5.0, 2022-04-27
+---------------
+- fixed error on filtering current chat by text (#107).
+
+
 5.0, 2022-04-02
 ---------------
 - added contacts-tab;
