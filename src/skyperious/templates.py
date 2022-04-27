@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    02.04.2022
+@modified    27.04.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2535,7 +2535,7 @@ from skyperious import conf, templates
 
 %>
 <tr>
-<td align="right" valign="top"><a href="table:{{ table["name"] }}:{{ count }}">{{ count }}</a></td>
+<td align="right" valign="top"><a href="table:{{ table["name"] }}:{{ count }}"><font color="{{ conf.LinkColour }}">{{ count }}</font></a></td>
 %for col in table["columns"]:
 <%
 value = row[col["name"]]
