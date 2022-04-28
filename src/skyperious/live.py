@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.04.2022
+@modified    29.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -790,6 +790,8 @@ class SkypeLogin(object):
                         else:
                             if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                                 updateds.add(cidentity)
+                            self.progress and self.progress(
+                                action="populate", table="chats", chat=cidentity)
 
                     if mstart: self.build_msg_cache(cidentity)
 

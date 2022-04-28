@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    29.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1115,9 +1115,11 @@ class SkypeDatabase(object):
             if not contact:
                 titlecol = self.make_title_col("contacts")
                 contact = self.execute(
-                    "SELECT *, %s AS name, "
-                    "COALESCE(skypename, pstnnumber, '') AS identity "
-                    "FROM contacts WHERE skypename = :identity "
+                    "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
+                    "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office) AS phone, "
+                    "NULL AS first_message_datetime, NULL AS last_message_datetime, "
+                    "NULL AS message_count_single, NULL AS message_count_group, "
+                    "%s AS name FROM contacts WHERE skypename = :identity "
                     "OR pstnnumber = :identity" % titlecol,
                     {"identity": identity}
                 ).fetchone()
