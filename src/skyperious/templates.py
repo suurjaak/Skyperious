@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    27.04.2022
+@modified    30.04.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2176,6 +2176,426 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 
 
 """
+Contacts information template, for use in export.
+
+@param   db               SkypeDatabase instance
+@param   contacts         list of contacts dicts, as returned from SkypeDatabase,
+                          supplemented with statistics
+"""
+EXPORT_CONTACTS_HTML = """<%
+import datetime, imghdr, json
+from skyperious import conf, images, skypedata, templates
+from skyperious.lib import util
+
+
+CONTACT_SORTS = [("name",                   "Name",          "name"),
+                 ("skypename",              "Skype name",    "Skype name"),
+                 ("chats",                  "Chats",         "chat count"),
+                 ("messages",               "Messages",      "message count"),
+                 ("first_message_datetime", "First message", "first message date"),
+                 ("last_message_datetime",  "Last message" , "last message date")]
+CHAT_COLS = [("title_long",             "Chat",                  "chat name"),
+             ("message_count",          "Messages from contact", "messages from contact"),
+             ("ratio",                  "Message ratio",         "message ratio"),
+             ("first_message_datetime", "First message",         "first message date"),
+             ("last_message_datetime",  "Last message",          "last message date")]
+datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
+HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
+
+bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
+phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
+contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
+%>
+<!DOCTYPE HTML><html lang="">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <meta name="generator" content="{{ conf.Title }} {{ conf.Version }}" />
+  <title>Skype contacts</title>
+  <link rel="shortcut icon" type="image/png" href="data:image/png;base64,{{! images.Icon16x16_8bit.data }}"/>
+  <style>
+    body {
+      font-family: {{ conf.HistoryFontName }};
+      font-size: 11px;
+      background: {{ conf.HistoryBackgroundColour }};
+      color: black;
+      margin: 0 10px 0 10px;
+    }
+    #body_table {
+      margin-left: auto;
+      margin-right: auto;
+      border-spacing: 0 10px;
+      max-width: 1000px;
+    }
+    #body_table > tbody > tr > td {
+      background: white;
+      width: 1000px;
+      font-family: {{ conf.HistoryFontName }};
+      font-size: 11px;
+      border-radius: 10px;
+      padding: 10px;
+      position: relative;
+    }
+    a, a.visited { color: {{ conf.ExportLinkColour }}; text-decoration: none; cursor: pointer; outline: 0; }
+    a:hover, a.visited:hover { text-decoration: underline; }
+    a.sort { display: block; }
+    a.sort:hover { cursor: pointer; text-decoration: none; }
+    a.sort::after      { content: ""; display: inline-block; min-width: 6px; position: relative; left: 3px; top: -1px; }
+    a.sort.asc::after  { content: "↓"; }
+    a.sort.desc::after { content: "↑"; }
+    #title { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
+    .hidden { display: none; }
+    td, th { text-align: left; vertical-align: top; }
+    th { white-space: nowrap; }
+    hr {
+      border: none;
+      border-top: 1px solid lightgray;
+    }
+    div.contact {
+      border: 1px solid #3399FF;
+      border-radius: 5px;
+      padding: 5px;
+      margin-top: 30px;
+      width: calc(100% - 10px);
+    }
+    div.contact > table {
+      width: 100%;
+    }
+    table.fields th {
+      min-width: 100px;
+    }
+    table.fields td {
+      word-break: break-word;
+    }
+    table.chats {
+      border-spacing: 10px 0;
+      margin: 0 -10px;
+      width: calc(100% + 20px);
+    }
+    table.chats td {
+      white-space: nowrap;
+    }
+    table.chats th {
+      font-weight: normal;
+    }
+    table.chats th:first-child {
+      width: 400px;
+    }
+    table.chats td:first-child {
+      max-width: 400px;
+      overflow-x: clip;
+      text-overflow: ellipsis;
+    }
+    table.chats td:nth-child(2), table.chats td:nth-child(3),
+    table.chats th:nth-child(2), table.chats th:nth-child(3) {
+      text-align: right;
+    }
+    #footer {
+      text-align: center;
+      padding-bottom: 10px;
+      color: #666;
+    }
+    #filter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    #sort_header a.sort {
+      display: inline-block;
+      margin-left: 10px;
+    }
+    #sort_header a.sort.asc,
+    #sort_header a.sort.desc {
+      font-weight: bold;
+    }
+    .avatar {
+      text-align: center;
+      width: 96px;
+      height: 96px;
+    }
+    .avatar > img {
+      border: 1px solid lightgray;
+      max-height: 96px;
+      max-width: 96px;
+    }
+    .avatar > img[data-jslghtbx] {
+      cursor: pointer;
+    }
+    .identity {
+      color: gray;
+    }
+    body.darkmode {
+      background: black;
+      color: white;
+    }
+    body.darkmode #title,
+    body.darkmode #header,
+    body.darkmode a, body.darkmode a.visited {
+      color: #80FF74;
+    }
+    a#darkmode {
+      color: black;
+      display: inline-block;
+      text-decoration: none;
+    }
+    body.darkmode a#darkmode {
+      color: white;
+    }
+    body.darkmode #body_table > tbody > tr > td {
+      background: #1E2224;
+    }
+    body.darkmode #header,
+    body.darkmode a, body.darkmode a.visited {
+      color: #80FF74;
+    }
+    body.darkmode #filter input {
+      background-color: #1E2224;
+      border-color: lightgray;
+      color: white;
+    }
+
+%if HAS_AVATARS:
+    {{! templates.LIGHTBOX_CSS }}
+%endif
+  </style>
+  <script>
+
+    var CONTACTS = {
+%for c in contacts:
+<%
+dct = {
+    "name":                   c["name"],
+    "skypename":              c["identity"],
+    "chats":                  len(c.get("conversations", [])),
+    "messages":               sum(x["message_count"] for x in c.get("conversations", [])),
+    "first_message_datetime": c["first_message_datetime"].isoformat() if c["first_message_datetime"] else None,
+    "last_message_datetime":  c["last_message_datetime"].isoformat() if c["last_message_datetime"] else None,
+}
+%>
+      "{{ c["identity"] }}": {{! json.dumps(dct) }},
+%endfor
+    };
+    var filter = "";        // Current filter value
+    var filtertimer = null; // Filter callback timer
+
+    function sort_contacts(link, col) {
+      var sort_direction = !link.classList.contains("asc"); // True for ascending
+      var sortfn = function(a, b) {
+        var n1 = a.id.replace(/^contact\//, "");
+        var n2 = b.id.replace(/^contact\//, "");
+        var v1 = CONTACTS[n1][col];
+        var v2 = CONTACTS[n2][col];
+        if (!v1 || !v2) { // Sort blank values always to the end
+          return (v1 === v2) ? 0 : !v2 ? -1 : 1;
+        }
+        var result = String(v1).toLowerCase().localeCompare(String(v2).toLowerCase(), undefined, {numeric: true});
+        return sort_direction ? result : -result;
+      };
+
+      var itemlist = document.getElementsByClassName("contact");
+      var items = [];
+      for (var i = 0, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
+
+      items.sort(sortfn);
+      var container = document.getElementById("content_wrapper");
+      for (var i = 0; i < items.length; i++) {
+        container.appendChild(items[i]);
+      }
+      var linklist = document.getElementById("sort_header").getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        linklist[i].className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+      return false;
+    }
+
+    function sort_table(link, idx) {
+      var sort_direction = !link.classList.contains("asc"); // True for ascending
+      var sortfn = function(a, b) {
+        var v1 = a.children[idx].title || a.children[idx].innerText;
+        var v2 = b.children[idx].title || b.children[idx].innerText;
+        var result = String(v1).toLowerCase().localeCompare(String(v2).toLowerCase(), undefined, {numeric: true});
+        return sort_direction ? result : -result;
+      };
+
+      var table = link.parentElement.parentElement.parentElement.parentElement;
+      var itemlist = table.getElementsByTagName("tr");
+      var items = [];
+      for (var i = 1, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
+
+      items.sort(sortfn);
+      for (var i = 0; i < items.length; i++) {
+        table.tBodies[0].appendChild(items[i]);
+      }
+      var linklist = itemlist[0].getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        linklist[i].className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+      return false;
+    }
+
+    function toggle_darkmode() {
+      document.body.classList.toggle("darkmode");
+      return false;
+    };
+
+    var on_filter_contacts = function(evt) {
+      window.clearTimeout(filtertimer); // Avoid reacting to rapid changes
+
+      var myfilter = evt.target.value.trim();
+      if (27 == evt.keyCode) myfilter = evt.target.value = "";
+      var mytimer = filtertimer = window.setTimeout(function() {
+        if (mytimer == filtertimer && myfilter != filter) {
+          filter = myfilter;
+          filter_contacts();
+        };
+        filtertimer = null;
+      }, 200);
+    };
+
+    var filter_contacts = function() {
+      var words = String(filter).split(/\s/g).filter(Boolean);
+      var regexes = words.map(function(word) { return new RegExp(escapeRegExp(word), "i"); });
+      var itemlist =  document.getElementById("content_wrapper").getElementsByClassName("contact");
+      for (var i = 0, ll = itemlist.length; i < ll; i++) {
+        var show = !filter;
+        var div = itemlist[i];
+        var dataelems = div.getElementsByTagName("td");
+        for (var j = 0; j < dataelems.length && !show; j++) {
+          if (dataelems[j].childElementCount) continue; // for j
+          var text = dataelems[j].innerText;
+          if (regexes.every(function(rgx) { return text.match(rgx); })) { show = true; break; };
+        };
+        div.classList[show ? "remove" : "add"]("hidden");
+      };
+    };
+
+    /** Escapes special characters in a string for RegExp. */
+    var escapeRegExp = function(string) {
+      return string.replace(/[-[\]{}()*+!<=:?.\/\^$|#\s,]/g, "\$&");
+    };
+
+%if HAS_AVATARS:
+    {{! templates.LIGHTBOX_JS }}
+%endif
+  </script>
+</head>
+<body>
+<table id="body_table">
+<tr><td><table id="header_table">
+  <tr>
+    <td>
+      <div id="title">Skype contacts</div><br />
+      Source: <b>{{ db.filename }}</b>.
+<% 
+# &#x1F313; first quarter moon symbol
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+%>
+      <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+      <br />
+%if bots or phones:
+      <b>{{ len(contacts) }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
+%if phones:
+      <b>{{ len(phones) }}</b> {{ util.plural("phone number contact", phones, numbers=False) }}{{ "," if bots else "." }}
+%endif
+%if bots:
+      <b>{{ len(bots) }}</b> {{ util.plural("bot contact", bots, numbers=False) }}.
+%endif
+%endif
+    </td>
+  </tr></table>
+</td></tr><tr><td>
+
+<div id="sort_header">
+    <b>Sort contacts by:</b>
+%for name, label, sortlabel in CONTACT_SORTS:
+    <a title="Sort contacts by {{ sortlabel }}" href="#" onClick="return sort_contacts(this, '{{ name }}');"
+       class="sort{{ " desc" if "last_message_datetime" == name else "" }}">{{ label }}</a>
+%endfor
+</div>
+
+<div id="filter">
+    <input type="search" placeholder="Filter contacts" title="Show only contacts containing entered text"
+           onkeyup="on_filter_contacts(event)" onsearch="on_filter_contacts(event)">
+</div>
+<div id="content_wrapper">
+
+%for c in contacts:
+<%
+alt = "%s%s" % (c["name"], (" (%s)" % c["identity"]) if c["name"] != c["identity"] else "")
+avatar = skypedata.get_avatar_raw(c)
+if avatar:
+    try: filetype = imghdr.what("", avatar[:100].encode("latin1")) or "png"
+    except Exception: filetype = "png"
+%>
+
+  <div class="contact" id="contact/{{ c["identity"] }}">
+    <table>
+      <tr><td class="avatar">
+        <img title="{{ alt }}" alt="{{ alt }}"
+%if avatar:
+             data-jslghtbx data-jslghtbx-group="avatar" data-jslghtbx-caption="{{ alt }}" 
+             src="data:image/{{ filetype }};base64,{{! util.b64encode(avatar) }}" 
+%else:
+             src="data:image/png;base64,{{! images.AvatarDefaultLarge.data }}"
+%endif
+        />
+      </td><td>
+
+        <table class="fields">
+%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(c, n)):
+        <tr>
+          <th>{{ label }}:</th>
+          <td>{{ skypedata.format_contact_field(c, name) }}</td>
+        </tr>
+%endfor
+        </table>
+
+      </td></tr>
+%if c.get("conversations"):
+      <tr><td colspan="2"><hr /></td></tr>
+      <tr><td></td><td>
+
+        <table class="chats"><tr>
+%for i, (name, label, sortlabel) in enumerate(CHAT_COLS):
+          <th><a href="#" title="Sort contact chats by {{ sortlabel }}"
+                 onClick="return sort_table(this, {{ i }});"
+                 class="sort{{! " desc" if name == "last_message_datetime" else "" }}">
+            {{ label }}
+          </a></th>
+%endfor
+         </tr>
+%for data in sorted(c["conversations"], reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min):
+        <tr>
+          <td title="{{  TITLEMAP.get(data["id"])  }}">{{ TITLEMAP.get(data["id"]) }}</td>
+          <td>{{ data["message_count"] }}</td>
+          <td title="{{ util.round_float(data["ratio"], 2) + "%" if data.get("ratio") is not None else "" }}">{{ util.round_float(data["ratio"], 0) + "%" if data.get("ratio") is not None else "" }}</td>
+          <td title={{ data["first_message_datetime"].isoformat() if data["first_message_datetime"] else "" }}>{{ datefmt(data["first_message_datetime"]) }}</td>
+          <td title={{ data["last_message_datetime"].isoformat() if data["last_message_datetime"] else "" }}>{{ datefmt(data["last_message_datetime"]) }}</td>
+        </tr>
+%endfor
+        </table>
+%endif
+
+      </td></tr>
+    </table>
+  </div>
+
+%endfor
+
+</div>
+</td></tr></table>
+<div id="footer">Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.</div>
+</body>
+%if HAS_AVATARS:
+<script> new Lightbox().load({carousel: false}); </script>
+%endif
+</html>
+"""
+
+
+"""
 Contact information template, for use with HtmlWindow.
 
 @param   db               SkypeDatabase instance
@@ -2192,7 +2612,6 @@ CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
              ("first_message_datetime", "First message"),
              ("last_message_datetime", "Last message")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
-chats = {x["id"]: x for x in db.get_conversations()}
 %>
 <font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
