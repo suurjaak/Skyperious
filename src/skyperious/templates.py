@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    30.04.2022
+@modified    01.05.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2243,6 +2243,10 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     a.sort::after      { content: ""; display: inline-block; min-width: 6px; position: relative; left: 3px; top: -1px; }
     a.sort.asc::after  { content: "↓"; }
     a.sort.desc::after { content: "↑"; }
+    a.toggle { display: inline-block; position: absolute; white-space: nowrap; }
+    a.toggle:hover { cursor: pointer; text-decoration: none; }
+    a.toggle::after { content: " \\\\25b6"; position: absolute; top: 0; left: 3px; }
+    a.toggle.open::after { content: " \\\\25bc"; font-size: 0.7em; top: 3px; }
     #title { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
     .hidden { display: none; }
     td, th { text-align: left; vertical-align: top; }
@@ -2250,6 +2254,22 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     hr {
       border: none;
       border-top: 1px solid lightgray;
+    }
+    #sort_header {
+      font-weight: bold;
+      margin-bottom: 40px;
+    }
+    #sort_header a {
+      font-weight: normal;
+    }
+    #toggle_header {
+      font-weight: bold;
+      top: 35px;
+      right: 20px;
+    }
+    #toggle_header::after {
+      left: unset;
+      right: -10px;
     }
     div.contact {
       border: 1px solid #3399FF;
@@ -2471,6 +2491,23 @@ dct = {
       };
     };
 
+    var on_toggle = function(a, id1, id2) {
+      a.classList.toggle("open");
+      document.getElementById(id1).classList.toggle("hidden");
+      document.getElementById(id2).classList.toggle("hidden");
+    };
+
+    var on_toggle_all = function(a) {
+      a.classList.toggle("open");
+      var on = a.classList.contains("open");
+      var linklist = document.querySelectorAll(".contact a.toggle");
+      for (var i = 0; i < linklist.length; i++) {
+        if (on != linklist[i].classList.contains("open")) linklist[i].click();
+      };
+      return false;
+    };
+
+
     /** Escapes special characters in a string for RegExp. */
     var escapeRegExp = function(string) {
       return string.replace(/[-[\]{}()*+!<=:?.\/\^$|#\s,]/g, "\$&");
@@ -2508,7 +2545,7 @@ dct = {
 </td></tr><tr><td>
 
 <div id="sort_header">
-    <b>Sort contacts by:</b>
+    Sort contacts by:
 %for name, label, sortlabel in CONTACT_SORTS:
     <a title="Sort contacts by {{ sortlabel }}" href="#" onClick="return sort_contacts(this, '{{ name }}');"
        class="sort{{ " desc" if "last_message_datetime" == name else "" }}">{{ label }}</a>
@@ -2519,6 +2556,9 @@ dct = {
     <input type="search" placeholder="Filter contacts" title="Show only contacts containing entered text"
            onkeyup="on_filter_contacts(event)" onsearch="on_filter_contacts(event)">
 </div>
+
+<a id="toggle_header" href="#" class="toggle open" title="Toggle chats of all contacts" onClick="return on_toggle_all(this)">Toggle chats</a>
+
 <div id="content_wrapper">
 
 %for c in contacts:
@@ -2550,12 +2590,28 @@ if avatar:
           <td>{{ skypedata.format_contact_field(c, name) }}</td>
         </tr>
 %endfor
+%if c.get("conversations"):
+        <tr>
+          <th colspan="2"><br /></th>
+        </tr>
+        <tr>
+          <th>Messages:</th>
+          <td>{{ c["message_count_single"] + c["message_count_group"] }}</td>
+        </tr>
+        <tr>
+          <th>Chats:</th>
+          <td>
+            {{ len(c["conversations"]) }}
+            <a class="toggle open" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
+          </td>
+        </tr>
+%endif
         </table>
 
       </td></tr>
 %if c.get("conversations"):
-      <tr><td colspan="2"><hr /></td></tr>
-      <tr><td></td><td>
+      <tr id="contact/{{ c["identity"] }}/sep"><td colspan="2"><hr /></td></tr>
+      <tr id="contact/{{ c["identity"] }}/chats"><td></td><td>
 
         <table class="chats"><tr>
 %for i, (name, label, sortlabel) in enumerate(CHAT_COLS):
@@ -2640,6 +2696,19 @@ if avatar_size[0] > 300:
         <td>{{ skypedata.format_contact_field(contact, name) }}</td>
       </tr>
 %endfor
+%if contact.get("conversations"):
+      <tr>
+        <td colspan="2"></td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Messages:</b></td>
+        <td>{{ contact["message_count_single"] + contact["message_count_group"] }}</td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Chats:</b></td>
+        <td>{{ len(contact["conversations"]) }}</td>
+      </tr>
+%endif
     </table>
   </td>
 </tr></table>
