@@ -3678,7 +3678,8 @@ class DatabasePage(wx.Panel):
                                 if self.contact and self.contact["identity"] in ids:
                                     contact = next((x for x in self.contacts
                                                     if x["identity"] == self.contact["identity"]), None)
-                                    if contact: self.load_contact(contact)
+                                    self.contact = contact
+                                self.load_contact(self.contact)
                             chat and wx.CallAfter(after2)
 
                     elif not result.get("start"):
@@ -3698,6 +3699,7 @@ class DatabasePage(wx.Panel):
                                     if c:
                                         self.contacts.append(c)
                                         self.list_contacts.Populate(self.contacts)
+                                        self.load_contact(self.contact)
 
                 if plabel:
                     self.label_sync_progress.Label = plabel
@@ -5802,31 +5804,31 @@ class DatabasePage(wx.Panel):
                 if clist.GetItemMappedData(i) == self.contact:
                     clist.SetItemFont(i, clist.Font)
             self.contact = None
-        if not contact:
             return
 
         # Update contact list colours and scroll to the opened contact
         if contact != self.contact:
             logger.info("Opening contact %s.", contact["name"])
-            clist.Freeze()
-            scrollpos = clist.GetScrollPos(wx.VERTICAL)
-            index_selected = -1
-            for i in range(clist.ItemCount):
-                if clist.GetItemMappedData(i) == self.contact:
-                    clist.SetItemFont(i, clist.Font)
-                elif clist.GetItemMappedData(i) == contact:
-                    index_selected = i
-                    f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
-                    clist.SetItemFont(i, f)
-            if index_selected >= 0:
-                delta = index_selected - scrollpos
-                if delta < 0 or abs(delta) >= clist.CountPerPage:
-                    nudge = -clist.CountPerPage // 2
-                    clist.ScrollLines(delta + nudge)
-            clist.Thaw()
-            wx.YieldIfNeeded() # Allow display to refresh
-            self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
-            self.label_contact.Parent.Layout()
+        clist.Freeze()
+        scrollpos = clist.GetScrollPos(wx.VERTICAL)
+        index_selected = -1
+        for i in range(clist.ItemCount):
+            myid = clist.GetItemMappedData(i)["id"]
+            if myid == contact["id"]:
+                index_selected = i
+                f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                clist.SetItemFont(i, f)
+            elif self.contact and myid == self.contact["id"]:
+                clist.SetItemFont(i, clist.Font)
+        if index_selected >= 0:
+            delta = index_selected - scrollpos
+            if delta < 0 or abs(delta) >= clist.CountPerPage:
+                nudge = -clist.CountPerPage // 2
+                clist.ScrollLines(delta + nudge)
+        clist.Thaw()
+        wx.YieldIfNeeded() # Allow display to refresh
+        self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
+        self.label_contact.Parent.Layout()
 
         titlemap = {x["id"]: x["title_long"] for x in self.chats}
         for data in contact.get("conversations", []):
