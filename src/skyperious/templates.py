@@ -2225,11 +2225,11 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
       margin-left: auto;
       margin-right: auto;
       border-spacing: 0 10px;
-      max-width: 1000px;
+      max-width: 800px;
     }
     #body_table > tbody > tr > td {
       background: white;
-      width: 1000px;
+      width: 800px;
       font-family: {{ conf.HistoryFontName }};
       font-size: 11px;
       border-radius: 10px;
@@ -2299,10 +2299,10 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
       font-weight: normal;
     }
     table.chats th:first-child {
-      width: 400px;
+      width: 250px;
     }
     table.chats td:first-child {
-      max-width: 400px;
+      max-width: 250px;
       overflow-x: clip;
       text-overflow: ellipsis;
     }
@@ -2356,6 +2356,7 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     a#darkmode {
       color: black;
       display: inline-block;
+      font-weight: bold;
       text-decoration: none;
     }
     body.darkmode a#darkmode {
