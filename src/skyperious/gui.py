@@ -3603,7 +3603,7 @@ class DatabasePage(wx.Panel):
                 else:
                     plabel = u"Synchronizing %s" % result["table"]
                     if "messages" == result["table"] and result.get("chat"):
-                        chat  = next(c for c in self.chats if c["identity"] == result["chat"])
+                        chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
                         title = chat["title_long_lc"] if chat else result["chat"]
                         if len(title) > 35:
                             title = title[:35] + ".."
@@ -3636,12 +3636,20 @@ class DatabasePage(wx.Panel):
                                 ]))
 
                             self.chats = self.db.get_conversations(reload=True, log=False)
+                            self.contacts = self.db.get_contacts(reload=True)
 
                             def after2():
                                 """Populate statistics for all chats after completion."""
                                 if not self: return
                                 self.db.get_conversations_stats(self.chats)
                                 self.list_chats.Populate(self.chats)
+                                self.db.get_contacts_stats(self.contacts, self.chats, log=False)
+                                self.list_contacts.Populate(self.contacts)
+                                if self.contact:
+                                    self.contact = next((x for x in self.contacts
+                                                         if x["identity"] == self.contact["identity"]), None)
+                                self.load_contact(self.contact)
+
                             wx.CallAfter(after2)
 
                         if "messages" == result["table"]:
@@ -3669,19 +3677,6 @@ class DatabasePage(wx.Panel):
                                 if result["updated"]: slabel += ", %s updated" % result["updated"]
                                 slabel += "."
 
-                            def after2():
-                                """Populate statistics for chat participants after finishing chat messages."""
-                                ids = [x["identity"] for x in chat["participants"]]
-                                contacts = [x for x in self.contacts if x["identity"] in ids]
-                                self.db.get_contacts_stats(contacts, self.chats)
-                                self.list_contacts.Populate(self.contacts)
-                                if self.contact and self.contact["identity"] in ids:
-                                    contact = next((x for x in self.contacts
-                                                    if x["identity"] == self.contact["identity"]), None)
-                                    self.contact = contact
-                                self.load_contact(self.contact)
-                            chat and wx.CallAfter(after2)
-
                     elif not result.get("start"):
                         if "chats" == result["table"] and result.get("chat"):
                             # Inserted or updated a chat: load new contacts, if any
@@ -3694,12 +3689,12 @@ class DatabasePage(wx.Panel):
                                 if cc: chat = cc[0]
                             if chat:
                                 ids = [x["identity"] for x in chat["participants"]]
-                                for identity in set(ids) - set(x["identity"] for x in self.contacts):
-                                    c = self.db.get_contact(identity)
-                                    if c:
-                                        self.contacts.append(c)
-                                        self.list_contacts.Populate(self.contacts)
-                                        self.load_contact(self.contact)
+                                newids = set(ids) - set(x["identity"] for x in self.contacts)
+                                newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
+                                if newcontacts:
+                                    self.contacts.extend(newcontacts)
+                                    self.list_contacts.Populate(self.contacts)
+                                    self.load_contact(self.contact)
 
                 if plabel:
                     self.label_sync_progress.Label = plabel
