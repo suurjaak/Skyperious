@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.04.2022
+@modified    01.05.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4345,11 +4345,15 @@ class DatabasePage(wx.Panel):
         dialog.Wildcard = export.CONTACT_WILDCARD
         if wx.ID_OK != dialog.ShowModal(): return
 
+        busy = controls.BusyPanel(self, "Exporting contacts.")
         filepath = controls.get_dialog_path(dialog)
         format = export.CONTACT_EXTS[dialog.FilterIndex]
         guibase.status("Exporting %s.", filepath, log=True)
-        export.export_contacts(self.contacts, filepath, format, self.db)
-        util.start_file(filepath)
+        try:
+            export.export_contacts(self.contacts, filepath, format, self.db)
+            util.start_file(filepath)
+        finally:
+            busy.Close()
 
 
     def on_export_chats(self, chats, do_all=False, do_singlefile=False, do_timerange=False, event=None):
