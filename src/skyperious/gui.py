@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    01.05.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3603,12 +3603,7 @@ class DatabasePage(wx.Panel):
                 else:
                     plabel = u"Synchronizing %s" % result["table"]
                     if "messages" == result["table"] and result.get("chat"):
-                        chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
-                        if not chat:
-                            cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
-                            self.chats.extend(cc)
-                            if cc: chat = cc[0]
-
+                        chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
                         title = chat["title_long_lc"] if chat else result["chat"]
                         if len(title) > 35:
                             title = title[:35] + ".."
@@ -3641,9 +3636,20 @@ class DatabasePage(wx.Panel):
                                 ]))
 
                             self.chats = self.db.get_conversations(reload=True, log=False)
+                            self.contacts = self.db.get_contacts(reload=True)
+
                             def after2():
-                                if self: self.db.get_conversations_stats(self.chats)
-                                if self: self.list_chats.Populate(self.chats)
+                                """Populate statistics for all chats after completion."""
+                                if not self: return
+                                self.db.get_conversations_stats(self.chats)
+                                self.list_chats.Populate(self.chats)
+                                self.db.get_contacts_stats(self.contacts, self.chats, log=False)
+                                self.list_contacts.Populate(self.contacts)
+                                if self.contact:
+                                    self.contact = next((x for x in self.contacts
+                                                         if x["identity"] == self.contact["identity"]), None)
+                                self.load_contact(self.contact)
+
                             wx.CallAfter(after2)
 
                         if "messages" == result["table"]:
@@ -3657,9 +3663,9 @@ class DatabasePage(wx.Panel):
                                 self.list_chats_sync.AppendRow(row)
                                 self.list_chats_sync.ResetColumnWidths()
                                 chat["message_count" ] = (chat["message_count"] or 0) + result["new"]
-                                chat["first_message_datetime"]  = min(chat["first_message_datetime"] or result["first"], result["first"])
-                                chat["last_message_datetime"]   = max(chat["last_message_datetime"]  or result["first"], result["last"])
-                                chat["last_activity_datetime"]  = max(chat["last_activity_datetime"] or result["last"],  result["last"])
+                                chat["first_message_datetime"] = min(chat["first_message_datetime"] or result["first"], result["first"])
+                                chat["last_message_datetime"]  = max(chat["last_message_datetime"]  or result["first"], result["last"])
+                                chat["last_activity_datetime"] = max(chat["last_activity_datetime"] or result["last"],  result["last"])
                                 for k in "first_message", "last_message", "last_activity":
                                     chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
                                 self.list_chats.Populate(self.chats)
@@ -3670,6 +3676,25 @@ class DatabasePage(wx.Panel):
                                 slabel += ": %s new" % result["new"]
                                 if result["updated"]: slabel += ", %s updated" % result["updated"]
                                 slabel += "."
+
+                    elif not result.get("start"):
+                        if "chats" == result["table"] and result.get("chat"):
+                            # Inserted or updated a chat: load new contacts, if any
+                            plabel = ""
+
+                            chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
+                            if not chat:
+                                cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
+                                self.chats.extend(cc)
+                                if cc: chat = cc[0]
+                            if chat:
+                                ids = [x["identity"] for x in chat["participants"]]
+                                newids = set(ids) - set(x["identity"] for x in self.contacts)
+                                newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
+                                if newcontacts:
+                                    self.contacts.extend(newcontacts)
+                                    self.list_contacts.Populate(self.contacts)
+                                    self.load_contact(self.contact)
 
                 if plabel:
                     self.label_sync_progress.Label = plabel
@@ -4317,11 +4342,15 @@ class DatabasePage(wx.Panel):
         dialog.Wildcard = export.CONTACT_WILDCARD
         if wx.ID_OK != dialog.ShowModal(): return
 
+        busy = controls.BusyPanel(self, "Exporting contacts.")
         filepath = controls.get_dialog_path(dialog)
         format = export.CONTACT_EXTS[dialog.FilterIndex]
         guibase.status("Exporting %s.", filepath, log=True)
-        export.export_contacts(self.contacts, filepath, format, self.db)
-        util.start_file(filepath)
+        try:
+            export.export_contacts(self.contacts, filepath, format, self.db)
+            util.start_file(filepath)
+        finally:
+            busy.Close()
 
 
     def on_export_chats(self, chats, do_all=False, do_singlefile=False, do_timerange=False, event=None):
@@ -5770,31 +5799,31 @@ class DatabasePage(wx.Panel):
                 if clist.GetItemMappedData(i) == self.contact:
                     clist.SetItemFont(i, clist.Font)
             self.contact = None
-        if not contact:
             return
 
         # Update contact list colours and scroll to the opened contact
         if contact != self.contact:
             logger.info("Opening contact %s.", contact["name"])
-            clist.Freeze()
-            scrollpos = clist.GetScrollPos(wx.VERTICAL)
-            index_selected = -1
-            for i in range(clist.ItemCount):
-                if clist.GetItemMappedData(i) == self.contact:
-                    clist.SetItemFont(i, clist.Font)
-                elif clist.GetItemMappedData(i) == contact:
-                    index_selected = i
-                    f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
-                    clist.SetItemFont(i, f)
-            if index_selected >= 0:
-                delta = index_selected - scrollpos
-                if delta < 0 or abs(delta) >= clist.CountPerPage:
-                    nudge = -clist.CountPerPage // 2
-                    clist.ScrollLines(delta + nudge)
-            clist.Thaw()
-            wx.YieldIfNeeded() # Allow display to refresh
-            self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
-            self.label_contact.Parent.Layout()
+        clist.Freeze()
+        scrollpos = clist.GetScrollPos(wx.VERTICAL)
+        index_selected = -1
+        for i in range(clist.ItemCount):
+            myid = clist.GetItemMappedData(i)["id"]
+            if myid == contact["id"]:
+                index_selected = i
+                f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
+                clist.SetItemFont(i, f)
+            elif self.contact and myid == self.contact["id"]:
+                clist.SetItemFont(i, clist.Font)
+        if index_selected >= 0:
+            delta = index_selected - scrollpos
+            if delta < 0 or abs(delta) >= clist.CountPerPage:
+                nudge = -clist.CountPerPage // 2
+                clist.ScrollLines(delta + nudge)
+        clist.Thaw()
+        wx.YieldIfNeeded() # Allow display to refresh
+        self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
+        self.label_contact.Parent.Layout()
 
         titlemap = {x["id"]: x["title_long"] for x in self.chats}
         for data in contact.get("conversations", []):
@@ -8160,9 +8189,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                                 in highlighted style
         """
         text = text or ""
-        if isinstance(text, six.text_type):
-            text = text.encode("utf-8")
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
+        if isinstance(text, six.text_type):
+            text_parts = [x.encode("utf-8") for x in text_parts]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
         len_self = self.GetTextLength()
         self.STC.AppendText(text)

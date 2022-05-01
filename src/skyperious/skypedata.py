@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    30.04.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -94,6 +94,7 @@ CONTACT_FIELD_TITLES = collections.OrderedDict([
     ("skypename",           "Skype name"),
     ("displayname",         "Display name"),
     ("given_displayname",   "Given display name"),
+    ("type",                "Contact type"),
     ("phone_mobile",        "Mobile phone"),
     ("phone_home",          "Home phone"),
     ("phone_office",        "Office phone"),
@@ -1115,9 +1116,11 @@ class SkypeDatabase(object):
             if not contact:
                 titlecol = self.make_title_col("contacts")
                 contact = self.execute(
-                    "SELECT *, %s AS name, "
-                    "COALESCE(skypename, pstnnumber, '') AS identity "
-                    "FROM contacts WHERE skypename = :identity "
+                    "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
+                    "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office) AS phone, "
+                    "NULL AS first_message_datetime, NULL AS last_message_datetime, "
+                    "NULL AS message_count_single, NULL AS message_count_group, "
+                    "%s AS name FROM contacts WHERE skypename = :identity "
                     "OR pstnnumber = :identity" % titlecol,
                     {"identity": identity}
                 ).fetchone()
@@ -2894,7 +2897,12 @@ def fix_image_raw(raw):
 def format_contact_field(datadict, name):
     """Returns contact/account field, or None if blank."""
     value = datadict.get(name)
-    if "emails" == name and value:
+    if "type" == name and value:
+        LABELS = {CONTACT_TYPE_NORMAL: "",
+                  CONTACT_TYPE_PHONE:  "phone number",
+                  CONTACT_TYPE_BOT:    "bot"}
+        value = LABELS.get(value)
+    elif "emails" == name and value:
         value = ", ".join(value.split(" "))
     elif "gender" == name:
         value = {1: "male", 2: "female"}.get(value)

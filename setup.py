@@ -8,11 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    26.03.2022
+@modified    29.04.2022
 ------------------------------------------------------------------------------
 """
 import os
+import re
 import sys
+
 import setuptools
 
 ROOTPATH  = os.path.abspath(os.path.dirname(__file__))
@@ -20,26 +22,48 @@ sys.path.insert(0, os.path.join(ROOTPATH, "src"))
 
 from skyperious import conf
 
+
+PACKAGE = conf.Title.lower()
+REPOSITORY = "https://github.com/suurjaak/Skyperious"
+
+
+def readfile(path):
+    """Returns contents of path, relative to current file."""
+    root = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(root, path)) as f: return f.read()
+
+def get_description():
+    """Returns package description from README."""
+    LINK_RGX = r"\[([^\]]+)\]\(([^\)]+)\)"  # 1: content in [], 2: content in ()
+    KEEP = ("ftp://", "http://", "https://", "www.")
+    # Unwrap page anchor links like [Page link](#page-link) as "Page link",
+    # make package file links like [LICENSE.md](LICENSE.md) point to repository
+    repl = lambda m: m.group(1) if m.group(2).startswith("#") else \
+                     m.group(0) if any(map(m.group(2).startswith, KEEP)) else \
+                     "[%s](%s/blob/master/%s)" % (m.group(1), REPOSITORY, m.group(2))
+    return re.sub(LINK_RGX, repl, readfile("README.md"))
+
+
 setuptools.setup(
-    name=conf.Title,
-    version=conf.Version,
-    description="Skype chat history tool",
-    url="https://github.com/suurjaak/Skyperious",
+    name                 = PACKAGE,
+    version              = conf.Version,
+    description          = "Skype chat history tool",
+    url                  = REPOSITORY,
 
-    author="Erki Suurjaak",
-    author_email="erki@lap.ee",
-    license="MIT",
-    platforms=["any"],
-    keywords="skype sqlite merge export",
+    author               = "Erki Suurjaak",
+    author_email         = "erki@lap.ee",
+    license              = "MIT",
+    platforms            = ["any"],
+    keywords             = "skype sqlite merge export",
 
-    install_requires=["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow",
-                      "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
-    entry_points={"gui_scripts": ["skyperious = skyperious.main:run"]},
+    install_requires     = ["appdirs", "beautifulsoup4", "ijson", "pyparsing", "Pillow",
+                            "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
+    entry_points         = {"gui_scripts": ["{0} = {0}.main:run".format(PACKAGE)]},
 
-    package_dir={"": "src"},
-    packages=[conf.Title.lower()],
-    include_package_data=True, # Use MANIFEST.in for data files
-    classifiers=[
+    package_dir          = {"": "src"},
+    packages             = [PACKAGE],
+    include_package_data = True, # Use MANIFEST.in for data files
+    classifiers          = [
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: End Users/Desktop",
         "Operating System :: Microsoft :: Windows",
@@ -47,30 +71,14 @@ setuptools.setup(
         "Operating System :: MacOS",
         "Topic :: Communications :: Chat",
         "Topic :: Database",
-        "Topic :: Utilities",
         "Topic :: Desktop Environment",
+        "Topic :: Utilities",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
     ],
 
-    long_description_content_type="text/markdown",
-    long_description=
-"""Skyperious is a Skype chat history tool, written in Python.
-
-You can open Skype SQLite databases and work with their contents:
-
-- import messages from Skype online service and Skype export archives
-- search across all messages and contacts
-- read chat history in full, see chat statistics and word clouds
-- export chats as HTML, text or spreadsheet
-- view any database table and export their data, fix database corruption
-- change, add or delete data in any table
-- execute direct SQL queries
-
-and
-
-- synchronize messages in two Skype databases, merging their differences
-""",
+    long_description_content_type = "text/markdown",
+    long_description = get_description(),
 )

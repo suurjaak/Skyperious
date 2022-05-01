@@ -2,6 +2,14 @@ CHANGELOG
 =========
 
 
+5.1, 2022-05-01
+---------------
+- added contacts HTML export;
+- refresh contacts list during and after live sync;
+- fixed live sync updating messages needlessly in Python3;
+- fixed error on filtering current chat by text (issue #107).
+
+
 5.0, 2022-04-02
 ---------------
 - added contacts-tab;

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.04.2022
+@modified    29.04.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -74,8 +74,8 @@ QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
                   "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
 QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
 
-CONTACT_WILDCARD = "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
-CONTACT_EXTS = ["xlsx", "csv"] if xlsxwriter else ["csv"]
+CONTACT_WILDCARD = "HTML document (*.html)|*.html|%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
+CONTACT_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html","csv"]
 
 IMAGE_EXTS = ["bmp", "jpg", "png"]
 IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
@@ -363,15 +363,24 @@ def export_chat_csv(chat, filename, db, messages, opts=None):
 
 def export_contacts(contacts, filename, format, db):
     """
-    Exports the contacts to a spreadsheet file.
+    Exports the contacts to an HTML or spreadsheet file.
 
-    @param   contacts      list of chat dicts, as returned from SkypeDatabase
+    @param   contacts      list of contacts dicts, as returned from SkypeDatabase,
+                           supplemented with statistics
     @param   filename      full path and filename of resulting file
-    @param   format        export format (xlsx|csv)
+    @param   format        export format (html|xlsx|csv)
     @param   db            SkypeDatabase instance
     """
+    is_html = ("html" == format)
     is_csv  = ("csv"  == format)
     is_xlsx = ("xlsx" == format)
+
+    if is_html:
+        namespace = {"contacts": contacts, "db": db}
+        with open(filename, "wb") as f:
+            template = step.Template(templates.EXPORT_CONTACTS_HTML, escape=True)
+            template.stream(f, namespace)
+        return
 
     writer = None
     colnames, collabels = zip(*((k, "%s (%s)" % (v, k))
@@ -385,7 +394,7 @@ def export_contacts(contacts, filename, format, db):
         writer.writerow(*([collabels, "bold"] if is_xlsx else [collabels]))
         writer.set_header(False) if is_xlsx else 0
         for c in contacts:
-            writer.writerow(["" if c.get(n) is None else c[n] for n in colnames])
+            writer.writerow([skypedata.format_contact_field(c, n) or "" for n in colnames])
         writer.close()
         writer = None
     finally:
