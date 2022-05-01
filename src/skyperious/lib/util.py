@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    01.04.2022
+@modified    01.05.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -171,6 +171,37 @@ def b64decode(s):
     """Returns value decoded from Base64 as text; input may be text or bytes."""
     if isinstance(s, six.text_type): s = s.encode("latin1")
     return base64.b64decode(s).decode("latin1")
+
+
+def hash_string(s):
+    """
+    Returns the hash value of the string, as an integer.
+
+    Port of Python2 string_hash() from C to Python.
+    Guaranteed to yield a constant value, unlike the built-in hash() from Py3.3+.
+
+    @param   value to hash, will be converted to string if not
+    @return  hash integer value
+    """
+    if not isinstance(s, six.string_types):
+        s = str(s)
+    if isinstance(s, six.text_type):
+        s = s.encode("utf-8", "xmlcharrefreplace")
+    if not s:
+        return 0
+
+    def oflow(v):
+        """Returns integer overflow value."""
+        if not -sys.maxsize - 1 <= v <= sys.maxsize:
+            v = (v + (sys.maxsize + 1)) % (2 * (sys.maxsize + 1)) - sys.maxsize - 1
+        return v
+
+    s = bytearray(s)
+    x = s[0] << 7
+    for c in s:
+        x = oflow((1000003 * x) ^ c)
+    x = oflow(x ^len(s))
+    return -2 if x == -1 else x
 
 
 def plural(word, items=None, numbers=True, single="1", sep="", pref="", suf=""):

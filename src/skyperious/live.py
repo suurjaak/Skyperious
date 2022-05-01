@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    29.04.2022
+@modified    01.05.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -105,7 +105,7 @@ class SkypeLogin(object):
         if self.db and self.db.username: self.username = self.db.username
         if username and not self.username: self.username = username
         path = util.safe_filename(self.username)
-        if path != self.username: path += "_%x" % hash(self.username)
+        if path != self.username: path += "_%x" % util.hash_string(self.username)
         path = self.tokenpath = os.path.join(conf.VarDirectory, "%s.token" % path)
 
         logger.info("Logging in to Skype online service as '%s'.", self.username)
@@ -590,7 +590,7 @@ class SkypeLogin(object):
                     chat = self.cache["chats"].get(identity)
                 result.update(convo_id=chat["id"])
             remote_id = item.raw.get("skypeeditedid") or item.clientId
-            if remote_id: result.update(remote_id=hash(remote_id))
+            if remote_id: result.update(remote_id=util.hash_string(remote_id))
 
             if isinstance(parent, skpy.SkypeSingleChat):
                 partner = result["author"] if result["author"] != self.skype.userId else parent.userId
@@ -1511,14 +1511,14 @@ def identity_to_id(identity):
 def make_db_path(username):
     """Returns the default database path for username."""
     base = util.safe_filename(username)
-    if base != username: base += "_%x" % hash(username)
+    if base != username: base += "_%x" % util.hash_string(username)
     return os.path.join(conf.VarDirectory, "%s.main.db" % base)
 
 
 def make_message_ids(msg_id):
     """Returns (pk_id, guid) for message ID."""
-    try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else hash(msg_id)
-    except Exception: pk_id = hash(msg_id) # Ensure fit into INTEGER-column
+    try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else util.hash_string(msg_id)
+    except Exception: pk_id = util.hash_string(msg_id) # Ensure fit into INTEGER-column
     guid = struct.pack("<i" if pk_id.bit_length() < 32 else "<q", pk_id)
     guid *= 32 // len(guid)
     return (pk_id, guid)
