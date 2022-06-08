@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.05.2022
+@modified    08.06.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -175,7 +175,7 @@ class SkypeLogin(object):
 
     def build_msg_cache(self, identity):
         """Fills in message cache for chat."""
-        BINARIES = "guid",
+        BINARIES = ("guid", )
         for dct in (self.msg_lookups, self.msg_stamps, self.cache["messages"]):
             dct.clear()
 
@@ -232,7 +232,7 @@ class SkypeLogin(object):
                 if tries > self.RETRY_LIMIT or not doretry:
                     if dolog: logger.exception("Error calling %r.", func)
                     if doraise: raise
-                    else: return
+                    return None
                 time.sleep(self.RETRY_DELAY)
             finally: # Replace with final
                 self.query_stamps[-1] = datetime.datetime.utcnow()
@@ -902,6 +902,7 @@ class SkypeLogin(object):
         for url in urls:
             raw = self.download_content(url, category)
             if raw: return raw
+        return None
 
 
     def download_content(self, url, category=None):
@@ -915,6 +916,7 @@ class SkypeLogin(object):
             and ("file" == category or any(x in hdr(r) for x in ("image", "audio", "video"))):
                 return r.content
         except Exception: pass
+        return None
 
 
     def get_contact(self, identity):
@@ -1006,7 +1008,7 @@ class SkypeExport(skypedata.SkypeDatabase):
             fh, dbfilename = tempfile.mkstemp(".db")
             os.close(fh)
         super(SkypeExport, self).__init__(dbfilename, truncate=not self.is_temporary)
-        db.ensure_schema()
+        self.ensure_schema()
 
 
     def __str__(self):

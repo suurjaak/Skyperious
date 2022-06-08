@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+5.2, 2022-06-08
+---------------
+- fix error on importing from JSON (issue #110).
+
+
 5.1, 2022-05-01
 ---------------
 - added contacts HTML export;
