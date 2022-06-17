@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.04.2022
+@modified    17.06.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -108,7 +108,6 @@ import wx.lib.embeddedimage
 import wx.lib.gizmos
 import wx.lib.mixins.listctrl
 import wx.lib.newevent
-import wx.lib.wordwrap
 import wx.stc
 
 
@@ -1045,7 +1044,6 @@ class NoteButton(wx.Panel, wx.Button):
             self._extent_label = self._extent_note = (0, 0)
             return
 
-        WORDWRAP = wx.lib.wordwrap.wordwrap
         width, height = self.Size
         if width > 20 and height > 20:
             dc = wx.ClientDC(self)
@@ -1054,10 +1052,10 @@ class NoteButton(wx.Panel, wx.Button):
             dc.SelectObject(wx.Bitmap(500, 100))
         dc.Font = self.Font
         x = 10 + self._bmp.Size.width + 10
-        self._text_note = WORDWRAP(self._text_note, width - 10 - x, dc)
+        self._text_note = wordwrap(self._text_note, width - 10 - x, dc)
         dc.Font = wx.Font(dc.Font.PointSize, dc.Font.Family, dc.Font.Style,
                           wx.FONTWEIGHT_BOLD, faceName=dc.Font.FaceName)
-        self._text_label = WORDWRAP(self._text_label, width - 10 - x, dc)
+        self._text_label = wordwrap(self._text_label, width - 10 - x, dc)
         self._extent_label = dc.GetMultiLineTextExtent(self._text_label)
         self._extent_note = dc.GetMultiLineTextExtent(self._text_note)
 
@@ -4786,3 +4784,43 @@ def get_dialog_path(dialog):
         if ext: result += ext
 
     return result
+
+
+def wordwrap(text, width, dc, breakLongWords=True, margin=0):
+    """
+    Returns text wrapped to pixel width according to given DC.
+
+    A patched copy of `wx.lib.wordwrap.wordwrap()`
+    able to handle multi-byte Unicode characters in Python3.
+
+    @param   text            string to wrap
+    @param   width           width to wrap into, in pixels
+    @param   dc              wx.DC instance
+    @param   breakLongWords  whether to break words wider than available width
+    @param   margin          additional left and right margin, in pixels
+    """
+    wrapped_lines = []
+    text = text.splitlines()
+    for line in text:
+        pte = []
+        for c in line:
+            pte.append(dc.GetTextExtent(c).width + (pte[-1] if pte else 0))
+        wid = width - (2 * margin + 1) * dc.GetTextExtent(" ")[0] - \
+              max([0] + [pte[i] - pte[i - 1] for i in range(1, len(pte))])
+
+        idx, start, startIdx, spcIdx = 0, 0, 0, -1
+        while idx < len(pte):
+            # remember the last seen space
+            if line[idx] == " ":
+                spcIdx = idx
+            # have we reached the max width?
+            if pte[idx] - start > wid and (spcIdx != -1 or breakLongWords):
+                if spcIdx != -1:
+                    idx = min(spcIdx + 1, len(pte) - 1)
+                wrapped_lines.append(" "*margin + line[startIdx : idx] + " "*margin)
+                start, startIdx, spcIdx = pte[idx], idx, -1
+            idx += 1
+
+        wrapped_lines.append(" " * margin + line[startIdx:idx] + " " * margin)
+
+    return "\n".join(wrapped_lines)

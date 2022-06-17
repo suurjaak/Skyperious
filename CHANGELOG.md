@@ -2,8 +2,9 @@ CHANGELOG
 =========
 
 
-5.2, 2022-06-08
+5.2, 2022-06-17
 ---------------
+- fix error on displaying search results with Unicode emoticons (issue #108).
 - fix error on importing from JSON (issue #110).
 
 

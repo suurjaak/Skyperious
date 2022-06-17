@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.04.2022
+@modified    17.06.2022
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -25,6 +25,7 @@ try:
 except ImportError:
     pass # Most functionality works without wx
 
+from . lib import controls
 from . lib import util
 from . lib.vendor import step
 
@@ -140,7 +141,7 @@ class SearchThread(WorkerThread):
                         dc = wx.MemoryDC()
                         dc.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                             wx.FONTWEIGHT_NORMAL, faceName=conf.HistoryFontName))
-                        wrap_html = lambda x: wx.lib.wordwrap.wordwrap(x, width, dc)
+                        wrap_html = lambda x: controls.wordwrap(x, width, dc)
                         output["wrap"] = True
                 else:
                     TEMPLATES = {
