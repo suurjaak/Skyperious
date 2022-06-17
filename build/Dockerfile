@@ -22,7 +22,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
     apt-get install -y --no-install-recommends \
     libgtk-3-0 \
     libsdl2-2.0 \
-    libwebkit2gtk-4.0 \
+    libwebkit2gtk-4.0-37 \
     python3 \
     python3-pip
 
