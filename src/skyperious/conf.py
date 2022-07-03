@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.06.2022
+@modified    03.07.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.2.dev1"
-VersionDate = "17.06.2022"
+Version = "5.3.dev0"
+VersionDate = "03.07.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -382,8 +382,9 @@ def load():
         # Instantiate OS- and user-specific paths
         try:
             p = appdirs.user_config_dir(Title, appauthor=False)
+            userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Try user-specific path first, then path under application folder
-            configpaths.insert(0, os.path.join(p, "%s.ini" % Title.lower()))
+            if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
         try: VarDirectory = appdirs.user_data_dir(Title, False)
         except Exception: pass
@@ -396,7 +397,7 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        for path in configpaths[::-1]:
+        for path in configpaths:
             if os.path.isfile(path) and parser.read(path):
                 break # for path
 
@@ -425,7 +426,7 @@ def save():
         userpath = os.path.join(p, "%s.ini" % Title.lower())
         # Pick only userpath if exists, else try application folder first
         if os.path.isfile(userpath): configpaths = [userpath]
-        else: configpaths.append(userpath)
+        elif userpath not in configpaths: configpaths.insert(0, userpath)
     except Exception: pass
 
     section = "*"

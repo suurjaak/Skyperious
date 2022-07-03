@@ -2,6 +2,11 @@ CHANGELOG
 =========
 
 
+5.3, 2022-07-03
+---------------
+- fix loading user-specific configuration file.
+
+
 5.2, 2022-06-17
 ---------------
 - fix error on displaying search results with Unicode emoticons (issue #108).
