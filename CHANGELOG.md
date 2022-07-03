@@ -4,6 +4,7 @@ CHANGELOG
 
 5.3, 2022-07-03
 ---------------
+- tweak icon borders.
 - fix loading user-specific configuration file.
 
 
