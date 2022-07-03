@@ -1,0 +1,68 @@
+# Snapcraft build file for Skyperious.
+#
+# To prepare the build environment, execute the following in project directory:
+#
+# mkdir -p snap/gui && cp build/snapcraft.yaml snap/ && cp build/skyperious.desktop snap/gui/ \
+#   && cp res/Icon256x256_32bit.png snap/gui/skyperious.png \
+#   && sed -i 's/Icon=.*/Icon=${SNAP}\/meta\/gui\/skyperious.png/' snap/gui/skyperious.desktop
+#
+# To build, execute the following in project directory:
+#
+# snapcraft snap
+#
+#
+# @author      Erki Suurjaak
+# @created     01.05.2022
+# @modified    03.07.2022
+name:    skyperious
+title:   Skyperious
+summary: Skype chat history tool
+website: https://suurjaak.github.io/Skyperious
+license: MIT
+description: |
+  Skyperious is a Skype chat history tool, written in Python.
+
+  You can open Skype SQLite databases and work with their contents:
+
+  - import messages from Skype online service and Skype export archives
+  - search across all messages and contacts
+  - read chat history in full, see chat statistics and word clouds
+  - export chats as HTML, text or spreadsheet
+  - view any database table and export their data, fix database corruption
+  - change, add or delete data in any table
+  - execute direct SQL queries
+
+  and
+
+  - synchronize messages in two Skype databases, merging their differences
+icon: snap/gui/skyperious.png  # Icon for Snap store
+
+base:        core18      # Ubuntu 18.04 LTS
+confinement: strict      # 'strict' when ready, else 'devmode'
+grade:       stable      # 'stable' to release into candidate/stable channels, else 'devel'
+adopt-info:  skyperious  # Version info from parts.skyperious
+
+architectures:
+- build-on: [amd64, arm64, armhf]
+
+apps:
+  skyperious:
+    command:    python3 -m skyperious
+    plugs:      [home, network, network-bind, removable-media, unity7]
+    extensions: [gnome-3-28]  # Adds plugs: desktop, desktop-legacy, gsettings, x11, wayland
+
+parts:
+  skyperious:
+    source: https://github.com/suurjaak/skyperious.git
+    plugin: python
+    stage-packages:
+    - libgtk-3-0
+    - libsdl2-2.0-0
+    - libwebkitgtk-3.0-0
+    python-packages:
+    - https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04/wxPython-4.1.1-cp36-cp36m-linux_x86_64.whl
+    requirements:
+    - /root/project/requirements.txt
+    override-pull: |  # Set build version from current git tag, drop leading letters ("v5.2" -> "5.2")
+      snapcraftctl pull
+      snapcraftctl set-version "$(git -C /root/project describe --tags | sed 's/^[a-z]*//i')"
