@@ -5,6 +5,7 @@ CHANGELOG
 5.3, 2022-07-03
 ---------------
 - add build file for Snap;
+- add command-line flag --config-file;
 - tweak icon borders;
 - fix loading user-specific configuration file.
 

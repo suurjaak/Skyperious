@@ -41,6 +41,9 @@ VarDirectory = os.path.join(ApplicationDirectory, "var")
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
 
+"""Whether to ignore user-specific config paths."""
+ConfigFileStatic = False
+
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
@@ -370,15 +373,21 @@ WordCloudWordsMax = 100
 WordCloudWordsAuthorMax = 50
 
 
-def load():
-    """Loads FileDirectives from ConfigFile into this module's attributes."""
-    global Defaults, VarDirectory, ConfigFile
+def load(configfile=None):
+    """
+    Loads FileDirectives into this module's attributes.
+
+    @param   configfile  name of configuration file to use from now if not module defaults
+    """
+    global Defaults, VarDirectory, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
     except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
 
+    if configfile:
+        ConfigFile, ConfigFileStatic = configfile, True
     configpaths = [ConfigFile]
-    if not Defaults:
+    if not Defaults and not ConfigFileStatic:
         # Instantiate OS- and user-specific paths
         try:
             p = appdirs.user_config_dir(Title, appauthor=False)
@@ -418,16 +427,21 @@ def load():
         pass # Fail silently
 
 
-def save():
-    """Saves FileDirectives into ConfigFile."""
-    configpaths = [ConfigFile]
-    try:
-        p = appdirs.user_config_dir(Title, appauthor=False)
-        userpath = os.path.join(p, "%s.ini" % Title.lower())
-        # Pick only userpath if exists, else try application folder first
-        if os.path.isfile(userpath): configpaths = [userpath]
-        elif userpath not in configpaths: configpaths.insert(0, userpath)
-    except Exception: pass
+def save(configfile=None):
+    """
+    Saves FileDirectives into configuration file.
+
+    @param   configfile  name of configuration file to use if not module defaults
+    """
+    configpaths = [configfile] if configfile else [ConfigFile]
+    if not configfile and not ConfigFileStatic:
+        try:
+            p = appdirs.user_config_dir(Title, appauthor=False)
+            userpath = os.path.join(p, "%s.ini" % Title.lower())
+            # Pick only userpath if exists, else try application folder first
+            if os.path.isfile(userpath): configpaths = [userpath]
+            elif userpath not in configpaths: configpaths.append(userpath)
+        except Exception: pass
 
     section = "*"
     module = sys.modules[__name__]

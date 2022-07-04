@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    03.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -71,7 +71,10 @@ ARGUMENTS = {
          "version": "%s %s, %s." % (conf.Title, conf.Version, conf.VersionDate)},
         {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
          "help": "command-line output suitable for non-terminal display, "
-                 "like piping to a file"}],
+                 "like piping to a file"},
+        {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+         "help": "path of configuration file to use"}
+    ],
     "commands": [
         {"name": "export",
          "help": "export Skype databases as HTML, text or spreadsheet",
@@ -121,6 +124,8 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]}, 
         {"name": "search",
          "help": "search Skype databases for messages or data",
@@ -142,6 +147,8 @@ ARGUMENTS = {
                       "(supports * wildcards)"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]}, 
         {"name": "sync",
          "help": "download new messages from Skype online service",
@@ -187,6 +194,8 @@ ARGUMENTS = {
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file; also skips all user interaction "
                       "like asking for Skype username or password"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]}, 
         {"name": "create",
          "help": "create a new database",
@@ -213,6 +222,8 @@ ARGUMENTS = {
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file; also skips all user interaction "
                       "like asking for Skype username or password"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]},
         {"name": "merge", "help": "merge two or more Skype databases "
                                   "into a new database",
@@ -232,6 +243,8 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]}, 
         {"name": "diff", "help": "compare chat history in two Skype databases",
          "description": "Compare two Skype databases for differences "
@@ -244,6 +257,8 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]}, 
         {"name": "gui",
          "help": "launch Skyperious graphical program (default option)",
@@ -252,6 +267,8 @@ ARGUMENTS = {
              {"args": ["FILE"], "nargs": "*",
               "help": "Skype database(s) to open on startup, if any\n"
                       "(supports * wildcards)"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]},
     ],
 }
@@ -920,7 +937,7 @@ def run(nogui=False):
             (util.to_unicode(f), 1) for f in arguments.FILE[::-1]
         ))[::-1] # Reverse and re-reverse to discard earlier duplicates
 
-    conf.load()
+    conf.load(arguments.config_file)
     if "gui" == arguments.command and (nogui or not is_gui_possible):
         argparser.print_help()
         status = None
