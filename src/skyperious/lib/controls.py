@@ -976,7 +976,7 @@ class NoteButton(wx.Panel, wx.Button):
                 dc.DrawRectangle(5, 5, width - 10, height - 10)
             dc.Pen = PEN(dc.TextForeground)
 
-        if self._press or (is_focused and any(wx.GetKeyState(x) for x in KEYS.SPACE)):
+        if self._press or (is_focused and any(get_key_state(x) for x in KEYS.SPACE)):
             # Button is being clicked with mouse: create sunken effect
             colours = [(128, 128, 128)] * 2
             lines   = [(1, 1, width - 2, 1), (1, 1, 1, height - 2)]
@@ -4784,6 +4784,12 @@ def get_dialog_path(dialog):
         if ext: result += ext
 
     return result
+
+
+def get_key_state(keycode):
+    """Returns true if specified key is currently down."""
+    try: return wx.GetKeyState(keycode)
+    except Exception: return False  # wx3 can raise for non-modifier keys in non-X11 backends
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):

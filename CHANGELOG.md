@@ -9,6 +9,7 @@ CHANGELOG
 - tweak icon borders
 - fix loading user-specific configuration file
 - fix error on using system colours with transparency
+- fix error on GTK with non-X11 backend
 
 
 5.2, 2022-06-17
