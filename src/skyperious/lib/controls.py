@@ -1667,7 +1667,7 @@ class RangeSlider(wx.Panel):
         # GetFullTextExtent returns (width, height, descent, leading)
         extent = self.GetFullTextExtent(self.FormatLabel(self._rng[1]))
         # 2.3 provides a bit of space between 2 labels
-        best.width  = 2.3 * extent[0]
+        best.width  = int(2.3 * extent[0])
         # +1 for upper gap plus label height plus optional marker label height,
         # plus all set positions
         best.height = (1 + (1 + self.MARKER_LABEL_SHOW) * sum(extent[1:3])

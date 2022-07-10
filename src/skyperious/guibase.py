@@ -133,7 +133,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
 
         button_clear = wx.Button(parent=panel, label="C&lear log", size=(100, -1))
         edit_log = self.log = wx.stc.StyledTextCtrl(panel)
-        edit_log.SetMarginCount(0)
+        hasattr(edit_log, "SetMarginCount") and edit_log.SetMarginCount(0)  # Since wx 3.1.1
         edit_log.SetReadOnly(True)
         edit_log.SetTabWidth(edit_log.TabWidth * 2)
         edit_log.SetWrapMode(wx.stc.STC_WRAP_WORD)

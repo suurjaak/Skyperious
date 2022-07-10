@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.05.2022
+@modified    10.07.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2578,8 +2578,9 @@ class DatabasePage(wx.Panel):
         edit_filter.SetToolTip("Find messages containing the exact text")
         label_range = wx.StaticText(
             parent=panel_stc2, label="Show messages from time perio&d:")
-        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
-        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=(90 * controls.COMBO_WIDTH_FACTOR, -1))
+        dtsize = (int(90 * controls.COMBO_WIDTH_FACTOR), -1)
+        date1 = self.edit_filterdate1 = controls.DatePickerCtrl(panel_stc2, size=dtsize)
+        date2 = self.edit_filterdate2 = controls.DatePickerCtrl(panel_stc2, size=dtsize)
         date1.Format = date2.Format = "%Y-%m-%d"
         date2.SetPopupAnchor(wx.RIGHT)
         date1.SetToolTip("Date in the form YYYY-MM-DD")
@@ -2898,7 +2899,8 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
         ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)
         ColourManager.Manage(grid, "LabelTextColour",             wx.SYS_COLOUR_WINDOWTEXT)
-        grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
+        if hasattr(grid, "SetDefaultCellFitMode"):
+            grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())  # Since wx 3.1.4
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK, self.on_sort_grid_column)
         grid.GridWindow.Bind(wx.EVT_MOTION, self.on_mouse_over_grid)
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
@@ -2974,7 +2976,8 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(grid, "DefaultCellTextColour",       wx.SYS_COLOUR_WINDOWTEXT)
         ColourManager.Manage(grid, "LabelBackgroundColour",       wx.SYS_COLOUR_BTNFACE)
         ColourManager.Manage(grid, "LabelTextColour",             wx.SYS_COLOUR_WINDOWTEXT)
-        grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())
+        if hasattr(grid, "SetDefaultCellFitMode"):
+            grid.SetDefaultCellFitMode(wx.grid.GridFitMode.Clip())  # Since wx 3.1.4
         grid.Bind(wx.grid.EVT_GRID_LABEL_LEFT_DCLICK,
                   self.on_sort_grid_column)
         grid.Bind(wx.grid.EVT_GRID_LABEL_RIGHT_CLICK,
