@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.04.2022
+@modified    10.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2398,15 +2398,15 @@ class MessageParser(object):
     def sanitize(self, dom, known_tags):
         """Turns unknown tags to span, drops empties and unnests single root."""
         parent_map = dict((c, p) for p in dom.iter() for c in p)
-        blank = lambda x: not (x.text or x.tail or x.getchildren())
+        blank = lambda x: not (x.text or x.tail or list(x)
         drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
 
         def process_node(node, last=None):
-            for child in node.getchildren():
+            for child in node:
                 if child.tag not in known_tags:
                     child.attrib, child.tag = {}, "span"
                 process_node(child)
-                if child.text or child.getchildren(): last = child
+                if child.text or list(child): last = child
                 else:
                     if child.tail: # Not totally empty: hang tail onto previous
                         if last: last.tail = (last.tail or "") + child.tail
@@ -2519,7 +2519,7 @@ class MessageParser(object):
             if "quote" == elem.tag:
                 self.add_dict_text(self.stats, "last_cloudtext", text)
                 self.add_dict_text(self.stats, "last_message", text)
-                subitems = elem.getchildren()
+                subitems = list(elem)
             elif "a" == elem.tag:
                 self.stats["links"].setdefault(message["author"], []).append(text)
                 self.add_dict_text(self.stats, "last_message", text)

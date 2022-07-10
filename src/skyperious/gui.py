@@ -8129,7 +8129,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         tails_new = {} if tails_new is None else tails_new
         linefeed_final = "\n\n" # Decreased if quotefrom is last
 
-        for e in dom.getiterator():
+        for e in dom.iter():
             # Possible tags: a|b||i|s|bodystatus|quote|quotefrom|msgstatus|
             #                span|special|xml|font|blink
             if e in to_skip:
@@ -8154,7 +8154,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 text = e.text
             elif "quote" == e.tag:
                 text = "\"" + text
-                children = e.getchildren()
+                children = list(e)
                 if len(children) > 1:
                     # Last element is always quotefrom
                     childtail = children[-2].tail if children[-2].tail else ""
