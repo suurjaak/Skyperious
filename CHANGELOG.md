@@ -2,12 +2,13 @@ CHANGELOG
 =========
 
 
-5.3, 2022-07-03
+5.3, 2022-07-10
 ---------------
 - add build file for Snap;
 - add command-line flag --config-file;
 - tweak icon borders;
-- fix loading user-specific configuration file.
+- fix loading user-specific configuration file;
+- fix error on using system colours with transparency.
 
 
 5.2, 2022-06-17

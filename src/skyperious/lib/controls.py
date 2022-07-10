@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    17.06.2022
+@modified    10.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -306,6 +306,8 @@ class ColourManager(object):
         """Returns wx.Colour or system colour as HTML colour hex string."""
         colour = idx if isinstance(idx, wx.Colour) \
                  else wx.SystemSettings.GetColour(idx)
+        if colour.Alpha() != wx.ALPHA_OPAQUE:
+            colour = wx.Colour(colour[:3])  # GetAsString(C2S_HTML_SYNTAX) can raise if transparent
         return colour.GetAsString(wx.C2S_HTML_SYNTAX)
 
 
@@ -3401,11 +3403,9 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
 
     def SetStyleSpecs(self):
         """Sets STC style colours."""
-        fgcolour, bgcolour, highcolour = (
-            wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
-            for x in (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW
-                      if self.Enabled else wx.SYS_COLOUR_BTNFACE,
-                      wx.SYS_COLOUR_HOTLIGHT)
+        fgcolour, bgcolour, highcolour = (ColourManager.ColourHex(x) for x in 
+            (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW if self.Enabled else wx.SYS_COLOUR_BTNFACE,
+             wx.SYS_COLOUR_HOTLIGHT)
         )
 
 

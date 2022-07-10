@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    19.03.2022
+@modified    10.07.2022
 """
 import datetime
 import logging
@@ -144,10 +144,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             edit_log.SetReadOnly(True)
         def on_colour(event=None):
             if event: event.Skip()
-            fgcolour, crcolour, bgcolour = (
-                wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
-                for x in (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT,
-                          wx.SYS_COLOUR_WINDOW)
+            fgcolour, crcolour, bgcolour = (ColourManager.ColourHex(x) for x in 
+                (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW)
             )
             edit_log.SetCaretForeground(crcolour)
             edit_log.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,
