@@ -2398,7 +2398,7 @@ class MessageParser(object):
     def sanitize(self, dom, known_tags):
         """Turns unknown tags to span, drops empties and unnests single root."""
         parent_map = dict((c, p) for p in dom.iter() for c in p)
-        blank = lambda x: not (x.text or x.tail or list(x)
+        blank = lambda x: not (x.text or x.tail or list(x))
         drop = lambda p, c: (p.remove(c), blank(p) and drop(parent_map[p], p))
 
         def process_node(node, last=None):

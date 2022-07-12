@@ -136,7 +136,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.frame_console.SetIcons(icons)
 
-        notebook = self.notebook = FlatNotebook(
+        notebook = self.notebook = controls.FlatNotebook(
             parent=panel, style=wx.NB_TOP,
             agwStyle=wx.lib.agw.flatnotebook.FNB_NODRAG |
                      wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
