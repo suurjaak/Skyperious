@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.07.2022
+@modified    12.07.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -136,7 +136,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.frame_console.SetIcons(icons)
 
-        notebook = self.notebook = wx.lib.agw.flatnotebook.FlatNotebook(
+        notebook = self.notebook = FlatNotebook(
             parent=panel, style=wx.NB_TOP,
             agwStyle=wx.lib.agw.flatnotebook.FNB_NODRAG |
                      wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |
@@ -3428,7 +3428,6 @@ class DatabasePage(wx.Panel):
         boldfont.SetFaceName(self.Font.FaceName)
         boldfont.SetPointSize(self.Font.PointSize)
         item_name.Font = boldfont
-        if len(chats) > 1: item_name.Enabled = item_rename.Enabled = False
 
         menu.Append(item_name)
         menu.AppendSeparator()
@@ -3442,6 +3441,7 @@ class DatabasePage(wx.Panel):
         if item_datesm: menu.Append(item_datesm)
         menu.AppendSeparator()
         menu.Append(item_delete)
+        if len(chats) > 1: item_name.Enabled = item_rename.Enabled = False
 
         def clipboardize(category):
             if "title" == category:
@@ -4521,7 +4521,7 @@ class DatabasePage(wx.Panel):
                 ratio = min(1, util.safedivf(html._last_scroll_pos[i],
                     html._last_scroll_range[i]
                 ))
-                html._last_scroll_pos[i] = ratio * html.GetScrollRange(orient)
+                html._last_scroll_pos[i] = int(ratio * html.GetScrollRange(orient))
             # Execute scroll later as something resets it after this handler
             scroll_func = lambda: html and html.Scroll(*html._last_scroll_pos)
             wx.CallLater(50, scroll_func)
@@ -8140,7 +8140,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             children = []
             if isinstance(text, six.binary_type):
                 text = text.decode("utf-8")
-            if isinstance(text, six.binary_type):
+            if isinstance(tail, six.binary_type):
                 tail = tail.decode("utf-8")
             if "a" == e.tag:
                 href = e.get("href")

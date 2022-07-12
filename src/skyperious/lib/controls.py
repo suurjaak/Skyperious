@@ -82,7 +82,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    10.07.2022
+@modified    12.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -334,7 +334,7 @@ class ColourManager(object):
                   if isinstance(colour2, integer_types) else wx.Colour(colour2)
         rgb1, rgb2 = tuple(colour1)[:3], tuple(colour2)[:3]
         delta  = tuple(a - b for a, b in zip(rgb1, rgb2))
-        result = tuple(a - (d * ratio) for a, d in zip(rgb1, delta))
+        result = tuple(a - int(d * ratio) for a, d in zip(rgb1, delta))
         result = tuple(min(255, max(0, x)) for x in result)
         return wx.Colour(result)
 
@@ -446,6 +446,35 @@ class ColourManager(object):
 
         stc.CallTipSetBackground(faces['calltipbg'])
         stc.CallTipSetForeground(faces['calltipfg'])
+
+
+
+class FlatNotebook(wx.lib.agw.flatnotebook.FlatNotebook):
+    """
+    Wrapper for wx.lib.agw.flatnotebook.FlatNotebook, handling wxPython bug
+    of raising error for using floats with wx.Rect in versions of Python later than 3.8.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(FlatNotebook, self).__init__(*args, **kwargs)
+        self._PatchRenderer(self)
+
+
+    @staticmethod
+    def _PatchRenderer(nb):
+        """Patches Renderer.DrawTabs of given notebook."""
+        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
+        except Exception: pass
+        else: return
+
+        def DrawTabs__Patched(*args, **kwargs):
+            wx.Rect = rect_defloat
+            try: return Renderer__DrawTabs(*args, **kwargs)
+            finally: wx.Rect = WX__RECT
+
+        # Renderer functions invoke wx.Rect() with float arguments
+        renderer = nb.GetTabArea()._mgr.GetRenderer(nb.GetAGWWindowStyleFlag())
+        Renderer__DrawTabs, renderer.DrawTabs = renderer.DrawTabs, DrawTabs__Patched
 
 
 
@@ -1202,6 +1231,24 @@ class NoteButton(wx.Panel, wx.Button):
     def GetNote(self):
         return self._note
     Note = property(GetNote, SetNote)
+
+
+
+class Patch(object):
+    """
+    Functionality for monkey-patching wx API for general compatibility over different versions.
+    """
+
+    @classmethod
+    def patch(cls, obj):
+        """Patches the object depending on its type and wx environment."""
+        if isinstance(obj, wx.stc.StyledTextCtrl):
+            # In some versions have StartStyling(start), others StartStyling(start, mask)
+            STC__StartStyling = obj.StartStyling
+            def StartStyling__Patched(start):
+                try: return STC__StartStyling(start)
+                except TypeError: return STC__StartStyling(start, 255)
+            obj.StartStyling = StartStyling__Patched
 
 
 
@@ -2282,7 +2329,7 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
             pos, rng = self._last_scroll_pos[i], self._last_scroll_range[i]
             ratio = pos / float(rng) if rng else 0.0
             ratio = min(1, pos / float(rng) if rng else 0.0)
-            self._last_scroll_pos[i] = ratio * self.GetScrollRange(orient)
+            self._last_scroll_pos[i] = int(ratio * self.GetScrollRange(orient))
         try:
             # Execute scroll later as something resets it after this handler
             wx.CallLater(50, lambda:
@@ -3699,6 +3746,7 @@ class SearchableStyledTextCtrl(wx.Panel):
         style_sub = functools.reduce(lambda a, b: a & ~b, nobits,
                                      style | wx.BORDER_NONE)
         self._stc = wx.stc.StyledTextCtrl(self, id, style=style_sub, name=name)
+        Patch.patch(self._stc)
 
         bmp = self.IMG_TOGGLE.GetBitmap()
         buttonsize = bmp.Width + 4, bmp.Height + 4
@@ -4112,7 +4160,7 @@ class TabbedHtmlWindow(wx.Panel):
         if "linux" in sys.platform and wx.VERSION[:3] == (4, 1, 1):
             # wxPython 4.1.1 on Linux crashes with FNB_VC8
             agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
-        notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
+        notebook = self._notebook = FlatNotebook(
             parent=self, size=(-1, 27), style=wx.NB_TOP,
             agwStyle=agwStyle)
         self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
@@ -4167,7 +4215,7 @@ class TabbedHtmlWindow(wx.Panel):
                 pos, rng = tab["scrollpos"][i], tab["scrollrange"][i]
                 ratio = pos / float(rng) if rng else 0.0
                 ratio = min(1, pos / float(rng) if rng else 0.0)
-                tab["scrollpos"][i] = ratio * self.GetScrollRange(orient)
+                tab["scrollpos"][i] = int(ratio * self.GetScrollRange(orient))
             # Execute scroll later as something resets it after this handler
             try:
                 wx.CallLater(50, lambda:
@@ -4734,7 +4782,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
         if val and h < 1.5: h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
         y = bmp.Height - h
-        bars.append((x, y, barsize[0], h))
+        bars.append(list(map(int, (x, y, barsize[0], h))))
     dc.Brush = BRUSH(colour)
     dc.DrawRectangleList(bars)
 
@@ -4790,6 +4838,15 @@ def get_key_state(keycode):
     """Returns true if specified key is currently down."""
     try: return wx.GetKeyState(keycode)
     except Exception: return False  # wx3 can raise for non-modifier keys in non-X11 backends
+
+
+WX__RECT = wx.Rect
+
+def rect_defloat(*args, **kwargs):
+    """Wrapper for constructing wx.Rect, casting any float arguments to int."""
+    args   = [int(v) if isinstance(v, float) else v for v in args]
+    kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
+    return WX__RECT(*args, **kwargs)
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):
