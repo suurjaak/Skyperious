@@ -573,7 +573,7 @@ class SkypeDatabase(object):
                 )
                 if timestamp_from:
                     messages_sorted = (x for x in messages_sorted
-                        if (x["timestamp"] > timestamp_from if ascending 
+                        if (x["timestamp"] > timestamp_from if ascending
                             else x["timestamp"] < timestamp_from))
                 for message in messages_sorted:
                     yield message
@@ -655,7 +655,7 @@ class SkypeDatabase(object):
                 args["name%s" % i] = "%" + safe + "%"
             for i, identity in enumerate(chatidentities or []):
                 where += (" OR " if i else "AND (") + (
-                          "identity = :identity%s" % i + 
+                          "identity = :identity%s" % i +
                          (")" if i == len(chatidentities) - 1 else ""))
                 args["identity%s" % i] = identity
             titlecol = self.make_title_col()
@@ -764,7 +764,7 @@ class SkypeDatabase(object):
                    "MAX(timestamp) AS last_message_timestamp, "
                    "NULL AS first_message_datetime, "
                    "NULL AS last_message_datetime "
-                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id" 
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             rows_stat = self.execute(sql, and_val).fetchall()
             stats = dict((i["id"], i) for i in rows_stat)
@@ -783,7 +783,7 @@ class SkypeDatabase(object):
                 "created_datetime", "creation_timestamp", "message_count",
                 "last_activity_datetime", "last_activity_timestamp"],
                 [min, max, min, min, sum, max, max]
-            ): # Combine 
+            ): # Combine
                 values = [d.get(n, c.get(n)) for c, d in zip(cc, datas)]
                 values = [x for x in values if x is not None]
                 chat[n] = f(values) if values else None
@@ -814,20 +814,20 @@ class SkypeDatabase(object):
             sql = ("SELECT convo_id AS id, author AS identity, COUNT(*) AS message_count, "
                    "MIN(timestamp) AS first_message_timestamp, "
                    "MAX(timestamp) AS last_message_timestamp "
-                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             for row in self.execute(sql, and_val).fetchall():
                 stats.setdefault(row["identity"], []).append(row)
 
             sql = ("SELECT id AS first_message_id, convo_id AS id, author AS identity, "
                    "MIN(timestamp) AS first_message_timestamp "
-                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             for row in self.execute(sql, and_val).fetchall():
                 firstmsgs[(row["id"], row["identity"])] = row
             sql = ("SELECT id AS last_message_id, convo_id AS id, author AS identity, "
                    "MAX(timestamp) AS last_message_timestamp "
-                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author" 
+                   "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             for row in self.execute(sql, and_val).fetchall():
                 lastmsgs[(row["id"], row["identity"])] = row
@@ -884,7 +884,7 @@ class SkypeDatabase(object):
             contact["message_count_group"] = sum((x["message_count"] for x in datas2
                                                   if x["id"] != singlechat_id), 0)
             for n, f in zip(["first_message_datetime", "last_message_datetime"], [min, max]):
-                contact[n] = f(d.get(n) for d in datas2) # Combine 
+                contact[n] = f(d.get(n) for d in datas2) # Combine
             contact["conversations"] = datas2
 
         if log and contacts:
@@ -1293,7 +1293,7 @@ class SkypeDatabase(object):
             # Messages.chatname corresponds to Chats.name, and Chats entries
             # must exist for Skype application to be able to find the messages.
             cc = [x for x in (source_chat, source_chat.get("__link")) if x]
-            chatrows_source = dict((i["name"], i) for i in 
+            chatrows_source = dict((i["name"], i) for i in
                 source_db.execute("SELECT * FROM chats WHERE conv_dbid IN (%s)"
                     % ", ".join("?" * len(cc)), [x["id"] for x in cc]))
             chatrows_present = dict([(i["name"], 1)
@@ -1722,7 +1722,7 @@ class MessageParser(object):
     Emoticon can be preceded by anything, followed by possible punctuation,
     and must end with whitespace, or string ending, or another emoticon.
     """
-    EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" % 
+    EMOTICON_REPL = lambda self, m: ("<ss type=\"%s\">%s</ss>" %
         (emoticons.EmoticonStrings[m.group(1)], m.group(1))
         if m.group(1) in emoticons.EmoticonStrings
         and re.match(r"^%s*[%s]*(\s|$)" % (self.EMOTICON_RGX.pattern,
@@ -1813,7 +1813,7 @@ class MessageParser(object):
         @param   message        message data dict
         @param   rgx_highlight  regex for finding text to highlight, if any
         @param   output         dict with output options:
-                                "format": "html" returns an HTML string 
+                                "format": "html" returns an HTML string
                                                  including author and timestamp
                                           "text" returns message body plaintext
                                 "wrap": False    whether to wrap long lines
@@ -1821,7 +1821,7 @@ class MessageParser(object):
                                                  using another content template
                                 "merge": False   for merge comparison, inserts
                                                  skypename instead of fullname
-        @return                 a string if html or text specified, 
+        @return                 a string if html or text specified,
                                 or ElementTree.Element containing message body,
                                 with "xml" as the root tag
                                 and any number of subtags:
@@ -2138,7 +2138,7 @@ class MessageParser(object):
                             # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
                             url = pkg["attachments"][0]["content"]["images"][0]["url"]
                             data.update(category="card", url=live.make_content_url(url, "card"))
-                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' % 
+                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
                                                 (urllib.parse.quote(url, ":/=?&#"), url), message)
                     except Exception: pass
 
@@ -2186,7 +2186,7 @@ class MessageParser(object):
                     text = text.replace("&", "&amp;")
                     result = ElementTree.fromstring(TAG % text)
                 except Exception:
-                    logger.exception('Error parsing message %s, body "%s".', 
+                    logger.exception('Error parsing message %s, body "%s".',
                                      message.get("id", message), text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
@@ -2197,7 +2197,7 @@ class MessageParser(object):
         """Wraps text matching regex in any dom element in <b> nodes."""
         parent_map = dict((c, p) for p in dom.iter() for c in p)
         rgx_highlight_split = re.compile("<b>")
-        repl_highlight = lambda x: "<b>%s<b>" % x.group(0) 
+        repl_highlight = lambda x: "<b>%s<b>" % x.group(0)
         # Highlight substrings in <b>-tags
         for i in dom.iter():
             if "b" == i.tag:
@@ -2655,7 +2655,7 @@ class MessageParser(object):
                 stats["hists"][author]["days-firsts"] = authorstamps
 
         # Create main cloudtext
-        options = {"COUNT_MIN": conf.WordCloudCountMin, 
+        options = {"COUNT_MIN": conf.WordCloudCountMin,
                    "WORDS_MAX": conf.WordCloudWordsMax}
         for author, links in stats["links"].items():
             stats["cloudcounter"].add_words(links, author)
@@ -2841,7 +2841,7 @@ def get_avatar(datadict, size=None, aspect_ratio=True):
                            filling the outside in white
     """
     result = None
-    raw = fix_image_raw(datadict.get("avatar_image") or 
+    raw = fix_image_raw(datadict.get("avatar_image") or
                         datadict.get("profile_attachments") or "")
     if raw:
         try:

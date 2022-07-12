@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.3.dev6"
+Version = "5.3.dev7"
 VersionDate = "12.07.2022"
 
 if getattr(sys, "frozen", False):
@@ -86,7 +86,7 @@ IsCLI = False
 IsCLIVerbose = False
 
 """
-Is command-line interface using output suitable for non-terminals 
+Is command-line interface using output suitable for non-terminals
 like piping to a file, skips progress bars and user interaction.
 """
 IsCLINonTerminal = True
@@ -456,7 +456,7 @@ def save(configfile=None):
             except Exception: continue # for path
             else: break # for path
 
-        f.write("# %s configuration written on %s.\n" % 
+        f.write("# %s configuration written on %s.\n" %
                 (Title, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try: parser.set(section, name, json.dumps(getattr(module, name)))

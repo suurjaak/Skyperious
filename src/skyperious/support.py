@@ -178,7 +178,7 @@ def take_screenshot(fullscreen=True):
         window = wx.GetApp().TopWindow
         rect   = window.GetRect()
 
-        # adjust widths for Linux (figured out by John Torres 
+        # adjust widths for Linux (figured out by John Torres
         # http://article.gmane.org/gmane.comp.python.wxpython/67327)
         if "linux" in sys.platform:
             client_x, client_y = window.ClientToScreen((0, 0))
@@ -399,7 +399,7 @@ class FeedbackDialog(wx_accel.AutoAcceleratorMixIn, wx.Dialog):
             ok = wx.MessageBox("Send the entered text%s? For reply, include "
                                "a contact e-mail in the text.\n\n\"%s\"" % (
                                " and screenshot" if bmp else "", text_short),
-                               self.Title, wx.OK | wx.CANCEL | 
+                               self.Title, wx.OK | wx.CANCEL |
                                wx.ICON_INFORMATION)
             text = (text if wx.OK == ok else "")
         if text:

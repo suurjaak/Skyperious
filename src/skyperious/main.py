@@ -17,6 +17,7 @@ import argparse
 import atexit
 import codecs
 import collections
+import copy
 import datetime
 import errno
 import getpass
@@ -80,7 +81,7 @@ ARGUMENTS = {
          "help": "export Skype databases as HTML, text or spreadsheet",
          "description": "Export all message history from a Skype database "
                         "into files under a new folder" + (", or a single Excel "
-                        "workbook with chats on separate sheets." 
+                        "workbook with chats on separate sheets."
                         if export.xlsxwriter else ""),
          "arguments": [
              {"args": ["-t", "--type"], "dest": "type",
@@ -95,7 +96,7 @@ ARGUMENTS = {
                       "text files"},
              {"args": ["FILE"], "nargs": "+",
               "help": "one or more Skype databases to export\n"
-                      "(supports * wildcards)"}, 
+                      "(supports * wildcards)"},
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
               "help": "Output directory if not current directory"},
@@ -126,7 +127,7 @@ ARGUMENTS = {
                       "like piping to a file"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
-        ]}, 
+        ]},
         {"name": "search",
          "help": "search Skype databases for messages or data",
          "description": "Search Skype databases for messages, chat or contact "
@@ -149,7 +150,7 @@ ARGUMENTS = {
               "help": "print detailed progress messages to stderr"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
-        ]}, 
+        ]},
         {"name": "sync",
          "help": "download new messages from Skype online service",
          "description": "Synchronize Skype database via login to Skype online service.",
@@ -196,7 +197,7 @@ ARGUMENTS = {
                       "like asking for Skype username or password"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
-        ]}, 
+        ]},
         {"name": "create",
          "help": "create a new database",
          "description": "Create a new blank database, or populated from "
@@ -245,7 +246,7 @@ ARGUMENTS = {
                       "like piping to a file"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
-        ]}, 
+        ]},
         {"name": "diff", "help": "compare chat history in two Skype databases",
          "description": "Compare two Skype databases for differences "
                         "in chat history.",
@@ -259,7 +260,7 @@ ARGUMENTS = {
                       "like piping to a file"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
-        ]}, 
+        ]},
         {"name": "gui",
          "help": "launch Skyperious graphical program (default option)",
          "description": "Launch Skyperious graphical program (default option)",
@@ -510,7 +511,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 else:
                     ns["bar"] = ProgressBar(pulse=True, interval=0.05,
                                             static=conf.IsCLINonTerminal,
-                                            afterword=" Synchronizing %s%s" % 
+                                            afterword=" Synchronizing %s%s" %
                                             (title, suff))
                     ns["bar"].start()
                 ns["chat_title"] = title
@@ -747,7 +748,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
         try:
             extras = [("", chatnames)] if chatnames else []
             extras += [(" with authors", authornames)] if authornames else []
-            output("Exporting%s%s as %s %sto %s." % 
+            output("Exporting%s%s as %s %sto %s." %
                   (" chats" if extras else "",
                    ",".join("%s like %s" % (x, y) for x, y in extras),
                    format.upper(), dbstr, path))
@@ -785,7 +786,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                       ("" if len(dbs) == 1 else " from %s" % db))
                 util.try_ignore((os.unlink if is_xlsx_single else os.rmdir), path)
         except Exception as e:
-            output("Error exporting chats: %s\n\n%s" % 
+            output("Error exporting chats: %s\n\n%s" %
                   (e, traceback.format_exc()))
 
 
@@ -895,7 +896,7 @@ def run(nogui=False):
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
-        sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to 
+        sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to
         sys.stderr = ConsoleWriter(sys.stderr) # a text console
     if "main" not in sys.modules: # E.g. setuptools install, calling main.run
         srcdir = os.path.abspath(os.path.dirname(__file__))
@@ -903,21 +904,21 @@ def run(nogui=False):
         #sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
-    for arg in ARGUMENTS["arguments"]:
+    for arg in copy.deepcopy(ARGUMENTS["arguments"]):
         argparser.add_argument(*arg.pop("args"), **arg)
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
         subparser = subparsers.add_parser(cmd["name"],
                     formatter_class=LineSplitFormatter, **kwargs)
-        for arg in cmd["arguments"]:
-            kwargs = dict((k, arg[k]) for k in arg if k != "args")
-            subparser.add_argument(*arg["args"], **kwargs)
+        for arg in copy.deepcopy(cmd["arguments"]):
+            subparser.add_argument(*arg.pop("args"), **arg)
 
     argv = sys.argv[:]
     if "nt" == os.name and six.PY2: # Fix Unicode arguments, otherwise converted to ?
         argv = win32_unicode_argv(argv)
     argv = argv[1:]
+
     if not argv or not any(x in argv for x in tuple(subparsers.choices) + ("-h", "--help")):
         argv[:0] = ["gui"] # argparse hack: force default argument
     if argv[0] in ("-h", "--help") and len(argv) > 1:
@@ -993,7 +994,7 @@ def run(nogui=False):
 
 class ConsoleWriter(object):
     """
-    Wrapper for sys.stdout/stderr, attaches to the parent console or creates 
+    Wrapper for sys.stdout/stderr, attaches to the parent console or creates
     a new command console, usable from python.exe, pythonw.exe or
     compiled binary. Hooks application exit to wait for final user input.
     """
@@ -1207,15 +1208,15 @@ def win32_unicode_argv(argv):
     result = argv
     from ctypes import POINTER, byref, cdll, c_int, windll
     from ctypes.wintypes import LPCWSTR, LPWSTR
- 
+
     GetCommandLineW = cdll.kernel32.GetCommandLineW
     GetCommandLineW.argtypes = []
     GetCommandLineW.restype = LPCWSTR
- 
+
     CommandLineToArgvW = windll.shell32.CommandLineToArgvW
     CommandLineToArgvW.argtypes = [LPCWSTR, POINTER(c_int)]
     CommandLineToArgvW.restype = POINTER(LPWSTR)
- 
+
     argc = c_int(0)
     argv = CommandLineToArgvW(GetCommandLineW(), byref(argc))
     if argc.value:

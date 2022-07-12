@@ -416,7 +416,7 @@ def create_file(filepath, mode="w", handle=False, **kwargs):
 
 def is_os_64bit():
     """Returns whether the operating system is 64-bit (Windows-only)."""
-    return ('PROCESSOR_ARCHITEW6432' in os.environ 
+    return ('PROCESSOR_ARCHITEW6432' in os.environ
             or os.environ['PROCESSOR_ARCHITECTURE'].endswith('64'))
 
 
@@ -508,7 +508,7 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
 
 def img_pil_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
     """
-    Returns a resized PIL.Image, centered if aspect ratio rescale resulted in 
+    Returns a resized PIL.Image, centered if aspect ratio rescale resulted in
     free space on one axis.
     """
     result = img
@@ -611,7 +611,7 @@ def path_to_url(path, encoding="utf-8"):
 def to_unicode(value, encoding=None, errors="strict"):
     """
     Returns the value as a Unicode string.
-    
+
     Tries decoding as UTF-8 if locale encoading fails.
     """
     result = value

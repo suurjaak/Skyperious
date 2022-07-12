@@ -115,7 +115,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         self.status_clearer      = None  # wx.CallLater instance
         console = self.console = self.frame_console.shell
         if not isinstance(conf.ConsoleHistoryCommands, list):
-            conf.ConsoleHistoryCommands = [] 
+            conf.ConsoleHistoryCommands = []
         for cmd in conf.ConsoleHistoryCommands:
             console.addHistory(cmd)
         ColourManager.Register(console)
@@ -144,7 +144,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             edit_log.SetReadOnly(True)
         def on_colour(event=None):
             if event: event.Skip()
-            fgcolour, crcolour, bgcolour = (ColourManager.ColourHex(x) for x in 
+            fgcolour, crcolour, bgcolour = (ColourManager.ColourHex(x) for x in
                 (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW)
             )
             edit_log.SetCaretForeground(crcolour)

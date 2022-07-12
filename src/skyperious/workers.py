@@ -55,7 +55,7 @@ class WorkerThread(threading.Thread):
 
     def work(self, data):
         """
-        Registers new work to process. Stops current work, if any. Starts 
+        Registers new work to process. Stops current work, if any. Starts
         thread if not running.
 
         @param   data  a dict with work data
@@ -129,7 +129,7 @@ class SearchThread(WorkerThread):
                 wrap_html = None # MessageParser wrap function, for HTML output
                 if is_html:
                     TEMPLATES = {
-                        "chat":    templates.SEARCH_ROW_CHAT_HTML, 
+                        "chat":    templates.SEARCH_ROW_CHAT_HTML,
                         "contact": templates.SEARCH_ROW_CONTACT_HTML,
                         "message": templates.SEARCH_ROW_MESSAGE_HTML,
                         "table":   templates.SEARCH_ROW_TABLE_HEADER_HTML,
@@ -145,7 +145,7 @@ class SearchThread(WorkerThread):
                         output["wrap"] = True
                 else:
                     TEMPLATES = {
-                        "chat":    templates.SEARCH_ROW_CHAT_TXT, 
+                        "chat":    templates.SEARCH_ROW_CHAT_TXT,
                         "contact": templates.SEARCH_ROW_CONTACT_TXT,
                         "message": templates.SEARCH_ROW_MESSAGE_TXT,
                         "table":   templates.SEARCH_ROW_TABLE_HEADER_TXT,
@@ -274,7 +274,7 @@ class SearchThread(WorkerThread):
                         ascending=False, use_cache=False)
                     for m in messages:
                         chat = chat_map.get(m["convo_id"])
-                        body = parser.parse(m, pattern_replace if match_words 
+                        body = parser.parse(m, pattern_replace if match_words
                                             else None, output)
                         count += 1
                         result_count += 1
@@ -314,7 +314,7 @@ class SearchThread(WorkerThread):
                         rows = search["db"].execute(sql, params)
                         row = rows.fetchone()
                         namepre, namesuf = ("<b>", "</b>") if row else ("", "")
-                        countpre, countsuf = (("<a href='#%s'>" % 
+                        countpre, countsuf = (("<a href='#%s'>" %
                             step.escape_html(table["name"]), "</a>") if row
                             else ("", ""))
                         infotext += (", " if infotext else "") \
@@ -353,7 +353,7 @@ class SearchThread(WorkerThread):
                             self.postback(result)
                             result = {"output": "", "map": {},
                                       "search": search, "count": 0}
-                        infotext += " (%s%s%s)" % (countpre, 
+                        infotext += " (%s%s%s)" % (countpre,
                                     util.plural("result", count), countsuf)
                         if not self._is_working or (is_html
                         and result_count >= conf.MaxSearchTableRows):
@@ -493,7 +493,7 @@ class MergeThread(WorkerThread):
             result["index"] = postback["index"]
             if not self._drop_results:
                 if index < len(compared) - 1:
-                    result["status"] = ("Scanning %s." % 
+                    result["status"] = ("Scanning %s." %
                                         compared[index + 1]["title_long_lc"])
                 self.postback(result)
                 result = dict(result, output="", chats=[])
@@ -574,7 +574,7 @@ class MergeThread(WorkerThread):
                 result["chats"].append(chat)
                 if not self._drop_results:
                     if index < len(compared) - 1:
-                        result["status"] = ("Scanning %s." % 
+                        result["status"] = ("Scanning %s." %
                                             compared[index+1]["title_long_lc"])
                     self.postback(result)
                     result = dict(result, output="", chats=[])
@@ -859,7 +859,7 @@ class SkypeArchiveThread(WorkerThread):
 
         def progress(**kwargs):
             if kwargs and not self._drop_results: self.postback(kwargs)
-            return self._is_working 
+            return self._is_working
 
         while self._is_running:
             action = self._queue.get()

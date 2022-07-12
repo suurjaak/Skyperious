@@ -240,7 +240,7 @@ class SkypeLogin(object):
 
     def save(self, table, item, parent=None):
         """
-        Saves the item to SQLite table. Returns true if item with the same 
+        Saves the item to SQLite table. Returns true if item with the same
         content already existed.
 
         @param    parent  chat for messages
@@ -682,7 +682,7 @@ class SkypeLogin(object):
                 filename, filesize = (item.file.name, item.file.size) if item.file else (None, None)
                 fileurl = item.file.urlFull
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
-                              body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' % 
+                              body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' %
                                        (urllib.parse.quote(util.to_unicode(filesize or 0)),
                                         urllib.parse.quote(util.to_unicode(fileurl or ""), ":/"),
                                         util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
@@ -965,7 +965,7 @@ class SkypeExport(skypedata.SkypeDatabase):
           'members':     '["accountname",..]', # Note that the list is a JSON string
         },
         'MessageList':   [{
-          'conversationid': 'chat ID', 
+          'conversationid': 'chat ID',
           'displayName':    None,
           'messagetype':    'RichText',
           'properties':     None,
@@ -982,7 +982,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     Account names can have prefix like '8:accountname'.
 
     Message type can be one of the following (not complete list): [
-     'Event/Call', 'InviteFreeRelationshipChanged/Initialized', 'Notice', 
+     'Event/Call', 'InviteFreeRelationshipChanged/Initialized', 'Notice',
      'PopCard', 'RichText', 'RichText/Media_Album', 'RichText/Media_Card',
      'RichText/Media_GenericFile', 'RichText/Media_Video', 'RichText/UriObject',
      'Text', 'ThreadActivity/AddMember', 'ThreadActivity/DeleteMember',
@@ -1132,7 +1132,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                         chat["type"] = skypedata.CHATS_TYPE_GROUP
                         if value.startswith(skypedata.ID_PREFIX_SINGLE):
                             chat["identity"] = value[len(skypedata.ID_PREFIX_SINGLE):]
-                            chat["type"] = skypedata.CHATS_TYPE_SINGLE 
+                            chat["type"] = skypedata.CHATS_TYPE_SINGLE
                     except Exception:
                         logger.warning("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
                         skip_chat = True

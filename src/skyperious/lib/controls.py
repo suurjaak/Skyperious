@@ -625,7 +625,7 @@ class NonModalOKDialog(wx.Dialog):
 
     def __init__(self, parent, title, message):
         wx.Dialog.__init__(self, parent=parent, title=title,
-                           style=wx.CAPTION | wx.CLOSE_BOX | 
+                           style=wx.CAPTION | wx.CLOSE_BOX |
                                  wx.FRAME_FLOAT_ON_PARENT)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -1786,7 +1786,7 @@ class RangeSlider(wx.Panel):
                                  height - box_top - self.BAR_HEIGHT)
         self._box_gap_areas = [
             wx.Rect(0, box_top, self.BAR_BUTTON_WIDTH,
-                    height - box_top - self.BAR_HEIGHT), 
+                    height - box_top - self.BAR_HEIGHT),
             wx.Rect(width - self.BAR_BUTTON_WIDTH, box_top,
                     width, height - box_top - self.BAR_HEIGHT)]
         dc.SetFont(self.GetFont())
@@ -1845,7 +1845,7 @@ class RangeSlider(wx.Panel):
             dc.SetPen(PEN(self.BAR_ARROW_FG_COLOUR))
             dc.DrawPolygon(((self.BAR_BUTTON_WIDTH // 2 + 1,
                 height - self.BAR_HEIGHT // 2 - 3), (
-                    self.BAR_BUTTON_WIDTH // 2 + 1, 
+                    self.BAR_BUTTON_WIDTH // 2 + 1,
                     height - self.BAR_HEIGHT // 2 + 1
                 ), (self.BAR_BUTTON_WIDTH // 2 - 1,
                     height - self.BAR_HEIGHT // 2 - 1
@@ -1923,7 +1923,7 @@ class RangeSlider(wx.Panel):
         # Skip first and last, as left and right are already known.
         for i in range(1, label_count - 1):
             labels.append(self.FormatLabel(self._rng[0] + i * value_step))
-            label_coords += [(self._box_area.x + i * self._box_area.width 
+            label_coords += [(self._box_area.x + i * self._box_area.width
                 // label_count, selection_top + self.RANGE_LABEL_TOP_GAP)]
         labels.append(right_label)
         label_coords += [(self._box_area.right - right_extent[0],
@@ -1952,7 +1952,7 @@ class RangeSlider(wx.Panel):
             # GetFullTextExtent returns (width, height, descent, leading)
             label_extent = self.GetFullTextExtent(label)
             # Center label on top of marker. +2 for padding
-            label_area = wx.Rect(x - label_extent[0] // 2, 0, 
+            label_area = wx.Rect(x - label_extent[0] // 2, 0,
                 label_extent[0] + 2, sum(label_extent[1:2])
             )
             if not self.ClientRect.Contains(label_area):
@@ -1983,9 +1983,9 @@ class RangeSlider(wx.Panel):
                 dc.SetPen(PEN(self.MARKER_BUTTON_COLOUR))
                 dc.DrawRoundedRectangle(*button_area, radius=button_radius)
                 button_lines = [
-                    (button_area.x + button_radius + i * 2, 
+                    (button_area.x + button_radius + i * 2,
                         button_area.y + button_radius,
-                        button_area.x + button_radius + i * 2, 
+                        button_area.x + button_radius + i * 2,
                          button_area.y + button_area.height - button_radius
                     ) for i in range(
                         (self.MARKER_BUTTON_WIDTH - 2 * button_radius + 1) // 2
@@ -2483,7 +2483,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
     def RefreshRows(self):
         """
-        Clears the list and inserts all unfiltered rows, auto-sizing the 
+        Clears the list and inserts all unfiltered rows, auto-sizing the
         columns.
         """
         scrollpos = self.GetScrollPos(wx.VERTICAL)
@@ -3450,7 +3450,7 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
 
     def SetStyleSpecs(self):
         """Sets STC style colours."""
-        fgcolour, bgcolour, highcolour = (ColourManager.ColourHex(x) for x in 
+        fgcolour, bgcolour, highcolour = (ColourManager.ColourHex(x) for x in
             (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW if self.Enabled else wx.SYS_COLOUR_BTNFACE,
              wx.SYS_COLOUR_HOTLIGHT)
         )
@@ -4286,7 +4286,7 @@ class TabbedHtmlWindow(wx.Panel):
 
     def _CreateTab(self, index, title):
         """Creates a new tab in the tab container at specified index."""
-        p = wx.Panel(parent=self, size=(0,0)) 
+        p = wx.Panel(parent=self, size=(0,0))
         p.Hide() # Dummy empty window as notebook needs something to hold
         self._notebook.InsertPage(index, page=p, text=title, select=True)
 

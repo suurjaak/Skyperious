@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
     """Skyperious main window."""
 
-    TRAY_ICON = (images.Icon16x16_32bit if "linux" not in sys.platform 
+    TRAY_ICON = (images.Icon16x16_32bit if "linux" not in sys.platform
                  else images.Icon24x24_32bit)
 
     def __init__(self):
@@ -327,7 +327,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
         newextra = ", or populated from a Skype source" if live.skpy or live.ijson else ""
         BUTTONS_MAIN = [
-            ("button_opena", "&Open a database..", images.ButtonOpenA, 
+            ("button_opena", "&Open a database..", images.ButtonOpenA,
              "Choose a database from your computer to open."),
             ("button_detect", "Detect databases", images.ButtonDetect,
              "Auto-detect Skype databases from user folders."),
@@ -368,7 +368,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             setattr(self, "label_" + field, valtext)
 
         BUTTONS_DETAIL = [
-            ("button_open", "&Open", images.ButtonOpen, 
+            ("button_open", "&Open", images.ButtonOpen,
              "Open the database for reading."),
             ("button_compare", "Compare and &merge", images.ButtonCompare,
              "Choose another Skype database to compare with, in order to merge "
@@ -1181,7 +1181,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return wx.MessageBox("%s is currently open in %s, cannot delete." %
                                  (filename, conf.Title), conf.Title, wx.OK)
         if filename in self.workers_import:
-            return wx.MessageBox("%s is currently being imported to, cannot delete." % 
+            return wx.MessageBox("%s is currently being imported to, cannot delete." %
                                  filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
         try: os.unlink(filename)
@@ -1227,7 +1227,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return
 
         if original in self.workers_import:
-            return wx.MessageBox("%s is currently being imported to, cannot save." % 
+            return wx.MessageBox("%s is currently being imported to, cannot save." %
                                  original, conf.Title, wx.OK | wx.ICON_WARNING)
 
         dialog = wx.FileDialog(parent=self, message="Save a copy..",
@@ -1316,7 +1316,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             do_singlefile = index > 0
 
         if self.db_filename in self.workers_import:
-            return wx.MessageBox("%s is currently being imported to, cannot export." % 
+            return wx.MessageBox("%s is currently being imported to, cannot export." %
                                  self.db_filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
         focused_control = self.FindFocus()
@@ -1445,10 +1445,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filename1 or not filename2: return
 
         if filename1 in self.workers_import:
-            return wx.MessageBox("%s is currently being imported to, cannot open." % 
+            return wx.MessageBox("%s is currently being imported to, cannot open." %
                                  filename1, conf.Title, wx.OK | wx.ICON_WARNING)
         if filename2 in self.workers_import:
-            return wx.MessageBox("%s is currently being imported to, cannot open." % 
+            return wx.MessageBox("%s is currently being imported to, cannot open." %
                                  filename2, conf.Title, wx.OK | wx.ICON_WARNING)
 
         title = "Database comparison"
@@ -1616,7 +1616,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_new_blank(self, event):
         """
-        Handler for creating a new blank database, asks for username, 
+        Handler for creating a new blank database, asks for username,
         populates a new database and opens the database page.
         """
         dialog1 = wx.TextEntryDialog(self, "Enter Skype username for new database:",
@@ -1640,7 +1640,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
-            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." %
                                  (filename, conf.Title), conf.Title, wx.OK)
 
         busy = controls.BusyPanel(self, "Creating new database..")
@@ -1686,7 +1686,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
-            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." %
                                  (filename, conf.Title), conf.Title, wx.OK)
 
         skype = live.SkypeLogin()
@@ -1696,7 +1696,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             try: skype.login(user, pw, token=False, init_db=False)
             except Exception as e:
                 busy.Close()
-                return wx.MessageBox("Failed to log in as '%s':\n\n%s" % 
+                return wx.MessageBox("Failed to log in as '%s':\n\n%s" %
                                      (user, util.format_exc(e)),
                                      conf.Title, wx.OK | wx.ICON_ERROR)
 
@@ -1740,7 +1740,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not efilename: return
 
         user = live.SkypeExport.export_get_account(efilename)
-        if not user: return wx.MessageBox("No Skype username found in %s." % efilename, 
+        if not user: return wx.MessageBox("No Skype username found in %s." % efilename,
                                           conf.Title, wx.OK | wx.ICON_WARNING)
 
         filename0 = live.make_db_path(user)
@@ -1757,7 +1757,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         filename = controls.get_dialog_path(dialog2)
 
         if filename in self.dbs or filename in self.workers_import:
-            return wx.MessageBox("%s is currently open in %s, cannot overwrite." % 
+            return wx.MessageBox("%s is currently open in %s, cannot overwrite." %
                                  (filename, conf.Title), conf.Title, wx.OK)
 
         def on_cancel():
@@ -1890,7 +1890,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         except Exception as e:
             self.label_account.Value = "(database not readable)"
             self.label_messages.Value = "Error text: %s" % util.format_exc(e)
-            self.label_account.ForegroundColour = conf.LabelErrorColour 
+            self.label_account.ForegroundColour = conf.LabelErrorColour
             self.label_chats.ForegroundColour = conf.LabelErrorColour
             logger.exception("Error opening %s.", filename)
             return
@@ -2007,7 +2007,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 syncing_pages[page] = db.filename
         if syncing_pages:
             if wx.OK != wx.MessageBox(
-                "Live syncing is currently in progress in %s.\n\nExit anyway?" % 
+                "Live syncing is currently in progress in %s.\n\nExit anyway?" %
                 "\n".join(textwrap.wrap(", ".join(syncing_pages.values()))),
                 conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING
             ): do_exit = False
@@ -2026,12 +2026,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if wx.YES == response:
                 do_exit = all(p.save_unsaved_grids() for p in unsaved_pages)
         if do_exit:
-            merging_pages = [x.title for x in self.merger_pages 
+            merging_pages = [x.title for x in self.merger_pages
                              if x.is_merging and x.title]
         if merging_pages:
             response = wx.MessageBox(
                 "Merging is currently in progress in %s.\n\nExit anyway? "
-                "This can result in corrupt data." % 
+                "This can result in corrupt data." %
                 "\n".join(textwrap.wrap(", ".join(merging_pages))),
                 conf.Title, wx.OK | wx.CANCEL | wx.ICON_WARNING)
             do_exit = (wx.CANCEL != response)
@@ -2272,7 +2272,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             page = next((x for x in self.db_pages if x and x.db == db), None)
         if not page:
             if filename in self.workers_import:
-                wx.MessageBox("%s is currently being imported to, cannot open." % 
+                wx.MessageBox("%s is currently being imported to, cannot open." %
                               filename, conf.Title, wx.OK | wx.ICON_WARNING)
                 return
 
@@ -2947,7 +2947,7 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(label_help, "ForegroundColour", "DisabledColour")
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         button_sql = self.button_sql = wx.Button(panel2, label="Execute S&QL")
-        button_script = self.button_script = wx.Button(panel2, 
+        button_script = self.button_script = wx.Button(panel2,
                                                        label="Execute scrip&t")
         button_sql.SetToolTip("Execute a single statement "
                                     "from the SQL window")
@@ -3048,7 +3048,7 @@ class DatabasePage(wx.Panel):
                  "edit_info_path", "edit_info_size", "edit_info_modified",
                  "edit_info_sha1", "edit_info_md5", ]
         labels = ["Conversations", "Contacts", "File transfers", "Messages",
-                  "Last message", "First message", "", 
+                  "Last message", "First message", "",
                   "Full path", "File size", "Last modified",
                   "SHA-1 checksum", "MD5 checksum",  ]
         for name, label in zip(names, labels):
@@ -3322,7 +3322,7 @@ class DatabasePage(wx.Panel):
         if self.db.live.is_logged_in() and self.button_login.Enabled:
             # Probable auto-login during HTML export
             self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
-            self.button_login.Disable() 
+            self.button_login.Disable()
             self.label_login_fail.Hide()
             for c in controls.get_controls(self.panel_sync): c.Enable()
             self.button_sync_stop.Disable()
@@ -3502,8 +3502,8 @@ class DatabasePage(wx.Panel):
         self.edit_login_status.Value = "Logging in to Skype.."
         for c in self.panel_login.Children:
             if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Disable()
-        self.button_user.Disable() 
-        self.button_login.Disable() 
+        self.button_user.Disable()
+        self.button_login.Disable()
         self.panel_login.Refresh()
         action = {"action": "login", "password": self.edit_pw.Value, "sync": sync}
         self.worker_live.work(action)
@@ -3711,13 +3711,13 @@ class DatabasePage(wx.Panel):
                 if "error" in result:
                     logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
                     self.edit_login_status.Value = result.get("error_short", result["error"])
-                    self.button_user.Enable() 
-                    self.button_login.Enable() 
+                    self.button_user.Enable()
+                    self.button_login.Enable()
                     self.label_login_fail.Show()
                     self.label_login_fail.ContainingSizer.Layout()
                 else:
                     self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
-                    self.button_login.Disable() 
+                    self.button_login.Disable()
                     self.label_login_fail.Hide()
                     for c in controls.get_controls(self.panel_sync): c.Enable()
                     self.button_sync_stop.Disable()
@@ -3977,7 +3977,7 @@ class DatabasePage(wx.Panel):
 
     def on_change_range_date(self, event):
         """
-        Handler for value change in chat filter date range, updates date 
+        Handler for value change in chat filter date range, updates date
         editboxes.
         """
         try:
@@ -4083,7 +4083,7 @@ class DatabasePage(wx.Panel):
         key0, name0 = next((k, chat[k]) for k in PREFS if chat.get(k))
         if not v:
             if wx.OK != wx.MessageBox(
-                'Remove given display name, falling back to %s "%s"?' % 
+                'Remove given display name, falling back to %s "%s"?' %
                 (key0, name0), conf.Title, wx.OK | wx.CANCEL
             ): return
             v = None
@@ -4136,7 +4136,7 @@ class DatabasePage(wx.Panel):
         key0, name0 = next((k, contact[k]) for k in PREFS if contact.get(k))
         if not v:
             if wx.OK != wx.MessageBox(
-                'Remove given display name from "%s", falling back to %s "%s"?' % 
+                'Remove given display name from "%s", falling back to %s "%s"?' %
                 (contact["identity"], key0, name0),
                 conf.Title, wx.OK | wx.CANCEL
             ): return
@@ -4210,7 +4210,7 @@ class DatabasePage(wx.Panel):
 
     def on_export_chats_menu(self, event):
         """
-        Handler for clicking to export selected or all chats, displays a 
+        Handler for clicking to export selected or all chats, displays a
         submenu with choices to export selected chats or all chats.
         """
         selected, selecteds = self.list_chats.GetFirstSelected(), []
@@ -4447,7 +4447,7 @@ class DatabasePage(wx.Panel):
                                util.plural("message", message_count, sep=","),
                                path, log=True)
             else: guibase.status("Exported %s and %s from %s as %s under %s.",
-                                 util.plural("chat", count, sep=","), 
+                                 util.plural("chat", count, sep=","),
                                  util.plural("message", message_count, sep=","), self.db,
                                  format.upper(), path, log=True)
             util.start_file(files[0] if do_singlefile or len(chats) == 1 else path)
@@ -4473,7 +4473,7 @@ class DatabasePage(wx.Panel):
         media_folder = "html" == format and self.dialog_savefile.FilterIndex
         if media_folder and not check_media_export_login(self.db): return
 
-        busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' % 
+        busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' %
                                   self.chat["title"])
         try:
             filter_new = self.build_filter()
@@ -4728,7 +4728,7 @@ class DatabasePage(wx.Panel):
                     menutitle = "C&opy message"
                     def handler(e):
                         if msg_id:
-                            m = next(self.db.get_messages(additional_sql="id = :id", 
+                            m = next(self.db.get_messages(additional_sql="id = :id",
                                      additional_params={"id": msg_id}), None)
                         if m:
                             t = step.Template(templates.MESSAGE_CLIPBOARD)
@@ -5375,7 +5375,7 @@ class DatabasePage(wx.Panel):
     def on_button_sql(self, event):
         """
         Handler for clicking to run an SQL query, runs the selected text or
-        whole contents, displays its results, if any, and commits changes 
+        whole contents, displays its results, if any, and commits changes
         done, if any.
         """
         sql = self.stc_sql.SelectedText.strip() or self.stc_sql.Text.strip()
@@ -5672,7 +5672,7 @@ class DatabasePage(wx.Panel):
         dates_values = [None, None] # currently filtered date range
         if chat != self.chat or (center_message_id
         and not self.stc_history.IsMessageShown(center_message_id)):
-            busy = controls.BusyPanel(self, 
+            busy = controls.BusyPanel(self,
                 "Loading history for %s." % chat["title_long_lc"])
             try:
                 # Refresh last messages, in case database has updated
@@ -6374,7 +6374,7 @@ class MergerPage(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_swap, button_swap)
         sizer_header.Add(label, border=5, proportion=1,
                          flag=wx.GROW | wx.TOP | wx.BOTTOM)
-        sizer_header.Add(button_swap, border=5, flag=wx.LEFT | wx.RIGHT | 
+        sizer_header.Add(button_swap, border=5, flag=wx.LEFT | wx.RIGHT |
                          wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(sizer_header, flag=wx.GROW)
         sizer.Layout() # To avoid header moving around during page creation
@@ -6762,7 +6762,7 @@ class MergerPage(wx.Panel):
         self.chats_nodiff.clear()
         self.chat = None
         self.chat_diff = None
-        self.is_scanned = False 
+        self.is_scanned = False
 
         for a, b in [(self.label_all1, self.label_all2)]:
             a.Label, b.Label = b.Label, a.Label
@@ -6942,7 +6942,7 @@ class MergerPage(wx.Panel):
                 self.button_export_chat.Enabled = len(messages)
                 if messages:
                     self.button_merge_chat.Note = (
-                        "Copy %s to the database on the right." % 
+                        "Copy %s to the database on the right." %
                         util.plural("chat message", messages, sep=","))
                     self.button_merge_chat.ContainingSizer.Layout()
                 idx = -conf.MaxHistoryInitialMessages
@@ -6983,7 +6983,7 @@ class MergerPage(wx.Panel):
         # Contacts and contact groups are shown in the same list. If a contact
         # group is chosen, it can include contacts not yet in target database.
         contacts_target_final = dict([(c["identity"], c) for c in contacts])
-        contacts_target_final.update(dict((c["identity"], c) 
+        contacts_target_final.update(dict((c["identity"], c)
                                           for c in db_target.get_contacts()))
         contacts_source = dict((c['identity'], c)
                                for c in db_source.get_contacts())
@@ -7087,14 +7087,14 @@ class MergerPage(wx.Panel):
                 self.button_merge_all.Enabled = True
                 self.html_report.Freeze()
                 self.html_report.AppendToPage(
-                    "<br /><br />New in %s: %s in %s." % 
+                    "<br /><br />New in %s: %s in %s." %
                     (self.db1, count_msgs, count_chats))
                 scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
                 self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
             else:
                 self.html_report.SetPage("<body bgcolor='%s'><font color='%s'>"
-                    "No new messages.</font></body>" % 
+                    "No new messages.</font></body>" %
                     (conf.MergeHtmlBackgroundColour, conf.FgColour))
             self.update_gauge(self.gauge_progress, 100, "Scan complete.")
             wx.Bell()
@@ -7163,7 +7163,7 @@ class MergerPage(wx.Panel):
             self.is_merging = False
             self.update_gauge(self.gauge_progress, 0, "%s error." % action)
             logger.error("%s error.\n\n%s", action, result["error"])
-            msg = "%s error.\n\n%s" % (action, 
+            msg = "%s error.\n\n%s" % (action,
                   result.get("error_short", result["error"]))
             self.html_report.Freeze()
             self.html_report.AppendToPage("<br /><br /> <b>Error merging chats:</b>&nbsp;&nbsp;"
@@ -7549,7 +7549,7 @@ class MergerPage(wx.Panel):
                     label.Label += "%s.\n%s.\n%s.\nFirst message at %s.\n" \
                                    "Last message at %s." % (
                                    util.plural("conversation", chats, sep=","),
-                                   util.plural("message", count_messages, sep=","), 
+                                   util.plural("message", count_messages, sep=","),
                                    contacttext, datetext_first, datetext_last)
         except Exception as e:
             # Database access can easily fail if the user closes the tab before
@@ -8019,7 +8019,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 self._append_text("  (%s). " % util.plural(
                                   "message", self._messages_current, sep=","))
 
-            if self._chat["message_count"] and self._auto_retrieve and (not self._messages 
+            if self._chat["message_count"] and self._auto_retrieve and (not self._messages
             or self._messages[0]["datetime"] > self._chat["first_message_datetime"]):
                 self._append_text("Scroll back more.", "link")
 
@@ -8048,7 +8048,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 from_items.append(("From the beginning", daterange))
                 for i, (title, daterange) in enumerate(from_items):
                     is_active = center_message_id is None \
-                                and ((title == self._datelink_last) 
+                                and ((title == self._datelink_last)
                                      or (daterange == dates_filter))
                     if i:
                         self._append_text(u"  \u2022  ", "special") # bullet
@@ -8392,7 +8392,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         result = False
         if (self._filter.get("participants")
         and message["author"] not in self._filter["participants"]
-        and set(self._filter["participants"]) != 
+        and set(self._filter["participants"]) !=
         set([p["identity"] for p in self._chat["participants"]])):
             # Last condition is to check if participants filter is applied.
             result = True
@@ -9183,7 +9183,7 @@ class ChatContentTimeline(wx.html.SimpleHtmlListBox):
                                 if self._timeline[i]["unit"] == self._units[-1])
             vspan = self.VisibleBegin, self.VisibleEnd
             # Scroll highlights into view, plus one row of padding
-            if not all(vspan[0] <= i - 1 <= vspan[1] and 
+            if not all(vspan[0] <= i - 1 <= vspan[1] and
                        vspan[0] <= i + 1 <= vspan[1] for i in tracklines):
                 if all(vspan[0] < i for i in tracklines): # Downward
                     self.ScrollRows(tracklines[-1] - vspan[1] + 1)
@@ -9278,7 +9278,7 @@ class DayHourDialog(wx.Dialog):
 
 
 class AboutDialog(wx.Dialog):
- 
+
     def __init__(self, parent, content):
         wx.Dialog.__init__(self, parent, title="About %s" % conf.Title,
                            style=wx.CAPTION | wx.CLOSE_BOX)
@@ -9327,7 +9327,7 @@ class AboutDialog(wx.Dialog):
 
 class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
     """Dialog that asks for username and password."""
- 
+
     def __init__(self, parent, title="Log in"):
         wx.Dialog.__init__(self, parent, title=title,
                            style=wx.CAPTION | wx.CLOSE_BOX)

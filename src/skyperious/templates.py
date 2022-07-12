@@ -270,7 +270,7 @@ from skyperious.lib.vendor import step
       background: url("data:image/png;base64,{{! images.ExportRemoved.data }}")
                   center center no-repeat;
     }
-    #content_table tr.shifted td.author, #content_table tr.shifted td.timestamp { 
+    #content_table tr.shifted td.author, #content_table tr.shifted td.timestamp {
       padding-top: 10px;
     }
     #content_table .author { min-width: 90px; text-align: right; }
@@ -732,9 +732,9 @@ MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(t
 
     function unhighlight(container, style) {
       if (container) {
-        var content = container.innerHTML; 
+        var content = container.innerHTML;
         var re = new RegExp("<span class=['\\"]" + style + "['\\"]>(.*?)<\/span>", "ig");
-        content = content.replace(re, "$1"); 
+        content = content.replace(re, "$1");
         container.innerHTML = content;
       }
     }
@@ -767,7 +767,7 @@ MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(t
       if (typeof el == "undefined") { return el };
       if (el.innerText) return el.innerText;
       var str = "";
-      
+
       var cs = el.childNodes;
       var l = cs.length;
       for (var i = 0; i < l; i++) {
@@ -988,11 +988,11 @@ except Exception: filetype = "png"
 %else:
 .
 %endif
-<% 
+<%
 # &#x1F313; first quarter moon symbol
-# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph
 %>
-<a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+<a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
 <br />
 %if chat["created_datetime"]:
       Chat created on <b>{{ chat["created_datetime"].strftime("%d.%m.%Y") }}</b>,
@@ -1210,7 +1210,7 @@ sizes = {7: "2.5em;", 6: "2.1em;", 5: "1.75em;", 4: "1.5em;", 3: "1.3em;", 2: "1
 <%
 countstring = ";\\n".join("%s from %s" % (c, a) for a, c in sorted(stats["wordcounts"][word].items(), key=lambda x: -x[1]))
 %>
-      <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ countstring }}">({{ count }})</span></span> 
+      <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ countstring }}">({{ count }})</span></span>
 %endfor
     </div>
 
@@ -1230,7 +1230,7 @@ globalcounts = dict((w, sum(vv.values())) for w, vv in stats["wordcounts"].items
         <div class="wordcloud">
 %if stats["wordclouds"].get(p["identity"]):
 %for word, count, size in stats["wordclouds"][p["identity"]]:
-          <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ "%d%% of total usage" % round(100. * count / globalcounts.get(word, count)) }}">({{ count }})</span></span> 
+          <span style="font-size: {{ sizes[size] }}"><a title="Highlight '{{ word }}' and go to first occurrence" href="#" onClick="return hilite(this);">{{ word }}</a> <span title="{{ "%d%% of total usage" % round(100. * count / globalcounts.get(word, count)) }}">({{ count }})</span></span>
 %endfor
 %else:
           <span class="gray">Not enough words.</span>
@@ -1747,11 +1747,11 @@ from skyperious.lib import util
             <div class="header">{{ title }}</div><br />
             Source: <b>{{ db.filename }}</b>.<br />
             <b>{{ row_count }}</b> {{ util.plural("row", row_count, numbers=False, sep=",") }} in results.
-<% 
+<%
 # &#x1F313; first quarter moon symbol
-# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph
 %>
-            <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+            <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
             <br />
 %if sql:
             <b>SQL:</b> {{ sql }}
@@ -1988,7 +1988,7 @@ safe_id = urllib.parse.quote(p["identity"])
     </td>
   </tr>
 %endfor
-  
+
 </table>
 </font>
 
@@ -2526,11 +2526,11 @@ dct = {
     <td>
       <div id="title">Skype contacts</div><br />
       Source: <b>{{ db.filename }}</b>.
-<% 
+<%
 # &#x1F313; first quarter moon symbol
-# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph  
+# &#xFE0E;  Unicode variation selector, force preceding character to monochrome text glyph
 %>
-      <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a> 
+      <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
       <br />
 %if bots or phones:
       <b>{{ len(contacts) }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
@@ -2576,8 +2576,8 @@ if avatar:
       <tr><td class="avatar">
         <img title="{{ alt }}" alt="{{ alt }}"
 %if avatar:
-             data-jslghtbx data-jslghtbx-group="avatar" data-jslghtbx-caption="{{ alt }}" 
-             src="data:image/{{ filetype }};base64,{{! util.b64encode(avatar) }}" 
+             data-jslghtbx data-jslghtbx-group="avatar" data-jslghtbx-caption="{{ alt }}"
+             src="data:image/{{ filetype }};base64,{{! util.b64encode(avatar) }}"
 %else:
              src="data:image/png;base64,{{! images.AvatarDefaultLarge.data }}"
 %endif
@@ -2788,7 +2788,7 @@ if title_matches:
     Title matches.<br />
 %endif
 %if matching_authors:
-    Participant matches: 
+    Participant matches:
 %for i, c in enumerate(matching_authors):
 <%
 name = c["fullname"] or c["displayname"]
@@ -2826,7 +2826,7 @@ if title_matches:
     Title matches.
 %endif
 %if matching_authors:
-    Participant matches: 
+    Participant matches:
 %for i, c in enumerate(matching_authors):
 <%
 name = c["fullname"] or c["displayname"]
@@ -3220,7 +3220,7 @@ from skyperious import conf
       </td><td width="10"></td><td valign="center">
         Log in to Skype online service<br />
         in order to synchronize chat history from live, <br />
-        and download shared media in HTML export. 
+        and download shared media in HTML export.
       </td></tr><tr><td nowrap align="center">
         <a href="page:live"><b><font color="{{ conf.FgColour }}">Online</font></b></a>
     </td></tr></table>
@@ -3330,7 +3330,7 @@ except ImportError:
       <br /><br />
       To find messages from specific chats only, use the keyword
       <font color="{{ conf.HelpCodeColour }}"><code>chat:name</code></font>.<br /><br />
-      Search from more than one chat by adding more 
+      Search from more than one chat by adding more
       <font color="{{ conf.HelpCodeColour }}"><code>chat:</code></font> keywords.
       <br />
     </td>
@@ -3451,8 +3451,8 @@ except ImportError:
   <code><font color="{{ conf.HelpCodeColour }}">&lt;a href="http://lmgtfy.com/"&gt;lmgtfy.com&lt;/a&gt;</font></code>,<br />
   displayed as <a href="http://lmgtfy.com/"><font color="{{ conf.LinkColour }}">lmgtfy.com</font></a>.<br /><br />
   This can be used for finding specific type of messages, for example
-  <font color="{{ conf.HelpCodeColour }}"><code>&lt;sms</code></font> finds SMS messages, 
-  <font color="{{ conf.HelpCodeColour }}"><code>&lt;file</code></font> finds transfers, 
+  <font color="{{ conf.HelpCodeColour }}"><code>&lt;sms</code></font> finds SMS messages,
+  <font color="{{ conf.HelpCodeColour }}"><code>&lt;file</code></font> finds transfers,
   <font color="{{ conf.HelpCodeColour }}"><code>&lt;quote</code></font> finds quoted messages,
   and <font color="{{ conf.HelpCodeColour }}"><code>&lt;ss</code></font> finds messages with emoticons.
 
@@ -3506,7 +3506,7 @@ and might not work for all accounts.
 <br /><br />
 If you are getting a "Profile accrual is required" error,
 setting an e-mail address as your primary Skype alias
-at <a href="https://account.live.com">account.live.com</a> 
+at <a href="https://account.live.com">account.live.com</a>
 may solve the problem, under Security -> More security options -> Sign-in options.
 </font>
 """

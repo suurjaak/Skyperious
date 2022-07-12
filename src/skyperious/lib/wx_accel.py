@@ -3,7 +3,7 @@
 Binds wx control label shortcut keys and label clicks to control click events.
 
 In wx, a button with a label "E&xit" is displayed as having the label "Exit"
-with "x" underlined, indicating a keyboard shortcut, but wx does not bind 
+with "x" underlined, indicating a keyboard shortcut, but wx does not bind
 these shortcuts automatically.
 
 Supported controls:
