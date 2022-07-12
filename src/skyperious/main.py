@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.07.2022
+@modified    12.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -918,8 +918,7 @@ def run(nogui=False):
     if "nt" == os.name and six.PY2: # Fix Unicode arguments, otherwise converted to ?
         argv = win32_unicode_argv(argv)
     argv = argv[1:]
-    if not argv or (argv[0] not in subparsers.choices
-    and argv[0].endswith(".db")):
+    if not argv or not any(x in argv for x in tuple(subparsers.choices) + ("-h", "--help")):
         argv[:0] = ["gui"] # argparse hack: force default argument
     if argv[0] in ("-h", "--help") and len(argv) > 1:
         argv[:2] = argv[:2][::-1] # Swap "-h option" to "option -h"

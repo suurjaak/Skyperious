@@ -2,14 +2,13 @@ CHANGELOG
 =========
 
 
-5.3, 2022-07-10
+5.3, 2022-07-12
 ---------------
 - add build file for Snap
 - add command-line flag --config-file
 - tweak icon borders
-- fix loading user-specific configuration file
 - fix error on using system colours with transparency
-- fix errors with GTK on Linux
+- fix errors on Ubuntu 22 (issue #111)
 
 
 5.2, 2022-06-17
