@@ -76,6 +76,25 @@ Stand-alone GUI components for wx:
 - def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
   Paints and returns (wx.Bitmap, rects) with histogram plot from data.
 
+- def get_controls(window):
+  Returns a list of all nested controls of given window.
+
+- def get_dialog_path(dialog):
+  Returns the file path chosen in FileDialog, adding extension if dialog result
+  has none even though a filter has been selected, or if dialog result has a
+  different extension than what is available in selected filter.
+
+- def get_key_state(keycode):
+  Returns true if specified key is currently down (swallows Linux exceptions).
+
+- def rect_defloat(*args, **kwargs):
+  Wrapper for constructing wx.Rect, casting any float arguments to int.
+
+- def wordwrap(text, width, dc, breakLongWords=True, margin=0):
+  Returns text wrapped to pixel width according to given DC;
+  a patched copy of `wx.lib.wordwrap.wordwrap()`
+  able to handle multi-byte Unicode characters in Python3.
+
 ------------------------------------------------------------------------------
 This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
@@ -4835,9 +4854,9 @@ def get_dialog_path(dialog):
 
 
 def get_key_state(keycode):
-    """Returns true if specified key is currently down."""
+    """Returns true if specified key is currently down (swallows Linux exceptions)."""
     try: return wx.GetKeyState(keycode)
-    except Exception: return False  # wx3 can raise for non-modifier keys in non-X11 backends
+    except Exception: return False  # wx3 can raise for non-modifier keys in Linux non-X11 backends
 
 
 WX__RECT = wx.Rect
