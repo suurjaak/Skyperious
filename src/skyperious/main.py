@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.07.2022
+@modified    13.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -988,7 +988,8 @@ def run(nogui=False):
                  arguments.sync_contacts, arguments.sync_older,
                  arguments.chat, arguments.author)
     elif "gui" == arguments.command:
-        run_gui(arguments.FILE)
+        try: run_gui(arguments.FILE)
+        except Exception: traceback.print_exc()
 
 
 
