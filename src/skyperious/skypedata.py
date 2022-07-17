@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.07.2022
+@modified    17.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -503,7 +503,7 @@ class SkypeDatabase(object):
 
 
     def get_messages(self, chat=None, ascending=True,
-                     additional_sql=None, additional_params=None,
+                     additional_sql=None, additional_params=None, limit=(),
                      timestamp_from=None, timestamp_to=None, use_cache=True):
         """
         Yields all the messages (or messages for the specified chat), as
@@ -516,6 +516,8 @@ class SkypeDatabase(object):
                                     or latest to earliest
         @param   additional_sql     additional SQL string added to the end
         @param   additional_params  SQL parameter dict for additional_sql
+        @param   limit              query limit and offset,
+                                    as LIMIT or (LIMIT, ) or (LIMIT, OFFSET)
         @param   timestamp_from     timestamp beyond which messages will start
         @param   timestamp_to       timestamp beyond which messages will end
         @param   use_cache          whether to use cached values if available.
@@ -551,6 +553,9 @@ class SkypeDatabase(object):
                     params.update(additional_params or {})
                 sql += " ORDER BY m.timestamp %s" \
                     % ("ASC" if ascending else "DESC")
+                limit  = limit if isinstance(limit, (list, tuple)) else [limit]
+                for i, (k, v) in enumerate(zip(("LIMIT", "OFFSET"), limit)):
+                    if not i or v is not None: sql += " %s %s" % (k, v or 0)
                 res = self.execute(sql, params)
                 messages = []
                 message = res.fetchone()

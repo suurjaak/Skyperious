@@ -2903,6 +2903,7 @@ HTML template for search result of chat messages, HTML table row.
 
 @param   chat              chata data dictionary
 @param   m                 message data dictionary
+@param   body              HTML-formatted message body
 @param   count             index of current match
 @param   result_count      total number of results so far
 @param   search            {db}
@@ -2945,6 +2946,7 @@ TXT template for search result item for chat messages.
 
 @param   chat              chata data dictionary
 @param   m                 message data dictionary
+@param   body              text-formatted message body
 @param   search            {db}
 """
 SEARCH_ROW_MESSAGE_TXT = """<%

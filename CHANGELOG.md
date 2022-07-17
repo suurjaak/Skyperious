@@ -2,10 +2,11 @@ CHANGELOG
 =========
 
 
-5.3, 2022-07-12
+5.3, 2022-07-17
 ---------------
 - add build file for Snap
 - add command-line flag --config-file
+- add command-line search flags --limit and --offset
 - tweak icon borders
 - fix error on using system colours with transparency
 - fix errors on Ubuntu 22 (issue #111)

@@ -126,6 +126,7 @@ class SearchThread(WorkerThread):
 
                 self._is_working, self._drop_results = True, False
                 is_html = ("text" != search.get("output"))
+                offset, limit = (search.get(k, 0) for k in ("offset", "limit"))
                 wrap_html = None # MessageParser wrap function, for HTML output
                 if is_html:
                     TEMPLATES = {
@@ -158,9 +159,9 @@ class SearchThread(WorkerThread):
 
                 parser = skypedata.MessageParser(search["db"],
                                                  wrapper=wrap_html)
+                result_type, result_count, match_count, count = None, 0, 0, 0
                 # {"output": text with results, "map": link data map}
                 # map data: {"contact:666": {"contact": {contact data}}, }
-                result_type, result_count, count = None, 0, 0
                 result = {"output": "", "map": {},
                           "search": search, "count": 0}
                 sql, params, match_words = query_parser.Parse(search["text"])
@@ -196,14 +197,17 @@ class SearchThread(WorkerThread):
                                     if self.match_all(n, match_words) \
                                     and contact not in matching_authors:
                                         matching_authors.append(contact)
-
                         if title_matches or matching_authors:
+                            match_count += 1
+                            if offset and match_count < offset:
+                                continue # for chat
                             count += 1
                             result_count += 1
                             try: result["output"] += template_chat.expand(locals())
                             except Exception:
                                 logger.exception("Error formatting search result for chat %s in %s.",
                                                  chat, search["db"])
+                                match_count -= 1
                                 count -= 1
                                 result_count -= 1
                                 continue # for chat
@@ -215,6 +219,8 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
+                    if limit and result_count >= limit:
+                        break # for chat
                     if not self._is_working:
                         break # for chat
                 if result["output"] and not self._drop_results:
@@ -240,12 +246,16 @@ class SearchThread(WorkerThread):
                                     val = pattern_replace.sub(wrap_b, val)
                                 fields_filled[field] = val
                         if match:
+                            match_count += 1
+                            if offset and match_count < offset:
+                                continue # for contact
                             count += 1
                             result_count += 1
                             try: result["output"] += template_contact.expand(locals())
                             except Exception:
                                 logger.exception("Error formatting search result for contact %s in %s.",
                                                  contact, search["db"])
+                                match_count -= 1
                                 count -= 1
                                 result_count -= 1
                                 continue # for contact
@@ -255,6 +265,8 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
+                        if limit and result_count >= limit:
+                            break # for contact
                         if not self._is_working:
                             break # for contact
                 if result["output"] and not self._drop_results:
@@ -271,6 +283,7 @@ class SearchThread(WorkerThread):
                     chat_order = []    # [chat id, ]
                     messages = search["db"].get_messages(
                         additional_sql=sql, additional_params=params,
+                        limit=(limit, offset) if limit or offset else (),
                         ascending=False, use_cache=False)
                     for m in messages:
                         chat = chat_map.get(m["convo_id"])
@@ -324,15 +337,19 @@ class SearchThread(WorkerThread):
                         result["output"] = template_table.expand(locals())
                         count = 0
                         while row:
+                            match_count += 1
+                            if offset and match_count < offset:
+                                continue # while row
                             count += 1
                             result_count += 1
                             try: result["output"] += template_row.expand(locals())
                             except Exception:
                                 logger.exception("Error formatting search result for row %s in %s.",
                                                  row, search["db"])
+                                match_count -= 1
                                 count -= 1
                                 result_count -= 1
-                                continue # for contact
+                                continue # while row
                             key = "table:%s:%s" % (table["name"], count)
                             result["map"][key] = {"table": table["name"],
                                                   "row": row}
@@ -342,6 +359,8 @@ class SearchThread(WorkerThread):
                                 self.postback(result)
                                 result = {"output": "", "map": {},
                                           "search": search, "count": 0}
+                            if limit and result_count >= limit:
+                                break # while row
                             if not self._is_working or (is_html
                             and result_count >= conf.MaxSearchTableRows):
                                 break # while row
@@ -355,6 +374,8 @@ class SearchThread(WorkerThread):
                                       "search": search, "count": 0}
                         infotext += " (%s%s%s)" % (countpre,
                                     util.plural("result", count), countsuf)
+                        if limit and result_count >= limit:
+                            break # for table
                         if not self._is_working or (is_html
                         and result_count >= conf.MaxSearchTableRows):
                             break # for table

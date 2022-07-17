@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.07.2022
+@modified    17.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -146,6 +146,10 @@ ARGUMENTS = {
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file(s) to search\n"
                       "(supports * wildcards)"},
+             {"args": ["--limit"], "type": int,
+              "help": "maximum number of matches to print"},
+             {"args": ["--offset"], "type": int,
+              "help": "number of matches to skip from the beginning"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
@@ -421,11 +425,12 @@ def run_merge(filenames, output_filename=None):
         db2.close()
 
 
-def run_search(filenames, query):
+def run_search(filenames, query, offset=0, limit=0):
     """Searches the specified databases for specified query."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     postbacks = queue.Queue()
-    args = {"text": query, "table": "messages", "output": "text"}
+    args = {"text": query, "offset": offset, "limit": limit,
+            "table": "messages", "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
@@ -981,7 +986,7 @@ def run(nogui=False):
                    arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
-        run_search(arguments.FILE, arguments.QUERY)
+        run_search(arguments.FILE, arguments.QUERY, arguments.offset, arguments.limit)
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
