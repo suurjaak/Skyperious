@@ -180,7 +180,7 @@ class SearchThread(WorkerThread):
                     chats = search["db"].get_conversations()
                     chats.sort(key=lambda x: x["title"], reverse=reverse)
                     chat_map = {} # {chat id: {chat data}}
-                    template_chat = FACTORY("chat")
+                    template_chat = FACTORY("chat", is_html)
                 for chat in chats:
                     chat_map[chat["id"]] = chat
                     if chat.get("__link"): chat_map[chat["__link"]["id"]] = chat

@@ -2821,7 +2821,8 @@ title = chat["title"]
 if title_matches:
     title = pattern_replace.sub(lambda x: "**%s**" % x.group(0), title)
 %>
-{{ "%3d" % result_count }}. {{ title }}
+
+{{ result_count }}. {{ title }}
 %if title_matches:
     Title matches.
 %endif
@@ -2833,7 +2834,7 @@ name = c["fullname"] or c["displayname"]
 name_replaced = pattern_replace.sub(wrap_b, name)
 identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace.sub(wrap_b, c["identity"])
 %>
-- {{ name_replaced }}{{ identity_replaced }}
+    - {{ name_replaced }}{{ identity_replaced }}
 %endfor
 %endif
 """

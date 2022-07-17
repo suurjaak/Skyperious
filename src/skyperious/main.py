@@ -99,7 +99,7 @@ ARGUMENTS = {
                       "(supports * wildcards)"},
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
-              "help": "Output directory if not current directory"},
+              "help": "output directory if not current directory"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to export", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
