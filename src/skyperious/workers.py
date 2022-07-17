@@ -126,7 +126,7 @@ class SearchThread(WorkerThread):
 
                 self._is_working, self._drop_results = True, False
                 is_html = ("text" != search.get("output"))
-                offset, limit = (search.get(k, 0) for k in ("offset", "limit"))
+                reverse, offset, limit = (search.get(k, 0) for k in ("reverse", "offset", "limit"))
                 wrap_html = None # MessageParser wrap function, for HTML output
                 if is_html:
                     TEMPLATES = {
@@ -178,7 +178,7 @@ class SearchThread(WorkerThread):
                 chats = []
                 if search["table"] in ["conversations", "messages"]:
                     chats = search["db"].get_conversations()
-                    chats.sort(key=lambda x: x["title"])
+                    chats.sort(key=lambda x: x["title"], reverse=reverse)
                     chat_map = {} # {chat id: {chat data}}
                     template_chat = FACTORY("chat")
                 for chat in chats:
@@ -233,7 +233,7 @@ class SearchThread(WorkerThread):
                 if self._is_working and "contacts" == search["table"] \
                 and match_words:
                     count = 0
-                    contacts = search["db"].get_contacts()
+                    contacts = search["db"].get_contacts()[::-1 if reverse else 1]
                     template_contact = FACTORY("contact", is_html)
                     for contact in contacts:
                         match = False
@@ -284,7 +284,7 @@ class SearchThread(WorkerThread):
                     messages = search["db"].get_messages(
                         additional_sql=sql, additional_params=params,
                         limit=(limit, offset) if limit or offset else (),
-                        ascending=False, use_cache=False)
+                        ascending=reverse, use_cache=False)
                     for m in messages:
                         chat = chat_map.get(m["convo_id"])
                         body = parser.parse(m, pattern_replace if match_words
@@ -317,13 +317,15 @@ class SearchThread(WorkerThread):
                     # Search over all fields of all tables.
                     template_table = FACTORY("table", is_html)
                     template_row = FACTORY("row", is_html)
-                    for table in search["db"].get_tables():
+                    for table in search["db"].get_tables()[::-1 if reverse else 1]:
                         table["columns"] = search["db"].get_table_columns(
                             table["name"])
                         sql, params, words = query_parser.Parse(search["text"],
                                                                 table)
                         if not sql:
                             continue # continue for table in search["db"]..
+                        if reverse and re.search(r" ORDER BY \S+$", sql):
+                            sql += " DESC"
                         rows = search["db"].execute(sql, params)
                         row = rows.fetchone()
                         namepre, namesuf = ("<b>", "</b>") if row else ("", "")

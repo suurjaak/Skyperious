@@ -6,7 +6,7 @@ CHANGELOG
 ---------------
 - add build file for Snap
 - add command-line flag --config-file
-- add command-line search flags --limit and --offset
+- add command-line search flags --reverse --limit --offset
 - tweak icon borders
 - fix command-line search ignoring --type flag
 - fix command-line search output for chats, contacts, and tables

@@ -147,9 +147,11 @@ ARGUMENTS = {
               "help": "Skype database file(s) to search\n"
                       "(supports * wildcards)"},
              {"args": ["--limit"], "type": int,
-              "help": "maximum number of matches to print"},
+              "help": "maximum number of matches to find"},
              {"args": ["--offset"], "type": int,
               "help": "number of matches to skip from the beginning"},
+             {"args": ["--reverse"], "action": "store_true",
+              "help": "find matches in reverse order"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
@@ -425,13 +427,13 @@ def run_merge(filenames, output_filename=None):
         db2.close()
 
 
-def run_search(filenames, query, category="message", offset=0, limit=0):
+def run_search(filenames, query, category="message", reverse=False, offset=0, limit=0):
     """Searches the specified databases for specified query."""
     TABLES = {"message": "messages", "contact": "contacts", "chat": "conversations",
               "table": "all tables"}
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     postbacks = queue.Queue()
-    args = {"text": query, "offset": offset, "limit": limit,
+    args = {"text": query, "reverse": reverse, "offset": offset, "limit": limit,
             "table": TABLES.get(category, category), "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
@@ -990,7 +992,7 @@ def run(nogui=False):
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY, arguments.type,
-                   arguments.offset, arguments.limit)
+                   arguments.reverse, arguments.offset, arguments.limit)
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,

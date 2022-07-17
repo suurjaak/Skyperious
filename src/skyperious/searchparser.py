@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    19.03.2022
+@modified    17.07.2022
 """
 import calendar
 import collections
@@ -150,7 +150,7 @@ class SearchQueryParser(object):
                 result = "SELECT * FROM %s WHERE %s" % (table["name"], result)
                 for col in table["columns"]:
                     if col.get("pk"):
-                        result += " ORDER BY %s ASC" % col["name"]
+                        result += " ORDER BY %s" % col["name"]
                         break # break for col in table["columns"]
         else:
             if "table" in keywords: del keywords["table"]
