@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    17.06.2022
+@modified    17.07.2022
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -153,7 +153,7 @@ class SearchThread(WorkerThread):
                         "row":     templates.SEARCH_ROW_TABLE_TXT, }
                     wrap_b = lambda x: "**%s**" % x.group(0)
                     output = {"format": "text"}
-                FACTORY = lambda x: step.Template(TEMPLATES[x], escape=is_html)
+                FACTORY = lambda x, s=True: step.Template(TEMPLATES[x], escape=is_html, strip=s)
                 logger.info('Searching "%s" in %s (%s).',
                             search["text"], search["table"], search["db"])
 
@@ -234,7 +234,7 @@ class SearchThread(WorkerThread):
                 and match_words:
                     count = 0
                     contacts = search["db"].get_contacts()
-                    template_contact = FACTORY("contact")
+                    template_contact = FACTORY("contact", is_html)
                     for contact in contacts:
                         match = False
                         fields_filled = {}
@@ -315,8 +315,8 @@ class SearchThread(WorkerThread):
                 if self._is_working and "all tables" == search["table"]:
                     infotext, result_type = "", "table row"
                     # Search over all fields of all tables.
-                    template_table = FACTORY("table")
-                    template_row = FACTORY("row")
+                    template_table = FACTORY("table", is_html)
+                    template_row = FACTORY("row", is_html)
                     for table in search["db"].get_tables():
                         table["columns"] = search["db"].get_table_columns(
                             table["name"])

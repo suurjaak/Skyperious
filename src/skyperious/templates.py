@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    01.05.2022
+@modified    17.07.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2827,13 +2827,13 @@ if title_matches:
 %endif
 %if matching_authors:
     Participant matches:
-%for i, c in enumerate(matching_authors):
+%for c in matching_authors:
 <%
 name = c["fullname"] or c["displayname"]
 name_replaced = pattern_replace.sub(wrap_b, name)
 identity_replaced = "" if (c["identity"] == name) else " (%s)" % pattern_replace.sub(wrap_b, c["identity"])
 %>
-{{ ", " if i else "" }}{{! name_replaced }}{{! identity_replaced }}{{ "." if i == len(matching_authors) - 1 else "" }}
+- {{ name_replaced }}{{ identity_replaced }}
 %endfor
 %endif
 """
@@ -2879,21 +2879,21 @@ TXT template for search result row of a matched contact.
 @param   count             index of current match
 @param   result_count      total number of results so far
 @param   fields_filled     {field: highlighted value}
-@param   match_fields      [contact field, ]
 @param   pattern_replace   re.RegexObject to find matching text
 @param   wrap_b            function(text) returning **text**
 """
 SEARCH_ROW_CONTACT_TXT = """<%
 from skyperious import conf, skypedata
 
+maxcol = max(len(v) for v in skypedata.CONTACT_FIELD_TITLES.values())
 %>
 %if count <= 1 and result_count > 1:
 -------------------------------------------------------------------------------
 %endif
-{{ "%3d" % result_count }}. {{ title }}
-{{ pattern_replace.sub(wrap_b, contact["name"]) }}
-%for field in filter(lambda x: x in fields_filled, match_fields):
-  {{ "15%s" % skypedata.CONTACT_FIELD_TITLES[field] }}: {{ fields_filled[field] }}
+
+{{ result_count }}. {{ pattern_replace.sub(wrap_b, contact["name"]) }}
+%for field in filter(lambda x: x in fields_filled, skypedata.CONTACT_FIELD_TITLES):
+  {{ skypedata.CONTACT_FIELD_TITLES[field].rjust(maxcol) }}: {{ fields_filled[field] }}
 %endfor
 """
 
@@ -3003,11 +3003,14 @@ TXT template for table search results header.
 
 @param   table  table data dictionary {name, columns: [{name, }]}
 """
-SEARCH_ROW_TABLE_HEADER_TXT = """
-Table {{ table["name"] }}:
-%for col in ["#"] + table["columns"]:
-{{ col["name"] }}    
-%endfor
+SEARCH_ROW_TABLE_HEADER_TXT = """<%
+from skyperious.lib import util
+
+header = "Table %s (%s):" % (table["name"], util.plural("column", table["columns"]))
+%>
+
+{{ header }}
+{{ "=" * len(header) }}
 """
 
 
@@ -3052,15 +3055,17 @@ import re
 from skyperious.lib import util
 from skyperious import conf, templates
 
+maxcol = max(len(c["name"]) for c in table["columns"]) if table["columns"] else 0
 %>
-{{ count }}
+
+Match #{{ count }} in {{ table["name"] }}:
 %for col in table["columns"]:
 <%
 value = row[col["name"]]
 value = value if value is not None else ""
 value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(value))
 %>
-{{ pattern_replace.sub(wrap_b, value) }}
+{{ ("%s:" % col["name"]).rjust(maxcol + 1) }} {{ pattern_replace.sub(wrap_b, value) }}
 %endfor
 """
 
