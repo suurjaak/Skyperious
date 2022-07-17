@@ -425,16 +425,18 @@ def run_merge(filenames, output_filename=None):
         db2.close()
 
 
-def run_search(filenames, query, offset=0, limit=0):
+def run_search(filenames, query, category="message", offset=0, limit=0):
     """Searches the specified databases for specified query."""
+    TABLES = {"message": "messages", "contact": "contacts", "chat": "conversations",
+              "table": "all tables"}
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     postbacks = queue.Queue()
     args = {"text": query, "offset": offset, "limit": limit,
-            "table": "messages", "output": "text"}
+            "table": TABLES.get(category, category), "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            logger.info('Searching "%s" in %s.', query, db)
+            logger.info('Searching "%s" in %s %s.', query, db, args["table"])
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()
@@ -443,7 +445,8 @@ def run_search(filenames, query, offset=0, limit=0):
                           (db, result.get("error_short", result["error"])))
                     break # while True
                 if "done" in result:
-                    logger.info("Finished searching for \"%s\" in %s.", query, db)
+                    logger.info("Finished searching for \"%s\" in %s %s.",
+                                query, db, args["table"])
                     break # while True
                 if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
@@ -986,7 +989,8 @@ def run(nogui=False):
                    arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
-        run_search(arguments.FILE, arguments.QUERY, arguments.offset, arguments.limit)
+        run_search(arguments.FILE, arguments.QUERY, arguments.type,
+                   arguments.offset, arguments.limit)
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,

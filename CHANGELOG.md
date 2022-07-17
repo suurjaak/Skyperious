@@ -8,6 +8,7 @@ CHANGELOG
 - add command-line flag --config-file
 - add command-line search flags --limit and --offset
 - tweak icon borders
+- fix command-line search ignoring --type flag
 - fix error on using system colours with transparency
 - fix errors on Ubuntu 22 (issue #111)
 
