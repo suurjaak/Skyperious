@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.07.2022
+@modified    19.07.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -82,6 +82,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                  else images.Icon24x24_32bit)
 
     def __init__(self):
+        controls.Patch.patch_wx()
         wx.Frame.__init__(self, parent=None, title=conf.Title, size=conf.WindowSize)
         guibase.TemplateFrameMixIn.__init__(self)
 
@@ -136,7 +137,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         self.frame_console.SetIcons(icons)
 
-        notebook = self.notebook = controls.FlatNotebook(
+        notebook = self.notebook = wx.lib.agw.flatnotebook.FlatNotebook(
             parent=panel, style=wx.NB_TOP,
             agwStyle=wx.lib.agw.flatnotebook.FNB_NODRAG |
                      wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON |

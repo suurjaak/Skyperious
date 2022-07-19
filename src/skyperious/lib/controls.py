@@ -28,6 +28,9 @@ Stand-alone GUI components for wx:
   Inspired by wx.CommandLinkButton, which does not support custom icons
   (at least not of wx 2.9.4).
 
+- Patch(object):
+  Monkey-patches wx API for general compatibility over different versions.
+
 - PropertyDialog(wx.Dialog):
   Dialog for displaying an editable property grid. Supports strings,
   integers, booleans, and tuples interpreted as wx.Size.
@@ -87,9 +90,6 @@ Stand-alone GUI components for wx:
 - def get_key_state(keycode):
   Returns true if specified key is currently down (swallows Linux exceptions).
 
-- def rect_defloat(*args, **kwargs):
-  Wrapper for constructing wx.Rect, casting any float arguments to int.
-
 - def wordwrap(text, width, dc, breakLongWords=True, margin=0):
   Returns text wrapped to pixel width according to given DC;
   a patched copy of `wx.lib.wordwrap.wordwrap()`
@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    12.07.2022
+@modified    19.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -113,6 +113,7 @@ import operator
 import os
 import re
 import sys
+
 import wx
 import wx.adv
 import wx.html
@@ -465,35 +466,6 @@ class ColourManager(object):
 
         stc.CallTipSetBackground(faces['calltipbg'])
         stc.CallTipSetForeground(faces['calltipfg'])
-
-
-
-class FlatNotebook(wx.lib.agw.flatnotebook.FlatNotebook):
-    """
-    Wrapper for wx.lib.agw.flatnotebook.FlatNotebook, handling wxPython bug
-    of raising error for using floats with wx.Rect in versions of Python later than 3.8.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(FlatNotebook, self).__init__(*args, **kwargs)
-        self._PatchRenderer(self)
-
-
-    @staticmethod
-    def _PatchRenderer(nb):
-        """Patches Renderer.DrawTabs of given notebook."""
-        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
-        except Exception: pass
-        else: return
-
-        def DrawTabs__Patched(*args, **kwargs):
-            wx.Rect = rect_defloat
-            try: return Renderer__DrawTabs(*args, **kwargs)
-            finally: wx.Rect = WX__RECT
-
-        # Renderer functions invoke wx.Rect() with float arguments
-        renderer = nb.GetTabArea()._mgr.GetRenderer(nb.GetAGWWindowStyleFlag())
-        Renderer__DrawTabs, renderer.DrawTabs = renderer.DrawTabs, DrawTabs__Patched
 
 
 
@@ -1254,20 +1226,52 @@ class NoteButton(wx.Panel, wx.Button):
 
 
 class Patch(object):
-    """
-    Functionality for monkey-patching wx API for general compatibility over different versions.
-    """
+    """Monkey-patches wx API for general compatibility over different versions."""
 
-    @classmethod
-    def patch(cls, obj):
-        """Patches the object depending on its type and wx environment."""
-        if isinstance(obj, wx.stc.StyledTextCtrl):
-            # In some versions have StartStyling(start), others StartStyling(start, mask)
-            STC__StartStyling = obj.StartStyling
-            def StartStyling__Patched(start):
-                try: return STC__StartStyling(start)
-                except TypeError: return STC__StartStyling(start, 255)
-            obj.StartStyling = StartStyling__Patched
+    _PATCHED = False
+
+    @staticmethod
+    def patch_wx():
+        """
+        Patches wx object methods to smooth over version and setup differences.
+
+        In wheel-built wxPython in Ubuntu22, floats are no longer auto-converted to ints
+        in core wx object method calls like wx.Colour().
+        """
+        if Patch._PATCHED: return
+
+        # Some versions have StartStyling(start), others StartStyling(start, mask)
+        STC__StartStyling = wx.stc.StyledTextCtrl.StartStyling
+        def StartStyling__Patched(self, *args, **kwargs):
+            try: return STC__StartStyling(self, *args, **kwargs)
+            except TypeError: return STC__StartStyling(self, *(args + [255]), **kwargs)
+        wx.stc.StyledTextCtrl.StartStyling = StartStyling__Patched
+        Patch._PATCHED = True
+
+        # In some setups, float->int autoconversion is not done for Python/C sip objects
+        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
+        except Exception: pass
+        else: return
+
+        def defloatify(func):
+            """Returns function pass-through wrapper, converting any float arguments to int."""
+            def inner(*args, **kwargs):
+                args = [int(v) if isinstance(v, float) else v for v in args]
+                kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
+                return func(*args, **kwargs)
+            return functools.update_wrapper(inner, func)
+
+        wx.Colour.__init__              = defloatify(wx.Colour.__init__)
+        wx.Point.__init__               = defloatify(wx.Point.__init__)
+        wx.Rect.__init__                = defloatify(wx.Rect.__init__)
+        wx.ImageList.Draw               = defloatify(wx.ImageList.Draw)
+        wx.BufferedPaintDC.DrawText     = defloatify(wx.BufferedPaintDC.DrawText)
+        wx.BufferedPaintDC.DrawBitmap   = defloatify(wx.BufferedPaintDC.DrawBitmap)
+        wx.PaintDC.DrawText             = defloatify(wx.PaintDC.DrawText)
+        wx.PaintDC.DrawBitmap           = defloatify(wx.PaintDC.DrawBitmap)
+        wx.MemoryDC.DrawText            = defloatify(wx.MemoryDC.DrawText)
+        wx.MemoryDC.DrawBitmap          = defloatify(wx.MemoryDC.DrawBitmap)
+        wx.ScrolledWindow.SetScrollbars = defloatify(wx.ScrolledWindow.SetScrollbars)
 
 
 
@@ -3765,7 +3769,6 @@ class SearchableStyledTextCtrl(wx.Panel):
         style_sub = functools.reduce(lambda a, b: a & ~b, nobits,
                                      style | wx.BORDER_NONE)
         self._stc = wx.stc.StyledTextCtrl(self, id, style=style_sub, name=name)
-        Patch.patch(self._stc)
 
         bmp = self.IMG_TOGGLE.GetBitmap()
         buttonsize = bmp.Width + 4, bmp.Height + 4
@@ -4179,7 +4182,7 @@ class TabbedHtmlWindow(wx.Panel):
         if "linux" in sys.platform and wx.VERSION[:3] == (4, 1, 1):
             # wxPython 4.1.1 on Linux crashes with FNB_VC8
             agwStyle ^= wx.lib.agw.flatnotebook.FNB_VC8
-        notebook = self._notebook = FlatNotebook(
+        notebook = self._notebook = wx.lib.agw.flatnotebook.FlatNotebook(
             parent=self, size=(-1, 27), style=wx.NB_TOP,
             agwStyle=agwStyle)
         self._html = wx.html.HtmlWindow(parent=self, style=style, name=name)
@@ -4857,15 +4860,6 @@ def get_key_state(keycode):
     """Returns true if specified key is currently down (swallows Linux exceptions)."""
     try: return wx.GetKeyState(keycode)
     except Exception: return False  # wx3 can raise for non-modifier keys in Linux non-X11 backends
-
-
-WX__RECT = wx.Rect
-
-def rect_defloat(*args, **kwargs):
-    """Wrapper for constructing wx.Rect, casting any float arguments to int."""
-    args   = [int(v) if isinstance(v, float) else v for v in args]
-    kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
-    return WX__RECT(*args, **kwargs)
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):
