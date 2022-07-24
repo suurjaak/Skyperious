@@ -37,6 +37,10 @@
             <a href="#windows">Windows</a><br />
             <a href="#mac">Mac</a><br />
             <a href="#linux">Linux</a><br />
+            <span class="subview">
+              <a href="#linux-snap">snap</a><br />
+              <a href="#linux-source">source</a><br />
+            </span>
             <a href="#general">General remarks</a><br />
             <a href="#docker">Docker</a><br />
           </span>
@@ -47,9 +51,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -84,12 +88,22 @@
 
         <a name="linux"><h3>Linux</h3></a>
 
+        <a name="linux-snap"><h4>snap</h4></a>
+
+        <ul>
+        <li>install Snap if not installed: <code>sudo apt-get install snap</code></li>
+        <li>install Skyperious from the Snap Store, or run <code>snap install skyperious</code></li>
+        <li>launch Skyperious from OS menu, or run <code>skyperious</code></li>
+        </ul>
+
+        <a name="linux-source"><h4>source</h4></a>
+
         <p>The graphical interface needs wxPython, best installed with one of the prepared
         Python wheels available at <a href="https://extras.wxpython.org/wxPython4/extras/linux">https://extras.wxpython.org/wxPython4/extras/linux</a>.</p>
 
         <p>E.g. installing Skyperious for Ubuntu 20.04:</p>
         <ul>
-        <li>run <code>sudo apt-get install libgtk-3-0 libsdl2-2.0 libwebkit2gtk-4.0 python3 python3-pip</code></li>
+        <li>run <code>sudo apt-get install libgtk-3-0 libsdl2-2.0 libsm6 libwebkit2gtk-4.0-37 libxtst6python3 python3-pip</code></li>
         <li>run <code>pip install wxPython --find-links https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04</code></li>
         <li>run <code>pip install skyperious</code></li>
         <li>run <code>skyperious</code></li>

@@ -50,13 +50,17 @@ a small {
   margin:0 auto;
 }
 
-.wrapper span.subview a {
+span.subview a {
   margin-left: 5px;
   font-size: 0.9em;
 }
-.wrapper span.subview a::before {
+span.subview a::before {
   content: "-";
   margin-right: 5px;
+}
+span.subview span.subview * {
+  margin-left: 10px;
+  font-size: 0.9em;
 }
 
 blockquote {

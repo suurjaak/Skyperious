@@ -45,9 +45,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.2-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -263,6 +263,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --verbose             print detailed progress messages to stderr
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -288,7 +289,7 @@ optional arguments:
                         export type: HTML files (default), Excel workbooks,
                         CSV spreadsheets, text files, or a single Excel
                         workbook with separate sheets
-  -o DIR, --output DIR  Output directory if not current directory
+  -o DIR, --output DIR  output directory if not current directory
   -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
                         names of specific chats to export
   -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
@@ -305,6 +306,7 @@ optional arguments:
   --verbose             print detailed progress messages to stderr
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -330,7 +332,11 @@ optional arguments:
                         search in message body (default), in contact
                         information, in chat title and participants, or in any
                         database table
+  --limit LIMIT         maximum number of matches to print
+  --offset OFFSET       number of matches to skip from the beginning
+  --reverse             find matches in reverse order
   --verbose             print detailed progress messages to stderr
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -374,6 +380,7 @@ optional arguments:
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file; also skips all user interaction
                         like asking for Skype username or password
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -405,6 +412,7 @@ optional arguments:
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file; also skips all user interaction
                         like asking for Skype username or password
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -428,6 +436,7 @@ optional arguments:
                         Final database filename, auto-chosen by default
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file
+  --config-file         path of configuration file to use
 </pre>
 
 
@@ -443,10 +452,11 @@ positional arguments:
   FILE2       second Skype databases
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --verbose   print detailed progress messages to stderr
+  -h, --help            show this help message and exit
+  --verbose             print detailed progress messages to stderr
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file
+  --config-file         path of configuration file to use
 </pre>
 
 <pre id="gui">
@@ -461,7 +471,8 @@ positional arguments:
               (supports * wildcards)
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
+  --config-file         path of configuration file to use
 </pre>
 
       </section>
