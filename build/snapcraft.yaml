@@ -13,14 +13,14 @@
 #
 # @author      Erki Suurjaak
 # @created     01.05.2022
-# @modified    03.07.2022
+# @modified    24.07.2022
 name:    skyperious
 title:   Skyperious
 summary: Skype chat history tool
 website: https://suurjaak.github.io/Skyperious
 license: MIT
 description: |
-  Skyperious is a Skype chat history tool, written in Python.
+  Skyperious is a Skype chat history tool.
 
   You can open Skype SQLite databases and work with their contents:
 
