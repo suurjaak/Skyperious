@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.07.2022
+@modified    24.07.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -9304,7 +9304,8 @@ class AboutDialog(wx.Dialog):
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
 
         self.Layout()
-        self.Size = (self.Size[0], html.VirtualSize[1] + 70)
+        if "win32" != sys.platform: self.MinSize = (550, -1)
+        self.Size = (self.Size[0], html.VirtualSize[1] + (10 if "win32" != sys.platform else 70))
         self.CenterOnParent()
 
 
