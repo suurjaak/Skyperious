@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2022
+@modified    25.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -17,7 +17,6 @@ import argparse
 import atexit
 import codecs
 import collections
-import copy
 import datetime
 import errno
 import getpass
@@ -914,14 +913,14 @@ def run(nogui=False):
         #sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
-    for arg in copy.deepcopy(ARGUMENTS["arguments"]):
+    for arg in map(dict, ARGUMENTS["arguments"]):
         argparser.add_argument(*arg.pop("args"), **arg)
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
         subparser = subparsers.add_parser(cmd["name"],
                     formatter_class=LineSplitFormatter, **kwargs)
-        for arg in copy.deepcopy(cmd["arguments"]):
+        for arg in map(dict, cmd["arguments"]):
             subparser.add_argument(*arg.pop("args"), **arg)
 
     argv = sys.argv[:]
