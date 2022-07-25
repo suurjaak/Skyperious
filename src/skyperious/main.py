@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.04.2022
+@modified    25.07.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -71,13 +71,16 @@ ARGUMENTS = {
          "version": "%s %s, %s." % (conf.Title, conf.Version, conf.VersionDate)},
         {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
          "help": "command-line output suitable for non-terminal display, "
-                 "like piping to a file"}],
+                 "like piping to a file"},
+        {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+         "help": "path of configuration file to use"}
+    ],
     "commands": [
         {"name": "export",
          "help": "export Skype databases as HTML, text or spreadsheet",
          "description": "Export all message history from a Skype database "
                         "into files under a new folder" + (", or a single Excel "
-                        "workbook with chats on separate sheets." 
+                        "workbook with chats on separate sheets."
                         if export.xlsxwriter else ""),
          "arguments": [
              {"args": ["-t", "--type"], "dest": "type",
@@ -92,10 +95,10 @@ ARGUMENTS = {
                       "text files"},
              {"args": ["FILE"], "nargs": "+",
               "help": "one or more Skype databases to export\n"
-                      "(supports * wildcards)"}, 
+                      "(supports * wildcards)"},
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
-              "help": "Output directory if not current directory"},
+              "help": "output directory if not current directory"},
              {"args": ["-c", "--chat"], "dest": "chat", "required": False,
               "help": "names of specific chats to export", "nargs": "+"},
              {"args": ["-a", "--author"], "dest": "author", "required": False,
@@ -121,7 +124,9 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
-        ]}, 
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "search",
          "help": "search Skype databases for messages or data",
          "description": "Search Skype databases for messages, chat or contact "
@@ -140,9 +145,17 @@ ARGUMENTS = {
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file(s) to search\n"
                       "(supports * wildcards)"},
+             {"args": ["--limit"], "type": int,
+              "help": "maximum number of matches to find"},
+             {"args": ["--offset"], "type": int,
+              "help": "number of matches to skip from the beginning"},
+             {"args": ["--reverse"], "action": "store_true",
+              "help": "find matches in reverse order"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
-        ]}, 
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "sync",
          "help": "download new messages from Skype online service",
          "description": "Synchronize Skype database via login to Skype online service.",
@@ -187,7 +200,9 @@ ARGUMENTS = {
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file; also skips all user interaction "
                       "like asking for Skype username or password"},
-        ]}, 
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "create",
          "help": "create a new database",
          "description": "Create a new blank database, or populated from "
@@ -213,6 +228,8 @@ ARGUMENTS = {
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file; also skips all user interaction "
                       "like asking for Skype username or password"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]},
         {"name": "merge", "help": "merge two or more Skype databases "
                                   "into a new database",
@@ -232,7 +249,9 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
-        ]}, 
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "diff", "help": "compare chat history in two Skype databases",
          "description": "Compare two Skype databases for differences "
                         "in chat history.",
@@ -244,7 +263,9 @@ ARGUMENTS = {
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
               "help": "command-line output suitable for non-terminal display, "
                       "like piping to a file"},
-        ]}, 
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "gui",
          "help": "launch Skyperious graphical program (default option)",
          "description": "Launch Skyperious graphical program (default option)",
@@ -252,6 +273,8 @@ ARGUMENTS = {
              {"args": ["FILE"], "nargs": "*",
               "help": "Skype database(s) to open on startup, if any\n"
                       "(supports * wildcards)"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
         ]},
     ],
 }
@@ -403,15 +426,18 @@ def run_merge(filenames, output_filename=None):
         db2.close()
 
 
-def run_search(filenames, query):
+def run_search(filenames, query, category="message", reverse=False, offset=0, limit=0):
     """Searches the specified databases for specified query."""
+    TABLES = {"message": "messages", "contact": "contacts", "chat": "conversations",
+              "table": "all tables"}
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     postbacks = queue.Queue()
-    args = {"text": query, "table": "messages", "output": "text"}
+    args = {"text": query, "reverse": reverse, "offset": offset, "limit": limit,
+            "table": TABLES.get(category, category), "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            logger.info('Searching "%s" in %s.', query, db)
+            logger.info('Searching "%s" in %s %s.', query, db, args["table"])
             worker.work(dict(args, db=db))
             while True:
                 result = postbacks.get()
@@ -420,7 +446,8 @@ def run_search(filenames, query):
                           (db, result.get("error_short", result["error"])))
                     break # while True
                 if "done" in result:
-                    logger.info("Finished searching for \"%s\" in %s.", query, db)
+                    logger.info("Finished searching for \"%s\" in %s %s.",
+                                query, db, args["table"])
                     break # while True
                 if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
@@ -493,7 +520,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
                 else:
                     ns["bar"] = ProgressBar(pulse=True, interval=0.05,
                                             static=conf.IsCLINonTerminal,
-                                            afterword=" Synchronizing %s%s" % 
+                                            afterword=" Synchronizing %s%s" %
                                             (title, suff))
                     ns["bar"].start()
                 ns["chat_title"] = title
@@ -730,7 +757,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
         try:
             extras = [("", chatnames)] if chatnames else []
             extras += [(" with authors", authornames)] if authornames else []
-            output("Exporting%s%s as %s %sto %s." % 
+            output("Exporting%s%s as %s %sto %s." %
                   (" chats" if extras else "",
                    ",".join("%s like %s" % (x, y) for x, y in extras),
                    format.upper(), dbstr, path))
@@ -768,7 +795,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                       ("" if len(dbs) == 1 else " from %s" % db))
                 util.try_ignore((os.unlink if is_xlsx_single else os.rmdir), path)
         except Exception as e:
-            output("Error exporting chats: %s\n\n%s" % 
+            output("Error exporting chats: %s\n\n%s" %
                   (e, traceback.format_exc()))
 
 
@@ -878,7 +905,7 @@ def run(nogui=False):
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
-        sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to 
+        sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to
         sys.stderr = ConsoleWriter(sys.stderr) # a text console
     if "main" not in sys.modules: # E.g. setuptools install, calling main.run
         srcdir = os.path.abspath(os.path.dirname(__file__))
@@ -886,23 +913,22 @@ def run(nogui=False):
         #sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
-    for arg in ARGUMENTS["arguments"]:
+    for arg in map(dict, ARGUMENTS["arguments"]):
         argparser.add_argument(*arg.pop("args"), **arg)
     subparsers = argparser.add_subparsers(dest="command")
     for cmd in ARGUMENTS["commands"]:
         kwargs = dict((k, cmd[k]) for k in cmd if k in ["help", "description"])
         subparser = subparsers.add_parser(cmd["name"],
                     formatter_class=LineSplitFormatter, **kwargs)
-        for arg in cmd["arguments"]:
-            kwargs = dict((k, arg[k]) for k in arg if k != "args")
-            subparser.add_argument(*arg["args"], **kwargs)
+        for arg in map(dict, cmd["arguments"]):
+            subparser.add_argument(*arg.pop("args"), **arg)
 
     argv = sys.argv[:]
     if "nt" == os.name and six.PY2: # Fix Unicode arguments, otherwise converted to ?
         argv = win32_unicode_argv(argv)
     argv = argv[1:]
-    if not argv or (argv[0] not in subparsers.choices
-    and argv[0].endswith(".db")):
+
+    if not argv or not any(x in argv for x in tuple(subparsers.choices) + ("-h", "--help")):
         argv[:0] = ["gui"] # argparse hack: force default argument
     if argv[0] in ("-h", "--help") and len(argv) > 1:
         argv[:2] = argv[:2][::-1] # Swap "-h option" to "option -h"
@@ -920,7 +946,7 @@ def run(nogui=False):
             (util.to_unicode(f), 1) for f in arguments.FILE[::-1]
         ))[::-1] # Reverse and re-reverse to discard earlier duplicates
 
-    conf.load()
+    conf.load(arguments.config_file)
     if "gui" == arguments.command and (nogui or not is_gui_possible):
         argparser.print_help()
         status = None
@@ -964,20 +990,22 @@ def run(nogui=False):
                    arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
     elif "search" == arguments.command:
-        run_search(arguments.FILE, arguments.QUERY)
+        run_search(arguments.FILE, arguments.QUERY, arguments.type,
+                   arguments.reverse, arguments.offset, arguments.limit)
     elif "sync" == arguments.command:
         run_sync(arguments.FILE, arguments.username, arguments.password,
                  arguments.ask_password, arguments.store_password,
                  arguments.sync_contacts, arguments.sync_older,
                  arguments.chat, arguments.author)
     elif "gui" == arguments.command:
-        run_gui(arguments.FILE)
+        try: run_gui(arguments.FILE)
+        except Exception: traceback.print_exc()
 
 
 
 class ConsoleWriter(object):
     """
-    Wrapper for sys.stdout/stderr, attaches to the parent console or creates 
+    Wrapper for sys.stdout/stderr, attaches to the parent console or creates
     a new command console, usable from python.exe, pythonw.exe or
     compiled binary. Hooks application exit to wait for final user input.
     """
@@ -1191,15 +1219,15 @@ def win32_unicode_argv(argv):
     result = argv
     from ctypes import POINTER, byref, cdll, c_int, windll
     from ctypes.wintypes import LPCWSTR, LPWSTR
- 
+
     GetCommandLineW = cdll.kernel32.GetCommandLineW
     GetCommandLineW.argtypes = []
     GetCommandLineW.restype = LPCWSTR
- 
+
     CommandLineToArgvW = windll.shell32.CommandLineToArgvW
     CommandLineToArgvW.argtypes = [LPCWSTR, POINTER(c_int)]
     CommandLineToArgvW.restype = POINTER(LPWSTR)
- 
+
     argc = c_int(0)
     argv = CommandLineToArgvW(GetCommandLineW(), byref(argc))
     if argc.value:

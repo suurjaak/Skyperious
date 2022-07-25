@@ -126,7 +126,7 @@ def export_chats(chats, path, format, db, opts=None):
     else:
         filedir = path if opts.get("multi") else os.path.dirname(path)
         if not os.path.exists(filedir): util.try_ignore(os.makedirs, filedir)
-        export_func = (export_chats_xlsx if "xlsx" == format else 
+        export_func = (export_chats_xlsx if "xlsx" == format else
                        export_chat_csv   if "csv"  == format else
                        export_chat_template)
 
@@ -457,7 +457,7 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
                     namespace["create_sql"] = re_sql.sub(replacer, create_sql)
 
-                template = step.Template(templates.GRID_HTML if is_html else 
+                template = step.Template(templates.GRID_HTML if is_html else
                            templates.SQL_TXT, strip=False, escape=is_html)
                 template.stream(f, namespace, newline=os.linesep)
 

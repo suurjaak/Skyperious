@@ -3,7 +3,7 @@
 Parses a Google-like search grammar into SQL for querying a Skype database.
 
 - words can consist of any non-whitespace characters including all Unicode,
-  excluding round brackets and quotes ()" 
+  excluding round brackets and quotes ()"
 - asterisk (*) can be used as a wildcard, matching any character or whitespace
 - quoted text is a literal phrase: "one two  three   ."
 - can use operator "OR" to make an either-or search: one OR two
@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    19.03.2022
+@modified    17.07.2022
 """
 import calendar
 import collections
@@ -150,7 +150,7 @@ class SearchQueryParser(object):
                 result = "SELECT * FROM %s WHERE %s" % (table["name"], result)
                 for col in table["columns"]:
                     if col.get("pk"):
-                        result += " ORDER BY %s ASC" % col["name"]
+                        result += " ORDER BY %s" % col["name"]
                         break # break for col in table["columns"]
         else:
             if "table" in keywords: del keywords["table"]
@@ -259,7 +259,7 @@ class SearchQueryParser(object):
                             if val is None: continue # continue for j, (forma..
                             format += ("-" if format else "") + "%" + frm
                             value += ("-" if value else "")
-                            value += "%02d" % val if j else "%04d" % val 
+                            value += "%02d" % val if j else "%04d" % val
                         param = "timestamp_%s" % len(sql_params)
                         temp = "STRFTIME('%s', m.timestamp, 'unixepoch') = :%s"
                         sql = temp % (format, param)
@@ -329,7 +329,7 @@ class SearchQueryParser(object):
         """
         Returns the non-empty strings joined together with the specified glue.
 
-        @param   glue  separator used as glue between strings 
+        @param   glue  separator used as glue between strings
         @return        (joined string, number of strings actually used)
         """
         strings = list(filter(None, strings))

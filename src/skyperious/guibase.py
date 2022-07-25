@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    19.03.2022
+@modified    10.07.2022
 """
 import datetime
 import logging
@@ -115,7 +115,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         self.status_clearer      = None  # wx.CallLater instance
         console = self.console = self.frame_console.shell
         if not isinstance(conf.ConsoleHistoryCommands, list):
-            conf.ConsoleHistoryCommands = [] 
+            conf.ConsoleHistoryCommands = []
         for cmd in conf.ConsoleHistoryCommands:
             console.addHistory(cmd)
         ColourManager.Register(console)
@@ -133,7 +133,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
 
         button_clear = wx.Button(parent=panel, label="C&lear log", size=(100, -1))
         edit_log = self.log = wx.stc.StyledTextCtrl(panel)
-        edit_log.SetMarginCount(0)
+        hasattr(edit_log, "SetMarginCount") and edit_log.SetMarginCount(0)  # Since wx 3.1.1
         edit_log.SetReadOnly(True)
         edit_log.SetTabWidth(edit_log.TabWidth * 2)
         edit_log.SetWrapMode(wx.stc.STC_WRAP_WORD)
@@ -144,10 +144,8 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             edit_log.SetReadOnly(True)
         def on_colour(event=None):
             if event: event.Skip()
-            fgcolour, crcolour, bgcolour = (
-                wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
-                for x in (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT,
-                          wx.SYS_COLOUR_WINDOW)
+            fgcolour, crcolour, bgcolour = (ColourManager.ColourHex(x) for x in
+                (wx.SYS_COLOUR_GRAYTEXT, wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW)
             )
             edit_log.SetCaretForeground(crcolour)
             edit_log.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,

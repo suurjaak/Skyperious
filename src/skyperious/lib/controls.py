@@ -28,6 +28,9 @@ Stand-alone GUI components for wx:
   Inspired by wx.CommandLinkButton, which does not support custom icons
   (at least not of wx 2.9.4).
 
+- Patch(object):
+  Monkey-patches wx API for general compatibility over different versions.
+
 - PropertyDialog(wx.Dialog):
   Dialog for displaying an editable property grid. Supports strings,
   integers, booleans, and tuples interpreted as wx.Size.
@@ -76,13 +79,29 @@ Stand-alone GUI components for wx:
 - def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
   Paints and returns (wx.Bitmap, rects) with histogram plot from data.
 
+- def get_controls(window):
+  Returns a list of all nested controls of given window.
+
+- def get_dialog_path(dialog):
+  Returns the file path chosen in FileDialog, adding extension if dialog result
+  has none even though a filter has been selected, or if dialog result has a
+  different extension than what is available in selected filter.
+
+- def get_key_state(keycode):
+  Returns true if specified key is currently down (swallows Linux exceptions).
+
+- def wordwrap(text, width, dc, breakLongWords=True, margin=0):
+  Returns text wrapped to pixel width according to given DC;
+  a patched copy of `wx.lib.wordwrap.wordwrap()`
+  able to handle multi-byte Unicode characters in Python3.
+
 ------------------------------------------------------------------------------
 This file is part of Skyperious - Skype chat history tool.
 Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    17.06.2022
+@modified    19.07.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -94,6 +113,7 @@ import operator
 import os
 import re
 import sys
+
 import wx
 import wx.adv
 import wx.html
@@ -306,6 +326,8 @@ class ColourManager(object):
         """Returns wx.Colour or system colour as HTML colour hex string."""
         colour = idx if isinstance(idx, wx.Colour) \
                  else wx.SystemSettings.GetColour(idx)
+        if colour.Alpha() != wx.ALPHA_OPAQUE:
+            colour = wx.Colour(colour[:3])  # GetAsString(C2S_HTML_SYNTAX) can raise if transparent
         return colour.GetAsString(wx.C2S_HTML_SYNTAX)
 
 
@@ -332,7 +354,7 @@ class ColourManager(object):
                   if isinstance(colour2, integer_types) else wx.Colour(colour2)
         rgb1, rgb2 = tuple(colour1)[:3], tuple(colour2)[:3]
         delta  = tuple(a - b for a, b in zip(rgb1, rgb2))
-        result = tuple(a - (d * ratio) for a, d in zip(rgb1, delta))
+        result = tuple(a - int(d * ratio) for a, d in zip(rgb1, delta))
         result = tuple(min(255, max(0, x)) for x in result)
         return wx.Colour(result)
 
@@ -594,7 +616,7 @@ class NonModalOKDialog(wx.Dialog):
 
     def __init__(self, parent, title, message):
         wx.Dialog.__init__(self, parent=parent, title=title,
-                           style=wx.CAPTION | wx.CLOSE_BOX | 
+                           style=wx.CAPTION | wx.CLOSE_BOX |
                                  wx.FRAME_FLOAT_ON_PARENT)
 
         self.Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -974,7 +996,7 @@ class NoteButton(wx.Panel, wx.Button):
                 dc.DrawRectangle(5, 5, width - 10, height - 10)
             dc.Pen = PEN(dc.TextForeground)
 
-        if self._press or (is_focused and any(wx.GetKeyState(x) for x in KEYS.SPACE)):
+        if self._press or (is_focused and any(get_key_state(x) for x in KEYS.SPACE)):
             # Button is being clicked with mouse: create sunken effect
             colours = [(128, 128, 128)] * 2
             lines   = [(1, 1, width - 2, 1), (1, 1, 1, height - 2)]
@@ -1200,6 +1222,56 @@ class NoteButton(wx.Panel, wx.Button):
     def GetNote(self):
         return self._note
     Note = property(GetNote, SetNote)
+
+
+
+class Patch(object):
+    """Monkey-patches wx API for general compatibility over different versions."""
+
+    _PATCHED = False
+
+    @staticmethod
+    def patch_wx():
+        """
+        Patches wx object methods to smooth over version and setup differences.
+
+        In wheel-built wxPython in Ubuntu22, floats are no longer auto-converted to ints
+        in core wx object method calls like wx.Colour().
+        """
+        if Patch._PATCHED: return
+
+        # Some versions have StartStyling(start), others StartStyling(start, mask)
+        STC__StartStyling = wx.stc.StyledTextCtrl.StartStyling
+        def StartStyling__Patched(self, *args, **kwargs):
+            try: return STC__StartStyling(self, *args, **kwargs)
+            except TypeError: return STC__StartStyling(self, *(args + [255]), **kwargs)
+        wx.stc.StyledTextCtrl.StartStyling = StartStyling__Patched
+        Patch._PATCHED = True
+
+        # In some setups, float->int autoconversion is not done for Python/C sip objects
+        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
+        except Exception: pass
+        else: return
+
+        def defloatify(func):
+            """Returns function pass-through wrapper, converting any float arguments to int."""
+            def inner(*args, **kwargs):
+                args = [int(v) if isinstance(v, float) else v for v in args]
+                kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
+                return func(*args, **kwargs)
+            return functools.update_wrapper(inner, func)
+
+        wx.Colour.__init__              = defloatify(wx.Colour.__init__)
+        wx.Point.__init__               = defloatify(wx.Point.__init__)
+        wx.Rect.__init__                = defloatify(wx.Rect.__init__)
+        wx.ImageList.Draw               = defloatify(wx.ImageList.Draw)
+        wx.BufferedPaintDC.DrawText     = defloatify(wx.BufferedPaintDC.DrawText)
+        wx.BufferedPaintDC.DrawBitmap   = defloatify(wx.BufferedPaintDC.DrawBitmap)
+        wx.PaintDC.DrawText             = defloatify(wx.PaintDC.DrawText)
+        wx.PaintDC.DrawBitmap           = defloatify(wx.PaintDC.DrawBitmap)
+        wx.MemoryDC.DrawText            = defloatify(wx.MemoryDC.DrawText)
+        wx.MemoryDC.DrawBitmap          = defloatify(wx.MemoryDC.DrawBitmap)
+        wx.ScrolledWindow.SetScrollbars = defloatify(wx.ScrolledWindow.SetScrollbars)
 
 
 
@@ -1665,7 +1737,7 @@ class RangeSlider(wx.Panel):
         # GetFullTextExtent returns (width, height, descent, leading)
         extent = self.GetFullTextExtent(self.FormatLabel(self._rng[1]))
         # 2.3 provides a bit of space between 2 labels
-        best.width  = 2.3 * extent[0]
+        best.width  = int(2.3 * extent[0])
         # +1 for upper gap plus label height plus optional marker label height,
         # plus all set positions
         best.height = (1 + (1 + self.MARKER_LABEL_SHOW) * sum(extent[1:3])
@@ -1737,7 +1809,7 @@ class RangeSlider(wx.Panel):
                                  height - box_top - self.BAR_HEIGHT)
         self._box_gap_areas = [
             wx.Rect(0, box_top, self.BAR_BUTTON_WIDTH,
-                    height - box_top - self.BAR_HEIGHT), 
+                    height - box_top - self.BAR_HEIGHT),
             wx.Rect(width - self.BAR_BUTTON_WIDTH, box_top,
                     width, height - box_top - self.BAR_HEIGHT)]
         dc.SetFont(self.GetFont())
@@ -1796,7 +1868,7 @@ class RangeSlider(wx.Panel):
             dc.SetPen(PEN(self.BAR_ARROW_FG_COLOUR))
             dc.DrawPolygon(((self.BAR_BUTTON_WIDTH // 2 + 1,
                 height - self.BAR_HEIGHT // 2 - 3), (
-                    self.BAR_BUTTON_WIDTH // 2 + 1, 
+                    self.BAR_BUTTON_WIDTH // 2 + 1,
                     height - self.BAR_HEIGHT // 2 + 1
                 ), (self.BAR_BUTTON_WIDTH // 2 - 1,
                     height - self.BAR_HEIGHT // 2 - 1
@@ -1874,7 +1946,7 @@ class RangeSlider(wx.Panel):
         # Skip first and last, as left and right are already known.
         for i in range(1, label_count - 1):
             labels.append(self.FormatLabel(self._rng[0] + i * value_step))
-            label_coords += [(self._box_area.x + i * self._box_area.width 
+            label_coords += [(self._box_area.x + i * self._box_area.width
                 // label_count, selection_top + self.RANGE_LABEL_TOP_GAP)]
         labels.append(right_label)
         label_coords += [(self._box_area.right - right_extent[0],
@@ -1903,7 +1975,7 @@ class RangeSlider(wx.Panel):
             # GetFullTextExtent returns (width, height, descent, leading)
             label_extent = self.GetFullTextExtent(label)
             # Center label on top of marker. +2 for padding
-            label_area = wx.Rect(x - label_extent[0] // 2, 0, 
+            label_area = wx.Rect(x - label_extent[0] // 2, 0,
                 label_extent[0] + 2, sum(label_extent[1:2])
             )
             if not self.ClientRect.Contains(label_area):
@@ -1934,9 +2006,9 @@ class RangeSlider(wx.Panel):
                 dc.SetPen(PEN(self.MARKER_BUTTON_COLOUR))
                 dc.DrawRoundedRectangle(*button_area, radius=button_radius)
                 button_lines = [
-                    (button_area.x + button_radius + i * 2, 
+                    (button_area.x + button_radius + i * 2,
                         button_area.y + button_radius,
-                        button_area.x + button_radius + i * 2, 
+                        button_area.x + button_radius + i * 2,
                          button_area.y + button_area.height - button_radius
                     ) for i in range(
                         (self.MARKER_BUTTON_WIDTH - 2 * button_radius + 1) // 2
@@ -2280,7 +2352,7 @@ class ScrollingHtmlWindow(wx.html.HtmlWindow):
             pos, rng = self._last_scroll_pos[i], self._last_scroll_range[i]
             ratio = pos / float(rng) if rng else 0.0
             ratio = min(1, pos / float(rng) if rng else 0.0)
-            self._last_scroll_pos[i] = ratio * self.GetScrollRange(orient)
+            self._last_scroll_pos[i] = int(ratio * self.GetScrollRange(orient))
         try:
             # Execute scroll later as something resets it after this handler
             wx.CallLater(50, lambda:
@@ -2434,7 +2506,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
 
     def RefreshRows(self):
         """
-        Clears the list and inserts all unfiltered rows, auto-sizing the 
+        Clears the list and inserts all unfiltered rows, auto-sizing the
         columns.
         """
         scrollpos = self.GetScrollPos(wx.VERTICAL)
@@ -3401,11 +3473,9 @@ class SQLiteTextCtrl(wx.stc.StyledTextCtrl):
 
     def SetStyleSpecs(self):
         """Sets STC style colours."""
-        fgcolour, bgcolour, highcolour = (
-            wx.SystemSettings.GetColour(x).GetAsString(wx.C2S_HTML_SYNTAX)
-            for x in (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW
-                      if self.Enabled else wx.SYS_COLOUR_BTNFACE,
-                      wx.SYS_COLOUR_HOTLIGHT)
+        fgcolour, bgcolour, highcolour = (ColourManager.ColourHex(x) for x in
+            (wx.SYS_COLOUR_BTNTEXT, wx.SYS_COLOUR_WINDOW if self.Enabled else wx.SYS_COLOUR_BTNFACE,
+             wx.SYS_COLOUR_HOTLIGHT)
         )
 
 
@@ -4167,7 +4237,7 @@ class TabbedHtmlWindow(wx.Panel):
                 pos, rng = tab["scrollpos"][i], tab["scrollrange"][i]
                 ratio = pos / float(rng) if rng else 0.0
                 ratio = min(1, pos / float(rng) if rng else 0.0)
-                tab["scrollpos"][i] = ratio * self.GetScrollRange(orient)
+                tab["scrollpos"][i] = int(ratio * self.GetScrollRange(orient))
             # Execute scroll later as something resets it after this handler
             try:
                 wx.CallLater(50, lambda:
@@ -4238,7 +4308,7 @@ class TabbedHtmlWindow(wx.Panel):
 
     def _CreateTab(self, index, title):
         """Creates a new tab in the tab container at specified index."""
-        p = wx.Panel(parent=self, size=(0,0)) 
+        p = wx.Panel(parent=self, size=(0,0))
         p.Hide() # Dummy empty window as notebook needs something to hold
         self._notebook.InsertPage(index, page=p, text=title, select=True)
 
@@ -4734,7 +4804,7 @@ def BuildHistogram(data, barsize=(3, 30), colour="#2d8b57", maxval=None):
         if val and h < 1.5: h = 1.5 # Very low values produce no visual bar
         x = i * rect_step + border + 1
         y = bmp.Height - h
-        bars.append((x, y, barsize[0], h))
+        bars.append(list(map(int, (x, y, barsize[0], h))))
     dc.Brush = BRUSH(colour)
     dc.DrawRectangleList(bars)
 
@@ -4784,6 +4854,12 @@ def get_dialog_path(dialog):
         if ext: result += ext
 
     return result
+
+
+def get_key_state(keycode):
+    """Returns true if specified key is currently down (swallows Linux exceptions)."""
+    try: return wx.GetKeyState(keycode)
+    except Exception: return False  # wx3 can raise for non-modifier keys in Linux non-X11 backends
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):

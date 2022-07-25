@@ -26,21 +26,31 @@ or, to run from source code:
 
 ### Linux ###
 
+#### snap ####
+
+* install Snap if not installed: `sudo apt-get install snap`
+* install Skyperious from the Snap Store, or run `snap install skyperious`
+* launch Skyperious from OS menu, or run `skyperious`
+
+
+#### source ####
+
 The graphical interface needs wxPython, best installed with one of the prepared
 Python wheels available at https://extras.wxpython.org/wxPython4/extras/linux.
 
 E.g. installing Skyperious for Ubuntu 20.04:
 
-* run `sudo apt-get install libgtk-3-0 libsdl2-2.0 libwebkit2gtk-4.0 python3 python3-pip`
-* run `sudo pip install wxPython --find-links \`
-      `https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04`
+* run `sudo apt-get install libgtk-3-0 libsdl2-2.0 libsm6 libwebkit2gtk-4.0-37
+                            libxtst6 python3 python3-pip`
+* run `sudo pip install wxPython --find-links
+                        https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04`
 * run `sudo pip install skyperious`
 * run `skyperious`
 
 Another option is to have wxPython built locally, e.g. for Ubuntu 20.04:
 
-* run `sudo apt-get install build-essential libgtk-3-dev libsdl2-dev \`
-      `libwebkit2gtk-4.0-dev python3 python3-pip`
+* run `sudo apt-get install build-essential libgtk-3-dev libsdl2-dev 
+       libwebkit2gtk-4.0-dev python3 python3-pip`
 * run `pip install skyperious`
 * run `skyperious`
 

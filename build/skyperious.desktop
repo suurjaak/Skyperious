@@ -1,8 +1,8 @@
 [Desktop Entry]
-Version=1.0
-Type=Application
-Terminal=false
-Exec=skyperious
 Name=Skyperious
-Icon=skyperious
+GenericName=Skype chat history tool
+Keywords=Skype SQLite SQLite3
+Type=Application
 Categories=Utility;Database;InstantMessaging;Chat;GTK;
+Icon=res/Icon256x256_32bit.png
+Exec=skyperious

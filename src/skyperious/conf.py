@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.06.2022
+@modified    25.07.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.2"
-VersionDate = "17.06.2022"
+Version = "5.3.dev17"
+VersionDate = "25.07.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -40,6 +40,9 @@ VarDirectory = os.path.join(ApplicationDirectory, "var")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
+
+"""Whether to ignore user-specific config paths."""
+ConfigFileStatic = False
 
 """List of attribute names that can be saved to and loaded from ConfigFile."""
 FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
@@ -83,7 +86,7 @@ IsCLI = False
 IsCLIVerbose = False
 
 """
-Is command-line interface using output suitable for non-terminals 
+Is command-line interface using output suitable for non-terminals
 like piping to a file, skips progress bars and user interaction.
 """
 IsCLINonTerminal = True
@@ -370,20 +373,27 @@ WordCloudWordsMax = 100
 WordCloudWordsAuthorMax = 50
 
 
-def load():
-    """Loads FileDirectives from ConfigFile into this module's attributes."""
-    global Defaults, VarDirectory, ConfigFile
+def load(configfile=None):
+    """
+    Loads FileDirectives into this module's attributes.
+
+    @param   configfile  name of configuration file to use from now if not module defaults
+    """
+    global Defaults, VarDirectory, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
     except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
 
+    if configfile:
+        ConfigFile, ConfigFileStatic = configfile, True
     configpaths = [ConfigFile]
-    if not Defaults:
+    if not Defaults and not ConfigFileStatic:
         # Instantiate OS- and user-specific paths
         try:
             p = appdirs.user_config_dir(Title, appauthor=False)
+            userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Try user-specific path first, then path under application folder
-            configpaths.insert(0, os.path.join(p, "%s.ini" % Title.lower()))
+            if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
         try: VarDirectory = appdirs.user_data_dir(Title, False)
         except Exception: pass
@@ -396,7 +406,7 @@ def load():
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
     try:
-        for path in configpaths[::-1]:
+        for path in configpaths:
             if os.path.isfile(path) and parser.read(path):
                 break # for path
 
@@ -417,16 +427,21 @@ def load():
         pass # Fail silently
 
 
-def save():
-    """Saves FileDirectives into ConfigFile."""
-    configpaths = [ConfigFile]
-    try:
-        p = appdirs.user_config_dir(Title, appauthor=False)
-        userpath = os.path.join(p, "%s.ini" % Title.lower())
-        # Pick only userpath if exists, else try application folder first
-        if os.path.isfile(userpath): configpaths = [userpath]
-        else: configpaths.append(userpath)
-    except Exception: pass
+def save(configfile=None):
+    """
+    Saves FileDirectives into configuration file.
+
+    @param   configfile  name of configuration file to use if not module defaults
+    """
+    configpaths = [configfile] if configfile else [ConfigFile]
+    if not configfile and not ConfigFileStatic:
+        try:
+            p = appdirs.user_config_dir(Title, appauthor=False)
+            userpath = os.path.join(p, "%s.ini" % Title.lower())
+            # Pick only userpath if exists, else try application folder first
+            if os.path.isfile(userpath): configpaths = [userpath]
+            elif userpath not in configpaths: configpaths.append(userpath)
+        except Exception: pass
 
     section = "*"
     module = sys.modules[__name__]
@@ -441,7 +456,7 @@ def save():
             except Exception: continue # for path
             else: break # for path
 
-        f.write("# %s configuration written on %s.\n" % 
+        f.write("# %s configuration written on %s.\n" %
                 (Title, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         for name in FileDirectives:
             try: parser.set(section, name, json.dumps(getattr(module, name)))

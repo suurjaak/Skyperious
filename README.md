@@ -21,7 +21,7 @@ no longer affect what is visible in the official Skype program.
 ---
 
 
-Skyperious is a Skype chat history tool, written in Python.
+Skyperious is a Skype chat history tool.
 
 You can open Skype SQLite databases and work with their contents:
 
@@ -125,6 +125,9 @@ Installation
 
 Windows: download and launch the latest setup from
 https://suurjaak.github.io/Skyperious/downloads.html.
+
+Linux Snap Store: install Skyperious, or run
+`snap install skyperious`
 
 Mac/Linux/other: install Python, wxPython, pip, and run
 `pip install skyperious`
