@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 
-5.3, 2022-07-17
+5.3, 2022-07-25
 ---------------
 - add build file for Snap
 - add command-line flag --config-file
