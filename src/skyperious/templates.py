@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    17.07.2022
+@modified    15.09.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -1462,7 +1462,7 @@ HTML chat history export template for shared media message body.
 @param   ?media_folder   path to save files under, if not embedding
 """
 CHAT_MESSAGE_MEDIA = """<%
-import imghdr, logging, mimetypes, os
+import logging, mimetypes, os
 from six.moves import urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
@@ -1470,13 +1470,9 @@ from skyperious.lib import util
 category = category if isdef("category") else None
 filename = filename if isdef("filename") else None
 if category not in ("audio", "video"): category = "image"
-src, mimetype, filetype = url, None, None
-if filename:
-    filetype = os.path.splitext(filename)[-1][1:]
+src, mimetype, filetype = url, None, util.get_file_type(content, category, filename)
 if category in ("audio", "video"):
     mimetype = mimetypes.guess_type(filename or "")[0]
-else:
-    filetype = imghdr.what("", content) or filetype or "image"
 if filename and filetype and not os.path.splitext(filename)[-1]:
     filename = "%s.%s" % (filename, filetype)
 filetype = filetype or category

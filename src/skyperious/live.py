@@ -8,11 +8,12 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    08.06.2022
+@modified    15.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
 import datetime
+import glob
 import json
 import logging
 import os
@@ -25,6 +26,7 @@ import time
 import warnings
 
 BeautifulSoup = skpy = ijson = None
+import appdirs
 try: from bs4 import BeautifulSoup
 except ImportError: pass
 try: import skpy
@@ -80,12 +82,17 @@ class SkypeLogin(object):
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
+        self.dl_cache_dir = None
         self.populated    = False
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
         self.msg_lookups  = collections.defaultdict(list) # {timestamp__ms: [{msg}, ]}
         self.msg_parser   = None # skypedata.MessageParser instance
+
+        title = conf.Title if "nt" == os.name else conf.Title.lower()
+        pathbase = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
+        self.dl_cache_dir = os.path.join(pathbase, "shared")
 
 
     def is_logged_in(self):
@@ -548,7 +555,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_content(item.picture, category="avatar")
+                    raw = self.get_api_content(item.picture, category="avatar", cache=False)
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw.decode("latin1"))
             else: result = None
@@ -684,7 +691,7 @@ class SkypeLogin(object):
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' %
                                        (urllib.parse.quote(util.to_unicode(filesize or 0)),
-                                        urllib.parse.quote(util.to_unicode(fileurl or ""), ":/"),
+                                        urllib.parse.quote(util.to_unicode(fileurl or ""), safe=":/"),
                                         util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             else: # SkypeCardMsg, SkypeChangeMemberMsg, ..
@@ -886,23 +893,46 @@ class SkypeLogin(object):
 
 
 
-    def get_api_content(self, url, category=None):
+    def get_api_content(self, url, category=None, cache=True):
         """
         Returns content raw binary from Skype API URL via login, or None.
 
         @param   category  type of content, e.g. "avatar" for avatar image,
                            "file" for shared file
+        @param   cache     whether to use disk cache if media caching is enabled;
+                           loads content from disk if available, and saves download to disk
         """
-        url = make_content_url(url, category)
+        result, cached, url = None, None, make_content_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
-        for url in urls:
-            raw = self.download_content(url, category)
-            if raw: return raw
-        return None
+
+        for url in urls if conf.SharedContentUseCache and cache else ():
+            try:
+                filebase = os.path.join(self.dl_cache_dir, urllib.parse.quote(url, safe=""))
+                for p in glob.glob(filebase + ".*")[:1]:
+                    with open(p, "rb") as f:
+                        result = cached = f.read()
+            except Exception: pass
+
+        for url in urls if not result else ():
+            result = self.download_content(url, category)
+            if result: break # for url
+
+        if result and conf.SharedContentUseCache and cache and not cached:
+            try:
+                filetype = util.get_file_type(result, category, url)
+                filename = "%s.%s" % (urllib.parse.quote(url, safe=""), filetype)
+                filepath = os.path.join(self.dl_cache_dir, filename)
+                if not os.path.exists(self.dl_cache_dir): os.makedirs(self.dl_cache_dir)
+                with open(filepath, "wb") as f:
+                    f.write(result)
+            except Exception:
+                logger.warning("Error caching %s.", filepath, exc_info=True)
+
+        return result
 
 
     def download_content(self, url, category=None):

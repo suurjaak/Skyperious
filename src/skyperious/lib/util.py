@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    01.05.2022
+@modified    15.09.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -16,6 +16,7 @@ import calendar
 import codecs
 import ctypes
 import datetime
+import imghdr
 import io
 import locale
 import math
@@ -412,6 +413,26 @@ def create_file(filepath, mode="w", handle=False, **kwargs):
     if handle: return open(filepath, mode, **kwargs)
     else:
         with open(filepath, mode, **kwargs): pass
+
+
+def get_file_type(content, category=None, filename=None):
+    """
+    Returns file type extension like "png", or category if detection failed
+    and known media category like "video", or "image".
+
+    @param   content   file as raw bytes
+    @param   category  type of content, e.g. "image" or "audio" or "video"
+    @param   filename  original name of file
+    """
+    category = category if category in ("audio", "video") else "image"
+    filetype = category
+    if filename:
+        filetype = os.path.splitext(filename)[-1][1:] or filetype
+    if "image" == category:
+        filetype = imghdr.what("", content) or filetype
+    elif not filetype:
+        filetype = "mp4" # Pretty safe bet for Skype audio/video
+    return filetype
 
 
 def is_os_64bit():

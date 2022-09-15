@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2022
+@modified    15.09.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.3.dev17"
-VersionDate = "25.07.2022"
+Version = "5.4.dev0"
+VersionDate = "15.09.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -59,9 +59,10 @@ OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedFileAutoDownload", "SharedImageAutoDownload", "StatisticsPlotWidth",
-    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
-    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "SharedFileAutoDownload", "SharedImageAutoDownload", "SharedContentUseCache",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
+    "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -350,6 +351,9 @@ SharedFileAutoDownload = True
 """Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
 
+"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
+SharedContentUseCache = True
+
 """Duration of status message on program statusbar, in milliseconds."""
 StatusFlashLength = 30000
 
@@ -389,13 +393,14 @@ def load(configfile=None):
     configpaths = [ConfigFile]
     if not Defaults and not ConfigFileStatic:
         # Instantiate OS- and user-specific paths
+        title = Title if "nt" == os.name else Title.lower()
         try:
-            p = appdirs.user_config_dir(Title, appauthor=False)
+            p = appdirs.user_config_dir(title, appauthor=False)
             userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Try user-specific path first, then path under application folder
             if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
-        try: VarDirectory = appdirs.user_data_dir(Title, False)
+        try: VarDirectory = appdirs.user_data_dir(title, appauthor=False)
         except Exception: pass
 
     section = "*"
@@ -435,8 +440,9 @@ def save(configfile=None):
     """
     configpaths = [configfile] if configfile else [ConfigFile]
     if not configfile and not ConfigFileStatic:
+        title = Title if "nt" == os.name else Title.lower()
         try:
-            p = appdirs.user_config_dir(Title, appauthor=False)
+            p = appdirs.user_config_dir(title, appauthor=False)
             userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Pick only userpath if exists, else try application folder first
             if os.path.isfile(userpath): configpaths = [userpath]

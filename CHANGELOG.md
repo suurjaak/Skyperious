@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+5.4, 2022-09-15
+---------------
+- add configuration flag to cache shared media on disk (issue #112)
+
 
 5.3, 2022-07-17
 ---------------
