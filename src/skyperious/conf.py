@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev1"
+Version = "5.4.dev3"
 VersionDate = "16.09.2022"
 
 if getattr(sys, "frozen", False):
@@ -353,6 +353,12 @@ SharedImageAutoDownload = True
 
 """Cache downloaded shared files and media in user directory, for faster repeated exports."""
 SharedContentUseCache = True
+
+"""
+Earliest message date to download shared content from Skype online service.
+Content from Skype's peer-to-peer era is unavailable for download.
+"""
+SharedContentDownloadMinDate = datetime.datetime(2017, 4, 1)
 
 """Duration of status message on program statusbar, in milliseconds."""
 StatusFlashLength = 30000

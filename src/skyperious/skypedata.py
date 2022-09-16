@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2022
+@modified    16.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1734,7 +1734,7 @@ class MessageParser(object):
                                            re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
         and not any(e in m.string[m.start(1) - len(e) + 1:m.end(1) + len(e) - 1]
-                    for e in MessageParser.COMMON_ENTITIES)
+                    for e in self.COMMON_ENTITIES)
         else m.group(1)
     )
 
@@ -2244,7 +2244,8 @@ class MessageParser(object):
         if message.get("__files") and output.get("export"):
             files = []
             do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
-                          and output.get("media_folder")
+                          and output.get("media_folder") \
+                          and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
                 content = None
                 if do_download and f.get("fileurl"):
@@ -2255,9 +2256,10 @@ class MessageParser(object):
 
         media = self.stats.get("shared_media", {}).get(message["id"])
         if media and output.get("export") \
-        and (conf.SharedImageAutoDownload      and media.get("category") not in ("audio", "video") or
-             conf.SharedAudioVideoAutoDownload and media.get("category")     in ("audio", "video")) \
-        and self.db.live.is_logged_in():
+        and (conf.SharedAudioVideoAutoDownload if media.get("category") in ("audio", "video")
+             else conf.SharedImageAutoDownload) \
+        and self.db.live.is_logged_in() \
+        and message["datetime"] >= conf.SharedContentDownloadMinDate:
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
             raw = self.db.live.get_api_content(media["url"], category)

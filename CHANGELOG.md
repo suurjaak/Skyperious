@@ -4,6 +4,7 @@ CHANGELOG
 5.4, 2022-09-15
 ---------------
 - add configuration flag to cache shared media on disk (issue #112)
+- skip trying to download old shared content guaranteed to be unavailable
 
 
 5.3, 2022-07-17
