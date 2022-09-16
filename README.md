@@ -145,6 +145,7 @@ Source Dependencies
 If running from source code, Skyperious needs Python 3.5+ or Python 2.7,
 and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
+
 The following are also listed in `requirements.txt` for pip:
 * appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
@@ -157,6 +158,7 @@ The following are also listed in `requirements.txt` for pip:
 
 If wxPython is not available, the command line interface will function
 regardless.
+
 If other Python libraries are not available, the program will function 
 regardless, only with lesser service - like lacking Excel export or full 
 search syntax. `appdirs` and `six` are mandatory.
