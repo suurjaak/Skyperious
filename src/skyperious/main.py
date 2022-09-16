@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2022
+@modified    16.09.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -284,7 +284,7 @@ logger = logging.getLogger(__package__)
 window = None # Application main window instance
 
 
-class MainApp(wx.App):
+class MainApp(wx.App if wx else object):
 
     def InitLocale(self):
         self.ResetLocale()
