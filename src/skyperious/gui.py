@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.07.2022
+@modified    16.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3645,12 +3645,13 @@ class DatabasePage(wx.Panel):
                             def after2():
                                 """Populate statistics for all chats after completion."""
                                 if not self: return
+                                contacts = [self.db.account] + self.contacts
                                 self.db.get_conversations_stats(self.chats)
                                 self.list_chats.Populate(self.chats)
-                                self.db.get_contacts_stats(self.contacts, self.chats, log=False)
-                                self.list_contacts.Populate(self.contacts)
+                                self.db.get_contacts_stats(contacts, self.chats, log=False)
+                                self.list_contacts.Populate(contacts)
                                 if self.contact:
-                                    self.contact = next((x for x in self.contacts
+                                    self.contact = next((x for x in contacts
                                                          if x["identity"] == self.contact["identity"]), None)
                                 self.load_contact(self.contact)
 
@@ -3697,7 +3698,7 @@ class DatabasePage(wx.Panel):
                                 newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
                                 if newcontacts:
                                     self.contacts.extend(newcontacts)
-                                    self.list_contacts.Populate(self.contacts)
+                                    self.list_contacts.Populate([self.db.account] + self.contacts)
                                     self.load_contact(self.contact)
 
                 if plabel:
@@ -4351,7 +4352,7 @@ class DatabasePage(wx.Panel):
         format = export.CONTACT_EXTS[dialog.FilterIndex]
         guibase.status("Exporting %s.", filepath, log=True)
         try:
-            export.export_contacts(self.contacts, filepath, format, self.db)
+            export.export_contacts([self.db.account] + self.contacts, filepath, format, self.db)
             util.start_file(filepath)
         finally:
             busy.Close()
@@ -4872,7 +4873,7 @@ class DatabasePage(wx.Panel):
                     self.notebook.SetSelection(self.pageorder[thepage])
         elif href.startswith("contact:"):
             contactid = int(href[href.index(":") + 1:])
-            contact = next((x for x in self.contacts if x["id"] == contactid), None)
+            contact = next((x for x in [self.db.account] + self.contacts if x["id"] == contactid), None)
             if contact:
                 self.notebook.SetSelection(self.pageorder[self.page_contacts])
                 self.load_contact(contact)
@@ -5806,8 +5807,9 @@ class DatabasePage(wx.Panel):
             return
 
         # Update contact list colours and scroll to the opened contact
+        category = "database account" if contact["identity"] == self.db.id else "contact"
         if contact != self.contact:
-            logger.info("Opening contact %s.", contact["name"])
+            logger.info("Opening %s %s.", category, contact["name"])
         clist.Freeze()
         scrollpos = clist.GetScrollPos(wx.VERTICAL)
         index_selected = -1
@@ -5826,7 +5828,9 @@ class DatabasePage(wx.Panel):
                 clist.ScrollLines(delta + nudge)
         clist.Thaw()
         wx.YieldIfNeeded() # Allow display to refresh
-        self.label_contact.Label = "&Contact %(name)s (%(identity)s):" % contact
+        prefix = category.replace("c", "&c", 1).capitalize()
+        self.button_export_contact_chats.Label = "&Export %s chats" % category.split()[-1]
+        self.label_contact.Label = prefix + " %(name)s (%(identity)s):" % contact
         self.label_contact.Parent.Layout()
 
         titlemap = {x["id"]: x["title_long"] for x in self.chats}
@@ -6185,7 +6189,7 @@ class DatabasePage(wx.Panel):
 
             # Populate the contacts list
             self.contacts = self.db.get_contacts()
-            self.list_contacts.Populate(self.contacts)
+            self.list_contacts.Populate([self.db.account] + self.contacts)
             self.list_contacts.SetColumnWidth(0, 150)
             self.list_contacts.SetColumnWidth(1, 250)
 
@@ -6223,11 +6227,11 @@ class DatabasePage(wx.Panel):
                 self.edit_filterdate1.Range = date_range
                 self.edit_filterdate2.Range = date_range
             # Load contact statistics and update the contact list
-            self.db.get_contacts_stats(self.contacts, self.chats)
+            self.db.get_contacts_stats([self.db.account] + self.contacts, self.chats)
             if self.contact:
                 # If the user already opened a contact while later data
                 # was loading, update the page
-                contact = next((x for x in self.contacts
+                contact = next((x for x in [self.db.account] + self.contacts
                                 if x["identity"] == self.contact["identity"]), None)
                 if contact: self.load_contact(contact)
             guibase.status("Opened Skype database %s.", self.db)

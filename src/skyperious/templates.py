@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    15.09.2022
+@modified    16.09.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2247,6 +2247,7 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     .hidden { display: none; }
     td, th { text-align: left; vertical-align: top; }
     th { white-space: nowrap; }
+    th.account { color: green; font-size: 1.2em; }
     hr {
       border: none;
       border-top: 1px solid lightgray;
@@ -2273,6 +2274,9 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
       padding: 5px;
       margin-top: 30px;
       width: calc(100% - 10px);
+    }
+    div.contact.self {
+      border-color: green;
     }
     div.contact > table {
       width: 100%;
@@ -2529,7 +2533,7 @@ dct = {
       <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
       <br />
 %if bots or phones:
-      <b>{{ len(contacts) }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
+      <b>{{ len(contacts) - 1 }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
 %if phones:
       <b>{{ len(phones) }}</b> {{ util.plural("phone number contact", phones, numbers=False) }}{{ "," if bots else "." }}
 %endif
@@ -2565,9 +2569,10 @@ avatar = skypedata.get_avatar_raw(c)
 if avatar:
     try: filetype = imghdr.what("", avatar[:100].encode("latin1")) or "png"
     except Exception: filetype = "png"
+category = "account" if db.id == c["identity"] else "contact"
 %>
 
-  <div class="contact" id="contact/{{ c["identity"] }}">
+  <div class="contact{{ " self" if db.id == c["identity"] else "" }}" id="contact/{{ c["identity"] }}">
     <table>
       <tr><td class="avatar">
         <img title="{{ alt }}" alt="{{ alt }}"
@@ -2581,6 +2586,9 @@ if avatar:
       </td><td>
 
         <table class="fields">
+%if db.id == c["identity"]:
+        <tr><th class="account" colspan="2">Database account</th></tr>
+%endif
 %for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(c, n)):
         <tr>
           <th>{{ label }}:</th>
@@ -2599,7 +2607,7 @@ if avatar:
           <th>Chats:</th>
           <td>
             {{ len(c["conversations"]) }}
-            <a class="toggle open" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
+            <a class="toggle{{ "" if db.id == c["identity"] else " open" }}" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
           </td>
         </tr>
 %endif
@@ -2607,12 +2615,15 @@ if avatar:
 
       </td></tr>
 %if c.get("conversations"):
-      <tr id="contact/{{ c["identity"] }}/sep"><td colspan="2"><hr /></td></tr>
-      <tr id="contact/{{ c["identity"] }}/chats"><td></td><td>
+      <tr id="contact/{{ c["identity"] }}/sep"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td colspan="2"><hr /></td></tr>
+      <tr id="contact/{{ c["identity"] }}/chats"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td></td><td>
 
         <table class="chats"><tr>
 %for i, (name, label, sortlabel) in enumerate(CHAT_COLS):
-          <th><a href="#" title="Sort contact chats by {{ sortlabel }}"
+<%
+label, sortlabel = (x.replace("contact", category) for x in (label, sortlabel))
+%>
+          <th><a href="#" title="Sort {{ category }} chats by {{ sortlabel }}"
                  onClick="return sort_table(this, {{ i }});"
                  class="sort{{! " desc" if name == "last_message_datetime" else "" }}">
             {{ label }}
@@ -2665,6 +2676,7 @@ CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
              ("first_message_datetime", "First message"),
              ("last_message_datetime", "Last message")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+category = "account" if db.id == contact["identity"] else "contact"
 %>
 <font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
@@ -2687,6 +2699,9 @@ if avatar_size[0] > 300:
   </td>
   <td valign="top">
     <table>
+%if db.id == contact["identity"]:
+      <tr><td nowrap valign="top" colspan="2"><font size="3"><b>Database account</b></font></td></tr>
+%endif
 %for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(contact, n)):
       <tr>
         <td nowrap valign="top"><b>{{ label }}:</b></td>
@@ -2715,6 +2730,9 @@ if avatar_size[0] > 300:
 %if contact.get("conversations"):
 <table cellpadding="2" cellspacing="2"><tr>
 %for i, (name, label) in enumerate(CHAT_COLS):
+<%
+if "contact" in label and "contact" != category: label = label.replace("contact", category)
+%>
     <td nowrap width="{{ 100 if i else 400 }}" align="{{ "right" if i in (1, 2) else "left" }}" valign="top">
 %if name == sort_by:
         <font color="gray">

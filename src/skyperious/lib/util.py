@@ -425,14 +425,14 @@ def get_file_type(content, category=None, filename=None):
     @param   filename  original name of file
     """
     category = category if category in ("audio", "video") else "image"
-    filetype = category
+    filetype = None
     if filename:
         filetype = os.path.splitext(filename)[-1][1:] or filetype
     if "image" == category:
         filetype = imghdr.what("", content) or filetype
     elif not filetype:
         filetype = "mp4" # Pretty safe bet for Skype audio/video
-    return filetype
+    return filetype or category
 
 
 def is_os_64bit():

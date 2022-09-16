@@ -812,6 +812,8 @@ class SkypeDatabase(object):
             logger.info("Contact statistics collection starting (%s).", self.filename)
         stats, chatmap, linkedchatmap, singlechatmap = {}, {}, {}, {} # {author: []}, {oldid: newid}, {id: {}}, {author: id}
         firstmsgs, lastmsgs = {}, {} # {(id, author): {}}
+        chatmap = {x["id"]: x for x in chats}
+        chatmap.update({x["__link"]["id"]: x["__link"] for x in chats if x.get("__link")})
         if self.is_open() and all(x in self.tables for x in ("contacts", "messages", "conversations")):
             and_str, and_val = "", []
             if 1 == len(contacts):
@@ -822,7 +824,8 @@ class SkypeDatabase(object):
                    "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             for row in self.execute(sql, and_val).fetchall():
-                stats.setdefault(row["identity"], []).append(row)
+                if row["id"] in chatmap:
+                    stats.setdefault(row["identity"], []).append(row)
 
             sql = ("SELECT id AS first_message_id, convo_id AS id, author AS identity, "
                    "MIN(timestamp) AS first_message_timestamp "
@@ -837,7 +840,6 @@ class SkypeDatabase(object):
             for row in self.execute(sql, and_val).fetchall():
                 lastmsgs[(row["id"], row["identity"])] = row
 
-            chatmap = {x["id"]: x for x in chats}
             linkedchatmap = {x["__link"]["id"]: x["id"] for x in chats if x.get("__link")}
             singlechatmap = {x["identity"]: x["id"] for x in chats
                              if CHATS_TYPE_SINGLE == x["type"]}
@@ -883,11 +885,18 @@ class SkypeDatabase(object):
                         dt = self.stamp_to_date(data[n + "_timestamp"])
                         data[n + "_datetime"] = dt
 
-            singlechat_id = singlechatmap.get(contact["identity"])
-            contact["message_count_single"] = next((x["message_count"] for x in datas2
-                                                    if x["id"] == singlechat_id), 0)
-            contact["message_count_group"] = sum((x["message_count"] for x in datas2
-                                                  if x["id"] != singlechat_id), 0)
+            if self.id == contact["identity"]:
+                chatids = set(singlechatmap.values())
+                contact["message_count_single"] = sum(x["message_count"] for x in datas2
+                                                      if x["id"] in chatids)
+                contact["message_count_group"] = sum(x["message_count"] for x in datas2
+                                                      if x["id"] not in chatids)
+            else:
+                singlechat_id = singlechatmap.get(contact["identity"])
+                contact["message_count_single"] = next((x["message_count"] for x in datas2
+                                                        if x["id"] == singlechat_id), 0)
+                contact["message_count_group"] = sum((x["message_count"] for x in datas2
+                                                      if x["id"] != singlechat_id), 0)
             for n, f in zip(["first_message_datetime", "last_message_datetime"], [min, max]):
                 contact[n] = f(d.get(n) for d in datas2) # Combine
             contact["conversations"] = datas2
