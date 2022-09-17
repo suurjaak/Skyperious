@@ -1,11 +1,12 @@
 CHANGELOG
 =========
 
-5.4, 2022-09-16
+5.4, 2022-09-17
 ---------------
 - add database account as one entry among contacts in contacts-tab
 - add configuration flag to cache shared media on disk (issue #112)
 - skip trying to download old shared content guaranteed to be unavailable
+- fix compiled exe and pythonw auto-closing window immediately on --help
 
 
 5.3, 2022-07-17

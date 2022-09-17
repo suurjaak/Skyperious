@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.09.2022
+@modified    17.09.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -905,6 +905,7 @@ def run(nogui=False):
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
+        conf.IsCLINonTerminal = None # Flag for ConsoleWriter.init_console()
         sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to
         sys.stderr = ConsoleWriter(sys.stderr) # a text console
     if "main" not in sys.modules: # E.g. setuptools install, calling main.run
@@ -1100,6 +1101,7 @@ class ConsoleWriter(object):
             t.daemon = True
             t.start()
         q.get()
+        os._exit(0)
 
 
 
