@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.09.2022
+@modified    18.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1409,7 +1409,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             self.dbs.pop(db.filename, None)
             db.close()
         if db and not error:
-            util.start_file(files[0] if do_singlefile else path)
+            if conf.ExportFileAutoOpen:
+                util.start_file(files[0] if do_singlefile else path)
         self.button_export.Enabled = True
         if focused_control: focused_control.SetFocus()
 
@@ -4195,7 +4196,7 @@ class DatabasePage(wx.Panel):
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
                            util.plural("message", message_count, sep=","), filepath, log=True)
-            try: util.start_file(filepath)
+            try: conf.ExportFileAutoOpen and util.start_file(filepath)
             except Exception:
                 logger.exception("Error starting %s.", filepath)
             wx.CallAfter(self.update_liveinfo)
@@ -4353,7 +4354,7 @@ class DatabasePage(wx.Panel):
         guibase.status("Exporting %s.", filepath, log=True)
         try:
             export.export_contacts([self.db.account] + self.contacts, filepath, format, self.db)
-            util.start_file(filepath)
+            if conf.ExportFileAutoOpen: util.start_file(filepath)
         finally:
             busy.Close()
 
@@ -4452,7 +4453,8 @@ class DatabasePage(wx.Panel):
                                  util.plural("chat", count, sep=","),
                                  util.plural("message", message_count, sep=","), self.db,
                                  format.upper(), path, log=True)
-            util.start_file(files[0] if do_singlefile or len(chats) == 1 else path)
+            if conf.ExportFileAutoOpen:
+                util.start_file(files[0] if do_singlefile or len(chats) == 1 else path)
         else:
             guibase.status(errormsg_short or errormsg)
             wx.MessageBox(errormsg, conf.Title, wx.OK | wx.ICON_WARNING)
@@ -4496,7 +4498,7 @@ class DatabasePage(wx.Panel):
                 guibase.status("Exported %s to %s.",
                                util.plural("message", message_count, sep=","),
                                filepath, log=True)
-                util.start_file(filepath)
+                if conf.ExportFileAutoOpen: util.start_file(filepath)
                 wx.CallAfter(self.update_liveinfo)
             else:
                 wx.MessageBox("Current filter leaves no data to export.",
@@ -5350,7 +5352,7 @@ class DatabasePage(wx.Panel):
                     export.export_grid(grid_source, filename, title,
                                        self.db, sql, table)
                     guibase.status("Exported %s.", filename, log=True)
-                    util.start_file(filename)
+                    if conf.ExportFileAutoOpen: util.start_file(filename)
                 except Exception as e:
                     guibase.status("Error saving %s: %s", filename, util.format_exc(e))
                     logger.exception("Error saving %s.", filename)
@@ -6670,7 +6672,7 @@ class MergerPage(wx.Panel):
             guibase.status("Exported %s to %s.",
                            util.plural("message", message_count, sep=","),
                            filepath, log=True)
-            util.start_file(filepath)
+            if conf.ExportFileAutoOpen: util.start_file(filepath)
         except Exception:
             guibase.status("Error saving %s.", filepath)
             logger.exception("Error saving %s.", filepath)

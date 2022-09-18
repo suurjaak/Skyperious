@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev6"
+Version = "5.4.dev7"
 VersionDate = "18.09.2022"
 
 if getattr(sys, "frozen", False):
@@ -55,7 +55,8 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
-OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
+OptionalFileDirectives = [
+    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
     "ExportDbTemplate", "HistoryFontSize", "LogSQL", "MinWindowSize",
     "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
     "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
@@ -132,6 +133,9 @@ SearchInTables = False
 
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
+
+"""Automatically open exported files and directories in registered application."""
+ExportFileAutoOpen = True
 
 """Chat export filename template, format can use Skype.Conversations data."""
 ExportChatTemplate = u"Skype %(title_long_lc)s"
