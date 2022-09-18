@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.09.2022
+@modified    18.09.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev5"
-VersionDate = "17.09.2022"
+Version = "5.4.dev6"
+VersionDate = "18.09.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -35,8 +35,10 @@ else:
     ApplicationDirectory = os.path.abspath(os.path.dirname(__file__))
     ResourceDirectory = os.path.join(ApplicationDirectory, "res")
 
-"""Directory for variable content like login tokens."""
+"""Directory for variable content like login tokens and created databases."""
 VarDirectory = os.path.join(ApplicationDirectory, "var")
+"""Directory for cached files like downloaded shared content for export."""
+CacheDirectory = os.path.join(ApplicationDirectory, "var", "cache")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -389,7 +391,7 @@ def load(configfile=None):
 
     @param   configfile  name of configuration file to use from now if not module defaults
     """
-    global Defaults, VarDirectory, ConfigFile, ConfigFileStatic
+    global Defaults, VarDirectory, CacheDirectory, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
     except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
@@ -407,6 +409,8 @@ def load(configfile=None):
             if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
         try: VarDirectory = appdirs.user_data_dir(title, appauthor=False)
+        except Exception: pass
+        try: CacheDirectory = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
         except Exception: pass
 
     section = "*"

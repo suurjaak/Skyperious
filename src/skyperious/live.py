@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    15.09.2022
+@modified    18.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -26,7 +26,6 @@ import time
 import warnings
 
 BeautifulSoup = skpy = ijson = None
-import appdirs
 try: from bs4 import BeautifulSoup
 except ImportError: pass
 try: import skpy
@@ -82,17 +81,13 @@ class SkypeLogin(object):
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
-        self.dl_cache_dir = None
+        self.dl_cache_dir = os.path.join(conf.CacheDirectory, "shared")
         self.populated    = False
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
         self.msg_stamps   = {} # {remote_id: last timestamp__ms}
         self.msg_lookups  = collections.defaultdict(list) # {timestamp__ms: [{msg}, ]}
         self.msg_parser   = None # skypedata.MessageParser instance
-
-        title = conf.Title if "nt" == os.name else conf.Title.lower()
-        pathbase = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
-        self.dl_cache_dir = os.path.join(pathbase, "shared")
 
 
     def is_logged_in(self):
@@ -926,7 +921,7 @@ class SkypeLogin(object):
                 filetype = util.get_file_type(result, category, url)
                 filename = "%s.%s" % (urllib.parse.quote(url, safe=""), filetype)
                 filepath = os.path.join(self.dl_cache_dir, filename)
-                if not os.path.exists(self.dl_cache_dir): os.makedirs(self.dl_cache_dir)
+                self.ensure_cache_dir()
                 with open(filepath, "wb") as f:
                     f.write(result)
             except Exception:
@@ -968,6 +963,17 @@ class SkypeLogin(object):
         botidentity = (skypedata.ID_PREFIX_BOT + identity) if identity else identity
         return botidentity if botidentity in self.cache["contacts"] else identity
 
+
+    def ensure_cache_dir(self):
+        """Creates content cache directory and tagfile if not already created."""
+        TAGCONTENT = """Signature: 8a477f597d28d172789f06886806bc55
+# This file is a cache directory tag created by %s.
+# For information about cache directory tags, see:
+#   http://www.brynosaurus.com/cachedir/""" % conf.Title
+        tagpath = os.path.join(self.dl_cache_dir, "CACHEDIR.TAG")
+        if not os.path.isfile(tagpath):
+            with util.create_file(tagpath, handle=True) as f:
+                f.write(TAGCONTENT)
 
 
 class SkypeExport(skypedata.SkypeDatabase):
