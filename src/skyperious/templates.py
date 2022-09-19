@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    16.09.2022
+@modified    19.09.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2201,6 +2201,7 @@ HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
 
 bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
 phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
+account_contact = next((c for c in contacts if c["identity"] == db.id), None)
 contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
 %>
 <!DOCTYPE HTML><html lang="">
@@ -2532,21 +2533,22 @@ dct = {
 %>
       <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
       <br />
-%if bots or phones:
-      <b>{{ len(contacts) - 1 }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
+      <b>{{ len(contacts) }}</b> {{ util.plural("entry", contacts, numbers=False) }} in total.
+%if account_contact:
+      <b>1</b> database account{{ ", " if phones or bots else "." }}
+%endif
 %if phones:
       <b>{{ len(phones) }}</b> {{ util.plural("phone number contact", phones, numbers=False) }}{{ "," if bots else "." }}
 %endif
 %if bots:
       <b>{{ len(bots) }}</b> {{ util.plural("bot contact", bots, numbers=False) }}.
 %endif
-%endif
     </td>
   </tr></table>
 </td></tr><tr><td>
 
 <div id="sort_header">
-    Sort contacts by:
+    Sort by:
 %for name, label, sortlabel in CONTACT_SORTS:
     <a title="Sort contacts by {{ sortlabel }}" href="#" onClick="return sort_contacts(this, '{{ name }}');"
        class="sort{{ " desc" if "last_message_datetime" == name else "" }}">{{ label }}</a>

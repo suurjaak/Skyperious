@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.09.2022
+@modified    19.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4339,7 +4339,9 @@ class DatabasePage(wx.Panel):
         """
         Handler for clicking to export contacts, display file dialog and saves spreadsheet.
         """
-        if not self.contacts: return
+        contacts = [self.list_contacts.GetItemMappedData(x)
+                    for x in range(self.list_contacts.ItemCount)]
+        if not contacts: return
 
         dialog = wx.FileDialog(parent=self, message="Save contacts",
             defaultFile="Skype contact list",
@@ -4353,7 +4355,7 @@ class DatabasePage(wx.Panel):
         format = export.CONTACT_EXTS[dialog.FilterIndex]
         guibase.status("Exporting %s.", filepath, log=True)
         try:
-            export.export_contacts([self.db.account] + self.contacts, filepath, format, self.db)
+            export.export_contacts(contacts, filepath, format, self.db)
             if conf.ExportFileAutoOpen: util.start_file(filepath)
         finally:
             busy.Close()
