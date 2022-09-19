@@ -7,6 +7,7 @@ CHANGELOG
 - add configuration flag to cache shared media on disk (issue #112)
 - add configuration flag to auto-open exported files
 - add 1:1 and group chat message counts to contact details
+- add context menu popup to contact list right-click
 - skip trying to download old shared content guaranteed to be unavailable
 - export contact list by current applied filter
 - fix compiled exe and pythonw auto-closing window immediately on --help

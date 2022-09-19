@@ -2727,6 +2727,7 @@ class DatabasePage(wx.Panel):
         html_contact.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_contact)
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
+        list_contacts.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_contacts)
         sizer1.Add(list_contacts, proportion=1, border=5, flag=wx.GROW | wx.LEFT | wx.RIGHT)
         sizer2_top.Add(label_contact, border=5, flag=wx.GROW | wx.TOP)
         sizer2_top.AddStretchSpacer()
@@ -3390,7 +3391,7 @@ class DatabasePage(wx.Panel):
 
 
     def on_menu_list_chats(self, event):
-        """Handler for right-clicking  or context-menu-keying chatlist, opens popup menu."""
+        """Handler for right-clicking or context-menu-keying chatlist, opens popup menu."""
         chats, selecteds = [], []
         selected = self.list_chats.GetFirstSelected()
         while selected >= 0:
@@ -3420,7 +3421,7 @@ class DatabasePage(wx.Panel):
         if export.xlsxwriter and len(chats) > 1:
             item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
                                                  "with separate sheets")
-            item_datesm  = wx.MenuItem(menu, -1, "Export date &range a single Excel workbook, "
+            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
                                                  "with separate sheets")
         item_dates   = wx.MenuItem(menu, -1, "Export &date range to file")
         item_delete  = wx.MenuItem(menu, -1, "Delete from database")
@@ -3479,6 +3480,103 @@ class DatabasePage(wx.Panel):
 
         # Needs callback, actions can modify list while mouse event ongoing
         wx.CallAfter(self.list_chats.PopupMenu, menu)
+
+
+    def on_menu_list_contacts(self, event):
+        """Handler for right-clicking or context-menu-keying contactlist, opens popup menu."""
+        contacts, selecteds = [], []
+        selected = self.list_contacts.GetFirstSelected()
+        while selected >= 0:
+            selecteds.append(selected)
+            contacts.append(self.list_contacts.GetItemMappedData(selected))
+            selected = self.list_contacts.GetNextSelected(selected)
+        if isinstance(event, wx.ListEvent) and event.GetIndex() >= 0 \
+        and event.GetIndex() not in selecteds:
+            contacts = [self.list_contacts.GetItemMappedData(event.GetIndex())]
+        if not contacts: return
+
+        category = "contact"
+        if len(contacts) == 1 and self.db.id == contacts[0]["identity"]: category = "account"
+        chatmap, chats, visited = {x["id"]: x for x in self.chats}, [], set()
+        for c in contacts:
+            chats.extend(sorted((chatmap[x["id"]] for x in c.get("conversations", [])
+                                if x["id"] not in visited),
+                                key=lambda x: (x["type"], x["title_long"].lower())))
+            visited.update(x["id"] for x in chats)
+
+        menu = wx.Menu()
+        item_name      = wx.MenuItem(menu, -1, ("Open %s " % category) if len(contacts) < 2
+                                               else util.plural("contact", contacts))
+        item_copy      = wx.MenuItem(menu, -1, "&Copy %s" %
+                                     util.plural("name", contacts, numbers=False))
+        item_copyprof  = wx.MenuItem(menu, -1, "Copy &%s" %
+                                     util.plural("profile", contacts, numbers=False))
+        item_copychats = wx.MenuItem(menu, -1, "Copy %s" %
+                                     util.plural("c&hat name", chats, numbers=False))
+        item_rename    = wx.MenuItem(menu, -1, "Re&name %s" % category)
+        item_export    = wx.MenuItem(menu, -1, "&Export chats")
+        item_exportm = item_datesm = None
+        if export.xlsxwriter and len(contacts) > 1:
+            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
+                                                 "with separate sheets")
+            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
+                                                 "with separate sheets")
+        item_dates   = wx.MenuItem(menu, -1, "Export chats &date range")
+
+        boldfont = wx.Font(item_name.Font)
+        boldfont.SetWeight(wx.FONTWEIGHT_BOLD)
+        boldfont.SetFaceName(self.Font.FaceName)
+        boldfont.SetPointSize(self.Font.PointSize)
+        item_name.Font = boldfont
+
+        menu.Append(item_name)
+        menu.AppendSeparator()
+        menu.Append(item_copy)
+        menu.Append(item_copyprof)
+        menu.Append(item_copychats)
+        menu.AppendSeparator()
+        menu.Append(item_rename)
+        menu.AppendSeparator()
+        menu.Append(item_export)
+        if item_exportm: menu.Append(item_exportm)
+        menu.Append(item_dates)
+        if item_datesm: menu.Append(item_datesm)
+        if len(contacts) > 1: item_name.Enabled = item_rename.Enabled = False
+
+        def clipboardize(category):
+            if "name" == category:
+                text = "\n".join(c["name"] for c in contacts)
+            elif "chat" == category:
+                text = "\n".join(x["title_long"] for x in chats)
+            else:
+                get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if self.db.id != c["identity"] \
+                                       else skypedata.ACCOUNT_FIELD_TITLES
+                text = "\n\n".join("%s%s" % (
+                    "Database account\n" if self.db.id == c["identity"] else "",
+                    "\n".join("%s: %s" % (l, v) for n, l in get_fields(c).items()
+                              for v in [skypedata.format_contact_field(c, n)] if v)
+                ) for c in contacts)
+            if wx.TheClipboard.Open():
+                d = wx.TextDataObject(text)
+                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+        def exporter(do_singlefile=False, do_timerange=False):
+            self.on_export_chats(chats, False, do_singlefile, do_timerange)
+
+        menu.Bind(wx.EVT_MENU, lambda e: self.load_contact(contacts[0]), item_name)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("name"),    item_copy)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("profile"), item_copyprof)
+        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("chat"),    item_copychats)
+        menu.Bind(wx.EVT_MENU, lambda e: self.on_rename_contact(contact=contacts[0]), item_rename)
+        menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
+        menu.Bind(wx.EVT_MENU, lambda e: exporter(False, True),  item_dates)
+        if item_exportm:
+            menu.Bind(wx.EVT_MENU, lambda e: exporter(True,  False), item_exportm)
+        if item_datesm:
+            menu.Bind(wx.EVT_MENU, lambda e: exporter(True,  True),  item_datesm)
+
+        # Needs callback, actions can modify list while mouse event ongoing
+        wx.CallAfter(self.list_contacts.PopupMenu, menu)
 
 
     def on_change_list_chats_sync(self, event):
@@ -4116,7 +4214,7 @@ class DatabasePage(wx.Panel):
         self.load_contact(self.contact)
 
 
-    def on_rename_contact(self, contact, event):
+    def on_rename_contact(self, contact, event=None):
         """
         Handler for clicking to rename a contact, opens a text entry dialog
         and saves entered value as Contacts.given_displayname.
