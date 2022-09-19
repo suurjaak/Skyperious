@@ -2602,8 +2602,16 @@ category = "account" if db.id == c["identity"] else "contact"
           <th colspan="2"><br /></th>
         </tr>
         <tr>
-          <th>Messages:</th>
+          <th>Messages in total:</th>
           <td>{{ c["message_count_single"] + c["message_count_group"] }}</td>
+        </tr>
+        <tr>
+          <th>Messages in 1:1 chat:</th>
+          <td>{{ c["message_count_single"] }}</td>
+        </tr>
+        <tr>
+          <th>Messages in group chats:</th>
+          <td>{{ c["message_count_group"] }}</td>
         </tr>
         <tr>
           <th>Chats:</th>
@@ -2715,8 +2723,16 @@ if avatar_size[0] > 300:
         <td colspan="2"></td>
       </tr>
       <tr>
-        <td nowrap valign="top"><b>Messages:</b></td>
+        <td nowrap valign="top"><b>Messages in total:</b></td>
         <td>{{ contact["message_count_single"] + contact["message_count_group"] }}</td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Messages in 1:1 chat:</b></td>
+        <td>{{ contact["message_count_single"] }}</td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Messages in group chats:</b></td>
+        <td>{{ contact["message_count_group"] }}</td>
       </tr>
       <tr>
         <td nowrap valign="top"><b>Chats:</b></td>
