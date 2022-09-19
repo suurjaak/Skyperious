@@ -2196,6 +2196,8 @@ CHAT_COLS = [("title_long",             "Chat",                  "chat name"),
              ("first_message_datetime", "First message",         "first message date"),
              ("last_message_datetime",  "Last message",          "last message date")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
 TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
 HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
 
@@ -2591,7 +2593,7 @@ category = "account" if db.id == c["identity"] else "contact"
 %if db.id == c["identity"]:
         <tr><th class="account" colspan="2">Database account</th></tr>
 %endif
-%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(c, n)):
+%for name, label in ((n, t) for n, t in get_fields(c).items() if skypedata.format_contact_field(c, n)):
         <tr>
           <th>{{ label }}:</th>
           <td>{{ skypedata.format_contact_field(c, name) }}</td>
@@ -2686,6 +2688,8 @@ CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
              ("first_message_datetime", "First message"),
              ("last_message_datetime", "Last message")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
 category = "account" if db.id == contact["identity"] else "contact"
 %>
 <font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
@@ -2712,7 +2716,7 @@ if avatar_size[0] > 300:
 %if db.id == contact["identity"]:
       <tr><td nowrap valign="top" colspan="2"><font size="3"><b>Database account</b></font></td></tr>
 %endif
-%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(contact, n)):
+%for name, label in ((n, t) for n, t in get_fields(contact).items() if skypedata.format_contact_field(contact, n)):
       <tr>
         <td nowrap valign="top"><b>{{ label }}:</b></td>
         <td>{{ skypedata.format_contact_field(contact, name) }}</td>

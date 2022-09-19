@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.09.2022
+@modified    19.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -111,21 +111,21 @@ CONTACT_FIELD_TITLES = collections.OrderedDict([
     ("languages",           "Languages"),
 ])
 ACCOUNT_FIELD_TITLES = collections.OrderedDict([
-    ("fullname",            "Full name"),
-    ("given_displayname",   "Given display name"),
     ("skypename",           "Skype name"),
     ("liveid_membername",   "Skype name alias"),
-    ("mood_text",           "Mood"),
+    ("fullname",            "Full name"),
+    ("given_displayname",   "Given display name"),
     ("phone_mobile",        "Mobile phone"),
     ("phone_home",          "Home phone"),
     ("phone_office",        "Office phone"),
     ("emails",              "E-mails"),
-    ("country",             "Country"),
-    ("province",            "Province"),
-    ("city",                "City"),
     ("homepage",            "Website"),
-    ("gender",              "Gender"),
+    ("mood_text",           "Mood"),
     ("birthday",            "Birth date"),
+    ("gender",              "Gender"),
+    ("city",                "City"),
+    ("province",            "State/Province"),
+    ("country",             "Country/Region"),
     ("languages",           "Languages"),
     ("nrof_authed_buddies", "Contacts"),
     ("about",               "About me"),

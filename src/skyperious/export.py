@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    29.04.2022
+@modified    19.09.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -75,7 +75,7 @@ QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
 QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
 
 CONTACT_WILDCARD = "HTML document (*.html)|*.html|%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
-CONTACT_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html","csv"]
+CONTACT_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
 
 IMAGE_EXTS = ["bmp", "jpg", "png"]
 IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
@@ -382,9 +382,21 @@ def export_contacts(contacts, filename, format, db):
             template.stream(f, namespace)
         return
 
+    FIELDS = skypedata.CONTACT_FIELD_TITLES
+    if len(contacts) == 1 and db.id == contacts[0]["identity"]:
+        FIELDS = skypedata.ACCOUNT_FIELD_TITLES
+    elif len(contacts) > 1 and any(db.id == c["identity"] for c in contacts):
+        FIELDS = collections.OrderedDict()
+        concounter, confields = 0, list(skypedata.CONTACT_FIELD_TITLES.items())
+        for k, v in skypedata.ACCOUNT_FIELD_TITLES.items():
+            if k in skypedata.CONTACT_FIELD_TITLES:
+                for i, (k2, v2) in zip(range(concounter, len(confields)), confields[concounter:]):
+                    FIELDS[k2], concounter = v2, concounter + 1
+                    if k2 == k: break # for i
+            FIELDS[k] = v
+
     writer = None
-    colnames, collabels = zip(*((k, "%s (%s)" % (v, k))
-                                for k, v in skypedata.CONTACT_FIELD_TITLES.items()))
+    colnames, collabels = zip(*((k, "%s (%s)" % (v, k)) for k, v in FIELDS.items()))
     try:
         if is_csv:
             writer = csv_writer(filename)
