@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.09.2022
+@modified    20.09.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -55,27 +55,28 @@ except Exception: # Fall back to a simple mono-spaced calculation if no PIL
 
 """FileDialog wildcard strings, matching extensions lists and default names."""
 XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|" if xlsxwriter else ""
-CHAT_WILDCARD = ("HTML document (*.html)|*.html|"
+CHAT_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                 "%s"
+                 "HTML document (*.html)|*.html|"
                  "HTML document with shared files in subfolder (*.html)|*.html|"
-                 "Text document (*.txt)|*.txt|"
-                 "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-CHAT_EXTS = ["html", "html", "txt", "xlsx", "csv"] if xlsxwriter \
-            else ["html", "html", "txt", "csv"]
+                 "Text document (*.txt)|*.txt" % XLSX_WILDCARD)
+CHAT_EXTS = ["csv", "xlsx", "html", "html", "txt"] if xlsxwriter \
+            else ["csv", "html", "html", "txt"]
 CHAT_WILDCARD_SINGLEFILE = "Excel workbook (*.xlsx)|*.xlsx" # Cannot end with |
 CHAT_EXTS_SINGLEFILE = ["xlsx"]
 
-TABLE_WILDCARD = ("HTML document (*.html)|*.html|"
-                  "SQL INSERT statements (*.sql)|*.sql|"
-                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-TABLE_EXTS = ["html", "sql", "xlsx", "csv"] if xlsxwriter \
-             else ["html", "sql", "csv"]
+TABLE_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                  "%s"
+                  "HTML document (*.html)|*.html|"
+                  "SQL INSERT statements (*.sql)|*.sql" % XLSX_WILDCARD)
+TABLE_EXTS = ["csv", "xlsx", "html", "sql"] if xlsxwriter \
+             else ["csv", "html", "sql"]
 
-QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
-                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
+QUERY_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|%sHTML document (*.html)|*.html" % XLSX_WILDCARD)
+QUERY_EXTS = ["csv", "xlsx", "html"] if xlsxwriter else ["csv", "html"]
 
-CONTACT_WILDCARD = "HTML document (*.html)|*.html|%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
-CONTACT_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
+CONTACT_WILDCARD = "CSV spreadsheet (*.csv)|*.csv|%sHTML document (*.html)|*.html" % XLSX_WILDCARD
+CONTACT_EXTS = ["csv", "xlsx", "html"] if xlsxwriter else ["csv", "html"]
 
 IMAGE_EXTS = ["bmp", "jpg", "png"]
 IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
