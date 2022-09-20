@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    19.09.2022
+@modified    20.09.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -1792,19 +1792,19 @@ import datetime
 from skyperious import conf
 from skyperious.lib import util
 
-str_cols = ", ".join(columns)
+str_cols = ", ".join(map(util.format_sql_name, columns))
 %>-- {{ title }}.
 -- Source: {{ db.filename }}.
 -- Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
 %if sql:
 -- SQL: {{ sql }}
 %endif
-%if table:
+%if isdef("create_sql") and create_sql:
 {{ create_sql }}
 %endif
 
 %for row in rows:
-INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
+INSERT INTO {{ util.format_sql_name(table) }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
 %endfor
 """
 

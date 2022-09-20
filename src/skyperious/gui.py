@@ -2440,7 +2440,7 @@ class DatabasePage(wx.Panel):
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         self.dialog_savegrid = wx.FileDialog(
-            parent=self, defaultDir=six.moves.getcwd(),
+            parent=self, defaultDir=six.moves.getcwd(), wildcard=export.DATA_WILDCARD,
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         self.dialog_saveimage = wx.FileDialog(
@@ -2451,7 +2451,7 @@ class DatabasePage(wx.Panel):
         self.dialog_savechat    .FilterIndex = export.CHAT_EXTS.index("html")
         self.dialog_savechats   .FilterIndex = export.CHAT_EXTS.index("html")
         self.dialog_savecontacts.FilterIndex = export.CONTACT_EXTS.index("html")
-        self.dialog_savegrid    .FilterIndex = export.QUERY_EXTS.index("html")
+        self.dialog_savegrid    .FilterIndex = export.DATA_EXTS.index("html")
         self.dialog_saveimage   .FilterIndex = export.IMAGE_EXTS.index("png")
 
         self.TopLevelParent.page_db_latest = self
@@ -5453,18 +5453,14 @@ class DatabasePage(wx.Panel):
                 table = self.db.tables[grid_source.Table.table.lower()]["name"]
                 title = "Table - \"%s\"" % table
                 self.dialog_savegrid.Message = "Save table as"
-                self.dialog_savegrid.Wildcard = export.TABLE_WILDCARD
             else:
                 title = "SQL query"
                 self.dialog_savegrid.Message = "Save query as"
-                self.dialog_savegrid.Wildcard = export.QUERY_WILDCARD
                 grid_source.Table.SeekAhead(True)
             self.dialog_savegrid.Filename = util.safe_filename(title)
             if wx.ID_OK == self.dialog_savegrid.ShowModal():
                 filename = controls.get_dialog_path(self.dialog_savegrid)
-                exts = export.TABLE_EXTS if grid_source is self.grid_table \
-                       else export.QUERY_EXTS
-                format = exts[self.dialog_savegrid.FilterIndex]
+                format = export.DATA_EXTS[self.dialog_savegrid.FilterIndex]
                 busy = controls.BusyPanel(self, "Exporting \"%s\"." % filename)
                 guibase.status("Exporting \"%s\".", filename)
                 try:

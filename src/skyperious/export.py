@@ -65,15 +65,11 @@ CHAT_EXTS = ["csv", "xlsx", "html", "html", "txt"] if xlsxwriter \
 CHAT_WILDCARD_SINGLEFILE = "Excel workbook (*.xlsx)|*.xlsx" # Cannot end with |
 CHAT_EXTS_SINGLEFILE = ["xlsx"]
 
-TABLE_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
-                  "%s"
-                  "HTML document (*.html)|*.html|"
-                  "SQL INSERT statements (*.sql)|*.sql" % XLSX_WILDCARD)
-TABLE_EXTS = ["csv", "xlsx", "html", "sql"] if xlsxwriter \
-             else ["csv", "html", "sql"]
-
-QUERY_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|%sHTML document (*.html)|*.html" % XLSX_WILDCARD)
-QUERY_EXTS = ["csv", "xlsx", "html"] if xlsxwriter else ["csv", "html"]
+DATA_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                 "%s"
+                 "HTML document (*.html)|*.html|"
+                 "SQL INSERT statements (*.sql)|*.sql" % XLSX_WILDCARD)
+DATA_EXTS = ["csv", "xlsx", "html", "sql"] if xlsxwriter else ["csv", "html", "sql"]
 
 CONTACT_WILDCARD = "CSV spreadsheet (*.csv)|*.csv|%sHTML document (*.html)|*.html" % XLSX_WILDCARD
 CONTACT_EXTS = ["csv", "xlsx", "html"] if xlsxwriter else ["csv", "html"]
@@ -469,6 +465,10 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     re_sql = re.compile("^(CREATE\\s+TABLE\\s+)", re.IGNORECASE)
                     replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
                     namespace["create_sql"] = re_sql.sub(replacer, create_sql)
+                elif is_sql:
+                    mytable, colstr = "results", ", ".join(map(util.format_sql_name, columns))
+                    create_sql = "CREATE TABLE %s (%s)" % (util.format_sql_name(mytable), colstr)
+                    namespace.update(table=mytable, create_sql=create_sql)
 
                 template = step.Template(templates.GRID_HTML if is_html else
                            templates.SQL_TXT, strip=False, escape=is_html)
