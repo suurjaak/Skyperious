@@ -71,8 +71,11 @@ DATA_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
                  "SQL INSERT statements (*.sql)|*.sql" % XLSX_WILDCARD)
 DATA_EXTS = ["csv", "xlsx", "html", "sql"] if xlsxwriter else ["csv", "html", "sql"]
 
-CONTACT_WILDCARD = "CSV spreadsheet (*.csv)|*.csv|%sHTML document (*.html)|*.html" % XLSX_WILDCARD
-CONTACT_EXTS = ["csv", "xlsx", "html"] if xlsxwriter else ["csv", "html"]
+CONTACT_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                    "%s"
+                    "HTML document (*.html)|*.html|"
+                    "Text document (*.txt)|*.txt" % XLSX_WILDCARD)
+CONTACT_EXTS = ["csv", "xlsx", "html", "txt"] if xlsxwriter else ["csv", "html", "txt"]
 
 IMAGE_EXTS = ["bmp", "jpg", "png"]
 IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
@@ -370,13 +373,14 @@ def export_contacts(contacts, filename, format, db):
     """
     is_html = ("html" == format)
     is_csv  = ("csv"  == format)
+    is_txt  = ("txt"  == format)
     is_xlsx = ("xlsx" == format)
 
-    if is_html:
+    if is_html or is_txt:
         namespace = {"contacts": contacts, "db": db}
-        with open(filename, "wb") as f:
-            template = step.Template(templates.EXPORT_CONTACTS_HTML, escape=True)
-            template.stream(f, namespace)
+        t = templates.EXPORT_CONTACTS_HTML if is_html else templates.EXPORT_CONTACTS_TXT
+        with util.create_file(filename, "wb", handle=True) as f:
+            step.Template(t, escape=is_html, strip=False).stream(f, namespace, newline=os.linesep)
         return
 
     FIELDS = skypedata.CONTACT_FIELD_TITLES

@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    20.09.2022
+@modified    21.09.2022
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, wx
+#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -2668,6 +2668,107 @@ label, sortlabel = (x.replace("contact", category) for x in (label, sortlabel))
 <script> new Lightbox().load({carousel: false}); </script>
 %endif
 </html>
+"""
+
+
+"""
+Contacts information template, for use in export.
+
+@param   db               SkypeDatabase instance
+@param   contacts         list of contacts dicts, as returned from SkypeDatabase,
+                          supplemented with statistics
+"""
+EXPORT_CONTACTS_TXT = """<%
+import datetime, textwrap
+from skyperious import conf, skypedata, templates
+from skyperious.lib import util
+
+
+CHAT_COLS = [("title_long",             "Chat"),
+             ("message_count",          "Messages from contact"),
+             ("ratio",                  "Message ratio"),
+             ("first_message_datetime", "First message"),
+             ("last_message_datetime",  "Last message")]
+datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
+wrap = lambda s, i: ("\\n" + i).join(sum((textwrap.wrap(x, width=80, break_long_words=False) or [""] for x in s.splitlines()), []))
+
+TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
+
+bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
+phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
+account_contact = next((c for c in contacts if c["identity"] == db.id), None)
+contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
+countstr = ", ".join(util.plural(n, v) for n, v in (
+    ("database account", bool(account_contact)),
+    ("phone number contact", phones),
+    ("bot contact", bots)
+) if v)
+%>Skype contacts
+==============
+
+Source: {{ db.filename }}
+{{ len(contacts) }} {{ util.plural("entry", contacts, numbers=False) }} in total.
+%if account_contact or phones or bots:
+{{ countstr }}.
+%endif
+Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
+%for c in contacts:
+
+
+
+%if db.id == c["identity"]:
+## Database account ##
+%endif
+<%
+maxw = max(len(x) for x in get_fields(c).values())
+indent = " " * (maxw + 2 + 1)
+%>
+%for name, label in ((n, t) for n, t in get_fields(c).items() if skypedata.format_contact_field(c, n)):
+{{ ("%s:" % label).ljust(maxw + 1) }}  {{ wrap(skypedata.format_contact_field(c, name), indent) }}
+%endfor
+%if c.get("conversations"):
+<%
+vals = [str(x) for x in (
+    c["message_count_single"] + c["message_count_group"],
+    c["message_count_single"], c["message_count_group"], len(c["conversations"])
+)]
+maxw = max(map(len, vals))
+%>
+
+Messages in total:       {{ vals[0].rjust(maxw) }}
+Messages in 1:1 chat:    {{ vals[1].rjust(maxw) }}
+Messages in group chats: {{ vals[2].rjust(maxw) }}
+Chats:                   {{ vals[3].rjust(maxw) }}
+
+<%
+category = "account" if db.id == c["identity"] else "contact"
+sortkey = lambda x: x["last_message_datetime"] or datetime.datetime.min
+justify = lambda i, v: (v.rjust if i else v.ljust)(widths[i])
+rows = [
+    [
+        util.ellipsize(TITLEMAP.get(d["id"]) or "", 80),
+        str(d["message_count"]),
+        util.round_float(d["ratio"], 0) + "%" if d.get("ratio") is not None else "",
+        datefmt(d["first_message_datetime"]),
+        datefmt(d["last_message_datetime"]),
+    ]
+    for d in sorted(c["conversations"], reverse=True, key=sortkey)
+]
+widths = [len(l) for _, l in CHAT_COLS]
+widths = [max(v, max(len(x[i]) for x in rows)) for i, v in enumerate(widths)]
+
+
+ren = lambda l: l.replace("contact", category) if "contact" in l and "contact" != category else l
+header = "  ".join([ren(l).ljust(widths[i]) for i, (_, l) in enumerate(CHAT_COLS[:-1])] + [CHAT_COLS[-1][1]])
+echo(header + "\\n")
+echo("-" * (2 * len(widths) - 2 + sum(widths)) + "\\n")
+for row in rows:
+    echo("%s\\n" % "  ".join(justify(i, v) for i, v in enumerate(row)))
+%>
+%endif
+%endfor
 """
 
 

@@ -2937,7 +2937,7 @@ def format_contact_field(datadict, name):
     if value is not None and not isinstance(value, six.string_types):
         value = str(value)
 
-    return None if value in (b"", "", None) else value
+    return None if value in (b"", "", None) else value.strip()
 
 
 

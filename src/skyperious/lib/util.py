@@ -205,6 +205,30 @@ def b64decode(s):
     return base64.b64decode(s).decode("latin1")
 
 
+def ellipsize(text, limit=50, front=False, ellipsis=".."):
+    """
+    Returns text ellipsized if beyond limit. If text is enclosed in quotes or
+    brackets ('' "" [] () <> {}), it is ellipsized inside the enclosure,
+    e.g. ellipsize('"0123456789"', 10) returns '"012345.."'.
+
+    @param   text      value to ellipsize, converted to string if not string
+    @param   limit     length beyond which text is truncated
+    @param   front     if true, ellipsis is inserted in front
+                       and text is truncated from the end
+    @param   ellipsis  the ellipsis string to use
+    """
+    if not isinstance(text, six.string_types): text = to_unicode(text)
+    if len(text) <= limit: return text
+
+    ENCLOSURES = "''", '""', "[]", "()", "<>", "{}"
+    extra = next((a if front else b for a, b in ENCLOSURES
+                  if a == text[0] and b == text[-1]), "")
+    if extra: limit -= 1
+
+    if front: return (extra + ellipsis + text[-limit + len(ellipsis):])
+    else:     return (text[:limit - len(ellipsis)] + ellipsis + extra)
+
+
 def hash_string(s):
     """
     Returns the hash value of the string, as an integer.
