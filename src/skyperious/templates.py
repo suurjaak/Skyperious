@@ -2535,7 +2535,7 @@ dct = {
 %>
       <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
       <br />
-      <b>{{ len(contacts) }}</b> {{ util.plural("entry", contacts, numbers=False) }} in total.
+      <b>{{ len(contacts) }}</b> {{ util.plural("entry", contacts, numbers=False) }} in total. <br />
 %if account_contact:
       <b>1</b> database account{{ ", " if phones or bots else "." }}
 %endif
@@ -2596,7 +2596,7 @@ category = "account" if db.id == c["identity"] else "contact"
 %for name, label in ((n, t) for n, t in get_fields(c).items() if skypedata.format_contact_field(c, n)):
         <tr>
           <th>{{ label }}:</th>
-          <td>{{ skypedata.format_contact_field(c, name) }}</td>
+          <td>{{! escape(skypedata.format_contact_field(c, name)).replace("\\n", "<br />") }}</td>
         </tr>
 %endfor
 %if c.get("conversations"):
