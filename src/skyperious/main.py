@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.09.2022
+@modified    22.09.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -194,6 +194,42 @@ ARGUMENTS = {
              {"args": ["FILE"], "nargs": "+",
               "help": "Skype database file(s) to sync (supports * wildcards), "
                       "will be created if it does not exist yet"},
+             {"args": ["--verbose"], "action": "store_true",
+              "help": "print detailed progress messages to stderr"},
+             {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
+              "help": "command-line output suitable for non-terminal display, "
+                      "like piping to a file; also skips all user interaction "
+                      "like asking for Skype username or password"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
+        {"name": "contacts",
+         "help": "export Skype contacts as HTML, text or spreadsheet",
+         "description": "Export contacts from a Skype database into file.",
+         "arguments": [
+             {"args": ["-t", "--type"], "dest": "type",
+              "choices": ["html", "xlsx", "csv", "txt"]
+                         if export.xlsxwriter else ["html", "csv", "txt"],
+              "default": "html", "required": False, "type": str.lower,
+              "help": "export type: HTML files (default), Excel workbooks, "
+                      "CSV spreadsheets, text files" if export.xlsxwriter
+                      else
+                      "export type: HTML files (default), CSV spreadsheets, "
+                      "text files"},
+             {"args": ["FILE"], "nargs": "+",
+              "help": "Skype databases to process (supports * wildcards)"},
+             {"args": ["-o", "--output"], "dest": "output",
+              "metavar": "FILE", "required": False,
+              "help": "output filename if not using auto-generated"},
+             {"args": ["-f", "--filter"], "dest": "filter", "metavar": "TEXT",
+              "nargs": "+", "required": False,
+              "help": "select contacts with given texts in any profile fields"},
+             {"args": ["-n", "--name"], "dest": "contact", "metavar": "NAME",
+              "nargs": "+", "required": False,
+              "help": "names of specific contacts to select"},
+             {"args": ["-c", "--chat"], "dest": "chat", "metavar": "CHAT",
+              "nargs": "+", "required": False,
+              "help": "names of chats to select contacts by"},
              {"args": ["--verbose"], "action": "store_true",
               "help": "print detailed progress messages to stderr"},
              {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
@@ -799,6 +835,85 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                   (e, traceback.format_exc()))
 
 
+def run_contacts(filenames, format="html", output_filename=None, fieldfilters=(), namefilters=(), chatfilters=()):
+    """Exports contacts from the specified databases in specified format."""
+    AFTER_MAX = sys.maxsize if conf.IsCLINonTerminal else 30
+    get_fields = lambda db, c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                               else skypedata.ACCOUNT_FIELD_TITLES
+
+    for filename in filenames:
+        try: db = skypedata.SkypeDatabase(filename)
+        except Exception as e:
+            logger.exception("Error opening %s." % filename)
+            output("Error opening %s: %s" % (filename, e))
+            continue # for filename
+
+        bartext = " Reading %s%s.." % (
+                  "..." if len(db.filename) > AFTER_MAX else "",
+                  db.filename[-AFTER_MAX:])
+        bar = ProgressBar(afterword=bartext, interval=0.05, pulse=True,
+                          static=conf.IsCLINonTerminal)
+        bar.start()
+
+        path = output_filename
+        if not path:
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(db.filename)
+            formatargs.update(db.account or {})
+            path = "%s.%s" % (util.safe_filename(conf.ExportContactsTemplate % formatargs), format)
+        path = util.unique_path(path)
+
+        chats    = db.get_conversations()
+        contacts = [db.account] + db.get_contacts()
+        db.get_conversations_stats(chats)
+        db.get_contacts_stats(contacts, chats)
+
+        if fieldfilters:
+            entries, texts = [], [x.lower() for x in fieldfilters]
+            for c in contacts:
+                ff = [(skypedata.format_contact_field(c, n) or "").lower()
+                      for n in get_fields(db, c)]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+        if namefilters:
+            entries, texts = [], [x.lower() for x in namefilters]
+            for c in contacts:
+                ff = [(c.get(n) or "").lower() for n in c if "name" in n]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+        if chatfilters:
+            entries, texts = [], [x.lower() for x in chatfilters]
+            chatmap = {x["id"]: x for x in chats}
+            chatmap.update({x["__link"]["id"]: x["__link"] for x in chats if x.get("__link")})
+            for c in contacts:
+                ff = [(chatmap[x["id"]].get("title") or "").lower()
+                      for x in c.get("conversations", [])]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+
+        util.try_ignore(os.makedirs, os.path.dirname(path))
+        bar.afterword = " Exporting %s%s.." % (
+                        "..." if len(db.filename) > AFTER_MAX else "",
+                        db.filename[-AFTER_MAX:])
+        bar.update()
+        try:
+            export.export_contacts(contacts, path, format, db)
+            bar.stop()
+            bar.afterword = " Exported %s from '%s' to '%s'. " % (
+                util.plural("contact", contacts), db, path)
+            bar.pulse = False
+            bar.update(bar.max)
+            output()
+            logger.info("Exported %s %sto %s as %s.", util.plural("contact", contacts),
+                        "from %s " % db if len(filenames) != 1 else "", path, format.upper())
+        except Exception as e:
+            output("Error exporting contacts: %s\n\n%s" %
+                  (e, traceback.format_exc()))
+
+
 def run_diff(filename1, filename2):
     """Compares the first database for changes with the second."""
     if os.path.realpath(filename1) == os.path.realpath(filename2):
@@ -990,6 +1105,9 @@ def run(nogui=False):
                    arguments.chat, arguments.author, arguments.start_date,
                    arguments.end_date, arguments.media_folder,
                    arguments.ask_password, arguments.store_password)
+    elif "contacts" == arguments.command:
+        run_contacts(arguments.FILE, arguments.type, arguments.output,
+                     arguments.filter, arguments.contact, arguments.chat)
     elif "search" == arguments.command:
         run_search(arguments.FILE, arguments.QUERY, arguments.type,
                    arguments.reverse, arguments.offset, arguments.limit)

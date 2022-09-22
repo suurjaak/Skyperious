@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.09.2022
+@modified    22.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2436,7 +2436,7 @@ class DatabasePage(wx.Panel):
         )
         self.dialog_savecontacts = wx.FileDialog(
             parent=self, message="Save contacts", defaultDir=six.moves.getcwd(),
-            defaultFile="Skype contact list", wildcard=export.CONTACT_WILDCARD,
+            wildcard=export.CONTACT_WILDCARD,
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         self.dialog_savegrid = wx.FileDialog(
@@ -4470,6 +4470,11 @@ class DatabasePage(wx.Panel):
                     for x in range(self.list_contacts.ItemCount)]
         if not contacts: return
 
+        formatargs = collections.defaultdict(str)
+        formatargs["skypename"] = os.path.basename(self.db.filename)
+        formatargs.update(self.db.account or {})
+        name = util.safe_filename(conf.ExportContactsTemplate % formatargs)
+        self.dialog_savecontacts.Filename = name
         if wx.ID_OK != self.dialog_savecontacts.ShowModal(): return
 
         busy = controls.BusyPanel(self, "Exporting contacts.")

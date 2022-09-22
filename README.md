@@ -93,6 +93,7 @@ Skyperious offers a number of options from the
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
   sync FILE                  download new messages from Skype online service
+  contacts FILE [-t format]  export Skype contacts as HTML, text or spreadsheet
   create FILE [-u user]      create new Skype database, blank or from a Skype source
   merge FILE FILE ...        merge two or more Skype databases into a new database
   diff FILE1 FILE2           compare chat history in two Skype databases

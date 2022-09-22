@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.09.2022
+@modified    22.09.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev15"
-VersionDate = "21.09.2022"
+Version = "5.4.dev16"
+VersionDate = "22.09.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -57,9 +57,9 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
     "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
-    "ExportDbTemplate", "HistoryFontSize", "LogSQL", "MinWindowSize",
-    "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
-    "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
+    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "LogSQL",
+    "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
     "SharedFileAutoDownload", "SharedImageAutoDownload", "SharedContentUseCache",
@@ -139,6 +139,9 @@ ExportFileAutoOpen = True
 
 """Chat export filename template, format can use Skype.Conversations data."""
 ExportChatTemplate = u"Skype %(title_long_lc)s"
+
+"""Database contacts export filename template, format can use Skype.Accounts data."""
+ExportContactsTemplate = u"Skype contacts for %(name)s"
 
 """Database export filename template, format can use Skype.Accounts data."""
 ExportDbTemplate = u"Export from %(name)s"
