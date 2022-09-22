@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    21.09.2022
+@modified    22.09.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -2404,6 +2404,18 @@ dct = {
 
     function sort_contacts(link, col) {
       var sort_direction = !link.classList.contains("asc"); // True for ascending
+
+      var linklist = document.getElementById("sort_header").getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        var elem = linklist[i], name = elem.getAttribute("data-name");
+        if (name != col) {
+          if (elem.classList.contains("asc")) sort_direction = true;
+          else if (elem.classList.contains("desc")) sort_direction = false;
+        };
+        elem.className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+
       var sortfn = function(a, b) {
         var n1 = a.id.replace(/^contact\//, "");
         var n2 = b.id.replace(/^contact\//, "");
@@ -2419,22 +2431,30 @@ dct = {
       var itemlist = document.getElementsByClassName("contact");
       var items = [];
       for (var i = 0, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
-
       items.sort(sortfn);
       var container = document.getElementById("content_wrapper");
       for (var i = 0; i < items.length; i++) {
         container.appendChild(items[i]);
       }
-      var linklist = document.getElementById("sort_header").getElementsByClassName("sort");
-      for (var i = 0; i < linklist.length; i++) {
-        linklist[i].className = "sort";
-      }
-      link.className = "sort " + (sort_direction ? "asc" : "desc");
       return false;
     }
 
     function sort_table(link, idx) {
       var sort_direction = !link.classList.contains("asc"); // True for ascending
+
+      var table = link.parentElement.parentElement.parentElement.parentElement;
+      var itemlist = table.getElementsByTagName("tr");
+      var linklist = itemlist[0].getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        var elem = linklist[i];
+        if (i != idx) {
+          if (elem.classList.contains("asc")) sort_direction = true;
+          else if (elem.classList.contains("desc")) sort_direction = false;
+        };
+        elem.className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+
       var sortfn = function(a, b) {
         var v1 = a.children[idx].title || a.children[idx].innerText;
         var v2 = b.children[idx].title || b.children[idx].innerText;
@@ -2442,20 +2462,12 @@ dct = {
         return sort_direction ? result : -result;
       };
 
-      var table = link.parentElement.parentElement.parentElement.parentElement;
-      var itemlist = table.getElementsByTagName("tr");
       var items = [];
       for (var i = 1, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
-
       items.sort(sortfn);
       for (var i = 0; i < items.length; i++) {
         table.tBodies[0].appendChild(items[i]);
       }
-      var linklist = itemlist[0].getElementsByClassName("sort");
-      for (var i = 0; i < linklist.length; i++) {
-        linklist[i].className = "sort";
-      }
-      link.className = "sort " + (sort_direction ? "asc" : "desc");
       return false;
     }
 
@@ -2552,7 +2564,7 @@ dct = {
 <div id="sort_header">
     Sort by:
 %for name, label, sortlabel in CONTACT_SORTS:
-    <a title="Sort contacts by {{ sortlabel }}" href="#" onClick="return sort_contacts(this, '{{ name }}');"
+    <a title="Sort contacts by {{ sortlabel }}" href="#" data-name="{{ name }}" onClick="return sort_contacts(this, '{{ name }}');"
        class="sort{{ " desc" if "last_message_datetime" == name else "" }}">{{ label }}</a>
 %endfor
 </div>
