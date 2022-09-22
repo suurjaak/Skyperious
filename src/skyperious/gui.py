@@ -4434,15 +4434,16 @@ class DatabasePage(wx.Panel):
         """
         Handler for clicking to export contact chats, displays a submenu with choices.
         """
-        def handler(do_singlefile=False):
+        def handler(do_singlefile=False, do_timerange=False):
             chatmap = {x["id"]: x for x in self.chats}
             chats = [chatmap[x["id"]] for x in self.contact.get("conversations") or []]
             if do_singlefile:
                 do_singlefile = "Chats with %s" % (self.contact["name"] or self.contact["identity"])
             return functools.partial(self.on_export_chats,
-                                     chats, False, do_singlefile, False)
+                                     chats, False, do_singlefile, do_timerange)
 
         menu = wx.lib.agw.flatmenu.FlatMenu()
+        menu_date = wx.lib.agw.flatmenu.FlatMenu()
 
         item_multi = wx.lib.agw.flatmenu.FlatMenuItem(
             menu, wx.ID_ANY, "Into individual &files")
@@ -4453,6 +4454,19 @@ class DatabasePage(wx.Panel):
                 menu, wx.ID_ANY, "Into a single &Excel workbook, with separate sheets")
             menu.AppendItem(item_single)
             self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_single)
+        item_date = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu, wx.ID_ANY, "Export &date range", subMenu=menu_date)
+        item_date_multi = wx.lib.agw.flatmenu.FlatMenuItem(
+            menu_date, wx.ID_ANY, "Into individual &files")
+        menu_date.AppendItem(item_date_multi)
+        self.Bind(wx.EVT_MENU, handler(do_timerange=True), item_date_multi)
+        if export.xlsxwriter:
+            item_date_single = wx.lib.agw.flatmenu.FlatMenuItem(
+                menu, wx.ID_ANY, "Into a single &Excel workbook, with separate sheets")
+            menu_date.AppendItem(item_date_single)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True, do_timerange=True),
+                      item_date_single)
+        menu.AppendItem(item_date)
 
         sz_btn, pt_btn = event.EventObject.Size, event.EventObject.Position
         pt_btn = event.EventObject.Parent.ClientToScreen(pt_btn)
@@ -5952,6 +5966,7 @@ class DatabasePage(wx.Panel):
         wx.YieldIfNeeded() # Allow display to refresh
         prefix = category.replace("c", "&c", 1).capitalize()
         self.button_export_contact_chats.Label = "&Export %s chats" % category.split()[-1]
+        self.button_export_contact_chats.Enabled = bool(contact.get("conversations", []))
         self.label_contact.Label = prefix + " %(name)s (%(identity)s):" % contact
         self.label_contact.Parent.Layout()
 
