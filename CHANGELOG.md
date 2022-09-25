@@ -1,9 +1,10 @@
 CHANGELOG
 =========
 
-5.4, 2022-09-22
+5.4, 2022-09-25
 ---------------
 - add database account as one entry among contacts in contacts-tab
+- add option to delete contact from database
 - add contacts TXT export
 - add contacts export to command-line interface
 - add configuration flag to cache shared media on disk (issue #112)

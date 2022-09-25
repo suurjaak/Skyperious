@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.09.2022
+@modified    25.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1252,8 +1252,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.MessageBox('Failed to copy "%s" to "%s".' % (original, newpath),
                           conf.Title, wx.OK | wx.ICON_WARNING)
         if success:
-            guibase.status("Saved a copy of %s as %s.", original, newpath,
-                           log=True)
+            guibase.status("Saved a copy of %s as %s.", original, newpath, log=True)
             self.update_database_list(newpath)
             for k in ("LastActivePage", "LastSearchResults", "Login", "SQLWindowTexts"):
                 dct = getattr(conf, k, {})
@@ -3554,6 +3553,7 @@ class DatabasePage(wx.Panel):
             item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
                                                  "with separate sheets")
         item_dates   = wx.MenuItem(menu, -1, "Export chats &date range")
+        item_delete  = wx.MenuItem(menu, -1, "Delete")
 
         boldfont = wx.Font(item_name.Font)
         boldfont.SetWeight(wx.FONTWEIGHT_BOLD)
@@ -3573,7 +3573,10 @@ class DatabasePage(wx.Panel):
         if item_exportm: menu.Append(item_exportm)
         menu.Append(item_dates)
         if item_datesm: menu.Append(item_datesm)
-        if len(contacts) > 1: item_name.Enabled = item_rename.Enabled = False
+        menu.AppendSeparator()
+        menu.Append(item_delete)
+        item_name.Enabled = item_rename.Enabled = (1 == len(contacts))
+        item_delete.Enabled = ("account" != category)
 
         def clipboardize(category):
             if "name" == category:
@@ -3600,6 +3603,7 @@ class DatabasePage(wx.Panel):
         menu.Bind(wx.EVT_MENU, lambda e: clipboardize("profile"), item_copyprof)
         menu.Bind(wx.EVT_MENU, lambda e: clipboardize("chat"),    item_copychats)
         menu.Bind(wx.EVT_MENU, lambda e: self.on_rename_contact(contact=contacts[0]), item_rename)
+        menu.Bind(wx.EVT_MENU, lambda e: self.on_delete_contacts(contacts=contacts), item_delete)
         menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
         menu.Bind(wx.EVT_MENU, lambda e: exporter(False, True),  item_dates)
         if item_exportm:
@@ -4228,9 +4232,7 @@ class DatabasePage(wx.Panel):
         chat["title_long"] = ltitle
         chat["title_long_lc"] = ltitle[0].lower() + ltitle[1:]
 
-        scrollpos = self.list_chats.GetScrollPos(wx.VERTICAL)
         self.list_chats.RefreshRows()
-        self.list_chats.ScrollLines(scrollpos)
         if chat is not self.chat: return
 
         # Add shortcut key flag to chat label
@@ -5964,7 +5966,7 @@ class DatabasePage(wx.Panel):
                 clist.ScrollLines(delta + nudge)
         clist.Thaw()
         wx.YieldIfNeeded() # Allow display to refresh
-        prefix = category.replace("c", "&c", 1).capitalize()
+        prefix = "Database a&ccount" if contact["identity"] == self.db.id else "&Contact"
         self.button_export_contact_chats.Label = "&Export %s chats" % category.split()[-1]
         self.button_export_contact_chats.Enabled = bool(contact.get("conversations", []))
         self.label_contact.Label = prefix + " %(name)s (%(identity)s):" % contact
@@ -6124,12 +6126,12 @@ class DatabasePage(wx.Panel):
         """Closes the currently open chat in ChatContentSTC."""
         if not self.chat: return
 
-        self.chat = None
+        chat, self.chat = self.chat, None
         self.chat_filter = {"daterange": None, "startdaterange": None,
                             "text": "", "participants": None}
         # Update chat list colours
         for i in range(self.list_chats.ItemCount):
-            if self.list_chats.GetItemMappedData(i) == self.chat:
+            if self.list_chats.GetItemMappedData(i) == chat:
                 self.list_chats.SetItemFont(i, self.list_chats.Font)
 
         # Clear filter controls
@@ -6175,7 +6177,16 @@ class DatabasePage(wx.Panel):
               "these" if len(chats) > 1 else "this",
               util.plural("chat", chats, single=""),
               "\n  ".join(c["title_long"] for c in chats))
-        if wx.OK != wx.MessageBox(msg, conf.Title, wx.OK | wx.CANCEL): return
+        if wx.OK != wx.MessageBox(msg, conf.Title, wx.ICON_INFORMATION | wx.OK | wx.CANCEL): return
+
+        if wx.OK != wx.MessageBox(
+            "Are you really sure you want to delete %s %s "
+            "and all their related data from the database?\n\n"
+            "This action is not undoable." % (
+                "this" if len(chats) == 1 else "these",
+                util.plural("chat", chats, numbers=False),
+            ), conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL
+        ): return
 
         cmap = {p["contact"]["identity"]: p["contact"]
                 for c in chats for p in c["participants"]
@@ -6200,7 +6211,7 @@ class DatabasePage(wx.Panel):
                   "\n  ".join(x["identity"] if x["identity"] == x["name"]
                               else "%s (%s)" % (x["name"], x["identity"])
                               for x in purgables))
-            resp = wx.MessageBox(msg, conf.Title, wx.YES | wx.NO | wx.CANCEL)
+            resp = wx.MessageBox(msg, conf.Title, wx.ICON_INFORMATION | wx.YES | wx.NO | wx.CANCEL)
             if wx.CANCEL == resp: return
             elif   wx.NO == resp: del purgables[:]
 
@@ -6232,16 +6243,148 @@ class DatabasePage(wx.Panel):
         try:
             if self.chat in chats: self.close_chat()
 
-            self.db.delete_conversations(chats)
-            self.db.delete_contacts(purgables)
+            result = self.db.delete_data(chats, purgables)
+            busy.Close()
+            busy = controls.BusyPanel(self, "Refreshing..")
 
             idxs = [i for i in range(self.list_chats.GetItemCount())
                     if self.list_chats.GetItemMappedData(i) in chats]
             for idx in idxs[::-1]: self.list_chats.DeleteItem(idx)
             self.chats = [c for c in self.chats if c not in chats]
 
+            idxs = [i for i in range(self.list_contacts.GetItemCount())
+                    if self.list_contacts.GetItemMappedData(i) in purgables]
+            for idx in idxs[::-1]: self.list_contacts.DeleteItem(idx)
+            self.contacts = [c for c in self.contacts if c not in purgables]
+
+            contacts_affected = [c for c in self.contacts if any(
+                x["id"] in [y["id"] for y in chats] for x in c.get("conversations") or []
+            )]
+            self.db.get_contacts_stats([self.db.account] + contacts_affected, self.chats)
+            self.list_contacts.RefreshRows()
+            self.load_contact(None if self.contact in purgables else self.contact)
+
             self.on_refresh_tables()
             wx.CallAfter(self.update_info_page)
+            wx.CallAfter(self.TopLevelParent.update_database_detail)
+            busy.Close()
+
+            MAINS = ["Conversations", "Messages", "Contacts"]
+            infotext = " and ".join(util.plural(t.lower()[:-1], result[t])
+                                    for t in MAINS if result.get(t))
+            othercount = sum(result[t] for t in result if t not in MAINS)
+            if othercount:
+                infotext += " (and %s)" % util.plural("related row", othercount)
+            guibase.status("Deleted %s from %s.", infotext, self.db, log=True)
+            wx.MessageBox("Deleted %s." % infotext, conf.Title, wx.ICON_INFORMATION)
+        finally: busy.Close()
+
+
+    def on_delete_contacts(self, event=None, contacts=()):
+        """Handler for deleting contacts, asks for confirmation."""
+        contacts = sorted((c for c in contacts if c["identity"] != self.db.id),
+                          key=lambda c: c["name"].lower())
+        if wx.OK != wx.MessageBox(
+            "Are you sure you want to delete %s from the database?\n\n"
+            "%s\n\n"
+            "This will delete their 1:1 %s, all their other messages, "
+            "and any other related data." % (
+                util.plural("contact", contacts, single="this"),
+                "\n".join("%s (%s)" % (c["name"], c["identity"]) for c in contacts),
+                util.plural("chat", contacts, numbers=False),
+            ), conf.Title, wx.ICON_INFORMATION | wx.OK | wx.CANCEL
+        ): return
+
+        if wx.OK != wx.MessageBox(
+            "Are you really sure you want to delete %s %s "
+            "and all related data from the database?\n\n"
+            "This action is not undoable." % (
+                "this" if len(contacts) == 1 else "these",
+                util.plural("contact", contacts, numbers=False),
+            ), conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL
+        ): return
+
+        TABLES = ["Alerts", "CallMembers", "Calls", "ChatMembers", "Chats", "Contacts",
+                  "ContactGroups", "Conversations", "MediaDocuments", "MessageAnnotations",
+                  "Messages", "Participants", "Transfers", "VideoMessages", "Videos",
+                  "Voicemails"]
+        openeds, changeds = [], []
+        for t in TABLES:
+            if t.lower() in self.db_grids:
+                openeds.append(t)
+                if self.db_grids[t.lower()].IsChanged(): changeds.append(t)
+
+        if changeds and wx.OK != wx.MessageBox("There are unsaved changes "
+            "in open data grids for the following tables:\n  %s\n\n"
+            "Discard changes and continue?" % "\n  ".join(changeds),
+            conf.Title, wx.ICON_WARNING | wx.OK | wx.CANCEL): return
+
+        # Close query cursors, discard table grids currently not visible
+        if self.grid_sql.Table: self.grid_sql.Table.Close()
+        if self.grid_table.Table and self.grid_table.Table.IsChanged():
+            self.grid_table.Table.UndoChanges()
+        for t in openeds:
+            grid = self.db_grids[t.lower()]
+            grid.Close()
+            if grid is not self.grid_table.Table: self.db_grids.pop(t.lower())
+        self.update_tabheader()
+
+        chatmap = {x["id"]: x for x in self.chats}
+        chats = {x["id"]: chatmap[x["id"]] for c in contacts
+                 for x in c.get("conversations") or [] if x["id"] in chatmap}
+        multichats  = [x for x in chats.values() if skypedata.CHATS_TYPE_SINGLE != x["type"]]
+        singlechats = [x for x in chats.values() if skypedata.CHATS_TYPE_SINGLE == x["type"]]
+        logger.info("CC: %s", [(x["id"], x["title"]) for x in chats.values()])
+
+        busy = controls.BusyPanel(self, "Deleting..")
+        try:
+            if self.chat and self.chat["id"] in chats:
+                self.close_chat()
+
+            result = self.db.delete_data(singlechats, contacts)
+            busy.Close()
+            busy = controls.BusyPanel(self, "Refreshing..")
+
+            idxs = [i for i in range(self.list_chats.GetItemCount())
+                    if self.list_chats.GetItemMappedData(i) in singlechats]
+            for idx in idxs[::-1]: self.list_chats.DeleteItem(idx)
+            self.chats = [c for c in self.chats if c not in singlechats]
+
+            idxs = [i for i in range(self.list_contacts.GetItemCount())
+                    if self.list_contacts.GetItemMappedData(i) in contacts]
+            for idx in idxs[::-1]: self.list_contacts.DeleteItem(idx)
+            self.contacts = [c for c in self.contacts if c not in contacts]
+
+            if multichats:
+                identities = [x["identity"] for x in contacts]
+                for chat in multichats:
+                    chat["participants"] = [x for x in chat["participants"]
+                                            if x["identity"] not in identities]
+                    people = sorted([p["identity"] for p in chat["participants"]])
+                    chat["people"] = "%s (%s)" % (len(people), ", ".join(people))
+                self.db.get_conversations_stats(multichats)
+                self.list_chats.RefreshRows()
+
+            contacts_affected = [c for c in [self.db.account] + self.contacts if any(
+                x["id"] in [y["id"] for y in multichats] for x in c.get("conversations") or []
+            )]
+            self.db.get_contacts_stats(contacts_affected, self.chats)
+            self.list_contacts.RefreshRows()
+
+            self.load_contact(None if self.contact in contacts else self.contact)
+            self.on_refresh_tables()
+            wx.CallAfter(self.update_info_page)
+            wx.CallAfter(self.TopLevelParent.update_database_detail)
+            busy.Close()
+
+            MAINS = ["Contacts", "Conversations", "Messages"]
+            infotext = " and ".join(util.plural(t.lower()[:-1], result[t])
+                                    for t in MAINS if result.get(t))
+            othercount = sum(result[t] for t in result if t not in MAINS)
+            if othercount:
+                infotext += " (and %s)" % util.plural("related row", othercount)
+            guibase.status("Deleted %s from %s.", infotext, self.db, log=True)
+            wx.MessageBox("Deleted %s." % infotext, conf.Title, wx.ICON_INFORMATION)
         finally: busy.Close()
 
 

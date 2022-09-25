@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    19.09.2022
+@modified    25.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -295,10 +295,23 @@ class SkypeDatabase(object):
 
 
     def clear_cache(self):
-        """Clears all the currently cached rows."""
+        """Clears all the currently cached rows, and refreshes row counts."""
         self.table_rows.clear()
         self.table_objects.clear()
         self.get_tables(refresh=True)
+
+
+    def clear_cache_rows(self, table, rows=None):
+        """Discards the specified rows from cache, or entire table cache if None."""
+        if rows:
+            for k in list(self.table_objects.get(table, {})):
+                if self.table_objects[table][k] in rows:
+                    self.table_objects[table].pop(k)
+            if table in self.table_rows:
+                self.table_rows[table] = [x for x in self.table_rows[table] if x not in rows]
+        if rows is None:
+            self.table_objects.pop(table, None)
+            self.table_rows.pop(table, None)
 
 
     def update_accountinfo(self, log_error=True):
@@ -357,11 +370,15 @@ class SkypeDatabase(object):
             util.try_ignore(lambda: os.unlink(self.live.tokenpath))
 
 
-    def execute(self, sql, params=(), log=True):
-        """Shorthand for self.connection.execute()."""
+    def execute(self, sql, params=(), log=None):
+        """
+        Shorthand for self.connection.execute().
+
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        """
         result = None
         if self.connection:
-            if log and conf.LogSQL:
+            if conf.LogSQL if log is None else log:
                 logger.info("SQL: %s%s", sql,
                             ("\nParameters: %s" % params) if params else "")
             result = self.connection.execute(sql, params)
@@ -608,7 +625,7 @@ class SkypeDatabase(object):
 
 
     def get_conversations(self, chatnames=None, authornames=None, chatidentities=None,
-                          reload=False, log=True):
+                          reload=False, log=None):
         """
         Returns chats as
         [{"id": integer, "title": "chat title", "created_datetime": datetime,
@@ -621,11 +638,13 @@ class SkypeDatabase(object):
         @param   authornames     return chats with authors containing given values
         @param   chatidentities  return chats with given identities
         @param   reload          ignore cache, retrieve everything again
+        @param   log             whether to log SQL statement, defaults to conf.LogSQL if None
         """
         result = []
         if not self.is_open() or "conversations" not in self.tables:
             return result
 
+        log = conf.LogSQL if log is None else log
         if reload or "conversations" not in self.table_rows:
             participants = {}
             sortkey_participants = lambda x: (x["contact"].get("name") or "").lower()
@@ -745,7 +764,7 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_conversations_stats(self, chats, log=True):
+    def get_conversations_stats(self, chats, log=None):
         """
         Collects statistics for all conversations and fills in the values:
         {"first_message_timestamp": int, "first_message_datetime": datetime,
@@ -754,7 +773,9 @@ class SkypeDatabase(object):
         Combines linked chat statistics into parent chat statistics.
 
         @param   chats  list of chats, as returned from get_conversations()
+        @param   log    whether to log SQL statement, defaults to conf.LogSQL if None
         """
+        log = conf.LogSQL if log is None else log
         if log and chats:
             logger.info("Statistics collection starting (%s).", self.filename)
         stats = {}
@@ -797,7 +818,7 @@ class SkypeDatabase(object):
             logger.info("Statistics collected (%s).", self.filename)
 
 
-    def get_contacts_stats(self, contacts, chats, log=True):
+    def get_contacts_stats(self, contacts, chats, log=None):
         """
         Collects statistics for all contacts and fills in the values:
         {"first_message_datetime": datetime, "last_message_datetime": datetime,
@@ -807,7 +828,9 @@ class SkypeDatabase(object):
 
         @param   contacts  list of contacts, as returned from get_contacts()
         @param   chats     list of conversations, as returned from get_conversations_stats()
+        @param   log       whether to log SQL statement, defaults to conf.LogSQL if None
         """
+        log = conf.LogSQL if log is None else log
         if log and contacts:
             logger.info("Contact statistics collection starting (%s).", self.filename)
         stats, chatmap, linkedchatmap, singlechatmap = {}, {}, {}, {} # {author: []}, {oldid: newid}, {id: {}}, {author: id}
@@ -962,8 +985,7 @@ class SkypeDatabase(object):
 
     def get_contact_name(self, identity, contact=None):
         """
-        Returns the full name for the specified contact, or given identity if
-        not set.
+        Returns the full name for the specified contact, or given identity if not set.
 
         @param   identity  skypename or pstnnumber
         @param   contact   cached Contacts-row, if any
@@ -1566,70 +1588,168 @@ class SkypeDatabase(object):
                     yield m
 
 
-    def delete_conversations(self, conversations):
-        """Deletes the specified conversations and all their related data."""
-        if not self.is_open() or not conversations or "conversations" not in self.tables:
-            return
+    def delete_data(self, conversations, contacts=()):
+        """
+        Deletes the specified conversations and contacts, and all their related data.
+
+        @return   {table: rows deleted}
+        """
+        result = {}
+        if not self.is_open() or not conversations and not contacts:
+            return result
+
+        # Cascading row deletions, as {parent table: {parent col: {foreign table: foreign col}}}
+        CASCADE_DELETES = {
+            "CallMembers": {
+                "call_db_id": {
+                    "Calls":               ["id"], },
+                "call_name": {
+                    "Calls":               ["name"],
+            }},
+            "Calls": {
+                "id": {
+                    "CallMembers":         ["call_db_id"],
+                    "ContentSharings":     ["call_id"],
+                    "LightWeightMeetings": ["call_id"], },
+                "name": {
+                    "CallMembers":         ["call_name"],
+            }},
+            "Chats": {
+                "name": {
+                    "ChatMembers":          ["chatname"],
+            }},
+            "Contacts": {
+                "identity": {
+                    "Alerts":              ["partner_name"],
+                    "CallMembers":         ["identity"],
+                    "Calls":               ["host_identity"],
+                    "ChatMembers":         ["identity"],
+                    "MessageAnnotations":  ["author"],
+                    "Messages":            ["author"],
+                    "Participants":        ["identity"],
+                    "SMSes":               ["convo_name", "TRIM(target_numbers)"],
+                    "Transfers":           ["partner_handle"],
+                    "VideoMessages":       ["author"],
+                    "Voicemails":          ["partner_handle"],
+            }},
+            "Conversations": {
+                "id": {
+                    "Calls":               ["conv_dbid"],
+                    "Chats":               ["conv_dbid"],
+                    "Messages":            ["convo_id"],
+                    "MediaDocuments":      ["convo_id"],
+                    "Participants":        ["convo_id"],
+                    "Transfers":           ["convo_id"],
+                    "Videos":              ["convo_id"],
+                    "Voicemails":          ["convo_id"], },
+                "identity": {
+                    "SMSes":               ["convo_name"],
+            }},
+            "Messages": {
+                "id": {
+                    "MessageAnnotations":  ["message_id"],
+                    "SMSes":               ["chatmsg_id"],
+                },
+            },
+        }
+        DEFERRED    = {"Calls": "id"}
+        REL_ALIASES = {"Contacts":      {"identity": "COALESCE(skypename, pstnnumber, '')"},
+                       "Conversations": {"identity": "identity"}}
+        DEL_ALIASES = {"Contacts": {"identity": "id"}, "Conversations": {"identity": "id"}}
+
         self.ensure_backup()
-        ids = [c["id"] for c in conversations]
-        idstr = ", ".join(map(str, ids))
-        TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
-                  "Participants", "Transfers", "Videos", "Voicemails"]
-
-        if "chats" in self.tables and "chatmembers" in self.tables:
-            # ChatMembers are matched by Chats.name
-            chats = self.execute("SELECT DISTINCT name FROM Chats "
-                                 "WHERE conv_dbid IN (%s)" % idstr).fetchall()
-            while chats: # Divide into chunks: SQLite can take up to 999 parameters.
-                argstr = ", ".join(":name%s" % i for i, _ in enumerate(chats[:999]))
-                args = {"name%s" % i: x["name"] for i, x in enumerate(chats[:999])}
-                self.execute("DELETE FROM ChatMembers WHERE chatname IN (%s)" % argstr, args)
-                chats = chats[999:]
-
-        KEYS = {"Calls": "conv_dbid", "Chats": "conv_dbid", "Conversations": "id"}
-        for table in TABLES:
-            ltable = table.lower()
-            if ltable not in self.tables: continue # for table
-            key = KEYS.get(table, "convo_id")
-            self.execute("DELETE FROM %s WHERE %s IN (%s)" % (table, key, idstr))
-            if "messages" == ltable and self.table_rows.get(ltable):
-                # Messages has {convo ID: [{msg}]} instead of [{msg}]
-                self.table_rows[ltable] = {k: v for k, v in self.table_rows[ltable].items()
-                                           if k not in ids}
-            elif self.table_rows.get(ltable):
-                self.table_rows[ltable] = [x for x in self.table_rows[ltable]
-                                           if x[key] not in ids]
-            if self.table_objects.get(ltable):
-                self.table_objects[ltable] = {k: v for k, v in self.table_objects[ltable].items()
-                                              if v[key] not in ids}
+        conversations = sorted(conversations, key=lambda x: x["title_long"].lower())
+        contacts      = sorted(contacts,      key=lambda x: x["name"].lower())
 
 
-    def delete_contacts(self, contacts):
-        """Deletes the specified contacts, from contact groups as well."""
-        if not self.is_open() or not contacts or "contacts" not in self.tables:
-            return
-        self.ensure_backup()
-        ids = [c["id"] for c in contacts if c.get("id")]
-        idstr = ", ".join(map(str, ids))
-        if ids: self.execute("DELETE FROM Contacts WHERE id IN (%s)" % idstr)
+        # [(table, "DELETE FROM ..")], {table}, {table: [where]}
+        sqls, clearables, deferreds = [], set(), collections.defaultdict(list)
+        tables = [("Conversations", conversations, "title_long_lc"), ("Contacts", contacts, "name")]
+        for table, deletables, labelcol in tables:
+            if not deletables: continue # for table
+            logger.info("Deleting %s: %s.",
+                        util.plural(table.lower()[:-1], deletables),
+                        ", ".join(x[labelcol] for x in deletables))
+            # First and last pair: table and column to select by, and to delete from.
+            # intermediary triplet: (link table, link column to parent, link column to child).
+            delstack = []
+            for pcol, rels in CASCADE_DELETES[table].items():
+                delstack.append((table, pcol))
+                for table2, cols2 in rels.items():
+                    delstack.extend((table, pcol, table2, col2) for col2 in cols2)
+                    for pcol2, rels2 in CASCADE_DELETES.get(table2, {}).items():
+                        for table3, cols3 in rels2.items(): # Use table2 as link table to table3
+                            for col2, col3 in ((a, b) for a in cols2 for b in cols3):
+                                delstack.append((table, pcol, table2, col2, pcol2, table3, col3))
+            # Start cascading deletes depth-first; Calls last at each depth due to cycles
+            delstack.sort(key=lambda x: (-len(x), x[-2] == "Calls", x[-2:]), reverse=True)
 
-        skypenames = [c["skypename"] for c in contacts]
+            rel_alias = lambda t, c: REL_ALIASES.get(t, {}).get(c, c)
+            del_alias = lambda t, c: DEL_ALIASES.get(t, {}).get(c, c)
+            while delstack: # Construct DELETE statements with zero or more nested SELECTs
+                path, index = delstack.pop(-1), 2
+                (stable, scol), (dtable, dcol) = path[:2], path[-2:]
+                svals = [x[del_alias(stable, scol)] for x in deletables]
+                if "Conversations" == table:
+                    svals.extend(y[del_alias(stable, scol)] for x in deletables
+                                 for y in [x.get("__link")] if y)
+                val = ", ".join(str(v) for v in svals)
+
+                if len(path) != 2 and scol in REL_ALIASES.get(stable, {}): # One level of indirection
+                    val = "SELECT %s FROM %s WHERE %s IN (%s)" % \
+                          (rel_alias(stable, scol), stable, del_alias(stable, scol), val)
+                while index + 3 < len(path):
+                    ftable, fcol, fkeycol = path[index:index + 3]
+                    val = "SELECT %s FROM %s WHERE %s IN (%s)" % (fkeycol, ftable, fcol, val)
+                    index += 3
+
+                if dtable != table: clearables.add(dtable)
+                if dtable in DEFERRED:
+                    deferreds[dtable].append("%s in (%s)" % (del_alias(dtable, dcol), val))
+                    continue # while
+
+                sql = "DELETE FROM %s WHERE %s IN (%s)" % (dtable, del_alias(dtable, dcol), val)
+                if (dtable, sql) not in sqls: sqls.append((dtable, sql))
+
+        for table, col, wheres in ((k, DEFERRED[k], v) for k, v in deferreds.items()):
+            selsql = "SELECT %s FROM %s WHERE %s" % (col, table, " OR ".join(wheres))
+            valstr = ", ".join(str(x[col]) for x in self.execute(selsql).fetchall())
+            if valstr:
+                sql = "DELETE FROM %s WHERE %s IN (%s)" % (table, col, valstr)
+                sqls.append((table, sql))
+
+        for table, sql in sqls:
+            delcount = self.execute(sql, log=True).rowcount
+            if delcount:
+                logger.info("Deleted from %s: %s.", table, util.plural("row", delcount))
+                result[table] = delcount
+        self.connection.commit()
+
+        identities = [c["identity"] for c in contacts]
         for group in self.get_contactgroups():
             members = (group["members"] or "").split()
-            members2 = [x for x in members if x not in skypenames]
+            members2 = [x for x in members if x not in identities]
             if members2 != members:
-                group["members"] = " ".join(members)
+                group["members"] = " ".join(members2)
                 self.execute("UPDATE ContactGroups SET members = :members "
-                             "WHERE id = :id", group)
+                             "WHERE id = :id", group, log=True)
+
+        for table, rows, _ in tables: self.clear_cache_rows(table, rows)
+        for table in sorted(clearables): self.clear_cache_rows(table)
+        self.get_tables(refresh=True)
+        return result
 
 
-    def update_row(self, table, row, original_row, rowid=None, log=True):
+    def update_row(self, table, row, original_row, rowid=None, log=None):
         """
         Updates the table row in the database, identified by its primary key
         in its original values, or the given rowid if table has no primary key.
+
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table, where, col_data = table.lower(), "", []
         colmap = {x["name"]: x for x in self.get_table_columns(table)}
         with warnings.catch_warnings():
@@ -1658,14 +1778,16 @@ class SkypeDatabase(object):
         self.last_modified = datetime.datetime.now()
 
 
-    def insert_row(self, table, row, log=True):
+    def insert_row(self, table, row, log=None):
         """
         Inserts the new table row in the database.
 
-        @return  ID of the inserted row
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        @return       ID of the inserted row
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table = table.lower()
         if log: logger.info("Inserting 1 row into table %s, %s.",
                             self.tables[table]["name"], self.filename)
@@ -1682,15 +1804,17 @@ class SkypeDatabase(object):
         return cursor.lastrowid
 
 
-    def delete_row(self, table, row, rowid=None, log=True):
+    def delete_row(self, table, row, rowid=None, log=None):
         """
         Deletes the table row from the database. Row is identified by its
         primary key, or by rowid if no primary key.
 
-        @return   success as boolean
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        @return       success as boolean
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table, where = table.lower(), ""
         if log: logger.info("Deleting 1 row from table %s, %s.",
                             self.tables[table]["name"], self.filename)
@@ -2153,7 +2277,7 @@ class MessageParser(object):
                             url = pkg["attachments"][0]["content"]["images"][0]["url"]
                             data.update(category="card", url=live.make_content_url(url, "card"))
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
-                                                (urllib.parse.quote(url, ":/=?&#"), url), message)
+                                                (urllib.parse.quote(url, safe=":/=?&#"), url), message)
                     except Exception: pass
 
                 url = data["url"] = live.make_content_url(data["url"], data.get("category"))
