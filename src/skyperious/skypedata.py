@@ -828,7 +828,7 @@ class SkypeDatabase(object):
 
         @param   contacts  list of contacts, as returned from get_contacts()
         @param   chats     list of conversations, as returned from get_conversations_stats()
-        @param   log       whether to log SQL statement, defaults to conf.LogSQL if None
+        @param   log       whether to emit log messages, defaults to conf.LogSQL if None
         """
         log = conf.LogSQL if log is None else log
         if log and contacts:
@@ -867,11 +867,16 @@ class SkypeDatabase(object):
             singlechatmap = {x["identity"]: x["id"] for x in chats
                              if CHATS_TYPE_SINGLE == x["type"]}
         for contact in contacts:
+            contact["first_message_datetime"] = None
+            contact["last_message_datetime"] = None
             contact["message_count_single"] = 0
             contact["message_count_group"] = 0
             contact["conversations"] = []
-            datas, datas2 = stats.get(contact["identity"]), []
-            if not datas: continue # for contact
+            chatids = set(c["id"] for c in chats if any(
+                contact["identity"] == p["identity"] for p in c["participants"]
+            ))
+            datas, datas2 = stats.get(contact["identity"], []), []
+            if not chatids and not datas: continue # for contact
 
             # First pass: add first/last message IDs, combine linked chats
             datamap = {x["id"]: x for x in datas}
@@ -896,14 +901,18 @@ class SkypeDatabase(object):
                     else:
                         data = dict(data, id=newid)
                 datas2.append(data)
+            for chatid in chatids - set(x["id"] for x in datas2):
+                datas2.append({"id": chatid, "identity": contact["identity"], "message_count": 0,
+                               "first_message_timestamp": None, "last_message_timestamp": None})
 
             # Second pass: populate ratios and datetimes
             for data in datas2:
                 data["ratio"] = None
                 chat = chatmap.get(data["id"])
-                if chat and chat.get("message_count") is not None:
+                if chat and chat.get("message_count"):
                     data["ratio"] = 100. * data["message_count"] / chat["message_count"]
                 for n in ["first_message", "last_message"]: # Initialize datetime objects
+                    data[n + "_datetime"] = None
                     if data[n + "_timestamp"]:
                         dt = self.stamp_to_date(data[n + "_timestamp"])
                         data[n + "_datetime"] = dt
@@ -921,7 +930,8 @@ class SkypeDatabase(object):
                 contact["message_count_group"] = sum((x["message_count"] for x in datas2
                                                       if x["id"] != singlechat_id), 0)
             for n, f in zip(["first_message_datetime", "last_message_datetime"], [min, max]):
-                contact[n] = f(d.get(n) for d in datas2) # Combine
+                vals = list(filter(bool, (d.get(n) for d in datas2)))
+                contact[n] = f(vals) if vals else None # Combine
             contact["conversations"] = datas2
 
         if log and contacts:
@@ -1676,9 +1686,11 @@ class SkypeDatabase(object):
             for pcol, rels in CASCADE_DELETES[table].items():
                 delstack.append((table, pcol))
                 for table2, cols2 in rels.items():
+                    if table2.lower() not in self.tables: continue # for table2
                     delstack.extend((table, pcol, table2, col2) for col2 in cols2)
                     for pcol2, rels2 in CASCADE_DELETES.get(table2, {}).items():
                         for table3, cols3 in rels2.items(): # Use table2 as link table to table3
+                            if table3.lower() not in self.tables: continue # for table3
                             for col2, col3 in ((a, b) for a in cols2 for b in cols3):
                                 delstack.append((table, pcol, table2, col2, pcol2, table3, col3))
             # Start cascading deletes depth-first; Calls last at each depth due to cycles
@@ -3207,5 +3219,5 @@ Transfers:
 
 
 Videos:
-  convo_id        foreign key on Calls.id
+  convo_id        foreign key on Conversations.id
 """

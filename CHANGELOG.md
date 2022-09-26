@@ -13,6 +13,7 @@ CHANGELOG
 - add context menu popup to contact list right-click
 - add support for exporting SQL query results as INSERT statements
 - expose chats and contacts lists context menu options under actions button
+- list all chats a contact is participant in, including empty chats
 - convert linefeeds in profile fields to line break tags in contacts HTML export
 - retain sort direction on changing sort column in contacts HTML export
 - export contact list by current applied filter
