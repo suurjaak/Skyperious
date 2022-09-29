@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.09.2022
+@modified    29.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3151,7 +3151,7 @@ class DatabasePage(wx.Panel):
         label_pw     = wx.StaticText(panel1, label="&Password:", name="label_live_pw")
         edit_pw      = wx.TextCtrl(panel1, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER, name="live_pw")
         check_store  = wx.CheckBox(panel1, label="&Remember password")
-        check_login  = wx.CheckBox(panel1, label="Log &in &automatically")
+        check_login  = wx.CheckBox(panel1, label="Log in &automatically")
         check_sync   = wx.CheckBox(panel1, label="Synchronize history &automatically")
         edit_status  = wx.TextCtrl(panel1, size=(-1, 30), style=wx.TE_MULTILINE | wx.TE_NO_VSCROLL | wx.BORDER_NONE)
         button_login = controls.NoteButton(panel1, bmp=images.ButtonLogin.Bitmap)
@@ -3217,7 +3217,7 @@ class DatabasePage(wx.Panel):
         button_sync.Label = "S&ynchronize history in local database"
         button_sync.Note  = "Query Skype online services for new messages and save them in local database."
         button_sync_sel.Label = "Synchronize selec&ted chats"
-        button_sync_sel.Note  = "Select specific chats to synchronize in local database."
+        button_sync_sel.Note  = "Select specific chats to update in local database."
         button_sync_stop.Label = "Stop synchronizing"
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
@@ -3442,64 +3442,6 @@ class DatabasePage(wx.Panel):
         name = ("Open %s " % chats[0]["title_long_lc"]) if len(chats) < 2 \
                else util.plural("chat", chats)
 
-        menu  = wx.Menu()
-        pmenu = wx.Menu()
-        for p in chats[0]["participants"] if len(chats) == 1 else ():
-            item = wx.MenuItem(menu, -1, "%(name)s (%(identity)s)" % p["contact"])
-            pmenu.Append(item)
-            pmenu.Bind(wx.EVT_MENU, functools.partial(self.on_rename_contact, p["contact"]),
-                       id=item.GetId())
-        if fullmenu:
-            item_name   = wx.MenuItem(menu, -1, name)
-        item_copy       = wx.MenuItem(menu, -1, "&Copy %s" %
-                                      util.plural("title", chats, numbers=False))
-        item_copycon    = wx.MenuItem(menu, -1, "Copy %s" %
-                                      util.plural("con&tact name",
-                                      chats[0]["participants"][1:] if len(chats) < 2 else chats,
-                                      numbers=False))
-        item_rename     = wx.MenuItem(menu, -1, "Re&name")
-
-        if fullmenu:
-            item_export = wx.MenuItem(menu, -1, "&Export to %s" %
-                                      util.plural("file", chats, numbers=False))
-            item_exportm = item_datesm = None
-        if fullmenu and export.xlsxwriter and len(chats) > 1:
-            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
-                                                 "with separate sheets")
-            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
-                                                 "with separate sheets")
-        if fullmenu:
-            item_dates   = wx.MenuItem(menu, -1, "Export &date range to file")
-        item_delete  = wx.MenuItem(menu, -1, "Delete from database")
-
-        if fullmenu:
-            boldfont = wx.Font(item_name.Font)
-            boldfont.SetWeight(wx.FONTWEIGHT_BOLD)
-            boldfont.SetFaceName(self.Font.FaceName)
-            boldfont.SetPointSize(self.Font.PointSize)
-            item_name.Font = boldfont
-
-        if fullmenu:
-            menu.Append(item_name)
-            menu.AppendSeparator()
-        menu.Append(item_copy)
-        menu.Append(item_copycon)
-        menu.AppendSeparator()
-        menu.Append(item_rename)
-        item_participants = menu.AppendSubMenu(pmenu, "Ren&ame participant")
-        menu.AppendSeparator()
-        if fullmenu:
-            menu.Append(item_export)
-            if item_exportm: menu.Append(item_exportm)
-            menu.Append(item_dates)
-            if item_datesm: menu.Append(item_datesm)
-            menu.AppendSeparator()
-        menu.Append(item_delete)
-        if fullmenu:
-            item_name.Enabled     = (1 == len(chats))
-        item_rename.Enabled       = (1 == len(chats)) and any(x["name"] == "given_displayname" for x in chat_cols)
-        item_participants.Enabled = (1 == len(chats)) and any(x["name"] == "given_displayname" for x in contact_cols)
-
         def clipboardize(category):
             if "title" == category:
                 text = "\n".join(c["title"] for c in chats)
@@ -3520,11 +3462,84 @@ class DatabasePage(wx.Panel):
         def exporter(do_singlefile=False, do_timerange=False):
             self.on_export_chats(chats, False, do_singlefile, do_timerange)
 
+        def sync(messages=False):
+            mychats, mycontacts = chats, None
+            if not messages:
+                identities = set(p["identity"] for c in chats for p in c["participants"])
+                mycontacts = [x for x in self.contacts if x["identity"] in identities]
+            self.on_live_sync_items(mychats, mycontacts, messages=messages)
+
+        menu, pmenu, smenu = wx.Menu(), wx.Menu(), wx.Menu()
+        for p in chats[0]["participants"] if len(chats) == 1 else ():
+            item = wx.MenuItem(menu, -1, "%(name)s (%(identity)s)" % p["contact"])
+            pmenu.Append(item)
+            pmenu.Bind(wx.EVT_MENU, functools.partial(self.on_rename_contact, p["contact"]),
+                       id=item.GetId())
+        if fullmenu:
+            item_name = wx.MenuItem(menu, -1, name)
+        item_copy     = wx.MenuItem(menu, -1, "&Copy %s" %
+                                    util.plural("title", chats, numbers=False))
+        item_copycon  = wx.MenuItem(menu, -1, "Copy %s" %
+                                    util.plural("con&tact name",
+                                    chats[0]["participants"][1:] if len(chats) < 2 else chats,
+                                    numbers=False))
+        item_rename   = wx.MenuItem(menu, -1, "Re&name")
+
+        item_syncm    = wx.MenuItem(menu, -1, "Update &messages and participants")
+        item_syncp    = wx.MenuItem(menu, -1, "Update &participants")
+        smenu.Append(item_syncm)
+        smenu.Append(item_syncp)
+
+        if fullmenu:
+            item_export = wx.MenuItem(menu, -1, "&Export to %s" %
+                                      util.plural("file", chats, numbers=False))
+            item_exportm = item_datesm = None
+        if fullmenu and export.xlsxwriter and len(chats) > 1:
+            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
+                                                 "with separate sheets")
+            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
+                                                 "with separate sheets")
+        if fullmenu:
+            item_dates   = wx.MenuItem(menu, -1, "Export &date range to file")
+        item_delete      = wx.MenuItem(menu, -1, "Delete from database")
+
+        if fullmenu:
+            boldfont = wx.Font(item_name.Font)
+            boldfont.SetWeight(wx.FONTWEIGHT_BOLD)
+            boldfont.SetFaceName(self.Font.FaceName)
+            boldfont.SetPointSize(self.Font.PointSize)
+            item_name.Font = boldfont
+
+        if fullmenu:
+            menu.Append(item_name)
+            menu.AppendSeparator()
+        menu.Append(item_copy)
+        menu.Append(item_copycon)
+        menu.AppendSeparator()
+        menu.Append(item_rename)
+        item_participants = menu.AppendSubMenu(pmenu, "Ren&ame participant")
+        menu.AppendSeparator()
+        item_sync         = menu.AppendSubMenu(smenu, "Update from on&line")
+        menu.AppendSeparator()
+        if fullmenu:
+            menu.Append(item_export)
+            if item_exportm: menu.Append(item_exportm)
+            menu.Append(item_dates)
+            if item_datesm: menu.Append(item_datesm)
+            menu.AppendSeparator()
+        menu.Append(item_delete)
+        if fullmenu:
+            item_name.Enabled     = (1 == len(chats))
+        item_rename.Enabled       = (1 == len(chats)) and any(x["name"] == "given_displayname" for x in chat_cols)
+        item_participants.Enabled = (1 == len(chats)) and any(x["name"] == "given_displayname" for x in contact_cols)
+
         if fullmenu:
             menu.Bind(wx.EVT_MENU, lambda e: self.load_chat(chats[0]), item_name)
-        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("title"),    item_copy)
-        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("contact"),  item_copycon)
-        menu.Bind(wx.EVT_MENU, lambda e: self.on_rename_chat(chat=chats[0]), item_rename)
+        menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("title"),    item_copy)
+        menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("contact"),  item_copycon)
+        menu.Bind(wx.EVT_MENU,  lambda e: self.on_rename_chat(chat=chats[0]), item_rename)
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(messages=True), id=item_syncm.GetId())
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(), id=item_syncp.GetId())
         if fullmenu:
             menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
             menu.Bind(wx.EVT_MENU, lambda e: exporter(False, True),  item_dates)
@@ -3567,7 +3582,33 @@ class DatabasePage(wx.Panel):
             visited.update(x["id"] for x in chats)
         contact_cols = self.db.get_table_columns("contacts")
 
-        menu = wx.Menu()
+        def clipboardize(category):
+            if "name" == category:
+                text = "\n".join(c["name"] for c in contacts)
+            elif "chat" == category:
+                text = "\n".join(x["title_long"] for x in chats)
+            else:
+                get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if self.db.id != c["identity"] \
+                                       else skypedata.ACCOUNT_FIELD_TITLES
+                text = "\n\n".join("%s%s" % (
+                    "Database account\n" if self.db.id == c["identity"] else "",
+                    "\n".join("%s: %s" % (l, v) for n, l in get_fields(c).items()
+                              for v in [skypedata.format_contact_field(c, n)] if v)
+                ) for c in contacts)
+            if wx.TheClipboard.Open():
+                d = wx.TextDataObject(text)
+                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+        def exporter(do_singlefile=False, do_timerange=False):
+            self.on_export_chats(chats, False, do_singlefile, do_timerange)
+
+        def sync(messages=False):
+            mychats, mycontacts = (chats if messages else None), contacts
+            full = messages and any(self.db.id == x["identity"] for x in contacts)
+            self.on_live_sync_items(mychats, mycontacts, messages=messages, full=full)
+
+        menu  = wx.Menu()
+        smenu = wx.Menu()
         if fullmenu:
             item_name  = wx.MenuItem(menu, -1, ("Open %s " % category) if len(contacts) < 2
                                                else util.plural("contact", contacts))
@@ -3578,6 +3619,8 @@ class DatabasePage(wx.Panel):
         item_copychats = wx.MenuItem(menu, -1, "Copy %s" %
                                      util.plural("c&hat name", chats, numbers=False))
         item_rename    = wx.MenuItem(menu, -1, "Re&name %s" % category)
+        item_syncm     = wx.MenuItem(menu, -1, "Update &messages and profile")
+        item_syncp     = wx.MenuItem(menu, -1, "Update &profile")
         if fullmenu:
             item_export  = wx.MenuItem(menu, -1, "&Export chats")
             item_exportm = item_datesm = None
@@ -3606,6 +3649,10 @@ class DatabasePage(wx.Panel):
         menu.AppendSeparator()
         menu.Append(item_rename)
         menu.AppendSeparator()
+        smenu.Append(item_syncm)
+        smenu.Append(item_syncp)
+        item_sync = menu.AppendSubMenu(smenu, "Update from on&line")
+        menu.AppendSeparator()
         if fullmenu:
             menu.Append(item_export)
             if item_exportm: menu.Append(item_exportm)
@@ -3618,33 +3665,15 @@ class DatabasePage(wx.Panel):
         item_rename.Enabled = (1 == len(contacts)) and any(x["name"] == "given_displayname" for x in contact_cols)
         item_delete.Enabled = ("account" != category)
 
-        def clipboardize(category):
-            if "name" == category:
-                text = "\n".join(c["name"] for c in contacts)
-            elif "chat" == category:
-                text = "\n".join(x["title_long"] for x in chats)
-            else:
-                get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if self.db.id != c["identity"] \
-                                       else skypedata.ACCOUNT_FIELD_TITLES
-                text = "\n\n".join("%s%s" % (
-                    "Database account\n" if self.db.id == c["identity"] else "",
-                    "\n".join("%s: %s" % (l, v) for n, l in get_fields(c).items()
-                              for v in [skypedata.format_contact_field(c, n)] if v)
-                ) for c in contacts)
-            if wx.TheClipboard.Open():
-                d = wx.TextDataObject(text)
-                wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
-
-        def exporter(do_singlefile=False, do_timerange=False):
-            self.on_export_chats(chats, False, do_singlefile, do_timerange)
-
         if fullmenu:
             menu.Bind(wx.EVT_MENU, lambda e: self.load_contact(contacts[0]), item_name)
-        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("name"),    item_copy)
-        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("profile"), item_copyprof)
-        menu.Bind(wx.EVT_MENU, lambda e: clipboardize("chat"),    item_copychats)
-        menu.Bind(wx.EVT_MENU, lambda e: self.on_rename_contact(contact=contacts[0]), item_rename)
-        menu.Bind(wx.EVT_MENU, lambda e: self.on_delete_contacts(contacts=contacts), item_delete)
+        menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("name"),    item_copy)
+        menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("profile"), item_copyprof)
+        menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("chat"),    item_copychats)
+        menu.Bind(wx.EVT_MENU,  lambda e: self.on_rename_contact(contact=contacts[0]), item_rename)
+        menu.Bind(wx.EVT_MENU,  lambda e: self.on_delete_contacts(contacts=contacts),  item_delete)
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(messages=True), id=item_syncm.GetId())
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(),              id=item_syncp.GetId())
         if fullmenu:
             menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
             menu.Bind(wx.EVT_MENU, lambda e: exporter(False, True),  item_dates)
@@ -3719,7 +3748,7 @@ class DatabasePage(wx.Panel):
                 t += " (%s)" % x["identity"]
             x["title"] = t
 
-        dlg = wx.MultiChoiceDialog(self, "Select chats to synchronize:",
+        dlg = wx.MultiChoiceDialog(self, "Select chats to update:",
                                    conf.Title, [x["title"] for x in chats])
         if wx.ID_OK != dlg.ShowModal() or not dlg.GetSelections(): return
 
@@ -3752,134 +3781,152 @@ class DatabasePage(wx.Panel):
         self.worker_live.stop_work()
 
 
+    def on_live_sync_items(self, chats=(), contacts=(), messages=True, full=False):
+        """
+        Opens online page, logs in if not logged in, and synchronizes specified items from live.
+
+        @param   chats     list of chats to update
+        @param   contacts  list of contacts to update profiles for
+        @param   messages  whether to sync chat messages if chats, or only chat participant profiles
+        @param   full      whether to ignore given chats and do full sync of all chats available,
+                           by recency, if syncing chat messages
+        """
+        if not chats and not contacts: return
+        self.notebook.SetSelection(self.pageorder[self.page_live])
+        if not self.db.live.is_logged_in() and conf.Login.get(self.db.filename, {}).get("password"):
+            pwd = util.deobfuscate(conf.Login[self.db.filename]["password"])
+            self.db.live.login(password=pwd)
+            self.on_live_login_result({})
+        if not self.db.live.is_logged_in():
+            self.edit_pw.SetFocus()
+            return
+
+        self.gauge_sync.Pulse()
+        self.button_sync.Disable()
+        self.button_sync_sel.Disable()
+        self.button_sync_stop.Enable()
+        self.gauge_sync.ContainingSizer.Layout()
+
+        account  = next((c for c in contacts or [] if c["identity"] == self.db.id), None)
+        contacts = [c for c in contacts or [] if c["identity"] != self.db.id]
+        if account and not full:
+            self.worker_live.work({"action": "account"})
+        if contacts:
+            self.worker_live.work({"action": "contacts", "contacts": [x["identity"] for x in contacts]})
+        if full:
+            self.worker_live.work({"action": "populate"})
+        elif chats and messages:
+            self.worker_live.work({"action": "history", "chats": [x["identity"] for x in chats]})
+        elif chats:
+            self.worker_live.work({"action": "chats", "chats": [x["identity"] for x in chats]})
+
+
     def on_live_result(self, result=None, **kwargs):
         """Callback for workers.LiveThread results."""
 
         def after(result):
             if not self or not result or "action" not in result: return
 
-            if "populate" == result["action"]:
+            if result.get("error") or result.get("done"):
+                self.on_live_work_done(result)
+            elif "populate" == result["action"]:
                 plabel, slabel = None, None
-                if "error" in result:
-                    err = "Error syncing from Skype online service:\n\n%s" % result["error"]
-                    logger.error(err)
-                    plabel = "Error syncing from Skype online service."
-                    slabel = err
-                    self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
-                    self.button_sync.Enable()
-                    self.button_sync_sel.Enable()
-                    self.button_sync_stop.Disable()
-                    wx.Bell()
-                    self.update_info_page()
-                elif result.get("done"):
-                    self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
-                    if result.get("stop"):
-                        plabel = slabel = "Stopped by user."
-                    else:
-                        plabel = slabel = "Synchronization complete."
-                        self.gauge_sync.Value = 100
-                    self.button_sync.Enable()
-                    self.button_sync_sel.Enable()
-                    self.button_sync_stop.Disable()
-                    if not self.get_unsaved_grids(): self.on_refresh_tables()
-                    wx.Bell()
-                    self.update_info_page()
-                else:
-                    plabel = u"Synchronizing %s" % result["table"]
-                    if "messages" == result["table"] and result.get("chat"):
-                        chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
-                        title = chat["title_long_lc"] if chat else result["chat"]
-                        if len(title) > 35:
-                            title = title[:35] + ".."
-                            if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
-                        plabel += " in %s" % title
 
-                    if result.get("count"):
-                        clabel = ", %s processed" % result["count"]
-                        for k in "new", "updated":
-                            if result.get(k): clabel += ", %s %s" % (result[k], k)
-                        plabel += clabel + "."
-                    elif result.get("start") and "messages" != result["table"] and self.worker_live.is_working():
-                        plabel = slabel = "Synchronizing messages.."
+                plabel = u"Synchronizing %s" % result["table"]
+                if "messages" == result["table"] and result.get("chat"):
+                    chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
+                    title = chat["title_long_lc"] if chat else result["chat"]
+                    if len(title) > 35:
+                        title = title[:35] + ".."
+                        if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
+                    plabel += " in %s" % title
 
-                    if result.get("end"):
-                        slabel = "Synchronized %s" % result["table"]
-                        if "chats" == result["table"]:
-                            slabel = "Synchronized %s%s: %s in total%s." % (
-                                util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
-                                " (%s new)" % result["new"] if result["new"] else "",
-                                util.plural("new message", result["message_count_new"], sep=","),
-                                ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
-                            )
-                            if result["contact_count_new"] or result["contact_count_updated"]:
-                                slabel += "\n%s." % ", ".join(filter(bool, [
-                                    util.plural("new contact", result["contact_count_new"], sep=",")
-                                    if result["contact_count_new"] else "",
-                                    util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
-                                    if result["contact_count_updated"] else "",
-                                ]))
+                if result.get("count"):
+                    clabel = ", %s processed" % result["count"]
+                    for k in "new", "updated":
+                        if result.get(k): clabel += ", %s %s" % (result[k], k)
+                    plabel += clabel + "."
+                elif result.get("start") and "chats" == result["table"] and "cidentity" in result:
+                    plabel = slabel = "Synchronizing messages.."
 
-                            self.chats = self.db.get_conversations(reload=True, log=False)
-                            self.contacts = self.db.get_contacts(reload=True)
+                if result.get("end"):
+                    slabel = "Synchronized %s" % result["table"]
+                    if "chats" == result["table"]:
+                        slabel = "Synchronized %s%s: %s in total%s." % (
+                            util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
+                            " (%s new)" % result["new"] if result["new"] else "",
+                            util.plural("new message", result["message_count_new"], sep=","),
+                            ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
+                        )
+                        if result["contact_count_new"] or result["contact_count_updated"]:
+                            slabel += "\n%s." % ", ".join(filter(bool, [
+                                util.plural("new contact", result["contact_count_new"], sep=",")
+                                if result["contact_count_new"] else "",
+                                util.plural("contact", result["contact_count_updated"], sep=",") + " updated"
+                                if result["contact_count_updated"] else "",
+                            ]))
 
-                            def after2():
-                                """Populate statistics for all chats after completion."""
-                                if not self: return
-                                contacts = [self.db.account] + self.contacts
-                                self.db.get_conversations_stats(self.chats)
-                                self.list_chats.Populate(self.chats)
-                                self.db.get_contacts_stats(contacts, self.chats, log=False)
-                                self.list_contacts.Populate(contacts)
-                                if self.contact:
-                                    self.contact = next((x for x in contacts
-                                                         if x["identity"] == self.contact["identity"]), None)
+                        self.chats = self.db.get_conversations(reload=True, log=False)
+                        self.contacts = self.db.get_contacts(reload=True)
+
+                        def after2():
+                            """Populate statistics for all chats after completion."""
+                            if not self: return
+                            contacts = [self.db.account] + self.contacts
+                            self.db.get_conversations_stats(self.chats)
+                            self.list_chats.Populate(self.chats)
+                            self.db.get_contacts_stats(contacts, self.chats, log=False)
+                            self.list_contacts.Populate(contacts)
+                            if self.contact:
+                                self.contact = next((x for x in contacts
+                                                     if x["identity"] == self.contact["identity"]), None)
+                            self.load_contact(self.contact)
+
+                        wx.CallAfter(after2)
+
+                    if "messages" == result["table"]:
+                        slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
+
+                        if chat and (result.get("new") or result.get("updated")):
+                            row = dict(title=chat["title"], identity=chat["identity"],
+                                       first_message_datetime=result["first"],
+                                       last_message_datetime=result["last"],
+                                       message_count=result["new"] + result["updated"])
+                            self.list_chats_sync.AppendRow(row)
+                            self.list_chats_sync.ResetColumnWidths()
+                            chat["message_count" ] = (chat["message_count"] or 0) + result["new"]
+                            chat["first_message_datetime"] = min(chat["first_message_datetime"] or result["first"], result["first"])
+                            chat["last_message_datetime"]  = max(chat["last_message_datetime"]  or result["first"], result["last"])
+                            chat["last_activity_datetime"] = max(chat["last_activity_datetime"] or result["last"],  result["last"])
+                            for k in "first_message", "last_message", "last_activity":
+                                chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
+                            self.list_chats.Populate(self.chats)
+
+                        if not any(result[k] for k in ("new", "updated")):
+                            slabel = None
+                        else:
+                            slabel += ": %s new" % result["new"]
+                            if result["updated"]: slabel += ", %s updated" % result["updated"]
+                            slabel += "."
+
+                elif not result.get("start"):
+                    if "chats" == result["table"] and result.get("chat"):
+                        # Inserted or updated a chat: load new contacts, if any
+                        plabel = ""
+
+                        chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
+                        if not chat:
+                            cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
+                            self.chats.extend(cc)
+                            if cc: chat = cc[0]
+                        if chat:
+                            ids = [x["identity"] for x in chat["participants"]]
+                            newids = set(ids) - set(x["identity"] for x in self.contacts)
+                            newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
+                            if newcontacts:
+                                self.contacts.extend(newcontacts)
+                                self.list_contacts.Populate([self.db.account] + self.contacts)
                                 self.load_contact(self.contact)
-
-                            wx.CallAfter(after2)
-
-                        if "messages" == result["table"]:
-                            slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
-
-                            if chat and (result.get("new") or result.get("updated")):
-                                row = dict(title=chat["title"], identity=chat["identity"],
-                                           first_message_datetime=result["first"],
-                                           last_message_datetime=result["last"],
-                                           message_count=result["new"] + result["updated"])
-                                self.list_chats_sync.AppendRow(row)
-                                self.list_chats_sync.ResetColumnWidths()
-                                chat["message_count" ] = (chat["message_count"] or 0) + result["new"]
-                                chat["first_message_datetime"] = min(chat["first_message_datetime"] or result["first"], result["first"])
-                                chat["last_message_datetime"]  = max(chat["last_message_datetime"]  or result["first"], result["last"])
-                                chat["last_activity_datetime"] = max(chat["last_activity_datetime"] or result["last"],  result["last"])
-                                for k in "first_message", "last_message", "last_activity":
-                                    chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
-                                self.list_chats.Populate(self.chats)
-
-                            if not any(result[k] for k in ("new", "updated")):
-                                slabel = None
-                            else:
-                                slabel += ": %s new" % result["new"]
-                                if result["updated"]: slabel += ", %s updated" % result["updated"]
-                                slabel += "."
-
-                    elif not result.get("start"):
-                        if "chats" == result["table"] and result.get("chat"):
-                            # Inserted or updated a chat: load new contacts, if any
-                            plabel = ""
-
-                            chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
-                            if not chat:
-                                cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
-                                self.chats.extend(cc)
-                                if cc: chat = cc[0]
-                            if chat:
-                                ids = [x["identity"] for x in chat["participants"]]
-                                newids = set(ids) - set(x["identity"] for x in self.contacts)
-                                newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
-                                if newcontacts:
-                                    self.contacts.extend(newcontacts)
-                                    self.list_contacts.Populate([self.db.account] + self.contacts)
-                                    self.load_contact(self.contact)
 
                 if plabel:
                     self.label_sync_progress.Label = plabel
@@ -3888,33 +3935,65 @@ class DatabasePage(wx.Panel):
                     self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
                 self.gauge_sync.ContainingSizer.Layout()
             elif "login"  == result["action"]:
-                for c in self.panel_login.Children:
-                    if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Enable()
-                if "error" in result:
-                    logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
-                    self.edit_login_status.Value = result.get("error_short", result["error"])
-                    self.button_user.Enable()
-                    self.button_login.Enable()
-                    self.label_login_fail.Show()
-                    self.label_login_fail.ContainingSizer.Layout()
-                else:
-                    self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
-                    self.button_login.Disable()
-                    self.label_login_fail.Hide()
-                    for c in controls.get_controls(self.panel_sync): c.Enable()
-                    self.button_sync_stop.Disable()
-                    if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
-                self.check_login_auto.Enable(self.check_login_store.Value)
-                self.check_login_sync.Enable(self.check_login_auto .Value)
+                self.on_live_login_result(result)
             elif "info" == result["action"] and "message" in result:
                 self.label_sync_progress.Label = result["message"] or ""
                 if "index" in result and "count" in result:
                     percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
                     self.gauge_sync.Value = percent
                 self.gauge_sync.ContainingSizer.Layout()
+            elif "log" == result["action"] and result.get("message"):
+                self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + result["message"]
+                self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
+
+
+    def on_live_login_result(self, result):
+        """Handler for live login result, updates UI."""
+        for c in self.panel_login.Children:
+            if c is self.edit_pw or isinstance(c, wx.CheckBox): c.Enable()
+        if "error" in result:
+            logger.error('Error logging in to Skype as "%s":\n\n%s', self.db.username, result["error"])
+            self.edit_login_status.Value = result.get("error_short", result["error"])
+            self.button_user.Enable()
+            self.button_login.Enable()
+            self.label_login_fail.Show()
+            self.label_login_fail.ContainingSizer.Layout()
+        else:
+            self.edit_login_status.Value = 'Logged in to Skype as "%s"' % self.db.username
+            self.button_login.Disable()
+            self.label_login_fail.Hide()
+            for c in controls.get_controls(self.panel_sync): c.Enable()
+            self.button_sync_stop.Disable()
+            if result.get("opts", {}).get("sync"): wx.CallAfter(self.on_live_sync)
+        self.check_login_auto.Enable(self.check_login_store.Value)
+        self.check_login_sync.Enable(self.check_login_auto .Value)
+
+
+    def on_live_work_done(self, result=None):
+        """Handler for live sync completion, updates UI."""
+        result = result or {}
+        self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
+        if result.get("error"):
+            plabel = "Error syncing from Skype online service."
+            slabel = "%s:\n\n%s" % (plabel, result["error"])
+        elif result.get("stop"):
+            plabel = slabel = "Stopped by user."
+        else:
+            plabel = slabel = "Synchronization complete."
+            self.gauge_sync.Value = 100
+        self.label_sync_progress.Label = plabel
+        self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
+        self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+        self.gauge_sync.ContainingSizer.Layout()
+        self.button_sync.Enable()
+        self.button_sync_sel.Enable()
+        self.button_sync_stop.Disable()
+        if not self.get_unsaved_grids(): self.on_refresh_tables()
+        wx.Bell()
+        self.update_info_page()
 
 
     def on_check_integrity(self, event):
@@ -6193,7 +6272,7 @@ class DatabasePage(wx.Panel):
         msg = "Are you sure you want to delete %s %s?\n\n  %s" % (
               "these" if len(chats) > 1 else "this",
               util.plural("chat", chats, single=""),
-              "\n  ".join(c["title_long"] for c in chats))
+              util.ellipsize("\n  ".join(c["title_long"] for c in chats), 500))
         if wx.OK != wx.MessageBox(msg, conf.Title, wx.ICON_INFORMATION | wx.OK | wx.CANCEL): return
 
         if wx.OK != wx.MessageBox(
@@ -6307,7 +6386,7 @@ class DatabasePage(wx.Panel):
             "This will delete their 1:1 %s, all their other messages, "
             "and any other related data." % (
                 util.plural("contact", contacts, single="this"),
-                "\n".join("%s (%s)" % (c["name"], c["identity"]) for c in contacts),
+                util.ellipsize("\n".join("%s (%s)" % (c["name"], c["identity"]) for c in contacts), 500),
                 util.plural("chat", contacts, numbers=False),
             ), conf.Title, wx.ICON_INFORMATION | wx.OK | wx.CANCEL
         ): return
