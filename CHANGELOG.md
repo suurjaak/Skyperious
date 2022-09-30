@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.4, 2022-09-29
+5.4, 2022-09-30
 ---------------
 - add database account as one entry among contacts in contacts-tab
 - add option to delete contact from database
@@ -10,6 +10,7 @@ CHANGELOG
 - add configuration flag to cache shared media on disk (issue #112)
 - add configuration flag to auto-open exported files
 - add 1:1 and group chat message counts to contact details
+- add text size selection to chat history context menu popup
 - add context menu popup to contact list right-click
 - add support for exporting SQL query results as INSERT statements
 - expose chats and contacts lists context menu options under actions button

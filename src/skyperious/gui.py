@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.09.2022
+@modified    30.09.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7961,6 +7961,22 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
     TEXT_NO_MESSAGES = "\nNo messages to show."
 
+    """STC zoom levels to effective text size multipliers."""
+    ZOOM_PERCENTS = {
+         -8:  .25, # Lower values displayed with same size
+         -5:  .50,
+         -3:  .80, # Approximate
+          0: 1.00,
+          2: 1.20, # Approximate
+          5: 1.50,
+          7: 1.75,
+         10: 2.00, # Approximate
+         15: 2.50,
+         20: 3.00,
+    }
+    ZOOM_PERCENT_MAX = 10.0
+
+
     def __init__(self, *args, **kwargs):
         controls.SearchableStyledTextCtrl.__init__(self, *args, **kwargs)
         self.SetUndoCollection(False)
@@ -8000,6 +8016,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self.SetMarginWidth(1, 0) # Hide left margin
         self.SetReadOnly(True)
         self.SetStyleSpecs()
+        self._textheight_zoom0 = self._stc.TextHeight(0)
 
         self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
         self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
@@ -8040,6 +8057,25 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
     def SetDatabasePage(self, page):
         self._page = page
+
+
+    def GetZoomPercent(self):
+        """Returns current text zoom level, as fractional percentage, e.g. 1.0 is default."""
+        percent = self.ZOOM_PERCENTS.get(self._stc.Zoom)
+        if percent is None:
+            percent = float(self._stc.TextHeight(0)) / self._textheight_zoom0
+        return percent
+    def SetZoomPercent(self, value):
+        """Sets current text zoom level, as fractional percentage, e.g. 1.0 is default."""
+        value = float(max(min(self.ZOOM_PERCENTS.values()), min(value, self.ZOOM_PERCENT_MAX)))
+        zoom = next((k for k, v in self.ZOOM_PERCENTS.items() if v == value), None)
+        if zoom is None and value < 1:
+            zoom = int(10 * value) - 10  # 0.625 to -4
+        elif zoom is None:
+            zoom = int(10 * (value - 1)) # 2.125 to 11
+        self._stc.Zoom = zoom
+    ZoomPercent = property(GetZoomPercent, SetZoomPercent, doc=
+    """Current text zoom level, as fractional percentage, defaults to 1.0 (100%).""")
 
 
     def GetUrlAtPosition(self, pos):
@@ -8126,6 +8162,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
                 guibase.status("Copied message #%s to clipboard." % msg["id"])
             def on_selectall(event): self._stc.SelectAll()
+            def on_textsize(direction=None, level=None):
+                def do_textsize(event):
+                    if level is not None: self.ZoomPercent = level
+                    else: self._stc.Zoom = (self._stc.Zoom + direction) if direction else 0
+                return do_textsize
             def on_search(event):
                 self.SetSearchBarVisible()
                 self._edit.SetFocus()
@@ -8153,7 +8194,27 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
 
             item_msg = wx.MenuItem(menu, -1, "Copy &message")
             item_select = wx.MenuItem(menu, -1, "Select &all")
-            menu.Append(item_msg), menu.Append(item_select)
+            menu.Append(item_msg)
+            menu.Append(item_select)
+
+            menu_size = wx.Menu()
+            item_larger  = wx.MenuItem(menu_size, -1, "&Larger\t\uFF0B")  # Full width plus
+            item_smaller = wx.MenuItem(menu_size, -1, "&Smaller\t\uFF0D") # Full width minus
+            item_reset   = wx.MenuItem(menu_size, -1, "&Reset")
+            menu_size.Append(item_larger)
+            menu_size.Append(item_smaller)
+            menu_size.Append(item_reset)
+            menu_size.AppendSeparator()
+            curlevel = self.ZoomPercent
+            for level in sorted(set(self.ZOOM_PERCENTS.values()) | {curlevel}):
+                text = util.round_float(level * 100, 3) + "%"
+                item = wx.MenuItem(menu_size, -1, text, kind=wx.ITEM_CHECK)
+                menu_size.Append(item)
+                if level == curlevel: item.Check()
+                menu.Bind(wx.EVT_MENU, on_textsize(level=level), id=item.GetId())
+            item_smaller.Enabled = (curlevel > min(self.ZOOM_PERCENTS.values()))
+            item_larger .Enabled = (curlevel < self.ZOOM_PERCENT_MAX)
+            item_size = menu.AppendSubMenu(menu_size, "&Text size")
             menu.AppendSeparator()
 
             item_search = wx.MenuItem(menu, -1, "&Search..")
@@ -8194,6 +8255,9 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             if not self._auto_retrieve: item_filter.Enabled = False
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
+            menu.Bind(wx.EVT_MENU, on_textsize(+1),          id=item_larger.GetId())
+            menu.Bind(wx.EVT_MENU, on_textsize(-1),          id=item_smaller.GetId())
+            menu.Bind(wx.EVT_MENU, on_textsize(),            id=item_reset.GetId())
             menu.Bind(wx.EVT_MENU, on_search,                id=item_search.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("day"),    id=item_day.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("week"),   id=item_week.GetId())
