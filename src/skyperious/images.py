@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    03.07.2022
+@modified    30.09.2022
 ------------------------------------------------------------------------------
 """
 try:
@@ -2595,6 +2595,18 @@ ToolbarTabs = PyEmbeddedImage(
     "KMprVVUsz3OuYGBJluU33D7+d65gYEmSpPeiKFgURVzBwJIoikaapiwMQ65gYEkQBBOfv9vt"
     "uIKBpeVy+ZFlGYvjmCsYWJrP54+LxeLzP8HSeGZjN2O3nMHMvgFTmvUJKTInOAAAAABJRU5E"
     "rkJggg=="
+)
+
+
+"""Toolbar icon for chat history text size on chat page."""
+ToolbarText = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABPElEQVQ4y82Sz0pCURDGv5lz"
+    "vAkXDC16hKA2takHCP8FYkSrINCeI4h6hPaRVpt2EYJaq1wUrYPKVwiCaFGY9zjTwktYqAkt"
+    "apbzDb/D9+MAfz00KLCZ8o6Ibg+7IcKDHRSK6Kyokmf5WoE315F5VUxGDDdACFxHFkQww4MA"
+    "zLhkpis/apNBvZhSxQ0AGKbVoF5MGaY9w1SlkcsmDyoActGISbRqhefPqt5yOSuC6X5yjKGL"
+    "VrXQHMa1gZOKKvq6EKUKgPwwAIe97v2oXQvN3o773joA6AjNrGHKW8OPry13BwCqeHo52zjx"
+    "suV3BZryE8Cdb9ZcV9JYb9CuF09Hccu//YkMAH7uKEZEh+FuzmZKu71HJl3aArAIAG0n+7GV"
+    "48QXADPFAc2GuwkAyW8PLQGY6orVdDuQOP7NfABbtWX03q98gQAAAABJRU5ErkJggg=="
 )
 
 

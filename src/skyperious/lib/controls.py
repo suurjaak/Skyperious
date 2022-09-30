@@ -4863,6 +4863,18 @@ def get_key_state(keycode):
     except Exception: return False  # wx3 can raise for non-modifier keys in Linux non-X11 backends
 
 
+def get_tool_rect(toolbar, id_tool):
+    """Returns position and size of a toolbar tool by ID."""
+    bmpsize, toolsize, packing = toolbar.ToolBitmapSize, toolbar.ToolSize, toolbar.ToolPacking
+    result = wx.Rect(0, 0, *toolsize)
+    for i in range(toolbar.GetToolPos(id_tool)):
+        tool = toolbar.GetToolByPos(i)
+        result.x += packing + (1 if tool.IsSeparator() else bmpsize[0] if tool.IsButton()
+                               else tool.Control.Size[0])
+
+    return result
+
+
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):
     """
     Returns text wrapped to pixel width according to given DC.

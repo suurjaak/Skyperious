@@ -2552,6 +2552,9 @@ class DatabasePage(wx.Panel):
         tb.AddCheckTool(wx.ID_ZOOM_100, "",
                         bitmap1=images.ToolbarMaximize.Bitmap,
                         shortHelp="Maximize chat panel  (Alt-M)")
+        tb.AddTool     (wx.ID_SETUP, "",
+                        bitmap=images.ToolbarText.Bitmap,
+                        shortHelp="Set chat history text size")
         tb.AddCheckTool(wx.ID_PROPERTIES, "",
                         bitmap1=images.ToolbarStats.Bitmap,
                         shortHelp="Toggle chat statistics  (Alt-I)")
@@ -2560,6 +2563,7 @@ class DatabasePage(wx.Panel):
         tb.Realize()
         self.Bind(wx.EVT_TOOL, self.on_toggle_timeline, id=wx.ID_JUMP_TO)
         self.Bind(wx.EVT_TOOL, self.on_toggle_maximize, id=wx.ID_ZOOM_100)
+        self.Bind(wx.EVT_TOOL, self.on_menu_size_chat,  id=wx.ID_SETUP)
         self.Bind(wx.EVT_TOOL, self.on_toggle_stats,    id=wx.ID_PROPERTIES)
         self.Bind(wx.EVT_TOOL, self.on_toggle_filter,   id=wx.ID_MORE)
 
@@ -5507,6 +5511,13 @@ class DatabasePage(wx.Panel):
         self.timeline_timer = wx.CallLater(200, do_highlight)
 
 
+    def on_menu_size_chat(self, event):
+        """Handler for clicking to change history text size, opens popup menu."""
+        menu = self.stc_history.MakeZoomMenu()
+        rect = controls.get_tool_rect(event.EventObject, event.Id)
+        event.EventObject.PopupMenu(menu, rect.Left, rect.Height)
+
+
     def show_stats(self, show=True):
         """Shows or hides the statistics window."""
         html, stc = self.html_stats, self.stc_history
@@ -8094,6 +8105,37 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         return self._stc.GetTextRange(*startstop), startstop
 
 
+    def MakeZoomMenu(self):
+        """Returns wx.Menu populated with text zoom change options."""
+        def on_textsize(direction=None, level=None):
+            def do_textsize(event):
+                if level is not None: self.ZoomPercent = level
+                else: self._stc.Zoom = (self._stc.Zoom + direction) if direction else 0
+            return do_textsize
+
+        menu = wx.Menu()
+        item_larger  = wx.MenuItem(menu, -1, "&Larger\t\uFF0B")  # Full width plus
+        item_smaller = wx.MenuItem(menu, -1, "&Smaller\t\uFF0D") # Full width minus
+        item_reset   = wx.MenuItem(menu, -1, "&Reset")
+        menu.Append(item_larger)
+        menu.Append(item_smaller)
+        menu.Append(item_reset)
+        menu.AppendSeparator()
+        curlevel = self.ZoomPercent
+        for level in sorted(set(self.ZOOM_PERCENTS.values()) | {curlevel}):
+            text = util.round_float(level * 100, 4) + "%"
+            item = wx.MenuItem(menu, -1, text, kind=wx.ITEM_CHECK)
+            menu.Append(item)
+            if level == curlevel: item.Check()
+            menu.Bind(wx.EVT_MENU, on_textsize(level=level), id=item.GetId())
+        item_smaller.Enabled = (curlevel > min(self.ZOOM_PERCENTS.values()))
+        item_larger .Enabled = (curlevel < self.ZOOM_PERCENT_MAX)
+        menu.Bind(wx.EVT_MENU, on_textsize(+1),          id=item_larger.GetId())
+        menu.Bind(wx.EVT_MENU, on_textsize(-1),          id=item_smaller.GetId())
+        menu.Bind(wx.EVT_MENU, on_textsize(),            id=item_reset.GetId())
+        return menu
+
+
     def OnZoom(self, event):
         """Handler for changing zoom level via ctrl+wheel, saves config."""
         conf.HistoryZoom = self.ZoomPercent
@@ -8170,11 +8212,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
                 clipboardize(t.expand({"m": msg, "parser": self._parser}))
                 guibase.status("Copied message #%s to clipboard." % msg["id"])
             def on_selectall(event): self._stc.SelectAll()
-            def on_textsize(direction=None, level=None):
-                def do_textsize(event):
-                    if level is not None: self.ZoomPercent = level
-                    else: self._stc.Zoom = (self._stc.Zoom + direction) if direction else 0
-                return do_textsize
             def on_search(event):
                 self.SetSearchBarVisible()
                 self._edit.SetFocus()
@@ -8204,25 +8241,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             item_select = wx.MenuItem(menu, -1, "Select &all")
             menu.Append(item_msg)
             menu.Append(item_select)
-
-            menu_size = wx.Menu()
-            item_larger  = wx.MenuItem(menu_size, -1, "&Larger\t\uFF0B")  # Full width plus
-            item_smaller = wx.MenuItem(menu_size, -1, "&Smaller\t\uFF0D") # Full width minus
-            item_reset   = wx.MenuItem(menu_size, -1, "&Reset")
-            menu_size.Append(item_larger)
-            menu_size.Append(item_smaller)
-            menu_size.Append(item_reset)
-            menu_size.AppendSeparator()
-            curlevel = self.ZoomPercent
-            for level in sorted(set(self.ZOOM_PERCENTS.values()) | {curlevel}):
-                text = util.round_float(level * 100, 3) + "%"
-                item = wx.MenuItem(menu_size, -1, text, kind=wx.ITEM_CHECK)
-                menu_size.Append(item)
-                if level == curlevel: item.Check()
-                menu.Bind(wx.EVT_MENU, on_textsize(level=level), id=item.GetId())
-            item_smaller.Enabled = (curlevel > min(self.ZOOM_PERCENTS.values()))
-            item_larger .Enabled = (curlevel < self.ZOOM_PERCENT_MAX)
-            item_size = menu.AppendSubMenu(menu_size, "&Text size")
+            item_size = menu.AppendSubMenu(self.MakeZoomMenu(), "&Text size")
             menu.AppendSeparator()
 
             item_search = wx.MenuItem(menu, -1, "&Search..")
@@ -8263,9 +8282,6 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             if not self._auto_retrieve: item_filter.Enabled = False
             menu.Bind(wx.EVT_MENU, on_selectall,             id=item_select.GetId())
             menu.Bind(wx.EVT_MENU, on_copymsg,               id=item_msg.GetId())
-            menu.Bind(wx.EVT_MENU, on_textsize(+1),          id=item_larger.GetId())
-            menu.Bind(wx.EVT_MENU, on_textsize(-1),          id=item_smaller.GetId())
-            menu.Bind(wx.EVT_MENU, on_textsize(),            id=item_reset.GetId())
             menu.Bind(wx.EVT_MENU, on_search,                id=item_search.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("day"),    id=item_day.GetId())
             menu.Bind(wx.EVT_MENU, on_filter_date("week"),   id=item_week.GetId())
