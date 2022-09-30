@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev26"
+Version = "5.4.dev27"
 VersionDate = "30.09.2022"
 
 if getattr(sys, "frozen", False):
@@ -364,7 +364,7 @@ SharedFileAutoDownload = True
 SharedImageAutoDownload = True
 
 """Cache downloaded shared files and media in user directory, for faster repeated exports."""
-SharedContentUseCache = True
+SharedContentUseCache = False
 
 """
 Earliest message date to download shared content from Skype online service.
