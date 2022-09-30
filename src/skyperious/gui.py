@@ -8017,11 +8017,13 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         self.SetReadOnly(True)
         self.SetStyleSpecs()
         self._textheight_zoom0 = self._stc.TextHeight(0)
+        self.SetZoomPercent(conf.HistoryZoom)
 
         self._stc.Bind(wx.stc.EVT_STC_HOTSPOT_CLICK, self.OnUrl)
         self._stc.Bind(wx.EVT_RIGHT_UP, self.OnMenu)
         self._stc.Bind(wx.EVT_CONTEXT_MENU, self.OnMenu)
         self._stc.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.OnSysColourChange)
+        self._stc.Bind(wx.stc.EVT_STC_ZOOM, self.OnZoom)
         # Hide caret
         self.SetCaretForeground(conf.BgColour), self.SetCaretWidth(0)
 
@@ -8074,6 +8076,7 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         elif zoom is None:
             zoom = int(10 * (value - 1)) # 2.125 to 11
         self._stc.Zoom = zoom
+        conf.HistoryZoom = value
     ZoomPercent = property(GetZoomPercent, SetZoomPercent, doc=
     """Current text zoom level, as fractional percentage, defaults to 1.0 (100%).""")
 
@@ -8089,6 +8092,11 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         url_range[1] += 1
         startstop = url_range[-1], url_range[1]
         return self._stc.GetTextRange(*startstop), startstop
+
+
+    def OnZoom(self, event):
+        """Handler for changing zoom level via ctrl+wheel, saves config."""
+        conf.HistoryZoom = self.ZoomPercent
 
 
     def OnSysColourChange(self, event):

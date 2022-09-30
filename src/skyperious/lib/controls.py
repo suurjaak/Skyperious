@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.07.2022
+@modified    30.09.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1278,7 +1278,7 @@ class Patch(object):
 class PropertyDialog(wx.Dialog):
     """
     Dialog for displaying an editable property grid. Supports strings,
-    integers, booleans, and wx classes like wx.Size interpreted as tuples.
+    integers, floats, booleans, and wx classes like wx.Size interpreted as tuples.
     """
 
 
@@ -1401,7 +1401,7 @@ class PropertyDialog(wx.Dialog):
         """Returns value in type expected, or None on failure."""
         try:
             result = typeclass(value)
-            if isinstance(result, integer_types) and result < 0:
+            if isinstance(result, integer_types + (float, )) and result < 0:
                 raise ValueError() # Reject negative numbers
             isinstance(result, string_types) and result.strip()[0] # Reject empty
             return result
@@ -1415,7 +1415,8 @@ class PropertyDialog(wx.Dialog):
         if isinstance(value, tuple):
             value = tuple(str(x) if isinstance(x, text_type) else x for x in value)
         return "" if value is None else value \
-               if isinstance(value, string_types + (bool, )) else text_type(value)
+               if isinstance(value, string_types + (bool, )) else \
+               str(round(value, 4)) if isinstance(value, float) else text_type(value)
 
 
 

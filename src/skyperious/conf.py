@@ -24,7 +24,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.dev23"
+Version = "5.4.dev24"
 VersionDate = "30.09.2022"
 
 if getattr(sys, "frozen", False):
@@ -57,8 +57,8 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
     "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
-    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "LogSQL",
-    "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "HistoryZoom",
+    "LogSQL", "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
     "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
@@ -227,6 +227,9 @@ HistoryFontName = "Tahoma"
 
 """Font size in chat history."""
 HistoryFontSize = 10
+
+"""Text zoom level in chat history, defaults to 1.0 (100%)."""
+HistoryZoom = 1.0
 
 """Window background colour."""
 BgColour = "#FFFFFF"
