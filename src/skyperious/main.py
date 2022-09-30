@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.09.2022
+@modified    27.09.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -112,6 +112,10 @@ ARGUMENTS = {
               "action": "store_true", "required": False,
               "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
+             {"args": ["--media-cache"], "dest": "media_cache",
+              "action": "store_true", "required": False,
+              "help": "cache downloaded media in user directory, "
+                      "for faster repeated exports"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
@@ -755,7 +759,7 @@ def run_create(filenames, input=None, username=None, password=None,
 
 
 def run_export(filenames, format, output_dir, chatnames, authornames,
-               start_date, end_date, media_folder, ask_password, store_password):
+               start_date, end_date, media_folder, media_cache, ask_password, store_password):
     """Exports the specified databases in specified format."""
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     is_xlsx_single = ("xlsx_single" == format)
@@ -814,6 +818,7 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                         timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
             if media_folder: opts["media_folder"] = True
+            if media_cache:  opts["media_cache"] = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
@@ -1103,7 +1108,7 @@ def run(nogui=False):
     elif "export" == arguments.command:
         run_export(arguments.FILE, arguments.type, arguments.output_dir,
                    arguments.chat, arguments.author, arguments.start_date,
-                   arguments.end_date, arguments.media_folder,
+                   arguments.end_date, arguments.media_folder, arguments.media_cache,
                    arguments.ask_password, arguments.store_password)
     elif "contacts" == arguments.command:
         run_contacts(arguments.FILE, arguments.type, arguments.output,

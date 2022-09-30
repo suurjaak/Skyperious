@@ -246,8 +246,9 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                        .html|.txt determines file format
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
-    @param   opts      export options dictionary, as {"media_folder": true}
-                       if saving images to subfolder in HTML export
+    @param   opts      export options dictionary, as {
+                         ?"media_cache": use local download cache,
+                         ?"media_folder": save images to subfolder in HTML export}
     @return            (number of chats exported, number of messages exported)
     """
     count, message_count, opts = 0, 0, opts or {}
@@ -255,8 +256,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
     try:
         is_html  = filename.lower().endswith(".html")
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
-        namespace = {"db": db, "chat": chat, "messages": messages,
-                     "parser": parser}
+        namespace = {"db": db, "chat": chat, "messages": messages, "parser": parser}
         if opts.get("media_folder"):
             filedir, basename = os.path.split(filename)
             basename = os.path.splitext(basename)[0]
@@ -271,7 +271,10 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         tmpfile = open(tmpname, "wb+")
         template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
                    templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
-        template.stream(tmpfile, namespace)
+        media_cache0 = conf.SharedContentUseCache
+        conf.SharedContentUseCache = bool(opts.get("media_cache", conf.SharedContentUseCache))
+        try: template.stream(tmpfile, namespace)
+        finally: conf.SharedContentUseCache = media_cache0
 
         namespace["stats"] = stats = parser.get_collected_stats()
         namespace.update({
