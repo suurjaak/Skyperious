@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.4, 2022-09-30
+5.4, 2022-10-01
 ---------------
+- add chat and contact counts to chats and contacts lists
 - add database account as one entry among contacts in contacts-tab
 - add option to delete contact from database
 - add contacts TXT export

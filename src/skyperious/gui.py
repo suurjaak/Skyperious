@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    30.09.2022
+@modified    01.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2492,9 +2492,8 @@ class DatabasePage(wx.Panel):
         panel1 = self.panel_chats1 = wx.Panel(parent=splitter)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_top.Add(
-            wx.StaticText(panel1, label="A&ll chat entries in database:"),
-            proportion=1, border=5, flag=wx.ALIGN_BOTTOM)
+        self.label_list_chats = wx.StaticText(panel1, label="A&ll chat entries in database:")
+        sizer_top.Add(self.label_list_chats, proportion=1, border=5, flag=wx.ALIGN_BOTTOM)
         list_chats = self.list_chats = controls.SortableListView(
             parent=panel1, style=wx.LC_REPORT)
         columns = [("title", "Chat"), ("message_count", "Messages"),
@@ -2716,9 +2715,8 @@ class DatabasePage(wx.Panel):
         panel1 = self.panel_contacts1 = wx.Panel(parent=splitter)
         sizer1 = panel1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_top.Add(
-            wx.StaticText(panel1, label="A&ll contacts in database:"),
-            proportion=1, border=5, flag=wx.ALIGN_BOTTOM)
+        self.label_list_contacts = wx.StaticText(panel1, label="A&ll contacts in database:")
+        sizer_top.Add(self.label_list_contacts, proportion=1, border=5, flag=wx.ALIGN_BOTTOM)
         list_contacts = self.list_contacts = controls.SortableListView(
             parent=panel1, style=wx.LC_REPORT)
         columns = [("identity", "Account"), ("name", "Name"), ("phone", "Phone"),
@@ -3881,6 +3879,10 @@ class DatabasePage(wx.Panel):
                             self.list_chats.Populate(self.chats)
                             self.db.get_contacts_stats(contacts, self.chats, log=False)
                             self.list_contacts.Populate(contacts)
+                            lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+                            self.label_list_chats.Label = lbl
+                            lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+                            self.label_list_contacts.Label = lbl
                             if self.contact:
                                 self.contact = next((x for x in contacts
                                                      if x["identity"] == self.contact["identity"]), None)
@@ -3905,6 +3907,8 @@ class DatabasePage(wx.Panel):
                             for k in "first_message", "last_message", "last_activity":
                                 chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
                             self.list_chats.Populate(self.chats)
+                            lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+                            self.label_list_chats.Label = lbl
 
                         if not any(result[k] for k in ("new", "updated")):
                             slabel = None
@@ -3930,6 +3934,8 @@ class DatabasePage(wx.Panel):
                             if newcontacts:
                                 self.contacts.extend(newcontacts)
                                 self.list_contacts.Populate([self.db.account] + self.contacts)
+                                lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+                                self.label_list_contacts.Label = lbl
                                 self.load_contact(self.contact)
 
                 if plabel:
@@ -4285,6 +4291,8 @@ class DatabasePage(wx.Panel):
                 f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
                 clist.SetItemFont(i, f)
                 break # for i
+        lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+        self.label_list_chats.Label = lbl
 
 
     def on_change_contactfilter(self, event):
@@ -4296,6 +4304,8 @@ class DatabasePage(wx.Panel):
                 f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
                 clist.SetItemFont(i, f)
                 break # for i
+        lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+        self.label_list_contacts.Label = lbl
 
 
     def on_rename_chat(self, event=None, chat=None):
@@ -6371,6 +6381,11 @@ class DatabasePage(wx.Panel):
             self.list_contacts.RefreshRows()
             self.load_contact(None if self.contact in purgables else self.contact)
 
+            lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+            self.label_list_chats.Label = lbl
+            lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+            self.label_list_contacts.Label = lbl
+
             self.on_refresh_tables()
             wx.CallAfter(self.update_info_page)
             wx.CallAfter(self.TopLevelParent.update_database_detail)
@@ -6478,6 +6493,11 @@ class DatabasePage(wx.Panel):
             self.db.get_contacts_stats(contacts_affected, self.chats)
             self.list_contacts.RefreshRows()
 
+            lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+            self.label_list_chats.Label = lbl
+            lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+            self.label_list_contacts.Label = lbl
+
             self.load_contact(None if self.contact in contacts else self.contact)
             self.on_refresh_tables()
             wx.CallAfter(self.update_info_page)
@@ -6573,12 +6593,16 @@ class DatabasePage(wx.Panel):
             # Populate the chats list
             self.chats = self.db.get_conversations()
             self.list_chats.Populate(self.chats)
+            lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
+            self.label_list_chats.Label = lbl
 
             # Populate the contacts list
             self.contacts = self.db.get_contacts()
             self.list_contacts.Populate([self.db.account] + self.contacts)
             self.list_contacts.SetColumnWidth(0, 150)
             self.list_contacts.SetColumnWidth(1, 250)
+            lbl = "A&ll contacts in database (%s):" % self.list_contacts.ItemCount
+            self.label_list_contacts.Label = lbl
 
             wx.CallLater(100, self.load_later_data)
         except Exception:
