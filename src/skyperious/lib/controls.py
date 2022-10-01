@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    30.09.2022
+@modified    01.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1773,7 +1773,6 @@ class RangeSlider(wx.Panel):
         return formatted
 
 
-
     def Draw(self, dc):
         global BRUSH, PEN
         width, height = self.GetClientSize()
@@ -2072,10 +2071,10 @@ class RangeSlider(wx.Panel):
                 self.TopLevelParent.SetCursor(self._cursor_default)
                 self._mousepos_special = False
                 refresh = True
-            elif self._grip_area:
-                if (self._grip_area.Contains(self._mousepos) \
+            elif self._grip_area and self._mousepos and last_pos:
+                if (self._grip_area.Contains(self._mousepos)
                 and not self._grip_area.Contains(last_pos)) \
-                or (self._grip_area.Contains(last_pos) \
+                or (self._grip_area.Contains(last_pos)
                 and not self._grip_area.Contains(self._mousepos)):
                     refresh = True
                 else:
