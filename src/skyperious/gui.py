@@ -1326,6 +1326,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         dialog.Message = "Choose folder where to save chat files"
         dialog.Filename = "Filename will be ignored"
         dialog.Wildcard = export.CHAT_WILDCARD
+        dialog.FilterIndex = export.CHAT_EXTS.index("html")
         if do_singlefile:
             db = self.load_database(self.db_filename)
             formatargs = collections.defaultdict(str)
@@ -1353,7 +1354,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             errormsg = "Cannot export %s. Not a valid Skype database?" % db
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[dialog.FilterIndex]
-            media_folder = "html" == format and dialog.FilterIndex
+            media_folder = "html" == format and \
+                           dialog.FilterIndex != export.CHAT_EXTS.index("html")
             if media_folder and not check_media_export_login(db):
                 self.button_export.Enabled = True
                 if focused_control: focused_control.SetFocus()
@@ -4418,7 +4420,7 @@ class DatabasePage(wx.Panel):
         filepath = controls.get_dialog_path(self.dialog_savechat)
         format = export.CHAT_EXTS[self.dialog_savechat.FilterIndex]
         media_folder = "html" == format and \
-                       self.dialog_savechat.FilterIndex == export.CHAT_EXTS.index("html")
+                       self.dialog_savechat.FilterIndex != export.CHAT_EXTS.index("html")
         if media_folder and not check_media_export_login(self.db): return
 
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
@@ -4668,7 +4670,7 @@ class DatabasePage(wx.Panel):
             if len(chats) > 1: path = os.path.dirname(path)
             format = export.CHAT_EXTS[dialog.FilterIndex]
             media_folder = "html" == format and \
-                           dialog.FilterIndex == export.CHAT_EXTS.index("html")
+                           dialog.FilterIndex != export.CHAT_EXTS.index("html")
 
         if media_folder and not check_media_export_login(self.db): return
 
@@ -4720,7 +4722,7 @@ class DatabasePage(wx.Panel):
         filepath = controls.get_dialog_path(self.dialog_savechat)
         format = export.CHAT_EXTS[self.dialog_savechat.FilterIndex]
         media_folder = "html" == format and \
-                       self.dialog_savechat.FilterIndex == export.CHAT_EXTS.index("html")
+                       self.dialog_savechat.FilterIndex != export.CHAT_EXTS.index("html")
         if media_folder and not check_media_export_login(self.db): return
 
         busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' %
@@ -7060,12 +7062,13 @@ class MergerPage(wx.Panel):
             style=wx.FD_OVERWRITE_PROMPT | wx.FD_SAVE | wx.RESIZE_BORDER
         )
         dialog.Wildcard = export.CHAT_WILDCARD
+        dialog.FilterIndex = export.CHAT_EXTS.index("html")
         if wx.ID_OK != dialog.ShowModal(): return
 
         filepath = controls.get_dialog_path(dialog)
         format = export.CHAT_EXTS[dialog.FilterIndex]
         media_folder = "html" == format and \
-                       dialog.FilterIndex == export.CHAT_EXTS.index("html")
+                       dialog.FilterIndex != export.CHAT_EXTS.index("html")
         if media_folder and not check_media_export_login(self.db): return
 
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
