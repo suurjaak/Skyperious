@@ -756,7 +756,7 @@ class SkypeLogin(object):
             for i, contact in enumerate(iterable):
                 if not i % 10 and not self.progress(
                     action="info", message="Querying contacts..",
-                    **(dict(index=i + 1, count=total) if total > 1 else {}),
+                    **(dict(index=i + 1, count=total) if total > 1 else {})
                 ): break # for i, contact
                 self.save("contacts", contact)
         finally:
@@ -786,7 +786,7 @@ class SkypeLogin(object):
                 if not self.progress(
                     action="info",
                     message="Querying %s chats.." % ("older" if older else "selected"),
-                    **(dict(index=i + 1, count=len(identities)) if len(identities) > 1 else {}),
+                    **(dict(index=i + 1, count=len(identities)) if len(identities) > 1 else {})
                 ): break # for k
                 v = self.request(self.skype.chats.chat, k, __raise=False, __log=False)
                 if v: yield v

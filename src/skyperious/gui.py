@@ -8135,8 +8135,8 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
             return do_textsize
 
         menu = wx.Menu()
-        item_larger  = wx.MenuItem(menu, -1, "&Larger\t\uFF0B")  # Full width plus
-        item_smaller = wx.MenuItem(menu, -1, "&Smaller\t\uFF0D") # Full width minus
+        item_larger  = wx.MenuItem(menu, -1, u"&Larger\t\uFF0B")  # Full width plus
+        item_smaller = wx.MenuItem(menu, -1, u"&Smaller\t\uFF0D") # Full width minus
         item_reset   = wx.MenuItem(menu, -1, "&Reset")
         menu.Append(item_larger)
         menu.Append(item_smaller)
