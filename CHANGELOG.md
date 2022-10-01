@@ -22,6 +22,7 @@ CHANGELOG
 - export contact list by current applied filter
 - order file types in save dialog by label
 - skip trying to download old shared content guaranteed to be unavailable
+- fix chat count on initial and info page not matching count in chat list
 - fix compiled exe and pythonw auto-closing window immediately on --help
 
 

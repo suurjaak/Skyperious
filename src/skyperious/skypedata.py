@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.09.2022
+@modified    01.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -455,26 +455,22 @@ class SkypeDatabase(object):
         """
         Get up-to-date general statistics raw from the database.
 
-        @param   full  whether to return full statistics, or only tables
-                       and last chat
+        @param   full  whether to return full statistics, or only tables and last chat
         """
         result = collections.defaultdict(str)
         if self.account:
             result.update({"name": self.account.get("name"),
                            "skypename": self.id, "username": self.username})
-        COUNTS = ["Conversations", "Messages", "Contacts"]
-        if full: COUNTS += ["Transfers"]
-        for table in COUNTS:
+        for table in ["Messages", "Contacts"] + (["Transfers"] if full else []):
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
-            label = "chats" if "Conversations" == table else table.lower()
-            result[label] = next(res, {}).get("count")
-
-        for k, table in [("chats", "Conversations"), ("messages", "Messages"),
-                       ("contacts", "Contacts"), ("transfers", "Transfers")]:
-            res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
-            result[k] = next(res, {}).get("count")
+            result[table.lower()] = next(res, {}).get("count")
 
         titlecol = self.make_title_col()
+        chats = self.execute("SELECT id, identity, alt_identity, type, %s AS title "
+                             "FROM Conversations WHERE displayname IS NOT NULL" % titlecol
+        ).fetchall()
+        result["chats"] = len(chats) - len(self.populate_conversation_links(chats))
+
         typestr = ", ".join(map(str, MESSAGE_TYPES_MESSAGE))
 
         for i, label in enumerate(["last", "first"]):
@@ -484,12 +480,7 @@ class SkypeDatabase(object):
                                "ORDER BY timestamp %s LIMIT 1" % (typestr, direction))
             msg = next(res, None)
             if msg:
-                chat = next((x for x in self.table_rows.get("conversations", [])
-                             if x["id"] == msg["convo_id"]), None)
-                chat = chat or self.execute(
-                    "SELECT *, %s AS title FROM conversations "
-                    "WHERE id = ?" % titlecol, [msg["convo_id"]]
-                ).fetchone()
+                chat = next((x for x in chats if x["id"] == msg["convo_id"]), None)
                 if msg.get("timestamp"):
                     dt = self.stamp_to_date(msg["timestamp"])
                     result["%smessage_dt" % label] = dt.strftime("%Y-%m-%d %H:%M")
@@ -692,22 +683,7 @@ class SkypeDatabase(object):
 
             # Chats can refer to older entries, prior to system from Skype 7.
             # Collate such chats automatically, with merged statistics.
-            idmap = dict((x["identity"], x) for x in rows)
-            for c in rows:
-                if c.get("alt_identity") in idmap: # Pointing to new ID
-                    idmap[c["alt_identity"]]["__link"] = c
-                if "thread.skype" not in c["identity"]: continue
-                # Can contain old chat ID base64-encoded into new identity:
-                # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
-                pattern = r"(\d+:)([^@]+)(.*)"
-                repl = lambda x: util.b64decode(x.group(2))
-                try:
-                    oldid = re.sub(pattern, repl, str(c["identity"]))
-                    if oldid in idmap:
-                        c["__link"] = idmap[oldid]
-                except Exception: pass
-            oldset = set(x["__link"]["identity"] for x in rows
-                         if x.get("__link"))
+            oldset = self.populate_conversation_links(rows)
             for chat in rows:
                 chat["participants"] = participants.get(chat["id"], [])
                 if authornames:
@@ -936,6 +912,29 @@ class SkypeDatabase(object):
 
         if log and contacts:
             logger.info("Contact statistics collected (%s).", self.filename)
+
+
+    def populate_conversation_links(self, chats):
+        """
+        Sets "__link" attribute for chats with an older database entry as well.
+
+        @return   a set of chat identities that have a newer entry available
+        """
+        idmap = {x["identity"]: x for x in chats}
+        for c in chats:
+            if c.get("alt_identity") in idmap: # Pointing to new ID
+                idmap[c["alt_identity"]]["__link"] = c
+            if "thread.skype" not in c["identity"]: continue
+            # Can contain old chat ID base64-encoded into new identity:
+            # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
+            pattern = r"(\d+:)([^@]+)(.*)"
+            repl = lambda x: util.b64decode(x.group(2))
+            try:
+                oldid = re.sub(pattern, repl, str(c["identity"]))
+                if oldid in idmap:
+                    c["__link"] = idmap[oldid]
+            except Exception: pass
+        return set(x["__link"]["identity"] for x in chats if x.get("__link"))
 
 
     def get_contactgroups(self):
