@@ -3829,7 +3829,15 @@ class DatabasePage(wx.Panel):
         def after(result):
             if not self or not result or "action" not in result: return
 
-            if result.get("error") or result.get("done"):
+            if "login"  == result["action"]:
+                self.on_live_login_result(result)
+            elif "info" == result["action"] and "message" in result:
+                self.label_sync_progress.Label = result["message"] or ""
+                if "index" in result and "count" in result:
+                    percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
+                    self.gauge_sync.Value = percent
+                self.gauge_sync.ContainingSizer.Layout()
+            elif result.get("error") or result.get("done"):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
                 plabel, slabel = None, None
@@ -3944,17 +3952,6 @@ class DatabasePage(wx.Panel):
                     self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
                     self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
                 self.gauge_sync.ContainingSizer.Layout()
-            elif "login"  == result["action"]:
-                self.on_live_login_result(result)
-            elif "info" == result["action"] and "message" in result:
-                self.label_sync_progress.Label = result["message"] or ""
-                if "index" in result and "count" in result:
-                    percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
-                    self.gauge_sync.Value = percent
-                self.gauge_sync.ContainingSizer.Layout()
-            elif "log" == result["action"] and result.get("message"):
-                self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + result["message"]
-                self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    29.09.2022
+@modified    01.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -731,10 +731,8 @@ class SkypeLogin(object):
         try:
             account = self.request(type(self.skype).user.fget, self.skype)
             self.save("accounts", account)
-        except Exception as e:
-            logger.exception("Error saving account %r.", self.skype.userId)
-            self.progress(action="log", message="ERROR saving live account data: %s" % e)
-        self.progress(action="populate", table="accounts", end=True)
+        finally:
+            self.progress(action="populate", table="accounts", end=True)
 
 
     def populate_contacts(self, contacts=()):
@@ -761,13 +759,10 @@ class SkypeLogin(object):
                     **(dict(index=i + 1, count=total) if total > 1 else {}),
                 ): break # for i, contact
                 self.save("contacts", contact)
-        except Exception as e:
-            logger.exception("Error updating contacts.")
-            self.progress(action="log", message="ERROR updating contacts: %s" % e)
-
-        self.progress(action="populate", table="contacts", end=True,
-                      count=self.sync_counts["contacts_updated"],
-                      new=self.sync_counts["contacts_new"])
+        finally:
+            self.progress(action="populate", table="contacts", end=True,
+                          count=self.sync_counts["contacts_updated"],
+                          new=self.sync_counts["contacts_new"])
 
 
     def populate_chats(self, chats=(), messages=True):
