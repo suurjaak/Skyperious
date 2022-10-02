@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.10.2022
+@modified    02.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -257,9 +257,12 @@ class SkypeLogin(object):
         Saves the item to SQLite table. Returns true if item with the same
         content already existed.
 
+        @param    table   database table to save into
+        @param    item    Skype API data object
         @param    parent  chat for messages
         @return           one of SkypeLogin.SAVE
         """
+        if item is None: return self.SAVE.SKIP
         dbitem = self.convert(table, item, parent=parent)
         if dbitem is None: return self.SAVE.SKIP
         result, dbitem1, table = None, dict(dbitem), table.lower()
