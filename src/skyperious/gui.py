@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.10.2022
+@modified    02.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -5547,6 +5547,7 @@ class DatabasePage(wx.Panel):
                 elif self.tb_chat.GetToolState(wx.ID_JUMP_TO):
                     self.list_timeline.Show()
                 self.tb_chat.EnableTool(wx.ID_JUMP_TO, not show)
+                self.tb_chat.EnableTool(wx.ID_SETUP,   not show)
                 html.ContainingSizer.Layout()
                 stc.ContainingSizer.Layout()
             if focus: # Switch focus to the other control if previous had focus
