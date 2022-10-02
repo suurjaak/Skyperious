@@ -3842,9 +3842,10 @@ class DatabasePage(wx.Panel):
             elif result.get("error") or result.get("done"):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
+                tlabel = ("account" if "accounts" == result["table"] else result["table"])
                 plabel, slabel = None, None
 
-                plabel = u"Synchronizing %s" % result["table"]
+                plabel = u"Synchronizing %s" % tlabel
                 if "messages" == result["table"] and result.get("chat"):
                     chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
                     title = chat["title_long_lc"] if chat else result["chat"]
@@ -3862,7 +3863,7 @@ class DatabasePage(wx.Panel):
                     plabel = slabel = "Synchronizing messages.."
 
                 if result.get("end"):
-                    slabel = "Synchronized %s" % result["table"]
+                    slabel = "Synchronized %s" % tlabel
                     if "chats" == result["table"]:
                         slabel = "Synchronized %s%s: %s in total%s." % (
                             util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
