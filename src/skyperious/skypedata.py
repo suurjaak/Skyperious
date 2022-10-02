@@ -317,8 +317,11 @@ class SkypeDatabase(object):
         """Refreshes Skype account information."""
         try:
             titlecol = self.make_title_col("accounts")
-            self.account = self.execute("SELECT *, %s AS name, "
-                "skypename AS identity FROM accounts LIMIT 1" % titlecol).fetchone()
+            phonecol = "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office)"
+            self.account = self.execute(
+                "SELECT *, %s AS phone, %s AS name, skypename AS identity "
+                "FROM accounts LIMIT 1" % (phonecol, titlecol)
+            ).fetchone()
             self.id = self.account["skypename"]
             self.username = self.account.get("liveid_membername") or self.id
             tdata = next((x for x in self.tables_list
