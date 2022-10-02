@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.09.2022
+@modified    02.10.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -143,7 +143,7 @@ ARGUMENTS = {
                       "information, in chat title and participants, or in any "
                       "database table"},
              {"args": ["QUERY"],
-              "help": "search query, with a Google-like syntax, for example: "
+              "help": "search query, with a simple query syntax, for example: "
                       "\"this OR that chat:links from:john\". More on syntax "
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",

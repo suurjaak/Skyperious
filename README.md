@@ -57,7 +57,7 @@ automatically, or you can select specific files or folders.
 Once added to the database list, a file can be opened for reading, searching 
 and exporting, or compared with another database for merging.
 
-Searching an opened database supports a simple Google-like
+Searching an opened database supports a simple
 [query syntax](https://suurjaak.github.io/Skyperious/help.html).
 You can use keywords to search among specific authors or chats only
 (`from:john`, `chat:links`), or from certain dates only

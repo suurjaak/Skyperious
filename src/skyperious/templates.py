@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.09.2022
+@modified    02.10.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -3315,7 +3315,7 @@ from skyperious import conf
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
-        Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{ conf.LinkColour }}">syntax</font></a>.<br />
+        Search over all Skype messages using a simple <a href="page:#help"><font color="{{ conf.LinkColour }}">query syntax</font></a>.<br />
         <br />
         Or choose other search targets from the toolbar: <br />
         search in contact information, or in chat information, <br />
@@ -3415,7 +3415,7 @@ except ImportError:
 %if not pyparsing:
 <b><font color="red">Search syntax currently limited:</font></b>&nbsp;&nbsp;pyparsing not installed.<br /><br /><br />
 %endif
-{{ conf.Title }} supports a Google-like syntax for searching messages:<br /><br />
+{{ conf.Title }} supports a simple query syntax for searching messages:<br /><br />
 <table><tr><td width="500">
   <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{ conf.HelpBorderColour }}"
    valign="top" width="500">
@@ -3577,8 +3577,8 @@ except ImportError:
         <font color="{{ conf.HelpCodeColour }}">
         <code>flickr.com from:john from:jane chat:links</code></font><br />
     </li>
-    <li>search from John Smith up to 2011:<br /><br />
-        <font color="{{ conf.HelpCodeColour }}"><code>from:"john smith" date:..2011</code></font>
+    <li>search from John Smith up to 2021:<br /><br />
+        <font color="{{ conf.HelpCodeColour }}"><code>from:"john smith" date:..2021</code></font>
         <br />
     </li>
     <li>search for either "John" and "my side" or "Stark" and "your side":
@@ -3586,17 +3586,17 @@ except ImportError:
         <font color="{{ conf.HelpCodeColour }}">
         <code>(john "my side") OR (stark "your side")</code></font><br />
     </li>
-    <li>search for either "barbecue" or "grill" in 2012,
+    <li>search for either "barbecue" or "grill" in 2022,
         except from June to August:<br /><br />
         <font color="{{ conf.HelpCodeColour }}">
-        <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
+        <code>barbecue OR grill date:2022 -date:2022-06..2022-08</code>
         </font><br />
     </li>
     <li>search for "TPS report" in chats named "office"
-        (but not named "backoffice") on the first day of the month in 2012:
+        (but not named "backoffice") on the first day of the month in 2022:
         <br /><br />
         <font color="{{ conf.HelpCodeColour }}">
-        <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
+        <code>"tps report" chat:office -chat:backoffice date:2022-*-1</code>
         </font><br />
     </li>
   </ul>

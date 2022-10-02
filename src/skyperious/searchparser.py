@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Parses a Google-like search grammar into SQL for querying a Skype database.
+Parses a simple search grammar into SQL for querying a Skype database.
 
 - words can consist of any non-whitespace characters including all Unicode,
   excluding round brackets and quotes ()"
@@ -23,7 +23,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.07.2013
-@modified    17.07.2022
+@modified    02.10.2022
 """
 import calendar
 import collections
