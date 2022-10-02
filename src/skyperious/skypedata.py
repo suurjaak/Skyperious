@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.10.2022
+@modified    02.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -127,7 +127,6 @@ ACCOUNT_FIELD_TITLES = collections.OrderedDict([
     ("province",            "State/Province"),
     ("country",             "Country/Region"),
     ("languages",           "Languages"),
-    ("nrof_authed_buddies", "Contacts"),
     ("about",               "About me"),
     ("skypeout_balance",    "SkypeOut balance"),
 ])
