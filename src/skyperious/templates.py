@@ -3511,8 +3511,8 @@ except ImportError:
   <tr>
     <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search from specific time periods</b><br /><br />
-      <font color="{{ conf.HelpCodeColour }}"><code>date:2008<br />date:2009-01<br />
-      date:2005-12-24..2007</code></font>
+      <font color="{{ conf.HelpCodeColour }}"><code>date:2020<br />date:2022-01<br />
+      date:2020-12-24..2021</code></font>
       <br />
     </td>
     <td bgcolor="{{ conf.BgColour }}">
@@ -3536,7 +3536,7 @@ except ImportError:
       <b>Exclude words or keywords</b><br /><br />
       <font color="{{ conf.HelpCodeColour }}"><code>-notthisword<br />-"not this phrase"<br />
       -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
-      -date:2013</code></font>
+      -date:2021</code></font>
       <br />
     </td>
     <td bgcolor="{{ conf.BgColour }}">
