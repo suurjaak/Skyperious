@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.10.2022
+@modified    03.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2259,7 +2259,7 @@ class MessageParser(object):
             if not url and link:
                 url = link.get("href")
             elif not url: # Parse link from message contents
-                text = ElementTree.tostring(dom, "unicode", "text")
+                text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
                 match = re.search(r"(https?://[^\s<]+)", text)
                 if match: # Make link clickable
                     url = match.group(0)
