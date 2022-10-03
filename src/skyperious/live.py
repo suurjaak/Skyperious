@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    02.10.2022
+@modified    03.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -420,13 +420,13 @@ class SkypeLogin(object):
                    else set([self.skype.userId, chat.userId])
             for uid in uids:
                 user = self.request(self.skype.contacts.__getitem__, uid)
-                uidentity = user.id
+                uidentity = user.id if user else uid
                 # Keep bot prefixes on bot accounts
                 if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
                 and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
-                    uidentity = skypedata.ID_PREFIX_BOT + user.id
+                    uidentity = skypedata.ID_PREFIX_BOT + uidentity
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
-                if isinstance(chat, skpy.SkypeGroupChat) and user.id == chat.creatorId:
+                if isinstance(chat, skpy.SkypeGroupChat) and (user.id if user else uid) == chat.creatorId:
                     p.update(rank=1)
                 participants.append(p)
 
