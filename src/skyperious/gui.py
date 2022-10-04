@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.10.2022
+@modified    04.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3489,8 +3489,8 @@ class DatabasePage(wx.Panel):
                                     numbers=False))
         item_rename   = wx.MenuItem(menu, -1, "Re&name")
 
-        item_syncm    = wx.MenuItem(menu, -1, "Update &messages and participants")
-        item_syncp    = wx.MenuItem(menu, -1, "Update &participants")
+        item_syncm    = wx.MenuItem(menu, -1, "Synchronize &messages and metainfo")
+        item_syncp    = wx.MenuItem(menu, -1, "Synchronize meta&info")
         smenu.Append(item_syncm)
         smenu.Append(item_syncp)
 
@@ -3585,6 +3585,8 @@ class DatabasePage(wx.Panel):
                                 key=lambda x: (x["type"], x["title_long"].lower())))
             visited.update(x["id"] for x in chats)
         contact_cols = self.db.get_table_columns("contacts")
+        clabel = util.plural("1:1 chat", None if "account" == category else contacts, numbers=False)
+        plabel = util.plural("profile", contacts, numbers=False)
 
         def clipboardize(category):
             if "name" == category:
@@ -3606,10 +3608,11 @@ class DatabasePage(wx.Panel):
         def exporter(do_singlefile=False, do_timerange=False):
             self.on_export_chats(chats, False, do_singlefile, do_timerange)
 
-        def sync(messages=False):
-            mychats, mycontacts = (chats if messages else None), contacts
-            full = messages and any(self.db.id == x["identity"] for x in contacts)
-            self.on_live_sync_items(mychats, mycontacts, messages=messages, full=full)
+        def sync(singles=None):
+            mychats, mycontacts = (None if singles is None else chats), contacts
+            if mychats and singles:
+                mychats = [x for x in mychats if skypedata.CHATS_TYPE_SINGLE == x["type"]]
+            self.on_live_sync_items(mychats, mycontacts, messages=singles is not None)
 
         menu  = wx.Menu()
         smenu = wx.Menu()
@@ -3618,13 +3621,13 @@ class DatabasePage(wx.Panel):
                                                else util.plural("contact", contacts))
         item_copy      = wx.MenuItem(menu, -1, "&Copy %s" %
                                      util.plural("name", contacts, numbers=False))
-        item_copyprof  = wx.MenuItem(menu, -1, "Copy &%s" %
-                                     util.plural("profile", contacts, numbers=False))
+        item_copyprof  = wx.MenuItem(menu, -1, "Copy &%s" % plabel)
         item_copychats = wx.MenuItem(menu, -1, "Copy %s" %
                                      util.plural("c&hat name", chats, numbers=False))
         item_rename    = wx.MenuItem(menu, -1, "Re&name %s" % category)
-        item_syncm     = wx.MenuItem(menu, -1, "Update &messages and profile")
-        item_syncp     = wx.MenuItem(menu, -1, "Update &profile")
+        item_synca     = wx.MenuItem(menu, -1, "Synchronize &all chats and %s" % plabel)
+        item_syncm     = wx.MenuItem(menu, -1, "Synchronize %s and %s" % (clabel, plabel))
+        item_syncp     = wx.MenuItem(menu, -1, "Synchronize &%s" % plabel)
         if fullmenu:
             item_export  = wx.MenuItem(menu, -1, "&Export chats")
             item_exportm = item_datesm = None
@@ -3653,6 +3656,7 @@ class DatabasePage(wx.Panel):
         menu.AppendSeparator()
         menu.Append(item_rename)
         menu.AppendSeparator()
+        smenu.Append(item_synca)
         smenu.Append(item_syncm)
         smenu.Append(item_syncp)
         item_sync = menu.AppendSubMenu(smenu, "Update from on&line")
@@ -3676,7 +3680,8 @@ class DatabasePage(wx.Panel):
         menu.Bind(wx.EVT_MENU,  lambda e: clipboardize("chat"),    item_copychats)
         menu.Bind(wx.EVT_MENU,  lambda e: self.on_rename_contact(contact=contacts[0]), item_rename)
         menu.Bind(wx.EVT_MENU,  lambda e: self.on_delete_contacts(contacts=contacts),  item_delete)
-        smenu.Bind(wx.EVT_MENU, lambda e: sync(messages=True), id=item_syncm.GetId())
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(singles=False), id=item_synca.GetId())
+        smenu.Bind(wx.EVT_MENU, lambda e: sync(singles=True),  id=item_syncm.GetId())
         smenu.Bind(wx.EVT_MENU, lambda e: sync(),              id=item_syncp.GetId())
         if fullmenu:
             menu.Bind(wx.EVT_MENU, lambda e: exporter(False, False), item_export)
@@ -3785,15 +3790,13 @@ class DatabasePage(wx.Panel):
         self.worker_live.stop_work()
 
 
-    def on_live_sync_items(self, chats=(), contacts=(), messages=True, full=False):
+    def on_live_sync_items(self, chats=(), contacts=(), messages=True):
         """
         Opens online page, logs in if not logged in, and synchronizes specified items from live.
 
         @param   chats     list of chats to update
         @param   contacts  list of contacts to update profiles for
         @param   messages  whether to sync chat messages if chats, or only chat participant profiles
-        @param   full      whether to ignore given chats and do full sync of all chats available,
-                           by recency, if syncing chat messages
         """
         if not chats and not contacts: return
         self.notebook.SetSelection(self.pageorder[self.page_live])
@@ -3812,14 +3815,12 @@ class DatabasePage(wx.Panel):
         self.gauge_sync.ContainingSizer.Layout()
 
         account  = next((c for c in contacts or [] if c["identity"] == self.db.id), None)
-        contacts = [c for c in contacts or [] if c["identity"] != self.db.id]
-        if account and not full:
+        if account:
+            contacts = [c for c in contacts or [] if c["identity"] != self.db.id]
             self.worker_live.work({"action": "account"})
         if contacts:
             self.worker_live.work({"action": "contacts", "contacts": [x["identity"] for x in contacts]})
-        if full:
-            self.worker_live.work({"action": "populate"})
-        elif chats and messages:
+        if chats and messages:
             self.worker_live.work({"action": "history", "chats": [x["identity"] for x in chats]})
         elif chats:
             self.worker_live.work({"action": "chats", "chats": [x["identity"] for x in chats]})
