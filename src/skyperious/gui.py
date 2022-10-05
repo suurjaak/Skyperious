@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    04.10.2022
+@modified    05.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3610,8 +3610,12 @@ class DatabasePage(wx.Panel):
 
         def sync(singles=None):
             mychats, mycontacts = (None if singles is None else chats), contacts
-            if mychats and singles:
+            if singles:
                 mychats = [x for x in mychats if skypedata.CHATS_TYPE_SINGLE == x["type"]]
+            if singles is not None:
+                chatids = set(x["identity"] for x in mychats)
+                mychats = [{"identity": c["identity"]} for c in contacts
+                           if c["identity"] not in chatids] + mychats
             self.on_live_sync_items(mychats, mycontacts, messages=singles is not None)
 
         menu  = wx.Menu()
