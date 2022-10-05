@@ -2741,8 +2741,12 @@ class DatabasePage(wx.Panel):
         sizer_top.Add(edit_contactfilter, flag=wx.RIGHT, border=15)
         button_export_contacts = self.button_export_contacts = \
             wx.Button(parent=panel1, label="Exp&ort contacts")
+        button_export_chats = self.button_export_contacts_chats = \
+            wx.Button(parent=panel1, label="Exp&ort chats")
         sizer_top.Add(button_export_contacts)
-        self.Bind(wx.EVT_BUTTON, self.on_export_contacts, button_export_contacts)
+        sizer_top.Add(button_export_chats, border=5, flag=wx.LEFT)
+        self.Bind(wx.EVT_BUTTON, self.on_export_contacts_menu, button_export_chats)
+        self.Bind(wx.EVT_BUTTON, self.on_export_contacts,      button_export_contacts)
         sizer1.Add(sizer_top, border=5,
                    flag=wx.RIGHT | wx.LEFT | wx.BOTTOM | wx.GROW)
 
@@ -3608,7 +3612,7 @@ class DatabasePage(wx.Panel):
 
         category = "contact"
         if len(contacts) == 1 and self.db.id == contacts[0]["identity"]: category = "account"
-        chatmap, chats, visited = {x["id"]: x for x in self.chats}, [], set()
+        chats, visited, chatmap = [], set(), {x["id"]: x for x in self.chats}
         for c in contacts:
             chats.extend(sorted((chatmap[x["id"]] for x in c.get("conversations", [])
                                 if x["id"] not in visited),
@@ -4572,6 +4576,86 @@ class DatabasePage(wx.Panel):
         item_sel  = menu.AppendSubMenu(menu_sel,  "Export &selected chats")
         item_all  = menu.AppendSubMenu(menu_all,  "Export &all chats")
         item_date = menu.AppendSubMenu(menu_date, "Export &date range")
+        item_sel.Enable(len(selecteds))
+        item_all.Enable(bool(self.list_chats.GetItemCount()))
+        item_date.Enable(bool(self.list_chats.GetItemCount()))
+
+        event.EventObject.PopupMenu(menu, (0, event.EventObject.Size[1]))
+
+
+    def on_export_contacts_menu(self, event):
+        """
+        Handler for clicking to export selected or all chats of contacts, displays a
+        submenu with choices to export selected chats or all chats.
+        """
+        selected, selecteds = self.list_contacts.GetFirstSelected(), []
+        while selected >= 0:
+            selecteds.append(selected)
+            selected = self.list_contacts.GetNextSelected(selected)
+
+        def handler(do_all=False, do_singlefile=False, do_timerange=False):
+            contacts = [self.list_contacts.GetItemMappedData(i)
+                        for i in (range(self.list_contacts.ItemCount) if do_all else selecteds)]
+            chats, visited, chatmap = [], set(), {x["id"]: x for x in self.chats}
+            for c in contacts:
+                chats.extend(sorted((chatmap[x["id"]] for x in c.get("conversations", [])
+                                    if x["id"] not in visited),
+                                    key=lambda x: (x["type"], x["title_long"].lower())))
+                visited.update(x["id"] for x in chats)
+            return functools.partial(self.on_export_chats,
+                                     chats, do_all, do_singlefile, do_timerange)
+
+        menu = wx.Menu()
+        menu_sel  = wx.Menu()
+        menu_all  = wx.Menu()
+        menu_date = wx.Menu()
+
+        item_sel_multi = wx.MenuItem(menu_sel, wx.ID_ANY, "Into individual &files")
+        menu_sel.Append(item_sel_multi)
+        self.Bind(wx.EVT_MENU, handler(), item_sel_multi)
+        if export.xlsxwriter:
+            item_sel_single = wx.MenuItem(menu_sel, wx.ID_ANY,
+                                          "Into a single &Excel workbook, with separate sheets")
+            menu_sel.Append(item_sel_single)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_sel_single)
+
+        item_all_multi = wx.MenuItem(menu_all, wx.ID_ANY, "Into individual &files")
+        menu_all.Append(item_all_multi)
+        self.Bind(wx.EVT_MENU, handler(do_all=True), item_all_multi)
+        if export.xlsxwriter:
+            item_all_single = wx.MenuItem(menu_all, wx.ID_ANY,
+                                          "Into a single &Excel workbook, with separate sheets")
+            menu_all.Append(item_all_single)
+            myhandler = handler(do_all=True, do_singlefile=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_all_single)
+
+        item_sel_date_multi = wx.MenuItem(menu_date, wx.ID_ANY,
+                                          "Chats of selected contacts into individual &files")
+        menu_date.Append(item_sel_date_multi)
+        item_sel_date_multi.Enable(len(selecteds))
+        self.Bind(wx.EVT_MENU, handler(do_timerange=True), item_sel_date_multi)
+        if export.xlsxwriter:
+            item_sel_date_single = wx.MenuItem(menu_sel, wx.ID_ANY,
+                "Chats of selected contacts into a single &Excel workbook, with separate sheets")
+            menu_date.Append(item_sel_date_single)
+            item_sel_date_single.Enable(len(selecteds))
+            myhandler = handler(do_singlefile=True, do_timerange=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_sel_date_single)
+        menu_date.AppendSeparator()
+        item_all_date_multi = wx.MenuItem(menu_date, wx.ID_ANY,
+                                          "Chats of all contacts into &individual files")
+        menu_date.Append(item_all_date_multi)
+        self.Bind(wx.EVT_MENU, handler(do_all=True, do_timerange=True), item_all_date_multi)
+        if export.xlsxwriter:
+            item_all_date_single = wx.MenuItem(menu_all, wx.ID_ANY,
+                "Chats of &all contacts into a single Excel workbook, with separate sheets")
+            menu_date.Append(item_all_date_single)
+            myhandler = handler(do_all=True, do_singlefile=True, do_timerange=True)
+            self.Bind(wx.EVT_MENU, myhandler, item_all_date_single)
+
+        item_sel  = menu.AppendSubMenu(menu_sel,  "Export chats of &selected contacts")
+        item_all  = menu.AppendSubMenu(menu_all,  "Export chats of &all contacts")
+        item_date = menu.AppendSubMenu(menu_date, "Export chats in &date range")
         item_sel.Enable(len(selecteds))
         item_all.Enable(bool(self.list_chats.GetItemCount()))
         item_date.Enable(bool(self.list_chats.GetItemCount()))

@@ -15,6 +15,7 @@ CHANGELOG
 - add context menu popup to contact list right-click
 - add support for exporting SQL query results as INSERT statements
 - add support for F2 and Ctrl-F key shortcuts in chats and contacts lists
+- add "Export chats" button to contacts tab
 - expose chats and contacts lists context menu options under actions button
 - add options to sync specific items in chats and contacts lists from live
 - list all chats a contact is participant in, including empty chats
