@@ -3507,7 +3507,7 @@ class DatabasePage(wx.Panel):
                 mycontacts = [x for x in self.contacts if x["identity"] in identities]
             self.on_live_sync_items(mychats, mycontacts, messages=messages)
 
-        menu, pmenu, smenu = wx.Menu(), wx.Menu(), wx.Menu()
+        menu, pmenu, smenu, xmenu = wx.Menu(), wx.Menu(), wx.Menu(), None
         for p in chats[0]["participants"] if len(chats) == 1 else ():
             item = wx.MenuItem(menu, -1, "%(name)s (%(identity)s)" % p["contact"])
             pmenu.Append(item)
@@ -3533,10 +3533,11 @@ class DatabasePage(wx.Panel):
                                       util.plural("file", chats, numbers=False))
             item_exportm = item_datesm = None
         if fullmenu and export.xlsxwriter and len(chats) > 1:
-            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
-                                                 "with separate sheets")
-            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
-                                                 "with separate sheets")
+            xmenu = wx.Menu()
+            item_exportm = wx.MenuItem(menu, -1, "Chats on &separate sheets")
+            item_datesm  = wx.MenuItem(menu, -1, "Chats in &date range on separate sheets")
+            xmenu.Append(item_exportm)
+            xmenu.Append(item_datesm)
         if fullmenu:
             item_dates   = wx.MenuItem(menu, -1, "Export &date range to file")
         item_delete      = wx.MenuItem(menu, -1, "Delete from database")
@@ -3561,9 +3562,8 @@ class DatabasePage(wx.Panel):
         menu.AppendSeparator()
         if fullmenu:
             menu.Append(item_export)
-            if item_exportm: menu.Append(item_exportm)
             menu.Append(item_dates)
-            if item_datesm: menu.Append(item_datesm)
+            if xmenu: menu.AppendSubMenu(xmenu, "Export to a single Excel &workbook")
             menu.AppendSeparator()
         menu.Append(item_delete)
         if fullmenu:
@@ -3652,8 +3652,7 @@ class DatabasePage(wx.Panel):
                            if c["identity"] not in chatids] + mychats
             self.on_live_sync_items(mychats, mycontacts, messages=singles is not None)
 
-        menu  = wx.Menu()
-        smenu = wx.Menu()
+        menu, smenu, xmenu  = wx.Menu(), wx.Menu(), None
         if fullmenu:
             item_name  = wx.MenuItem(menu, -1, ("Open %s " % category) if len(contacts) < 2
                                                else util.plural("contact", contacts))
@@ -3670,10 +3669,11 @@ class DatabasePage(wx.Panel):
             item_export  = wx.MenuItem(menu, -1, "&Export chats")
             item_exportm = item_datesm = None
         if fullmenu and export.xlsxwriter and len(contacts) > 1:
-            item_exportm = wx.MenuItem(menu, -1, "Export to a single Excel &workbook, "
-                                                 "with separate sheets")
-            item_datesm  = wx.MenuItem(menu, -1, "Export date &range to a single Excel workbook, "
-                                                 "with separate sheets")
+            xmenu = wx.Menu()
+            item_exportm = wx.MenuItem(menu, -1, "Chats on &separate sheets")
+            item_datesm  = wx.MenuItem(menu, -1, "Chats in &date range on separate sheets")
+            xmenu.Append(item_exportm)
+            xmenu.Append(item_datesm)
         if fullmenu:
             item_dates   = wx.MenuItem(menu, -1, "Export chats &date range")
         item_delete  = wx.MenuItem(menu, -1, "Delete")
@@ -3701,9 +3701,8 @@ class DatabasePage(wx.Panel):
         menu.AppendSeparator()
         if fullmenu:
             menu.Append(item_export)
-            if item_exportm: menu.Append(item_exportm)
             menu.Append(item_dates)
-            if item_datesm: menu.Append(item_datesm)
+            if xmenu: menu.AppendSubMenu(xmenu, "Export to a single Excel &workbook")
             menu.AppendSeparator()
         menu.Append(item_delete)
         if fullmenu:
@@ -4675,27 +4674,22 @@ class DatabasePage(wx.Panel):
             return functools.partial(self.on_export_chats,
                                      chats, False, do_singlefile, do_timerange)
 
-        menu = wx.Menu()
-        menu_date = wx.Menu()
-
-        item_multi = wx.MenuItem(menu, wx.ID_ANY, "Into individual &files")
-        menu.Append(item_multi)
-        self.Bind(wx.EVT_MENU, handler(), item_multi)
+        menu, xmenu = wx.Menu(), None
+        item_files = wx.MenuItem(menu, wx.ID_ANY, "To individual &files")
+        item_dates = wx.MenuItem(menu, wx.ID_ANY, "&Date range to individual files")
+        menu.Append(item_files)
+        menu.Append(item_dates)
         if export.xlsxwriter:
-            item_single = wx.MenuItem(menu, wx.ID_ANY,
-                                      "Into a single &Excel workbook, with separate sheets")
-            menu.Append(item_single)
-            self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_single)
-        item_date_multi = wx.MenuItem(menu_date, wx.ID_ANY, "Into individual &files")
-        menu_date.Append(item_date_multi)
-        self.Bind(wx.EVT_MENU, handler(do_timerange=True), item_date_multi)
-        if export.xlsxwriter:
-            item_date_single = wx.MenuItem(menu, wx.ID_ANY,
-                                           "Into a single &Excel workbook, with separate sheets")
-            menu_date.Append(item_date_single)
-            self.Bind(wx.EVT_MENU, handler(do_singlefile=True, do_timerange=True),
-                      item_date_single)
-        menu.AppendSubMenu(menu_date, "Export &date range")
+            xmenu = wx.Menu()
+            item_file = wx.MenuItem(menu, wx.ID_ANY, "Chats on &separate sheets")
+            item_date = wx.MenuItem(menu, wx.ID_ANY, "Chats in &date range on separate sheets")
+            xmenu.Append(item_file)
+            xmenu.Append(item_date)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True), item_file)
+            self.Bind(wx.EVT_MENU, handler(do_singlefile=True, do_timerange=True), item_date)
+            menu.AppendSubMenu(xmenu, "To a single Excel &workbook")
+        self.Bind(wx.EVT_MENU, handler(), item_files)
+        self.Bind(wx.EVT_MENU, handler(do_timerange=True), item_dates)
 
         event.EventObject.PopupMenu(menu, (0, event.EventObject.Size[1]))
 
