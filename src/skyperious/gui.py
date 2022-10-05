@@ -2526,6 +2526,8 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
                   self.on_change_list_chats, list_chats)
         list_chats.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_chats)
+        list_chats.Bind(wx.EVT_CHAR_HOOK,    self.on_list_chats_key)
+
         sizer1.Add(list_chats, proportion=1, border=5,
                    flag=wx.GROW | wx.LEFT | wx.RIGHT)
 
@@ -2763,6 +2765,8 @@ class DatabasePage(wx.Panel):
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
         list_contacts.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_contacts)
+        list_contacts.Bind(wx.EVT_CHAR_HOOK,    self.on_list_contacts_key)
+
         sizer1.Add(list_contacts, proportion=1, border=5, flag=wx.GROW | wx.LEFT | wx.RIGHT)
         sizer2_top.Add(label_contact, proportion=1, border=5, flag=wx.LEFT | wx.BOTTOM | wx.ALIGN_BOTTOM)
         sizer2_top.AddStretchSpacer()
@@ -3423,6 +3427,32 @@ class DatabasePage(wx.Panel):
             conf.Login[self.db.filename].pop("sync_older", None)
         if not conf.Login[self.db.filename]: conf.Login.pop(self.db.filename)
         util.run_once(conf.save)
+
+
+    def on_list_chats_key(self, event):
+        """
+        Handler for pressing a key in chats list, opens rename dialog on F2,
+        and focuses filter on Ctrl-F.
+        """
+        if event.KeyCode in [ord("F")] and event.CmdDown():
+            self.edit_chatfilter.SetFocus()
+        elif event.KeyCode in [wx.WXK_F2] and self.list_chats.SelectedItemCount == 1:
+            item = self.list_chats.GetItemMappedData(self.list_chats.GetFirstSelected())
+            self.on_rename_chat(chat=item)
+        event.Skip()
+
+
+    def on_list_contacts_key(self, event):
+        """
+        Handler for pressing a key in contacts list, opens rename dialog on F2,
+        and focuses filter on Ctrl-F.
+        """
+        if event.KeyCode in [ord("F")] and event.CmdDown():
+            self.edit_contactfilter.SetFocus()
+        elif event.KeyCode in [wx.WXK_F2] and self.list_contacts.SelectedItemCount == 1:
+            item = self.list_contacts.GetItemMappedData(self.list_contacts.GetFirstSelected())
+            self.on_rename_contact(contact=item)
+        event.Skip()
 
 
     def on_menu_list_chats(self, event):
