@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.4, 2022-10-05
+5.4, 2022-10-06
 ---------------
 - add chat and contact counts to chats and contacts lists
 - add database account as one entry among contacts in contacts-tab
@@ -16,6 +16,7 @@ CHANGELOG
 - add support for exporting SQL query results as INSERT statements
 - add support for F2 and Ctrl-F key shortcuts in chats and contacts lists
 - add "Export chats" button to contacts tab
+- add context menu popups to all HTML controls
 - expose chats and contacts lists context menu options under actions button
 - add options to sync specific items in chats and contacts lists from live
 - list all chats a contact is participant in, including empty chats

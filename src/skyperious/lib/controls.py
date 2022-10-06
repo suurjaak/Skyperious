@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.10.2022
+@modified    06.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -4413,6 +4413,11 @@ class TabbedHtmlWindow(wx.Panel):
         """Returns the number of tabs (default empty tab is not counted)."""
         return len(self._tabs)
 
+
+    def GetHtmlWindow(self):
+        """Returns the internal wx.HtmlWindow."""
+        return self._html
+    HtmlWindow = property(GetHtmlWindow)
 
 
 class TextCtrlAutoComplete(wx.TextCtrl):

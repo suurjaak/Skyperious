@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.10.2022
+@modified    06.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -2595,10 +2595,11 @@ class DatabasePage(wx.Panel):
         stc.SetDatabasePage(self)
         stc.STC.Bind(wx.stc.EVT_STC_UPDATEUI, self.on_scroll_chat_history)
         html_stats = self.html_stats = wx.html.HtmlWindow(parent=panel_stc1)
-        html_stats.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                        self.on_click_html_stats)
-        html_stats.Bind(wx.EVT_SCROLLWIN, self.on_scroll_html_stats)
-        html_stats.Bind(wx.EVT_SIZE, self.on_size_html_stats)
+        html_stats.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_stats)
+        html_stats.Bind(wx.EVT_CONTEXT_MENU,           self.on_rightclick_html)
+        html_stats.Bind(wx.EVT_RIGHT_UP,               self.on_rightclick_html)
+        html_stats.Bind(wx.EVT_SCROLLWIN,              self.on_scroll_html_stats)
+        html_stats.Bind(wx.EVT_SIZE,                   self.on_size_html_stats)
         html_stats.Hide()
 
         sizer_stc.Add(timeline, flag=wx.GROW)
@@ -2766,6 +2767,8 @@ class DatabasePage(wx.Panel):
         button_action.Bind(wx.EVT_BUTTON, self.on_menu_list_contacts)
         button_export.Bind(wx.EVT_BUTTON, self.on_export_contact_chats_menu)
         html_contact.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_contact)
+        html_contact.Bind(wx.EVT_CONTEXT_MENU,           self.on_rightclick_html)
+        html_contact.Bind(wx.EVT_RIGHT_UP,               self.on_rightclick_html)
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
         list_contacts.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_contacts)
@@ -2838,13 +2841,13 @@ class DatabasePage(wx.Panel):
         default = step.Template(templates.SEARCH_WELCOME_HTML).expand()
         html.SetDefaultPage(default)
         html.SetDeleteCallback(self.on_delete_tab_callback)
-        label_html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                        self.on_click_html_link)
-        html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                  self.on_click_html_link)
-        html._html.Bind(wx.EVT_RIGHT_UP, self.on_rightclick_searchall)
-        html.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_change_searchall_tab)
-        html.Bind(controls.EVT_TAB_LEFT_DCLICK, self.on_dclick_searchall_tab)
+        label_html.Bind(wx.EVT_RIGHT_UP,               self.on_rightclick_html)
+        label_html.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.on_click_html_link)
+        html.Bind(wx.html.EVT_HTML_LINK_CLICKED,       self.on_click_html_link)
+        html.HtmlWindow.Bind(wx.EVT_CONTEXT_MENU,      self.on_rightclick_html)
+        html.HtmlWindow.Bind(wx.EVT_RIGHT_UP,          self.on_rightclick_html)
+        html.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED,        self.on_change_searchall_tab)
+        html.Bind(controls.EVT_TAB_LEFT_DCLICK,        self.on_dclick_searchall_tab)
         html.Font.PixelSize = (0, 8)
 
         ColourManager.Manage(label_html, "BackgroundColour", "WidgetColour")
@@ -3251,8 +3254,8 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
-        label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                        lambda e: webbrowser.open(e.GetLinkInfo().Href))
+        label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,          self.on_click_html_link)
+        label_info.Bind(wx.EVT_RIGHT_UP,                        self.on_rightclick_html)
 
         self.edit_user           = edit_user
         self.button_user         = button_user
@@ -4955,8 +4958,29 @@ class DatabasePage(wx.Panel):
         specific message if transfer author link, otherwise shows the history
         and finds the word clicked in the word cloud.
         """
-        href = event.GetLinkInfo().Href
-        if href.startswith("#"):
+        href, htmlwindow = event.GetLinkInfo().Href, event.EventObject
+        if getattr(htmlwindow, "is_rightclick", False):
+
+            def on_copy(event):
+                if wx.TheClipboard.Open():
+                    text = htmlwindow.SelectionToText()
+                    d = wx.TextDataObject(text)
+                    wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+            def on_selectall(event):
+                htmlwindow.SelectAll()
+
+            htmlwindow.is_rightclick = False
+            menu = wx.Menu()
+            item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+            item_selectall = wx.MenuItem(menu, -1, "&Select all")
+            menu.Append(item_selection)
+            menu.Append(item_selectall)
+            item_selection.Enable(bool(htmlwindow.SelectionToText()))
+            menu.Bind(wx.EVT_MENU, on_copy,      id=item_selection.GetId())
+            menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
+            htmlwindow.PopupMenu(menu)
+        elif href.startswith("#"):
             self.html_stats.ScrollToAnchor(href[1:])
             wx.CallAfter(self.store_html_stats_scroll)
         elif href.startswith("file://"):
@@ -4993,8 +5017,29 @@ class DatabasePage(wx.Panel):
         Handler for clicking a link in contact page, sorts chats if sort link, goes to
         specific message if chat link, saves image if image link.
         """
-        href = event.GetLinkInfo().Href
-        if href == "avatar":
+        href, htmlwindow = event.GetLinkInfo().Href, event.EventObject
+        if getattr(htmlwindow, "is_rightclick", False):
+
+            def on_copy(event):
+                if wx.TheClipboard.Open():
+                    text = htmlwindow.SelectionToText()
+                    d = wx.TextDataObject(text)
+                    wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+
+            def on_selectall(event):
+                htmlwindow.SelectAll()
+
+            htmlwindow.is_rightclick = False
+            menu = wx.Menu()
+            item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+            item_selectall = wx.MenuItem(menu, -1, "&Select all")
+            menu.Append(item_selection)
+            menu.Append(item_selectall)
+            item_selection.Enable(bool(htmlwindow.SelectionToText()))
+            menu.Bind(wx.EVT_MENU, on_copy,      id=item_selection.GetId())
+            menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
+            htmlwindow.PopupMenu(menu)
+        elif href == "avatar":
             imgkey = ("avatar", self.contact["id"])
             img = self.imagecache.get(imgkey)
             if not img: return
@@ -5030,34 +5075,36 @@ class DatabasePage(wx.Panel):
                 self.load_chat(chat, center_message_id=messageid)
 
 
-    def on_rightclick_searchall(self, event):
+    def on_rightclick_html(self, event):
         """
         Handler for right-clicking in HtmlWindow, sets up a temporary flag for
         HTML link click handler to check, in order to display a context menu.
         """
-        self.html_searchall.is_rightclick = True
-        def reset():
-            if self.html_searchall.is_rightclick: # Flag still up: show menu
-                def on_copy(event):
-                    if wx.TheClipboard.Open():
-                        text = self.html_searchall.SelectionToText()
-                        d = wx.TextDataObject(text)
-                        wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
+        event.EventObject.is_rightclick = True
+        def reset(htmlwindow):
+            if not self or not htmlwindow.is_rightclick: return
+                
+            def on_copy(event):
+                if wx.TheClipboard.Open():
+                    text = htmlwindow.SelectionToText()
+                    d = wx.TextDataObject(text)
+                    wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
 
-                def on_selectall(event):
-                    self.html_searchall.SelectAll()
-                self.html_searchall.is_rightclick = False
-                menu = wx.Menu()
-                item_selection = wx.MenuItem(menu, -1, "&Copy selection")
-                item_selectall = wx.MenuItem(menu, -1, "&Select all")
-                menu.Append(item_selection)
-                menu.AppendSeparator()
-                menu.Append(item_selectall)
-                item_selection.Enable(bool(self.html_searchall.SelectionToText()))
-                menu.Bind(wx.EVT_MENU, on_copy, id=item_selection.GetId())
-                menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
-                self.html_searchall.PopupMenu(menu)
-        event.Skip(), wx.CallAfter(reset)
+            def on_selectall(event):
+                htmlwindow.SelectAll()
+
+            # Flag still up: show menu
+            htmlwindow.is_rightclick = False
+            menu = wx.Menu()
+            item_selection = wx.MenuItem(menu, -1, "&Copy selection")
+            item_selectall = wx.MenuItem(menu, -1, "&Select all")
+            menu.Append(item_selection)
+            menu.Append(item_selectall)
+            item_selection.Enable(bool(htmlwindow.SelectionToText()))
+            menu.Bind(wx.EVT_MENU, on_copy,      id=item_selection.GetId())
+            menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
+            htmlwindow.PopupMenu(menu)
+        event.Skip(), wx.CallAfter(reset, event.EventObject)
 
 
     def on_click_html_link(self, event):
@@ -5065,26 +5112,26 @@ class DatabasePage(wx.Panel):
         Handler for clicking a link in HtmlWindow, opens the link inside
         program or in default browser, opens a popupmenu if right click.
         """
-        href = event.GetLinkInfo().Href
+        href, htmlwindow = event.GetLinkInfo().Href, event.EventObject
         link_data, tab_data = None, None
-        if event.EventObject != self.label_html:
+        if htmlwindow in (self.html_searchall, self.html_searchall.HtmlWindow):
             tab_data = self.html_searchall.GetActiveTabData()
         if tab_data and tab_data.get("info"):
             link_data = tab_data["info"]["map"].get(href, {})
 
         # Workaround for no separate wx.html.HtmlWindow link right click event
-        if getattr(self.html_searchall, "is_rightclick", False):
+        if getattr(htmlwindow, "is_rightclick", False):
             # Open a pop-up menu with options to copy or select text
-            self.html_searchall.is_rightclick = False
+            htmlwindow.is_rightclick = False
             def clipboardize(text):
                 if wx.TheClipboard.Open():
                     d = wx.TextDataObject(text)
                     wx.TheClipboard.SetData(d), wx.TheClipboard.Close()
-            menutitle = None
+            copytitle = None
             if link_data:
                 msg_id, m = link_data.get("message"), None
                 if msg_id:
-                    menutitle = "C&opy message"
+                    copytitle = "C&opy message"
                     def handler(e):
                         if msg_id:
                             m = next(self.db.get_messages(additional_sql="id = :id",
@@ -5099,17 +5146,17 @@ class DatabasePage(wx.Panel):
                         chat = next((c for c in self.chats if c["id"] == chat_id), None)
                     if chat:
                         if skypedata.CHATS_TYPE_SINGLE == chat["type"]:
-                            menutitle, cliptext = "C&opy contact", chat["identity"]
+                            copytitle, cliptext = "C&opy contact", chat["identity"]
                         else:
-                            menutitle, cliptext = "C&opy chat name", chat["title"]
+                            copytitle, cliptext = "C&opy chat name", chat["title"]
                         def handler(e):
                             clipboardize(cliptext)
                     elif link_data.get("row"):
-                        menutitle = "C&opy row"
+                        copytitle = "C&opy row"
                         def handler(e):
                             clipboardize(repr(link_data["row"]))
             else:
-                menutitle = "C&opy link location"
+                copytitle = "C&opy link location"
                 if href.startswith("file://"):
                     href = urllib.request.url2pathname(href[5:])
                     if any(href.startswith(x) for x in ["\\\\\\", "///"]):
@@ -5117,32 +5164,32 @@ class DatabasePage(wx.Panel):
                     if isinstance(href, six.text_type):
                         # Workaround for wx.html.HtmlWindow double encoding
                         href = href.encode('latin1', errors="xmlcharrefreplace").decode("utf-8")
-                    menutitle = "C&opy file location"
+                    copytitle = "C&opy file location"
                 elif href.startswith("mailto:"):
                     href = href[7:]
-                    menutitle = "C&opy e-mail address"
+                    copytitle = "C&opy e-mail address"
                 elif any(href.startswith(x) for x in ["callto:", "skype:", "tel:"]):
                     href = href[href.index(":") + 1:]
-                    menutitle = "C&opy contact"
+                    copytitle = "C&opy contact"
                 def handler(e):
                     clipboardize(href)
-            if menutitle:
+            if copytitle:
                 def on_copyselection(event):
-                    clipboardize(self.html_searchall.SelectionToText())
+                    clipboardize(htmlwindow.SelectionToText())
                 def on_selectall(event):
-                    self.html_searchall.SelectAll()
+                    htmlwindow.SelectAll()
                 menu = wx.Menu()
                 item_selection = wx.MenuItem(menu, -1, "&Copy selection")
-                item_copy = wx.MenuItem(menu, -1, menutitle)
+                item_copy      = wx.MenuItem(menu, -1, copytitle)
                 item_selectall = wx.MenuItem(menu, -1, "&Select all")
                 menu.Append(item_selection)
                 menu.Append(item_copy)
                 menu.Append(item_selectall)
-                item_selection.Enable(bool(self.html_searchall.SelectionToText()))
+                item_selection.Enable(bool(htmlwindow.SelectionToText()))
                 menu.Bind(wx.EVT_MENU, on_copyselection, id=item_selection.GetId())
                 menu.Bind(wx.EVT_MENU, handler, id=item_copy.GetId())
                 menu.Bind(wx.EVT_MENU, on_selectall, id=item_selectall.GetId())
-                self.html_searchall.PopupMenu(menu)
+                htmlwindow.PopupMenu(menu)
         elif link_data or href.startswith("file://"):
             # Open the link, or file, or program internal link to chat or table
             chat_id = link_data.get("chat")
@@ -5214,14 +5261,15 @@ class DatabasePage(wx.Panel):
         elif href.startswith("page:"):
             # Go to database subpage
             page = href[5:]
-            if "#help" == page:
-                html = self.html_searchall
-                if html.GetTabDataByID(0):
-                    html.SetActiveTabByID(0)
+            if "#help" == page \
+            and htmlwindow in (self.html_searchall, self.html_searchall.HtmlWindow, self.label_html):
+                if self.html_searchall.GetTabDataByID(0):
+                    self.html_searchall.SetActiveTabByID(0)
                 else:
                     h = step.Template(templates.SEARCH_HELP_LONG).expand()
-                    html.InsertTab(html.GetTabCount(), "Search help", 0,
-                                   h, None)
+                    self.html_searchall.InsertTab(
+                        self.html_searchall.GetTabCount(), "Search help", 0, h, None
+                    )
             elif "#search" == page:
                 self.edit_searchall.SetFocus()
             else:
