@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.10.2022
+@modified    12.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3885,10 +3885,15 @@ class DatabasePage(wx.Panel):
             elif "populate" == result["action"]:
                 reloads = {} # {category: whether to reload in full or refresh UI only}
                 tlabel = ("account" if "accounts" == result["table"] else result["table"])
-                plabel, slabel = u"Synchronizing %s" % tlabel, None
+                plabel, slabel, chat = u"Synchronizing %s" % tlabel, None, None
+                if result.get("chat"):
+                    chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
+                    if not chat:
+                        cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
+                        self.chats.extend(cc)
+                        if cc: chat = cc[0]
 
                 if "messages" == result["table"] and result.get("chat"):
-                    chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
                     title = chat["title_long_lc"] if chat else result["chat"]
                     if len(title) > 35:
                         title = title[:35] + ".."
@@ -3907,15 +3912,19 @@ class DatabasePage(wx.Panel):
                     slabel = "Synchronized %s" % tlabel
 
                     if "accounts" == result["table"]:
-                        reloads.update(account=True, contacts=None)
+                        if result["identities"]:
+                            reloads.update(accounts=True, contacts=None)
 
                     if "contacts" == result["table"]:
-                        reloads.update(contacts=True)
+                        if result["identities"]:
+                            reloads.update(contacts=result["identities"])
 
                     if "chats" == result["table"]:
-                        slabel = "Synchronized %s%s: %s in total%s." % (
+                        slabel = "Synchronized %s%s" % (
                             util.plural("chat", result["count"], sep=",") if result["count"] else "chats",
-                            " (%s new)" % result["new"] if result["new"] else "",
+                            " (%s new)" % result["new"] if result["new"] else ""
+                        )
+                        if "message_count_new" in result: slabel += ": %s in total%s." % (
                             util.plural("new message", result["message_count_new"], sep=","),
                             ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                         )
@@ -3927,7 +3936,14 @@ class DatabasePage(wx.Panel):
                                 if result["contact_count_updated"] else "",
                             ]))
 
-                        reloads.update(chats=True, contacts=True)
+                        if "message_count_new" not in result: # Message sync is already handled by now
+                            chats = [c for c in self.chats if c["identity"] in result["identities"]]
+                            contacts = list(set(p["identity"] for c in chats for p in c["participants"]))
+                            if self.db.id in contacts: contacts.remove(self.db.id)
+                            if chats:
+                                reloads.update(accounts=True, chats=result["identities"])
+                            if contacts:
+                                reloads.update(accounts=True, contacts=contacts)
 
                     if "messages" == result["table"]:
                         slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
@@ -3946,8 +3962,9 @@ class DatabasePage(wx.Panel):
                             for k in "first_message", "last_message", "last_activity":
                                 chat[k + "_timestamp"] = util.datetime_to_epoch(chat[k + "_datetime"])
 
-                            reloads.update(chats=None)
-
+                            contacts = [x["identity"] for x in chat["participants"]]
+                            if self.db.id in contacts: contacts.remove(self.db.id)
+                            reloads.update(accounts=True, chats=[chat["identity"]], contacts=contacts)
 
                         if not any(result[k] for k in ("new", "updated")):
                             slabel = None
@@ -3958,21 +3975,15 @@ class DatabasePage(wx.Panel):
 
                 elif not result.get("start"):
                     if "chats" == result["table"] and result.get("chat"):
-                        # Inserted or updated a chat: load new contacts, if any
+                        # Updated chat metainfo: load new contacts, if any
                         plabel = ""
-
-                        chat = next((c for c in self.chats if c["identity"] == result["chat"]), None)
-                        if not chat:
-                            cc = self.db.get_conversations(chatidentities=[result["chat"]], reload=True, log=False)
-                            self.chats.extend(cc)
-                            if cc: chat = cc[0]
                         if chat:
                             ids = [x["identity"] for x in chat["participants"]]
                             newids = set(ids) - set(x["identity"] for x in self.contacts)
                             newcontacts = list(filter(bool, map(self.db.get_contact, newids)))
                             if newcontacts:
                                 self.contacts.extend(newcontacts)
-                                reloads.update(contacts=None)
+                                reloads.update(contacts=[x["identity"] for x in newcontacts])
 
                 if plabel:
                     self.label_sync_progress.Label = plabel
@@ -3981,40 +3992,52 @@ class DatabasePage(wx.Panel):
                     self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
                 self.gauge_sync.ContainingSizer.Layout()
 
-                def after2():
+                def after2(reloads):
                     """Populate statistics and reload views."""
                     if not self: return
                     contacts = [self.db.account] + self.contacts
+                    if reloads.get("accounts"):
+                        self.db.update_accountinfo()
                     if reloads.get("chats"):
-                        self.db.get_conversations_stats(self.chats)
+                        chats = self.db.get_conversations(reload=True, log=False,
+                                                          chatidentities=reloads["chats"])
+                        self.db.get_conversations_stats(chats)
+                        cmap = {c["identity"]: c for c in chats}
+                        self.chats = [cmap.pop(x["identity"], x) for x in self.chats] + \
+                                     list(cmap.values())
                     if reloads.get("contacts"):
-                        self.db.get_contacts_stats(contacts, self.chats, log=False)
-
-                    if "account" in reloads:
+                        mycontacts = self.db.get_contacts(reload=True, identities=reloads["contacts"])
+                        self.db.get_contacts_stats(mycontacts, self.chats, log=False)
+                        cmap = {c["identity"]: c for c in mycontacts}
+                        self.contacts = sorted([cmap.pop(x["identity"], x) for x in self.contacts] +
+                                               list(cmap.values()), key=lambda x: x["name"].lower())
+                        contacts = [self.db.account] + self.contacts
+                    if "accounts" in reloads:
                         self.db.get_contacts_stats([self.db.account], self.chats, log=False)
-                        self.update_info_page()
+                        contacts = [self.db.account] + self.contacts
                     if "chats" in reloads:
                         self.list_chats.Populate(self.chats)
                         lbl = "A&ll chat entries in database (%s):" % self.list_chats.ItemCount
                         self.label_list_chats.Label = lbl
-                    if "contacts" in reloads:
+                    if "accounts" in reloads or "contacts" in reloads:
                         self.list_contacts.Populate(contacts)
                         lbl = "A&ll profiles in database (%s):" % self.list_contacts.ItemCount
                         self.label_list_contacts.Label = lbl
+                    if self.chat:
+                        pidentities = set(x["identity"] for x in self.chat["participants"])
+                        is_related = self.chat["identity"] in (reloads.get("chats") or []) or \
+                                     pidentities & set(reloads.get("contacts") or [])
+                        is_related and self.load_chat(self.chat, reload=True)
                     if "contacts" in reloads and self.contact:
                         self.contact = next((x for x in contacts
                                              if x["identity"] == self.contact["identity"]), None)
-                    if "contacts" in reloads:
+                    if "accounts" in reloads or "contacts" in reloads:
                         self.load_contact(self.contact)
+                    self.db.update_fileinfo()
+                    self.update_accountinfo()
+                    self.update_info_page(reload=False)
 
-                if reloads.get("account"):
-                    self.db.update_accountinfo()
-                if reloads.get("chats"):
-                    self.chats = self.db.get_conversations(reload=True, log=False)
-                if reloads.get("contacts"):
-                    self.contacts = self.db.get_contacts(reload=True)
-                if reloads:
-                    wx.CallAfter(after2)
+                if reloads: wx.CallAfter(after2, reloads)
 
         if self: wx.CallAfter(after, result or kwargs)
         return bool(self and self.worker_live.is_working())
@@ -6048,9 +6071,9 @@ class DatabasePage(wx.Panel):
         self.load_contact(self.list_contacts.GetItemMappedData(event.Index))
 
 
-    def load_chat(self, chat, center_message_id=None):
+    def load_chat(self, chat, center_message_id=None, reload=False):
         """Loads history of the specified chat (as returned from db)."""
-        if not chat or (chat == self.chat and not center_message_id):
+        if not chat or (chat == self.chat and not center_message_id and not reload):
             return
 
         busy, clist, plist = None, self.list_chats, self.list_participants
@@ -6082,7 +6105,7 @@ class DatabasePage(wx.Panel):
 
         dates_range  = [None, None] # total available date range
         dates_values = [None, None] # currently filtered date range
-        if chat != self.chat or (center_message_id
+        if chat != self.chat or reload or (center_message_id
         and not self.stc_history.IsMessageShown(center_message_id)):
             busy = controls.BusyPanel(self,
                 "Loading history for %s." % chat["title_long_lc"])

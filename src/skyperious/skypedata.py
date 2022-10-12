@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    03.10.2022
+@modified    11.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -798,7 +798,7 @@ class SkypeDatabase(object):
 
     def get_contacts_stats(self, contacts, chats, log=None):
         """
-        Collects statistics for all contacts and fills in the values:
+        Collects statistics for given contacts and fills in the values:
         {"first_message_datetime": datetime, "last_message_datetime": datetime,
          "message_count_single": message count in 1:1 chat,
          "message_count_group": message count in group chats,
@@ -956,19 +956,19 @@ class SkypeDatabase(object):
                     self.table_objects["contactgroups"][group["id"]] = group
                 self.table_rows["contactgroups"] = groups
             else:
-                groups = self.table_rows["contactgroups"]
+                groups = self.table_rows["contactgroups"][:]
 
         return groups
 
 
-    def get_contacts(self, reload=False):
+    def get_contacts(self, identities=None, reload=False):
         """
-        Returns all the contacts in the database, as
-        [{"identity": skypename or pstnnumber,
-          "name": displayname or fullname, },]
+        Returns contacts in the database, as
+        [{"identity": skypename or pstnnumber, "name": displayname or fullname, }].
         Uses already retrieved cached values if possible.
 
-        @param   reload  ignore cache, retrieve everything again
+        @param   identities  contacts with specific identities to return if not all
+        @param   reload      ignore cache, retrieve everything again
         """
         result = []
         if not self.is_open() or "contacts" not in self.tables:
@@ -976,20 +976,27 @@ class SkypeDatabase(object):
 
         if reload or "contacts" not in self.table_rows:
             titlecol = self.make_title_col("contacts")
+            where, params = ("", ()) if not identities else \
+                            (" WHERE identity IN (%s)" % ", ".join("?" * len(identities)), identities)
             rows = self.execute(
                 "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
                 "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office) AS phone, "
                 "NULL AS first_message_datetime, NULL AS last_message_datetime, "
                 "NULL AS message_count_single, NULL AS message_count_group, "
-                "%s AS name FROM contacts ORDER BY name COLLATE NOCASE"
-            % titlecol).fetchall()
-            self.table_objects["contacts"] = {}
+                "%s AS name FROM contacts%s ORDER BY name COLLATE NOCASE"
+            % (titlecol, where), params).fetchall()
+            if not identities: self.table_objects["contacts"] = {}
             for c in rows:
                 result.append(c)
                 self.table_objects["contacts"][c["identity"]] = c
-            self.table_rows["contacts"] = result
+            if identities:
+                contacts0, cmap = self.table_rows["contacts"], {c["identity"]: c for c in result}
+                self.table_rows["contacts"] = sorted([cmap.pop(c["identity"], c) for c in contacts0] + \
+                                                     list(cmap.values()), key=lambda x: x["name"].lower())
+            else: self.table_rows["contacts"] = result
         else:
-            result = self.table_rows["contacts"]
+            result = self.table_rows["contacts"][:]
+            if identities: result = [x for x in result if x["identity"] in identities]
 
         return result
 
@@ -1047,7 +1054,7 @@ class SkypeDatabase(object):
                     for row in result:
                         self.table_objects[table][row[pk]] = row
             else:
-                result = self.table_rows[table]
+                result = self.table_rows[table][:]
         return result
 
 
@@ -1058,15 +1065,10 @@ class SkypeDatabase(object):
         """
         if self.is_open() and "smses" in self.tables:
             if "smses" not in self.table_rows:
-                rows = self.execute(
-                    "SELECT * FROM smses ORDER BY id").fetchall()
-                smses = []
-                for sms in rows:
-                    smses.append(sms)
-                self.table_rows["smses"] = smses
+                rows = self.execute("SELECT * FROM smses ORDER BY id").fetchall()
+                smses = self.table_rows["smses"] = list(rows)
             else:
-                smses = self.table_rows["smses"]
-
+                smses = self.table_rows["smses"][:]
         return smses
 
 
@@ -1078,15 +1080,10 @@ class SkypeDatabase(object):
         transfers = []
         if self.is_open() and "transfers" in self.tables:
             if "transfers" not in self.table_rows:
-                rows = self.execute(
-                    "SELECT * FROM transfers ORDER BY id").fetchall()
-                transfers = []
-                for transfer in rows:
-                    transfers.append(transfer)
-                self.table_rows["transfers"] = transfers
+                rows = self.execute("SELECT * FROM transfers ORDER BY id").fetchall()
+                transfers = self.table_rows["transfers"] = list(rows)
             else:
-                transfers = self.table_rows["transfers"]
-
+                transfers = self.table_rows["transfers"][:]
         return transfers
 
 
@@ -1113,7 +1110,7 @@ class SkypeDatabase(object):
                     self.table_objects["videos"][video["id"]] = video
                 self.table_rows["videos"] = videos
             else:
-                videos = self.table_rows["videos"]
+                videos = self.table_rows["videos"][:]
 
         if chat:
             ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]
@@ -1142,7 +1139,7 @@ class SkypeDatabase(object):
                     self.table_objects["calls"][call["id"]] = call
                 self.table_rows["calls"] = calls
             else:
-                calls = self.table_rows["calls"]
+                calls = self.table_rows["calls"][:]
 
         if chat:
             ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    03.10.2022
+@modified    12.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -254,17 +254,16 @@ class SkypeLogin(object):
 
     def save(self, table, item, parent=None):
         """
-        Saves the item to SQLite table. Returns true if item with the same
-        content already existed.
+        Saves the item to SQLite table.
 
         @param    table   database table to save into
         @param    item    Skype API data object
         @param    parent  chat for messages
-        @return           one of SkypeLogin.SAVE
+        @return           (database row, one of SkypeLogin.SAVE)
         """
-        if item is None: return self.SAVE.SKIP
+        if item is None: return (None, self.SAVE.SKIP)
         dbitem = self.convert(table, item, parent=parent)
-        if dbitem is None: return self.SAVE.SKIP
+        if dbitem is None: return (None, self.SAVE.SKIP)
         result, dbitem1, table = None, dict(dbitem), table.lower()
 
         identity = dbitem["skypename"] if table in ("accounts", "contacts") else \
@@ -387,7 +386,7 @@ class SkypeLogin(object):
                 same = all(v == dbitem0[k] for k, v in dbitem1.items() if k in dbitem0)
                 result = self.SAVE.NOCHANGE if same else self.SAVE.UPDATE
                 if not same: self.sync_counts["%s_updated" % table] += 1
-        return result
+        return dbitem, result
 
 
     def insert_transfers(self, msg, row, row0):
@@ -731,11 +730,14 @@ class SkypeLogin(object):
         self.sync_counts.clear()
         self.build_cache("accounts")
         logger.info("Synchronizing database account profile from live.")
+        updateds = set()
         try:
             account = self.request(type(self.skype).user.fget, self.skype)
-            self.save("accounts", account)
+            _, action = self.save("accounts", account)
+            if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                updateds.add(self.db.id)
         finally:
-            self.progress(action="populate", table="accounts", end=True)
+            self.progress(action="populate", table="accounts", identities=list(updateds), end=True)
 
 
     def populate_contacts(self, contacts=()):
@@ -755,17 +757,20 @@ class SkypeLogin(object):
         self.build_cache("contacts")
         logger.info("Synchronizing %s from live.",
                     util.plural("contact profile", total, numbers=bool(contacts)))
+        updateds = set()
         try:
             for i, contact in enumerate(iterable):
                 if not i % 10 and not self.progress(
                     action="info", message="Querying contacts..",
                     **(dict(index=i + 1, count=total) if total > 1 else {})
                 ): break # for i, contact
-                self.save("contacts", contact)
+                dbitem, action = self.save("contacts", contact)
+                if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                    updateds.add(dbitem["skypename"])
         finally:
             self.progress(action="populate", table="contacts", end=True,
                           count=self.sync_counts["contacts_updated"],
-                          new=self.sync_counts["contacts_new"])
+                          new=self.sync_counts["contacts_new"], identities=list(updateds))
 
 
     def populate_chats(self, chats=(), messages=True):
@@ -817,13 +822,15 @@ class SkypeLogin(object):
                 if not chats: break # while run
             elif not mychats: break # while run
 
-        self.progress(
-            action="populate", table="chats", end=True, count=len(updateds),
-            new=self.sync_counts["chats_new"],
+        pargs = dict(
             message_count_new=self.sync_counts["messages_new"],
             message_count_updated=self.sync_counts["messages_updated"],
+        ) if messages else {}
+        self.progress(
+            action="populate", table="chats", end=True, count=len(updateds),
+            new=self.sync_counts["chats_new"], identities=list(updateds),
             contact_count_new=self.sync_counts["contacts_new"],
-            contact_count_updated=self.sync_counts["contacts_updated"],
+            contact_count_updated=self.sync_counts["contacts_updated"], **pargs
         )
         for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
         logger.info("Finished syncing %s'%s'.", cstr, self.db)
@@ -835,7 +842,6 @@ class SkypeLogin(object):
 
         @param   chat                skpy.SkypeChat instance
         @param   full                retrieve messages, or only chat metainfo and participants
-
         @param   chats_processed     state parameter: set of chat identities processed
         @param   chats_updated       state parameter: set of chat identities updated
         @param   chats_completed     state parameter: set of chat identities finished
@@ -872,7 +878,7 @@ class SkypeLogin(object):
             or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
                 and not self.cache["chats"][cidentity].get("__updated__"))):
                 # Insert chat or update existing contacts, only if doing metainfo or if any messages
-                try: action = self.save("chats", chat)
+                try: _, action = self.save("chats", chat)
                 except Exception:
                     logger.exception("Error saving chat %r.", chat)
                 else:
@@ -890,7 +896,7 @@ class SkypeLogin(object):
             start = False
 
             for msg in msgs:
-                try: action = self.save("messages", msg, parent=chat)
+                try: _, action = self.save("messages", msg, parent=chat)
                 except Exception:
                     logger.exception("Error saving message %r.", msg)
                     if not self.progress():
