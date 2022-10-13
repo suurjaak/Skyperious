@@ -3978,6 +3978,8 @@ class DatabasePage(wx.Panel):
                             if result["updated"]: slabel += ", %s updated" % result["updated"]
                             slabel += "."
 
+                    if slabel and not slabel.endswith("."): slabel += "."
+
                 elif not result.get("start"):
                     if "chats" == result["table"] and result.get("chat"):
                         # Updated chat metainfo: load new contacts, if any
@@ -3995,6 +3997,7 @@ class DatabasePage(wx.Panel):
                 if slabel:
                     self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
                     self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+                    logger.info(slabel)
                 self.gauge_sync.ContainingSizer.Layout()
 
                 def after2(reloads):
