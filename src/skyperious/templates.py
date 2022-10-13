@@ -1816,6 +1816,8 @@ HTML statistics template, for use with HtmlWindow.
 @param   db               SkypeDatabase instance
 @param   participants     [{contact data}, ]
 @param   chat             chat data dictionary
+@param   chat_image       memoryfs filename, if any
+@param   chat_image_size  chat image size as (w, h)
 @param   sort_by          the field stats are currently sorted by
 @param   stats            SkypeDatabase.get_collected_stats()
 @param   images           {histogram type: memoryfs filename}
@@ -1882,6 +1884,22 @@ interval = items[1][0] - items[0][0]
 %endif
   </tr>
 %endfor
+
+%if chat_image:
+<%
+sz = None
+if chat_image_size[0] > 100:
+    ratio = 100. / chat_image_size[0]
+    sz = tuple(int(x * ratio) for x in chat_image_size)
+%>
+  <tr>
+    <td valign="top">Chat profile picture:</td>
+    <td valign="top">
+      <img src="memory:{{ chat_image }}" {{! 'width="%s" height="%s" ' % sz if sz else "" }}/><br />
+      <a href="picture"><font color="{{ conf.LinkColour }}">Save image</font></a>
+    </td>
+  </tr>
+%endif
 
 %if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
   <tr><td><br /><br /></td><td colspan="3" valign="bottom">
@@ -2796,6 +2814,7 @@ Contact information template, for use with HtmlWindow.
 @param   contact          contact data dictionary, including "conversations": [}
 @param   sort_by          the field that chats are currently sorted by
 @param   avatar           memoryfs filename
+@param   avatar_size      avatar image size as (w, h)
 """
 CONTACT_HTML = """<%
 from skyperious import conf, skypedata

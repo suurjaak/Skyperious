@@ -19,6 +19,7 @@ import datetime
 import functools
 import hashlib
 import inspect
+import io
 import logging
 import math
 import os
@@ -2342,7 +2343,7 @@ class DatabasePage(wx.Panel):
         self.contact = None # Currently viewed contact
         self.contacts = []  # All contacts in database
         self.contact_sort_field = "last_message_datetime"
-        self.imagecache = {} # {("contact", contact ID): wx.Image}
+        self.imagecache = {} # {("avatar", contact/account ID) or ("chat", chat ID): wx.Image}
         self.stats_sort_field = "name"
         self.stats_expand = {"clouds": False, "emoticons": False,
                              "shared_media": False}
@@ -5042,6 +5043,22 @@ class DatabasePage(wx.Panel):
         elif href.startswith("message:"):
             self.show_stats(False)
             self.stc_history.FocusMessage(int(href[8:]))
+        elif href == "picture":
+            imgkey = ("chat", self.chat["id"])
+            img = self.imagecache.get(imgkey)
+            if not img: return
+
+            self.dialog_saveimage.Filename = util.safe_filename(self.chat["title_long"])
+            fmt = next((k for k, v in export.IMAGE_FORMATS.items() if v == img.Type), None)
+            if fmt: self.dialog_saveimage.FilterIndex = export.IMAGE_EXTS.index(fmt)
+            if wx.ID_OK != self.dialog_saveimage.ShowModal(): return
+
+            filepath = controls.get_dialog_path(self.dialog_saveimage)
+            guibase.status('Exporting "%s".', filepath)
+            ext = os.path.splitext(filepath)[-1].lstrip(".").lower()
+            # Make copy as SaveFile() converts image format
+            img.Copy().SaveFile(filepath, export.IMAGE_FORMATS[ext])
+            util.start_file(filepath)
         else:
             self.stc_history.SearchBarVisible = True
             self.show_stats(False)
@@ -6331,6 +6348,7 @@ class DatabasePage(wx.Panel):
         if stats:
             data = {"db": self.db, "participants": [],
                     "chat": self.chat, "sort_by": self.stats_sort_field,
+                    "chat_image": None, "chat_image_size": None,
                     "stats": stats, "images": {}, "authorimages": {},
                     "imagemaps": {}, "authorimagemaps": {},
                     "expand": self.stats_expand}
@@ -6416,6 +6434,21 @@ class DatabasePage(wx.Panel):
                 if img and fn not in fs["files"]:
                     fs["handler"].AddFile(fn, img.Image, wx.BITMAP_TYPE_GIF)
                     fs["files"][fn] = 1
+            # Fill chat image
+            pic = self.chat["meta_picture"] or self.chat.get("__link", {}).get("meta_picture")
+            bmp, raw = None, (skypedata.fix_image_raw(pic) if pic else None)
+            try:
+                bmp = wx.Image(io.BytesIO(raw.encode("latin1")))
+            except Exception:
+                logger.exception("Error loading image for %s.", self.chat["title_long_lc"])
+            if bmp:
+                vals = (str(self.chat["id"]).encode("utf-8"), self.db.filename.encode("utf-8"))
+                fn = "%s_%s.bmp" % tuple(map(urllib.parse.quote, vals))
+                if fn not in fs["files"]:
+                    fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
+                    fs["files"][fn] = 1
+                data["chat_image"], data["chat_image_size"] = fn, tuple(bmp.GetSize())
+                self.imagecache[("chat", self.chat["id"])] = bmp
 
             html = step.Template(templates.STATS_HTML, escape=True).expand(data)
 

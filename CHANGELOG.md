@@ -6,6 +6,7 @@ CHANGELOG
 - add chat and contact counts to chats and contacts lists
 - add database account as one entry among contacts in contacts-tab
 - add links to contacts page in chat statistics
+- add chat image to chat statistics
 - add option to delete contact from database
 - add contacts TXT export
 - add contacts export to command-line interface
