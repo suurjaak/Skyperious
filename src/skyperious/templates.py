@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    02.10.2022
+@modified    13.10.2022
 ------------------------------------------------------------------------------
 """
 import re
@@ -1927,8 +1927,13 @@ if stats["counts"][p["identity"]]["shares"]:
   <tr>
     <td valign="top">
       <table cellpadding="0" cellspacing="0"><tr>
+%if p.get("id"):
+        <td valign="top"><a href="contact:{{ p["id"] }}"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/></a>&nbsp;&nbsp;</td>
+        <td valign="center"><a href="contact:{{ p["id"] }}"><font color="{{ conf.LinkColour }}">{{ p["name"] }}</font></a><br /><font size="2" color="gray">{{ p["identity"] }}</font></td>
+%else:
         <td valign="top"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/>&nbsp;&nbsp;</td>
         <td valign="center">{{ p["name"] }}<br /><font size="2" color="gray">{{ p["identity"] }}</font></td>
+%endif
       </tr></table>
     </td><td valign="top">
 %for type, label, count, total in stat_rows:

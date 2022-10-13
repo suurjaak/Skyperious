@@ -5033,6 +5033,12 @@ class DatabasePage(wx.Panel):
             section = href[9:]
             self.stats_expand[section] = not self.stats_expand[section]
             self.populate_chat_statistics()
+        elif href.startswith("contact:"):
+            contactid = int(href[href.index(":") + 1:])
+            contact = next((x for x in [self.db.account] + self.contacts if x["id"] == contactid), None)
+            if contact:
+                self.notebook.SetSelection(self.pageorder[self.page_contacts])
+                self.load_contact(contact)
         elif href.startswith("message:"):
             self.show_stats(False)
             self.stc_history.FocusMessage(int(href[8:]))
