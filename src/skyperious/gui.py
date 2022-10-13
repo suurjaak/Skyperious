@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.10.2022
+@modified    13.10.2022
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3772,9 +3772,10 @@ class DatabasePage(wx.Panel):
         """Starts synchronizing local database from Skype online service."""
         self.label_sync_progress.Label = "Updating local database from Skype online service.."
         self.list_chats_sync.DeleteAllItems()
+        self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
-        self.button_sync.Disable()
-        self.button_sync_sel.Disable()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate"})
@@ -3809,9 +3810,10 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
         self.label_sync_progress.Label = plabel
         self.list_chats_sync.DeleteAllItems()
+        self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
-        self.button_sync.Disable()
-        self.button_sync_sel.Disable()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate", "chats": [x["identity"] for x in selchats]})
@@ -3823,8 +3825,8 @@ class DatabasePage(wx.Panel):
             conf.Title, wx.ICON_QUESTION | wx.OK | wx.CANCEL
         ) or not self.worker_live.is_working(): return
         self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
-        self.button_sync.Enable()
-        self.button_sync_sel.Enable()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
         self.button_sync_stop.Disable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.stop_work()
@@ -3848,11 +3850,14 @@ class DatabasePage(wx.Panel):
             self.edit_pw.SetFocus()
             return
 
-        self.gauge_sync.Pulse()
-        self.button_sync.Disable()
-        self.button_sync_sel.Disable()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
         self.button_sync_stop.Enable()
-        self.gauge_sync.ContainingSizer.Layout()
+        if not self.worker_live.is_working():
+            self.list_chats_sync.DeleteAllItems()
+            self.edit_sync_status.Clear()
+            self.gauge_sync.Pulse()
+            self.gauge_sync.ContainingSizer.Layout()
 
         account  = next((c for c in contacts or [] if c["identity"] == self.db.id), None)
         if account:
@@ -4081,8 +4086,8 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.Value += ("\n\n" if self.edit_sync_status.Value else "") + slabel
         self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
         self.gauge_sync.ContainingSizer.Layout()
-        self.button_sync.Enable()
-        self.button_sync_sel.Enable()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
         self.button_sync_stop.Disable()
         if not self.get_unsaved_grids(): self.on_refresh_tables()
         wx.Bell()
