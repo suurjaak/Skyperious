@@ -3526,8 +3526,8 @@ class DatabasePage(wx.Panel):
                                     numbers=False))
         item_rename   = wx.MenuItem(menu, -1, "Re&name")
 
-        item_syncm    = wx.MenuItem(menu, -1, "Synchronize &messages and metainfo")
-        item_syncp    = wx.MenuItem(menu, -1, "Synchronize meta&info")
+        item_syncm    = wx.MenuItem(menu, -1, "Synchronize &messages and profiles")
+        item_syncp    = wx.MenuItem(menu, -1, "Synchronize &profiles")
         smenu.Append(item_syncm)
         smenu.Append(item_syncp)
 
