@@ -4008,12 +4008,13 @@ class DatabasePage(wx.Panel):
                     if reloads.get("accounts"):
                         self.db.update_accountinfo()
                     if reloads.get("chats"):
-                        chats = self.db.get_conversations(reload=True, log=False,
+                        mychats = self.db.get_conversations(reload=True, log=False,
                                                           chatidentities=reloads["chats"])
-                        self.db.get_conversations_stats(chats)
-                        cmap = {c["identity"]: c for c in chats}
+                        self.db.get_conversations_stats(mychats)
+                        cmap = {c["identity"]: c for c in mychats}
                         self.chats = [cmap.pop(x["identity"], x) for x in self.chats] + \
                                      list(cmap.values())
+                        for c in mychats: self.imagecache.pop(("chat", c["id"]), None)
                     if reloads.get("contacts"):
                         mycontacts = self.db.get_contacts(reload=True, identities=reloads["contacts"])
                         self.db.get_contacts_stats(mycontacts, self.chats, log=False)
@@ -4021,6 +4022,7 @@ class DatabasePage(wx.Panel):
                         self.contacts = sorted([cmap.pop(x["identity"], x) for x in self.contacts] +
                                                list(cmap.values()), key=lambda x: x["name"].lower())
                         contacts = [self.db.account] + self.contacts
+                        for c in mycontacts: self.imagecache.pop(("avatar", c["id"]), None)
                     if "accounts" in reloads:
                         self.db.get_contacts_stats([self.db.account], self.chats, log=False)
                         contacts = [self.db.account] + self.contacts
@@ -5054,7 +5056,7 @@ class DatabasePage(wx.Panel):
             if wx.ID_OK != self.dialog_saveimage.ShowModal(): return
 
             filepath = controls.get_dialog_path(self.dialog_saveimage)
-            guibase.status('Exporting "%s".', filepath)
+            guibase.status('Exporting "%s".', filepath, log=True)
             ext = os.path.splitext(filepath)[-1].lstrip(".").lower()
             # Make copy as SaveFile() converts image format
             img.Copy().SaveFile(filepath, export.IMAGE_FORMATS[ext])
@@ -5104,7 +5106,7 @@ class DatabasePage(wx.Panel):
             if wx.ID_OK != self.dialog_saveimage.ShowModal(): return
 
             filepath = controls.get_dialog_path(self.dialog_saveimage)
-            guibase.status('Exporting "%s".', filepath)
+            guibase.status('Exporting "%s".', filepath, log=True)
             ext = os.path.splitext(filepath)[-1].lstrip(".").lower()
             # Make copy as SaveFile() converts image format
             img.Copy().SaveFile(filepath, export.IMAGE_FORMATS[ext])
@@ -6436,19 +6438,20 @@ class DatabasePage(wx.Panel):
                     fs["files"][fn] = 1
             # Fill chat image
             pic = self.chat["meta_picture"] or self.chat.get("__link", {}).get("meta_picture")
-            bmp, raw = None, (skypedata.fix_image_raw(pic) if pic else None)
+            img, imgkey = self.imagecache.get(("chat", self.chat["id"])), ("chat", self.chat["id"])
             try:
-                bmp = wx.Image(io.BytesIO(raw.encode("latin1")))
+                raw = skypedata.fix_image_raw(pic) if pic and not img else None
+                img = img or wx.Image(io.BytesIO(raw.encode("latin1")))
             except Exception:
                 logger.exception("Error loading image for %s.", self.chat["title_long_lc"])
-            if bmp:
+            if img:
                 vals = (str(self.chat["id"]).encode("utf-8"), self.db.filename.encode("utf-8"))
                 fn = "%s_%s.bmp" % tuple(map(urllib.parse.quote, vals))
                 if fn not in fs["files"]:
-                    fs["handler"].AddFile(fn, bmp, wx.BITMAP_TYPE_BMP)
+                    fs["handler"].AddFile(fn, img.Copy(), wx.BITMAP_TYPE_BMP)
                     fs["files"][fn] = 1
-                data["chat_image"], data["chat_image_size"] = fn, tuple(bmp.GetSize())
-                self.imagecache[("chat", self.chat["id"])] = bmp
+                data["chat_image"], data["chat_image_size"] = fn, tuple(img.GetSize())
+                self.imagecache[imgkey] = img
 
             html = step.Template(templates.STATS_HTML, escape=True).expand(data)
 
