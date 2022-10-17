@@ -30,6 +30,7 @@ CHANGELOG
 - fix parsing quoted media messages
 - fix chat count on initial and info page not matching count in chat list
 - fix error on syncing a contact no longer available online
+- fix escaping quotes in SQL export
 - fix compiled exe and pythonw auto-closing window immediately on --help
 
 

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    02.10.2022
+@modified    17.10.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -185,7 +185,8 @@ def format_sql_value(value):
         else:
             if isinstance(value, six.text_type):
                 value = value.encode("utf-8")
-            value = '"%s"' % codecs.encode(value.decode("latin1"), "unicode-escape").decode("latin1")
+            escaped = codecs.encode(value.decode("latin1"), "unicode-escape").decode("latin1")
+            value = '"%s"' % escaped.replace('"', '""')
     elif value is None:
         value = "NULL"
     else:
