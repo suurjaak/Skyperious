@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.4, 2022-10-13
+5.4, 2022-10-17
 ---------------
 - add chat and contact counts to chats and contacts lists
 - add database account as one entry among contacts in contacts-tab
@@ -27,6 +27,7 @@ CHANGELOG
 - export contact list by current applied filter
 - order file types in save dialog by label
 - skip trying to download old shared content guaranteed to be unavailable
+- fix parsing quoted media messages
 - fix chat count on initial and info page not matching count in chat list
 - fix error on syncing a contact no longer available online
 - fix compiled exe and pythonw auto-closing window immediately on --help

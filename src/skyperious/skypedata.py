@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    11.10.2022
+@modified    17.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2246,7 +2246,7 @@ class MessageParser(object):
 
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
-            url, filename, dom0 = dom.find("URIObject").get("uri"), None, dom
+            url, filename, dom0 = next(dom.iter("URIObject")).get("uri"), None, dom
             nametag = next(dom.iter("OriginalName"), None)
             if nametag is not None: filename = nametag.get("v")
             if not filename:
@@ -2273,7 +2273,7 @@ class MessageParser(object):
                 try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
                 except Exception: pass
 
-                objtype = (dom0.find("URIObject").get("type") or "").lower()
+                objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
                 if   "audio"   in objtype: data["category"] = "audio"
                 elif "video"   in objtype: data["category"] = "video"
                 elif "sticker" in objtype: data["category"] = "sticker"
@@ -2294,7 +2294,9 @@ class MessageParser(object):
                 a = next(dom.iter("a"), None)
                 if a is not None: a.set("href", url); a.text = url
 
-                if self.stats: self.stats["shared_media"][message["id"]] = data
+                # If not root element, then this message quotes a media message
+                if self.stats and dom0.find("URIObject"):
+                    self.stats["shared_media"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
