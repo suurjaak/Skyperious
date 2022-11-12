@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    17.10.2022
+@modified    12.11.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -60,7 +60,7 @@ def safedivf(a, b):
 def safe_filename(filename):
     """Returns the filename with characters like \:*?"<>| removed."""
     result = re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
-    return re.sub("\s+", " ", result)
+    return re.sub(r"\s+", " ", result)
 
 
 def format_bytes(size, precision=2, max_units=True):
