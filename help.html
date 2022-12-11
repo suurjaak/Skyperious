@@ -45,16 +45,16 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
         <h2>Help Texts</h2>
 
         <a name="search"><h3>Search Syntax</h3></a>
-        Skyperious supports a Google-like syntax for searching messages:
+        Skyperious supports a simple query syntax for searching messages:
         <br /><br />
 
         <table>
@@ -143,8 +143,8 @@
         <tr>
           <td>
             <b>Search from specific time periods</b><br /><br />
-            <code>date:2008<br />date:2009-01<br />
-            date:2005-12-24..2007</code>
+            <code>date:2020<br />date:2022-01<br />
+            date:2020-12-24..2021</code>
             <br />
           </td>
           <td>
@@ -167,7 +167,7 @@
             <b>Exclude words or keywords</b><br /><br />
             <code>-notthisword<br />-"not this phrase"<br />
             -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
-            -date:2013</code>
+            -date:2021</code>
             <br />
           </td>
           <td>
@@ -204,21 +204,21 @@
             <code>flickr.com from:john from:jane chat:links</code>
             <br /><br />
           </li>
-          <li>search from John Smith up to 2011:<br />
-            <code>from:"john smith" date:..2011</code>
+          <li>search from John Smith up to 2021:<br />
+            <code>from:"john smith" date:..2021</code>
             <br /><br />
           </li>
           <li>search for either "John" and "my side" or "Stark" and "your side":<br />
             <code>(john "my side") OR (stark "your side")</code>
             <br /><br />
           </li>
-          <li>search for either "barbecue" or "grill" in 2012, except from June to August:<br />
-            <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
+          <li>search for either "barbecue" or "grill" in 2022, except from June to August:<br />
+            <code>barbecue OR grill date:2022 -date:2022-06..2022-08</code>
             <br /><br />
           </li>
           <li>search for "TPS report" in chats named "office"
-              (but not named "backoffice") on the first day of the month in 2012:<br />
-            <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
+              (but not named "backoffice") on the first day of the month in 2022:<br />
+            <code>"tps report" chat:office -chat:backoffice date:2022-*-1</code>
             <br /><br />
           </li>
         </ul>
@@ -252,13 +252,14 @@ Skyperious - Skype SQLite database viewer and merger.
 
 positional arguments:
   {export,search,sync,merge,diff,gui}
-    <a href="#export">export</a>              export Skype databases as HTML, text or spreadsheet
-    <a href="#search">search</a>              search Skype databases for messages or data
-    <a href="#sync"  >sync</a>                download new messages from Skype online service
-    <a href="#create">create</a>              create new Skype database, blank or from Skype source
-    <a href="#merge" >merge</a>               merge two or more Skype databases into a new database
-    <a href="#diff"  >diff</a>                compare chat history in two Skype databases
-    <a href="#gui"   >gui</a>                 launch Skyperious graphical program (default option)
+    <a href="#export"  >export</a>              export Skype databases as HTML, text or spreadsheet
+    <a href="#search"  >search</a>              search Skype databases for messages or data
+    <a href="#sync"    >sync</a>                download new messages from Skype online service
+    <a href="#contacts">contacts</a>            export Skype contacts as HTML, text or spreadsheet
+    <a href="#create"  >create</a>              create new Skype database, blank or from Skype source
+    <a href="#merge"   >merge</a>               merge two or more Skype databases into a new database
+    <a href="#diff"    >diff</a>                compare chat history in two Skype databases
+    <a href="#gui"     >gui</a>                 launch Skyperious graphical program (default option)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -271,7 +272,7 @@ optional arguments:
 <code>$ skyperious -h export</code>
 
 usage: skyperious export [-h] [-t {html,xlsx,csv,txt,xlsx_single}] [-o DIR]
-                         [-c CHAT [CHAT ...]] [-a AUTHOR [AUTHOR ...]]
+                         [-c CHAT [CHAT ...]] [-a NAME [NAME ...]]
                          [-s START_DATE] [-e END_DATE] [--media-folder]
                          [--ask-password] [--store-password] [--verbose]
                          FILE [FILE ...]
@@ -292,7 +293,7 @@ optional arguments:
   -o DIR, --output DIR  output directory if not current directory
   -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
                         names of specific chats to export
-  -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
+  -a NAME [NAME ...], --author NAME [NAME ...]
                         names of specific authors whose chats to export
   -s START_DATE, --start START_DATE
                         date to export messages from, as YYYY-MM-DD
@@ -300,6 +301,8 @@ optional arguments:
                         date to export messages until, as YYYY-MM-DD
   --media-folder        save shared media into a subfolder in HTML export
                         instead of embedding into HTML
+  --media-cache         cache downloaded media in user directory,
+                        for faster repeated exports
   --ask-password        prompt for Skype password on HTML export to download
                         shared media
   --store-password      store entered password in configuration
@@ -320,7 +323,7 @@ Search Skype databases for messages, chat or contact information, or table
 data.
 
 positional arguments:
-  QUERY                 search query, with a Google-like syntax, for example:
+  QUERY                 search query, with a simple query syntax, for example:
                         "this OR that chat:links from:john". More on syntax at
                         https://suurjaak.github.io/Skyperious/help.html.
   FILE                  Skype database file(s) to search
@@ -345,7 +348,7 @@ optional arguments:
 
 usage: skyperious sync [-h] [-u USERNAME] [-p PASSWORD] [--store-password]
                        [--ask-password] [-c CHAT [CHAT ...]]
-                       [-a AUTHOR [AUTHOR ...]] [--verbose]
+                       [-a NAME [NAME ...]] [--verbose]
                        FILE [FILE ...]
 
 Synchronize Skype database via login to Skype online service.
@@ -374,13 +377,49 @@ optional arguments:
                         to sync
   -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
                         names of specific chats to sync
-  -a AUTHOR [AUTHOR ...], --author AUTHOR [AUTHOR ...]
+  -a NAME [NAME ...], --author NAME [NAME ...]
                         names of specific authors whose chats to sync
   --verbose             print detailed progress messages to stderr
   --no-terminal         command-line output suitable for non-terminal display,
                         like piping to a file; also skips all user interaction
                         like asking for Skype username or password
   --config-file         path of configuration file to use
+</pre>
+
+
+<pre id="contacts">
+<code>$ skyperious -h contacts</code>
+
+usage: skyperious contacts [-h] [-t {html,xlsx,csv,txt}] [-o FILE]
+                           [-f TEXT [TEXT ...]] [-n NAME [NAME ...]]
+                           [-c CHAT [CHAT ...]] [--verbose] [--no-terminal]
+                           [--config-file CONFIG_FILE]
+                           FILE [FILE ...]
+
+Export contacts from a Skype database into file.
+
+positional arguments:
+  FILE                  Skype databases to process (supports * wildcards)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t {html,xlsx,csv,txt}, --type {html,xlsx,csv,txt}
+                        export type: HTML files (default), Excel workbooks,
+                        CSV spreadsheets, text files
+  -o FILE, --output FILE
+                        output filename if not using auto-generated
+  -f TEXT [TEXT ...], --filter TEXT [TEXT ...]
+                        select contacts with given texts in any profile fields
+  -n NAME [NAME ...], --name NAME [NAME ...]
+                        names of specific contacts to select
+  -c CHAT [CHAT ...], --chat CHAT [CHAT ...]
+                        names of chats to select contacts by
+  --verbose             print detailed progress messages to stderr
+  --no-terminal         command-line output suitable for non-terminal display,
+                        like piping to a file; also skips all user interaction
+                        like asking for Skype username or password
+  --config-file CONFIG_FILE
+                        path of configuration file to use
 </pre>
 
 

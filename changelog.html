@@ -40,14 +40,48 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+        <h4>v5.4, 2022-12-11:</h4>
+        <ul>
+          <li>add chat and contact counts to chats and contacts lists</li>
+          <li>add database account as one entry among contacts in contacts-tab</li>
+          <li>add links to contacts page in chat statistics</li>
+          <li>add chat image to chat statistics</li>
+          <li>add option to delete contact from database</li>
+          <li>add contacts TXT export</li>
+          <li>add contacts export to command-line interface</li>
+          <li>add configuration flag to cache shared media on disk (issue #112)</li>
+          <li>add configuration flag to auto-open exported files</li>
+          <li>add 1:1 and group chat message counts to contact details</li>
+          <li>add chat history text size selection to chat toolbar and context menu</li>
+          <li>add context menu popup to contact list right-click</li>
+          <li>add support for exporting SQL query results as INSERT statements</li>
+          <li>add support for F2 and Ctrl-F key shortcuts in chats and contacts lists</li>
+          <li>add "Export chats" button to contacts tab</li>
+          <li>add context menu popups to all HTML controls</li>
+          <li>expose chats and contacts lists context menu options under actions button</li>
+          <li>add options to sync specific items in chats and contacts lists from live</li>
+          <li>list all chats a contact is participant in, including empty chats</li>
+          <li>convert linefeeds in profile fields to line break tags in contacts HTML export</li>
+          <li>retain sort direction on changing sort column in contacts HTML export</li>
+          <li>export contact list by current applied filter</li>
+          <li>order file types in save dialog by label</li>
+          <li>skip trying to download old shared content guaranteed to be unavailable</li>
+          <li>fix parsing quoted media messages</li>
+          <li>fix chat count on initial and info page not matching count in chat list</li>
+          <li>fix error on syncing a contact no longer available online</li>
+          <li>fix escaping quotes in SQL export</li>
+          <li>fix compiled exe and pythonw auto-closing window immediately on --help</li>
+        </ul>
+        <br />
 
         <h4>v5.3, 2022-07-25:</h4>
         <ul>

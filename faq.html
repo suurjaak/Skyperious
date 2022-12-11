@@ -40,9 +40,9 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.3-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.4-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
       <section>
@@ -51,6 +51,7 @@
         <ul>
           <li><a href="#obsolete">Does Skyperious work with modern Skype?</a></li>
           <li><a href="#login-fail">Why am I getting login failure from Skype online?</a></li>
+          <li><a href="#shared-media">Can I download my shared pictures and other files?</a></li>
           <li><a href="#automation">Can I automate backing up my Skype history?</a></li>
           <li><a href="#merge-different">Can I merge chat history from another operating system?</a></li>
           <li><a href="#osx">Can I use Skyperious on OS X?</a></li>
@@ -98,11 +99,33 @@
         <br />
 
 
+        <h3><a name="shared-media"></a>Can I download my shared pictures and other files?</h3>
+        <p>
+          Yes, to a degree. Skyperious can automatically download shared pictures
+          and audio/video messages for HTML export, saving them to a subfolder 
+          or embedding them in the HTML file. 
+          <br />
+          <br />
+          Note that audio/video messages are kept online for 30 days,
+          after that they will be unavailable for download.
+          If you wish to automatically retain full chat histories including shared media,
+          you should periodically synchronize your database from online,
+          and export the chats as HTML.
+          <br />
+          <br />
+          Content shared before 2017 April is no longer available,
+          that is when Microsoft moved Skype to the current client-server solution.
+
+        </p>
+        <br />
+
+
         <h3><a name="automation"></a>Can I automate backing up my Skype history?</h3>
         <p>
           Yes, Skyperious has a command-line interface (<a href="help.html#commandline">help.html#commandline</a>),
           which can be used to set up a periodic sync task to download new messages from Skype online service, 
-          e.g. using Task Scheduler on Windows or cron on Linux.
+          e.g. using Task Scheduler on Windows or cron on Linux. <br />
+          Skyperious can also export messages from the command-line in a variety of output formats.
         </p>
         <br />
 
