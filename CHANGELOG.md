@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.4, 2022-10-17
+5.4, 2022-12-11
 ---------------
 - add chat and contact counts to chats and contacts lists
 - add database account as one entry among contacts in contacts-tab
@@ -34,7 +34,7 @@ CHANGELOG
 - fix compiled exe and pythonw auto-closing window immediately on --help
 
 
-5.3, 2022-07-25
+5.3, 2022-07-17
 ---------------
 - add build file for Snap
 - add command-line flag --config-file
@@ -118,7 +118,7 @@ CHANGELOG
 - add detected media type extension to shared media exported in HTML if lacking one (issue #93)
 
 
-4.5, 2021-02-09
+4.5, 2021-02-06
 ---------------
 - added option to change Skype online account username
 - added option to delete chats from the database
