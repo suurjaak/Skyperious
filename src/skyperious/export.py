@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    29.04.2022
+@modified    20.09.2022
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -55,27 +55,27 @@ except Exception: # Fall back to a simple mono-spaced calculation if no PIL
 
 """FileDialog wildcard strings, matching extensions lists and default names."""
 XLSX_WILDCARD = "Excel workbook (*.xlsx)|*.xlsx|" if xlsxwriter else ""
-CHAT_WILDCARD = ("HTML document (*.html)|*.html|"
+CHAT_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                 "%s"
+                 "HTML document (*.html)|*.html|"
                  "HTML document with shared files in subfolder (*.html)|*.html|"
-                 "Text document (*.txt)|*.txt|"
-                 "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-CHAT_EXTS = ["html", "html", "txt", "xlsx", "csv"] if xlsxwriter \
-            else ["html", "html", "txt", "csv"]
+                 "Text document (*.txt)|*.txt" % XLSX_WILDCARD)
+CHAT_EXTS = ["csv", "xlsx", "html", "html", "txt"] if xlsxwriter \
+            else ["csv", "html", "html", "txt"]
 CHAT_WILDCARD_SINGLEFILE = "Excel workbook (*.xlsx)|*.xlsx" # Cannot end with |
 CHAT_EXTS_SINGLEFILE = ["xlsx"]
 
-TABLE_WILDCARD = ("HTML document (*.html)|*.html|"
-                  "SQL INSERT statements (*.sql)|*.sql|"
-                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-TABLE_EXTS = ["html", "sql", "xlsx", "csv"] if xlsxwriter \
-             else ["html", "sql", "csv"]
+DATA_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                 "%s"
+                 "HTML document (*.html)|*.html|"
+                 "SQL INSERT statements (*.sql)|*.sql" % XLSX_WILDCARD)
+DATA_EXTS = ["csv", "xlsx", "html", "sql"] if xlsxwriter else ["csv", "html", "sql"]
 
-QUERY_WILDCARD = ("HTML document (*.html)|*.html|"
-                  "%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD)
-QUERY_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html", "csv"]
-
-CONTACT_WILDCARD = "HTML document (*.html)|*.html|%sCSV spreadsheet (*.csv)|*.csv" % XLSX_WILDCARD
-CONTACT_EXTS = ["html", "xlsx", "csv"] if xlsxwriter else ["html","csv"]
+CONTACT_WILDCARD = ("CSV spreadsheet (*.csv)|*.csv|"
+                    "%s"
+                    "HTML document (*.html)|*.html|"
+                    "Text document (*.txt)|*.txt" % XLSX_WILDCARD)
+CONTACT_EXTS = ["csv", "xlsx", "html", "txt"] if xlsxwriter else ["csv", "html", "txt"]
 
 IMAGE_EXTS = ["bmp", "jpg", "png"]
 IMAGE_WILDCARD = "|".join("%s image (*.%s)|*.%s" % (x.upper(), x, x) for x in IMAGE_EXTS)
@@ -246,8 +246,9 @@ def export_chat_template(chat, filename, db, messages, opts=None):
                        .html|.txt determines file format
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
-    @param   opts      export options dictionary, as {"media_folder": true}
-                       if saving images to subfolder in HTML export
+    @param   opts      export options dictionary, as {
+                         ?"media_cache": use local download cache,
+                         ?"media_folder": save images to subfolder in HTML export}
     @return            (number of chats exported, number of messages exported)
     """
     count, message_count, opts = 0, 0, opts or {}
@@ -255,8 +256,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
     try:
         is_html  = filename.lower().endswith(".html")
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
-        namespace = {"db": db, "chat": chat, "messages": messages,
-                     "parser": parser}
+        namespace = {"db": db, "chat": chat, "messages": messages, "parser": parser}
         if opts.get("media_folder"):
             filedir, basename = os.path.split(filename)
             basename = os.path.splitext(basename)[0]
@@ -271,7 +271,10 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         tmpfile = open(tmpname, "wb+")
         template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
                    templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
-        template.stream(tmpfile, namespace)
+        media_cache0 = conf.SharedContentUseCache
+        conf.SharedContentUseCache = bool(opts.get("media_cache", conf.SharedContentUseCache))
+        try: template.stream(tmpfile, namespace)
+        finally: conf.SharedContentUseCache = media_cache0
 
         namespace["stats"] = stats = parser.get_collected_stats()
         namespace.update({
@@ -373,18 +376,31 @@ def export_contacts(contacts, filename, format, db):
     """
     is_html = ("html" == format)
     is_csv  = ("csv"  == format)
+    is_txt  = ("txt"  == format)
     is_xlsx = ("xlsx" == format)
 
-    if is_html:
+    if is_html or is_txt:
         namespace = {"contacts": contacts, "db": db}
-        with open(filename, "wb") as f:
-            template = step.Template(templates.EXPORT_CONTACTS_HTML, escape=True)
-            template.stream(f, namespace)
+        t = templates.EXPORT_CONTACTS_HTML if is_html else templates.EXPORT_CONTACTS_TXT
+        with util.create_file(filename, "wb", handle=True) as f:
+            step.Template(t, escape=is_html, strip=False).stream(f, namespace, newline=os.linesep)
         return
 
+    FIELDS = skypedata.CONTACT_FIELD_TITLES
+    if len(contacts) == 1 and db.id == contacts[0]["identity"]:
+        FIELDS = skypedata.ACCOUNT_FIELD_TITLES
+    elif len(contacts) > 1 and any(db.id == c["identity"] for c in contacts):
+        FIELDS = collections.OrderedDict()
+        concounter, confields = 0, list(skypedata.CONTACT_FIELD_TITLES.items())
+        for k, v in skypedata.ACCOUNT_FIELD_TITLES.items():
+            if k in skypedata.CONTACT_FIELD_TITLES:
+                for i, (k2, v2) in zip(range(concounter, len(confields)), confields[concounter:]):
+                    FIELDS[k2], concounter = v2, concounter + 1
+                    if k2 == k: break # for i
+            FIELDS[k] = v
+
     writer = None
-    colnames, collabels = zip(*((k, "%s (%s)" % (v, k))
-                                for k, v in skypedata.CONTACT_FIELD_TITLES.items()))
+    colnames, collabels = zip(*((k, "%s (%s)" % (v, k)) for k, v in FIELDS.items()))
     try:
         if is_csv:
             writer = csv_writer(filename)
@@ -456,6 +472,10 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     re_sql = re.compile("^(CREATE\\s+TABLE\\s+)", re.IGNORECASE)
                     replacer = lambda m: ("%sIF NOT EXISTS " % m.group(1))
                     namespace["create_sql"] = re_sql.sub(replacer, create_sql)
+                elif is_sql:
+                    mytable, colstr = "results", ", ".join(map(util.format_sql_name, columns))
+                    create_sql = "CREATE TABLE %s (%s)" % (util.format_sql_name(mytable), colstr)
+                    namespace.update(table=mytable, create_sql=create_sql)
 
                 template = step.Template(templates.GRID_HTML if is_html else
                            templates.SQL_TXT, strip=False, escape=is_html)

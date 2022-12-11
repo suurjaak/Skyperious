@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  01.04.2022
+@modified  30.09.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -137,6 +137,8 @@ IMAGES = {
         "Toolbar icon for tables button on search page.",
     "ToolbarTabs.png":
         "Toolbar icon for tabs toggle button on search page.",
+    "ToolbarText.png":
+        "Toolbar icon for chat history text size on chat page.",
     "ToolbarTitle.png":
         "Toolbar icon for title toggle button on search page.",
     "TransparentPixel.gif":

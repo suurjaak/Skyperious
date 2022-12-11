@@ -8,11 +8,12 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    08.06.2022
+@modified    12.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
 import datetime
+import glob
 import json
 import logging
 import os
@@ -75,11 +76,12 @@ class SkypeLogin(object):
                            returning false if work should stop
         """
         self.db           = db   # SQLite database populated with live data
-        self.progress     = progress
+        self.progress     = progress or (lambda *_, **__: True)
         self.username     = db.username if db else None
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
+        self.dl_cache_dir = os.path.join(conf.CacheDirectory, "shared")
         self.populated    = False
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
@@ -152,12 +154,24 @@ class SkypeLogin(object):
         self.msg_parser = skypedata.MessageParser(self.db)
 
 
-    def build_cache(self):
-        """Fills in local cache."""
+    def build_cache(self, *tables):
+        """
+        Fills in local cache.
+
+        @param   tables  specific tables to build if not all
+        """
         BINARIES = "avatar_image", "guid", "meta_picture"
-        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
+        tables = [x.lower() for x in tables]
+        if tables:
+            for table in tables:
+                self.cache.pop(table, None)
+                if "messages" == table:
+                    self.msg_lookups.clear(), self.msg_stamps.clear()
+        else:
+            for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
 
         for table in "accounts", "chats", "contacts":
+            if tables and table not in tables: continue # for table
             key = "identity" if "chats" == table else "skypename"
             cols  = ", ".join(self.CACHE_COLS[table]) if table in self.CACHE_COLS else "*"
             dbtable = "conversations" if "chats" == table else table
@@ -201,8 +215,8 @@ class SkypeLogin(object):
                 self.msg_lookups[row["timestamp__ms"]].append(row)
         for m in self.cache["messages"].values():
             if m.get("remote_id") is not None and m.get("timestamp__ms") is not None:
-                self.msg_stamps[m["remote_id"]] = max(m["timestamp__ms"],
-                                                      self.msg_stamps.get(m["remote_id"], -sys.maxsize))
+                val = max(m["timestamp__ms"], self.msg_stamps.get(m["remote_id"], -sys.maxsize))
+                self.msg_stamps[m["remote_id"]] = val
 
 
     def request(self, func, *args, **kwargs):
@@ -240,14 +254,16 @@ class SkypeLogin(object):
 
     def save(self, table, item, parent=None):
         """
-        Saves the item to SQLite table. Returns true if item with the same
-        content already existed.
+        Saves the item to SQLite table.
 
+        @param    table   database table to save into
+        @param    item    Skype API data object
         @param    parent  chat for messages
-        @return           one of SkypeLogin.SAVE
+        @return           (database row, one of SkypeLogin.SAVE)
         """
+        if item is None: return (None, self.SAVE.SKIP)
         dbitem = self.convert(table, item, parent=parent)
-        if dbitem is None: return self.SAVE.SKIP
+        if dbitem is None: return (None, self.SAVE.SKIP)
         result, dbitem1, table = None, dict(dbitem), table.lower()
 
         identity = dbitem["skypename"] if table in ("accounts", "contacts") else \
@@ -370,7 +386,7 @@ class SkypeLogin(object):
                 same = all(v == dbitem0[k] for k, v in dbitem1.items() if k in dbitem0)
                 result = self.SAVE.NOCHANGE if same else self.SAVE.UPDATE
                 if not same: self.sync_counts["%s_updated" % table] += 1
-        return result
+        return dbitem, result
 
 
     def insert_transfers(self, msg, row, row0):
@@ -403,13 +419,13 @@ class SkypeLogin(object):
                    else set([self.skype.userId, chat.userId])
             for uid in uids:
                 user = self.request(self.skype.contacts.__getitem__, uid)
-                uidentity = user.id
+                uidentity = user.id if user else uid
                 # Keep bot prefixes on bot accounts
                 if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
                 and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
-                    uidentity = skypedata.ID_PREFIX_BOT + user.id
+                    uidentity = skypedata.ID_PREFIX_BOT + uidentity
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
-                if isinstance(chat, skpy.SkypeGroupChat) and user.id == chat.creatorId:
+                if isinstance(chat, skpy.SkypeGroupChat) and (user.id if user else uid) == chat.creatorId:
                     p.update(rank=1)
                 participants.append(p)
 
@@ -514,7 +530,7 @@ class SkypeLogin(object):
             if item.avatar: # https://avatar.skype.com/v1/avatars/username/public
                 raw = self.download_content(item.avatar)
                 # main.db has NULL-byte in front of image binary
-                if raw: result.update(avatar_image="\0" + raw.decode("latin1"))
+                if raw: result.update(avatar_image=b"\0" + raw)
 
         if "accounts" == table:
             if item.mood:
@@ -548,7 +564,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_content(item.picture, category="avatar")
+                    raw = self.get_api_content(item.picture, category="avatar", cache=False)
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw.decode("latin1"))
             else: result = None
@@ -684,7 +700,7 @@ class SkypeLogin(object):
                 result.update(chatmsg_type=skypedata.CHATMSG_TYPE_SPECIAL, type=skypedata.MESSAGE_TYPE_FILE,
                               body_xml='<files><file index="0" size="%s" url="%s">%s</file></files>' %
                                        (urllib.parse.quote(util.to_unicode(filesize or 0)),
-                                        urllib.parse.quote(util.to_unicode(fileurl or ""), ":/"),
+                                        urllib.parse.quote(util.to_unicode(fileurl or ""), safe=":/"),
                                         util.to_unicode(filename or "file").replace("<", "&lt;").replace(">", "&gt;")))
 
             else: # SkypeCardMsg, SkypeChangeMemberMsg, ..
@@ -695,7 +711,7 @@ class SkypeLogin(object):
 
     def populate(self, chats=()):
         """
-        Retrieves all chats and messages, or selected chats only.
+        Retrieves account information, all or selected chats with messages, and saves to database.
 
         @param   chats  list of chat identities to populate if not everything
         """
@@ -703,151 +719,100 @@ class SkypeLogin(object):
             self.skype = None
             self.login() # Re-login to reset skpy query cache
         self.db.ensure_schema()
-        self.build_cache()
+        if not chats: self.populate_account()
+        self.populate_chats(chats)
+        self.populated = True
+
+
+    def populate_account(self):
+        """Retrieves account profile data and saves to database."""
+        if not self.progress(action="populate", table="accounts", start=True): return
         self.sync_counts.clear()
-        if not chats:
-            try: self.save("accounts", self.skype.user)
-            except Exception:
-                logger.exception("Error saving account %r.", self.skype.userId)
+        self.build_cache("accounts")
+        logger.info("Synchronizing database account profile from live.")
+        updateds = set()
+        try:
+            account = self.request(type(self.skype).user.fget, self.skype)
+            _, action = self.save("accounts", account)
+            if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                updateds.add(self.db.id)
+        finally:
+            self.progress(action="populate", table="accounts", identities=list(updateds), end=True)
+
+
+    def populate_contacts(self, contacts=()):
+        """
+        Retrieves contact profiles and saves to database.
+
+        @param   contacts  list of contact identities to populate if not all
+        """
+        total = len(contacts or self.skype.contacts)
+        if not self.progress(action="populate", table="contacts", start=True):
+            return
+
+        getter = lambda x: self.request(self.skype.contacts.__getitem__, x, __raise=False)
+        makeid = lambda x: re.sub(r"^\d+\:", "", x) # Strip numeric prefix
+        iterable = iter((getter(makeid(x)) for x in contacts) if contacts else self.skype.contacts)
+        self.sync_counts.clear()
+        self.build_cache("contacts")
+        logger.info("Synchronizing %s from live.",
+                    util.plural("contact profile", total, numbers=bool(contacts)))
+        updateds = set()
+        try:
+            for i, contact in enumerate(iterable):
+                if not i % 10 and not self.progress(
+                    action="info", message="Querying contacts..",
+                    **(dict(index=i + 1, count=total) if total > 1 else {})
+                ): break # for i, contact
+                dbitem, action = self.save("contacts", contact)
+                if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                    updateds.add(dbitem["skypename"])
+        finally:
+            self.progress(action="populate", table="contacts", end=True,
+                          count=self.sync_counts["contacts_updated"],
+                          new=self.sync_counts["contacts_new"], identities=list(updateds))
+
+
+    def populate_chats(self, chats=(), messages=True):
+        """
+        Retrieves all conversations and saves to database.
+
+        @param   chats     list of chat identities to populate if not all
+        @param   messages  whether to retrieve messages, or only chat metainfo and participants
+        """
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
         logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
-        self.populate_history(chats)
-        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
-        self.populated = True
-        logger.info("Finished syncing %s'%s'.", cstr, self.db)
-
-
-    def populate_history(self, chats=()):
-        """
-        Retrieves all conversations and their messages.
-
-        @param   chats  list of chat identities to populate if not all
-        """
-        if self.progress and not self.progress(action="populate", table="chats", start=True):
+        if not self.progress(action="populate", table="chats", start=True):
             return
-        if not self.cache: self.build_cache()
+        self.build_cache()
         self.sync_counts.clear()
 
         def get_live_chats(identities, older=False):
             """Yields skpy.SkypeChat instances for identities"""
             for i, k in enumerate(map(identity_to_id, identities or ())):
-                if self.progress and not self.progress(
-                    action="info", index=i, count=len(identities),
+                if not self.progress(
+                    action="info",
                     message="Querying %s chats.." % ("older" if older else "selected"),
+                    **(dict(index=i + 1, count=len(identities)) if len(identities) > 1 else {})
                 ): break # for k
                 v = self.request(self.skype.chats.chat, k, __raise=False, __log=False)
                 if v: yield v
 
         selchats = get_live_chats(chats)
-        updateds, completeds, processeds, msgids = set(), set(), set(), set()
+        processeds, updateds, completeds, msgids = set(), set(), set(), set()
         run = True
         while run:
             if chats: mychats = selchats
-            else:
-                if self.progress and not self.progress(
-                    action="info", message="Querying recent chats.."
-                ):
-                    run = False
-                    break # while run
-                mychats = self.request(self.skype.chats.recent, __raise=False).values()
+            elif not self.progress(action="info", message="Querying recent chats.."):
+                break # while run
+            else: mychats = self.request(self.skype.chats.recent, __raise=False).values()
+
             for chat in mychats:
-                if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
-                    continue # for chat
-                if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
-                    # Weird empty conversation, getMsgs raises 404
-                    continue # for chat
-                if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.userId:
-                    # Conversation with self?
-                    continue # for chat
-                cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
-                            or isinstance(chat.user, skpy.SkypeBotUser) \
-                            or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
-                if cidentity in processeds: continue # for chat
-                processeds.add(cidentity)
-
-                if self.progress and not self.progress(
-                    action="populate", table="messages", chat=cidentity, start=True
-                ):
-                    run = False
-                    break # while mrun
-
-                mcount, mnew, mupdated, mrun, mstart = 0, 0, 0, True, True
-                mfirst, mlast = datetime.datetime.max, datetime.datetime.min
-                while mrun:
-                    msgs, max_tries = [], 3 if mstart else 1
-                    while max_tries and not msgs: # First or second call can return nothing
-                        msgs = self.request(chat.getMsgs, __raise=False) or []
-                        max_tries -= 1
-
-                    if msgs and (cidentity not in self.cache["chats"]
-                    or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
-                        and not self.cache["chats"][cidentity].get("__updated__"))):
-                        # Insert chat only if there are any messages, or update existing contacts
-                        try: action = self.save("chats", chat)
-                        except Exception:
-                            logger.exception("Error saving chat %r.", chat)
-                        else:
-                            if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
-                                updateds.add(cidentity)
-                            self.progress and self.progress(
-                                action="populate", table="chats", chat=cidentity)
-
-                    if mstart: self.build_msg_cache(cidentity)
-
-                    if self.progress and not self.progress(
-                        action="populate", table="messages", chat=cidentity,
-                        count=mcount, new=mnew, updated=mupdated, start=mstart
-                    ):
-                        run = mrun = False
-                        break # while mrun
-                    mstart = False
-
-                    for msg in msgs:
-                        try: action = self.save("messages", msg, parent=chat)
-                        except Exception:
-                            logger.exception("Error saving message %r.", msg)
-                            if self.progress and not self.progress():
-                                msgs, mrun = [], False
-                                break # for msg
-                            continue # for msg
-                        if self.SAVE.SKIP != action:   mcount += 1
-                        if self.SAVE.INSERT == action: mnew += 1
-                        if self.SAVE.UPDATE == action: mupdated += 1
-                        if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
-                            mfirst, mlast = min(mfirst, msg.time), max(mlast, msg.time)
-                        if self.progress and not self.progress(
-                            action="populate", table="messages", chat=cidentity,
-                            count=mcount, new=mnew, updated=mupdated
-                        ):
-                            msgs, mrun = [], False
-                            break # for msg
-                        if self.SAVE.NOCHANGE == action and msg.id not in msgids:
-                            msgs = [] # Stop on reaching already retrieved messages
-                            break # for msg
-                        msgids.add(msg.id)
-                    if not msgs:
-                        break # while mrun
-                if (mnew or mupdated):
-                    updateds.add(cidentity)
-                    if cidentity in self.cache["chats"] and self.db.is_open():
-                        row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
-                                              "MAX(timestamp) AS last "
-                                              "FROM messages WHERE convo_id = :id", self.cache["chats"][cidentity]
-                        ).fetchone()
-                        self.db.execute("UPDATE conversations SET last_message_id = :id, "
-                                        "last_activity_timestamp = :last, "
-                                        "creation_timestamp = COALESCE(creation_timestamp, :first) "
-                                        "WHERE id = :convo_id", row)
-                        completeds.add(cidentity)
-
-                if self.progress and not self.progress(action="populate", table="messages",
-                    chat=cidentity, end=True, count=mcount,
-                    new=mnew, updated=mupdated, first=mfirst, last=mlast
-                ):
+                if not self.process_chat(chat, messages, processeds, updateds, completeds, msgids):
                     run = False
                     break # for chat
-                if not mrun: break # for chat
+
             if chats: break # while run; stop after processing specific chats
             elif run and not mychats \
             and conf.Login.get(self.db.filename, {}).get("sync_older", True):
@@ -857,52 +822,163 @@ class SkypeLogin(object):
                 if not chats: break # while run
             elif not mychats: break # while run
 
-        ids = [self.cache["chats"][x]["id"] for x in updateds
-               if x in self.cache["chats"] and x not in completeds] \
-              if self.db.is_open() else []
-        for myids in [ids[i:i+999] for i in range(0, len(ids), 999)]:
-            # Divide into chunks: SQLite can take up to 999 parameters.
-            idstr = ", ".join(":id%s" % (j+1) for j in range(len(myids)))
-            where = " WHERE convo_id IN (%s)" % idstr
-            args = dict(("id%s" % (j+1), x) for j, x in enumerate(myids))
-
-            stats = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
-                                    "MAX(timestamp) AS last "
-                                    "FROM messages%s GROUP BY convo_id" % where, args)
-            for row in stats:
-                self.db.execute("UPDATE conversations SET last_message_id = :id, "
-                                "last_activity_timestamp = :last, "
-                                "creation_timestamp = COALESCE(creation_timestamp, :first) "
-                                "WHERE id = :convo_id", row)
-
-        if self.progress: self.progress(
-            action="populate", table="chats", end=True, count=len(updateds),
-            new=self.sync_counts["chats_new"],
+        pargs = dict(
             message_count_new=self.sync_counts["messages_new"],
             message_count_updated=self.sync_counts["messages_updated"],
+        ) if messages else {}
+        self.progress(
+            action="populate", table="chats", end=True, count=len(updateds),
+            new=self.sync_counts["chats_new"], identities=list(updateds),
             contact_count_new=self.sync_counts["contacts_new"],
-            contact_count_updated=self.sync_counts["contacts_updated"],
+            contact_count_updated=self.sync_counts["contacts_updated"], **pargs
         )
+        for dct in (self.cache, self.msg_lookups, self.msg_stamps): dct.clear()
+        logger.info("Finished syncing %s'%s'.", cstr, self.db)
 
 
+    def process_chat(self, chat, full, chats_processed, chats_updated, chats_completed, messages_processed):
+        """
+        Retrieves chat metainfo and messages and saves to database.
 
-    def get_api_content(self, url, category=None):
+        @param   chat                skpy.SkypeChat instance
+        @param   full                retrieve messages, or only chat metainfo and participants
+        @param   chats_processed     state parameter: set of chat identities processed
+        @param   chats_updated       state parameter: set of chat identities updated
+        @param   chats_completed     state parameter: set of chat identities finished
+        @param   messages_processed  state parameter: set of message identities processed
+        @return                      whether further progress should continue
+        """
+        result = True
+        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
+                    or isinstance(chat.user, skpy.SkypeBotUser) \
+                    or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
+        if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
+            return result
+        if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
+            # Weird empty conversation, getMsgs raises 404
+            return result
+        if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.userId:
+            # Conversation with self?
+            return result
+        if cidentity in chats_processed: return result
+        chats_processed.add(cidentity)
+
+        if not self.progress(action="populate", table="chats", chat=cidentity, start=True):
+            return False
+
+        count, new, updated, run, start = 0, 0, 0, True, bool(full)
+        first, last = datetime.datetime.max, datetime.datetime.min
+        while run:
+            msgs, max_tries = [], 3 if start else 1
+            while full and max_tries and not msgs: # First or second call can return nothing
+                msgs = self.request(chat.getMsgs, __raise=False) or []
+                max_tries -= 1
+
+            if not full or msgs and (cidentity not in self.cache["chats"]
+            or (conf.Login.get(self.db.filename, {}).get("sync_contacts", True)
+                and not self.cache["chats"][cidentity].get("__updated__"))):
+                # Insert chat or update existing contacts, only if doing metainfo or if any messages
+                try: _, action = self.save("chats", chat)
+                except Exception:
+                    logger.exception("Error saving chat %r.", chat)
+                else:
+                    if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                        chats_updated.add(cidentity)
+                    if not self.progress(action="populate", table="chats", chat=cidentity):
+                        break # while run
+
+            if start: self.build_msg_cache(cidentity)
+
+            if not self.progress(action="populate", table="messages", chat=cidentity,
+                                 count=count, new=new, updated=updated, start=start):
+                result = run = False
+                break # while run
+            start = False
+
+            for msg in msgs:
+                try: _, action = self.save("messages", msg, parent=chat)
+                except Exception:
+                    logger.exception("Error saving message %r.", msg)
+                    if not self.progress():
+                        msgs, run = [], False
+                        break # for msg
+                    continue # for msg
+                if self.SAVE.SKIP != action:   count += 1
+                if self.SAVE.INSERT == action: new += 1
+                if self.SAVE.UPDATE == action: updated += 1
+                if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
+                    first, last = min(first, msg.time), max(last, msg.time)
+                if not self.progress(action="populate", table="messages", chat=cidentity,
+                                     count=count, new=new, updated=updated):
+                    msgs, run = [], False
+                    break # for msg
+                if self.SAVE.NOCHANGE == action and msg.id not in messages_processed:
+                    msgs = [] # Stop on reaching already retrieved messages
+                    break # for msg
+                messages_processed.add(msg.id)
+            if not msgs:
+                break # while run
+        if (new or updated):
+            chats_updated.add(cidentity)
+        if cidentity in chats_updated and cidentity in self.cache["chats"] and self.db.is_open():
+            row = self.db.execute("SELECT id, convo_id, MIN(timestamp) AS first, "
+                                  "MAX(timestamp) AS last FROM messages WHERE convo_id = :id",
+                                  self.cache["chats"][cidentity]
+            ).fetchone()
+            self.db.execute("UPDATE conversations SET last_message_id = :id, "
+                            "last_activity_timestamp = :last, "
+                            "creation_timestamp = COALESCE(creation_timestamp, :first) "
+                            "WHERE id = :convo_id", row)
+            chats_completed.add(cidentity)
+
+        pargs = dict(action="populate", table="chats", chat=cidentity)
+        if full: pargs.update(table="messages", count=count, new=new, updated=updated,
+                              first=first, last=last, end=True)
+        if not self.progress(**pargs):
+            result = False
+        return result
+
+
+    def get_api_content(self, url, category=None, cache=True):
         """
         Returns content raw binary from Skype API URL via login, or None.
 
         @param   category  type of content, e.g. "avatar" for avatar image,
                            "file" for shared file
+        @param   cache     whether to use disk cache if media caching is enabled;
+                           loads content from disk if available, and saves download to disk
         """
-        url = make_content_url(url, category)
+        result, cached, url = None, None, make_content_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
-        for url in urls:
-            raw = self.download_content(url, category)
-            if raw: return raw
-        return None
+
+        for url in urls if conf.SharedContentUseCache and cache else ():
+            try:
+                filebase = os.path.join(self.dl_cache_dir, urllib.parse.quote(url, safe=""))
+                for p in glob.glob(filebase + ".*")[:1]:
+                    with open(p, "rb") as f:
+                        result = cached = f.read()
+            except Exception: pass
+
+        for url in urls if not result else ():
+            result = self.download_content(url, category)
+            if result: break # for url
+
+        if result and conf.SharedContentUseCache and cache and not cached:
+            try:
+                filetype = util.get_file_type(result, category, url)
+                filename = "%s.%s" % (urllib.parse.quote(url, safe=""), filetype)
+                filepath = os.path.join(self.dl_cache_dir, filename)
+                self.ensure_cache_dir()
+                with open(filepath, "wb") as f:
+                    f.write(result)
+            except Exception:
+                logger.warning("Error caching %s.", filepath, exc_info=True)
+
+        return result
 
 
     def download_content(self, url, category=None):
@@ -938,6 +1014,17 @@ class SkypeLogin(object):
         botidentity = (skypedata.ID_PREFIX_BOT + identity) if identity else identity
         return botidentity if botidentity in self.cache["contacts"] else identity
 
+
+    def ensure_cache_dir(self):
+        """Creates content cache directory and tagfile if not already created."""
+        TAGCONTENT = """Signature: 8a477f597d28d172789f06886806bc55
+# This file is a cache directory tag created by %s.
+# For information about cache directory tags, see:
+#   http://www.brynosaurus.com/cachedir/""" % conf.Title
+        tagpath = os.path.join(self.dl_cache_dir, "CACHEDIR.TAG")
+        if not os.path.isfile(tagpath):
+            with util.create_file(tagpath, handle=True) as f:
+                f.write(TAGCONTENT)
 
 
 class SkypeExport(skypedata.SkypeDatabase):

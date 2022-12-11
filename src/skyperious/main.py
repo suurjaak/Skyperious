@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2022
+@modified    05.10.2022
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -83,7 +83,7 @@ ARGUMENTS = {
                         "workbook with chats on separate sheets."
                         if export.xlsxwriter else ""),
          "arguments": [
-             {"args": ["-t", "--type"], "dest": "type",
+             {"args": ["-t", "--type"], "dest": "format",
               "choices": ["html", "xlsx", "csv", "txt", "xlsx_single"]
                          if export.xlsxwriter else ["html", "csv", "txt"],
               "default": "html", "required": False, "type": str.lower,
@@ -99,9 +99,9 @@ ARGUMENTS = {
              {"args": ["-o", "--output"], "dest": "output_dir",
               "metavar": "DIR", "required": False,
               "help": "output directory if not current directory"},
-             {"args": ["-c", "--chat"], "dest": "chat", "required": False,
+             {"args": ["-c", "--chat"], "dest": "chats", "metavar": "CHAT", "required": False,
               "help": "names of specific chats to export", "nargs": "+"},
-             {"args": ["-a", "--author"], "dest": "author", "required": False,
+             {"args": ["-a", "--author"], "dest": "authors", "metavar": "NAME", "required": False,
               "help": "names of specific authors whose chats to export",
               "nargs": "+"},
              {"args": ["-s", "--start"], "dest": "start_date", "required": False,
@@ -112,6 +112,10 @@ ARGUMENTS = {
               "action": "store_true", "required": False,
               "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
+             {"args": ["--media-cache"], "dest": "media_cache",
+              "action": "store_true", "required": False,
+              "help": "cache downloaded media in user directory, "
+                      "for faster repeated exports"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
@@ -132,14 +136,14 @@ ARGUMENTS = {
          "description": "Search Skype databases for messages, chat or contact "
                         "information, or table data.",
          "arguments": [
-             {"args": ["-t", "--type"], "dest": "type", "required": False,
+             {"args": ["-t", "--type"], "dest": "category", "required": False,
               "choices": ["message", "contact", "chat", "table"],
               "default": "message",
               "help": "search in message body (default), in contact "
                       "information, in chat title and participants, or in any "
                       "database table"},
-             {"args": ["QUERY"],
-              "help": "search query, with a Google-like syntax, for example: "
+             {"args": ["query"], "metavar": "QUERY",
+              "help": "search query, with a simple query syntax, for example: "
                       "\"this OR that chat:links from:john\". More on syntax "
                       "at https://suurjaak.github.io/Skyperious/help.html. " },
              {"args": ["FILE"], "nargs": "+",
@@ -186,9 +190,9 @@ ARGUMENTS = {
              {"args": ["--no-check-older"], "dest": "sync_older",
               "action": "store_false", "required": False, "default": None,
               "help": "do not check all older chats in database for messages to sync"},
-             {"args": ["-c", "--chat"], "dest": "chat", "required": False,
+             {"args": ["-c", "--chat"], "dest": "chats", "metavar": "CHAT", "required": False,
               "help": "names of specific chats to sync", "nargs": "+"},
-             {"args": ["-a", "--author"], "dest": "author", "required": False,
+             {"args": ["-a", "--author"], "dest": "authors", "metavar": "NAME", "required": False,
               "help": "names of specific authors whose chats to sync",
               "nargs": "+"},
              {"args": ["FILE"], "nargs": "+",
@@ -203,8 +207,44 @@ ARGUMENTS = {
              {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
               "help": "path of configuration file to use"},
         ]},
+        {"name": "contacts",
+         "help": "export Skype contacts as HTML, text or spreadsheet",
+         "description": "Export contacts from a Skype database into file.",
+         "arguments": [
+             {"args": ["-t", "--type"], "dest": "format",
+              "choices": ["html", "xlsx", "csv", "txt"]
+                         if export.xlsxwriter else ["html", "csv", "txt"],
+              "default": "html", "required": False, "type": str.lower,
+              "help": "export type: HTML files (default), Excel workbooks, "
+                      "CSV spreadsheets, text files" if export.xlsxwriter
+                      else
+                      "export type: HTML files (default), CSV spreadsheets, "
+                      "text files"},
+             {"args": ["FILE"], "nargs": "+",
+              "help": "Skype databases to process (supports * wildcards)"},
+             {"args": ["-o", "--output"], "dest": "output",
+              "metavar": "FILE", "required": False,
+              "help": "output filename if not using auto-generated"},
+             {"args": ["-f", "--filter"], "dest": "fields", "metavar": "TEXT",
+              "nargs": "+", "required": False,
+              "help": "select contacts with given texts in any profile fields"},
+             {"args": ["-n", "--name"], "dest": "names", "metavar": "NAME",
+              "nargs": "+", "required": False,
+              "help": "names of specific contacts to select"},
+             {"args": ["-c", "--chat"], "dest": "chats", "metavar": "CHAT",
+              "nargs": "+", "required": False,
+              "help": "names of chats to select contacts by"},
+             {"args": ["--verbose"], "action": "store_true",
+              "help": "print detailed progress messages to stderr"},
+             {"args": ["--no-terminal"], "action": "store_true", "dest": "no_terminal",
+              "help": "command-line output suitable for non-terminal display, "
+                      "like piping to a file; also skips all user interaction "
+                      "like asking for Skype username or password"},
+             {"args": ["--config-file"], "dest": "config_file", "nargs": 1,
+              "help": "path of configuration file to use"},
+        ]},
         {"name": "create",
-         "help": "create a new database",
+         "help": "create a new database, blank or from a Skype source",
          "description": "Create a new blank database, or populated from "
                         "Skype online service, or from a Skype export archive.",
          "arguments": [
@@ -284,7 +324,7 @@ logger = logging.getLogger(__package__)
 window = None # Application main window instance
 
 
-class MainApp(wx.App):
+class MainApp(wx.App if wx else object):
 
     def InitLocale(self):
         self.ResetLocale()
@@ -355,8 +395,13 @@ def install_thread_excepthook():
     threading.Thread.__init__ = init
 
 
-def run_merge(filenames, output_filename=None):
-    """Merges all Skype databases to a new database."""
+def run_merge(filenames, args):
+    """
+    Merges all Skype databases to a new database.
+
+    @param   args       argparse.Namespace
+               output   name of output database, auto-generated if not given
+    """
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     db_base = dbs.pop()
     counts = collections.defaultdict(lambda: collections.defaultdict(int))
@@ -364,8 +409,7 @@ def run_merge(filenames, output_filename=None):
 
     name, ext = os.path.splitext(os.path.basename(db_base.filename))
     now = datetime.datetime.now().strftime("%Y%m%d")
-    if not output_filename:
-        output_filename = util.unique_path("%s.merged.%s%s" %  (name, now, ext))
+    output_filename = args.output or util.unique_path("%s.merged.%s%s" %  (name, now, ext))
     output("Creating %s, using %s as base." % (output_filename, db_base))
     bar = ProgressBar(static=conf.IsCLINonTerminal)
     bar.start()
@@ -426,19 +470,29 @@ def run_merge(filenames, output_filename=None):
         db2.close()
 
 
-def run_search(filenames, query, category="message", reverse=False, offset=0, limit=0):
-    """Searches the specified databases for specified query."""
+def run_search(filenames, args):
+    """
+    Searches the specified databases for specified query.
+
+    @param   args         argparse.Namespace
+               query      search query text
+               category   search category like "message"
+               reverse    find matches in reverse order
+               offset     number of matches to skip from the beginning
+               limit      maximum number of matches to find
+    """
     TABLES = {"message": "messages", "contact": "contacts", "chat": "conversations",
               "table": "all tables"}
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
     postbacks = queue.Queue()
-    args = {"text": query, "reverse": reverse, "offset": offset, "limit": limit,
-            "table": TABLES.get(category, category), "output": "text"}
+    wargs = {"text": args.query, "reverse": args.reverse, "offset": args.offset,
+             "limit": args.limit, "table": TABLES.get(args.category, args.category),
+             "output": "text"}
     worker = workers.SearchThread(postbacks.put)
     try:
         for db in dbs:
-            logger.info('Searching "%s" in %s %s.', query, db, args["table"])
-            worker.work(dict(args, db=db))
+            logger.info('Searching "%s" in %s %s.', args.query, db, wargs["table"])
+            worker.work(dict(wargs, db=db))
             while True:
                 result = postbacks.get()
                 if "error" in result:
@@ -447,7 +501,7 @@ def run_search(filenames, query, category="message", reverse=False, offset=0, li
                     break # while True
                 if "done" in result:
                     logger.info("Finished searching for \"%s\" in %s %s.",
-                                query, db, args["table"])
+                                args.query, db, wargs["table"])
                     break # while True
                 if result.get("count", 0) or conf.IsCLIVerbose:
                     if len(dbs) > 1:
@@ -457,11 +511,20 @@ def run_search(filenames, query, category="message", reverse=False, offset=0, li
         worker and (worker.stop(), worker.join())
 
 
-def run_sync(filenames, username=None, password=None, ask_password=False,
-             store_password=False, sync_contacts=None, sync_older=None,
-             chatnames=(), authornames=()):
-    """Synchronizes history in specified databases from Skype online service."""
+def run_sync(filenames, args):
+    """
+    Synchronizes history in specified databases from Skype online service.
 
+    @param   args               argparse.Namespace
+               username         Skype username
+               password         Skype password
+               ask_password     whether to ask password on the command line interactively
+               store_password   whether to store password in configuration file
+               sync_contacts    whether to update profile fields of existing contacts
+               sync_older       whether to check all older chats in database for messages to sync
+               chats            names of specific chats to export
+               authors          names of specific authors whose chats to export
+    """
     ns = {"bar": None, "chat_title": None, "filename": None}
     enc = sys.stdout.encoding or locale.getpreferredencoding() or "utf-8"
     def progress(result=None, **kwargs):
@@ -562,7 +625,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         return True
 
 
-    username0, password0, passwords = username, password, {}
+    username0, password0, passwords = args.username, args.password, {}
     for filename in filenames:
         filepath = os.path.realpath(filename)
         file_existed = os.path.exists(filepath)
@@ -571,7 +634,7 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         username = username0
         password = password0 or passwords.get(username)
 
-        if not password and (not ask_password or conf.IsCLINonTerminal) \
+        if not password and (not args.ask_password or conf.IsCLINonTerminal) \
         and conf.Login.get(filepath, {}).get("password"):
             password = util.deobfuscate(conf.Login[filepath]["password"])
 
@@ -600,10 +663,10 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
 
         prompt, count = "Enter Skype password for '%s': " % username, 0
         while not db.live.is_logged_in() and count < 5:
-            if (ask_password or not password) and not conf.IsCLINonTerminal:
+            if (args.ask_password or not password) and not conf.IsCLINonTerminal:
                 password = get_password(username, prompt=prompt)
             passwords[username] = password
-            if not count or not conf.IsCLINonTerminal and (ask_password or not password):
+            if not count or not conf.IsCLINonTerminal and (args.ask_password or not password):
                 output("Logging in to Skype as '%s'.." % username, end="")
             try: db.live.login(username, password, init_db=True)
             except Exception as e:
@@ -612,17 +675,18 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             count += 1
         save_conf = False
 
+        sync_older = args.sync_older
         if not file_existed:
             conf.Login.setdefault(filepath, {})["sync_older"] = False
             save_conf, sync_older = True, None
 
-        if password and store_password:
+        if password and args.store_password:
             conf.Login.setdefault(filepath, {})
             conf.Login[filepath].update(store=True, password=util.obfuscate(password))
             save_conf = True
 
-        if sync_contacts is not None:
-            if not sync_contacts:
+        if args.sync_contacts is not None:
+            if not args.sync_contacts:
                 conf.Login.setdefault(filepath, {})["sync_contacts"] = False
             elif filepath in conf.Login:
                 conf.Login[filepath].pop("sync_contacts", None)
@@ -640,8 +704,8 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
             continue # for filename
 
         chats = []
-        if chatnames or authornames:
-            cc = db.get_conversations(chatnames, authornames)
+        if args.chats or args.authors:
+            cc = db.get_conversations(args.chats, args.authors)
             chats = [c["identity"] for c in cc]
 
         output()
@@ -652,10 +716,18 @@ def run_sync(filenames, username=None, password=None, ask_password=False,
         db.close()
 
 
-def run_create(filenames, input=None, username=None, password=None,
-               ask_password=False, store_password=False):
-    """Creates a new database, blank or from a Skype source."""
-    if not input and not username:
+def run_create(filenames, args):
+    """
+    Creates a new database, blank or from a Skype source.
+
+    @param   args               argparse.Namespace
+               input            path of Skype export archive to populate from
+               username         Skype username
+               password         Skype password
+               ask_password     whether to ask password on the command line interactively
+               store_password   whether to store password in configuration file
+    """
+    if not args.input and not args.username:
         output("Not enough arguments.")
         sys.exit(1)
 
@@ -664,15 +736,15 @@ def run_create(filenames, input=None, username=None, password=None,
         output("%s already exists." % filename)
         sys.exit(1)
 
-    if not input: # Create blank database, with just account username
-        logger.info("Creating new blank database %s for user '%s'.", filename, username)
+    if not args.input: # Create blank database, with just account username
+        logger.info("Creating new blank database %s for user '%s'.", filename, args.username)
         db = skypedata.SkypeDatabase(filename, truncate=True)
         db.ensure_schema()
-        db.insert_account({"skypename": username})
-        output("Created blank database %s for user %s." % (filename, username))
+        db.insert_account({"skypename": args.username})
+        output("Created blank database %s for user %s." % (filename, args.username))
         db.close()
-        if username and (password or ask_password):
-            run_sync(filenames, username, password, ask_password, store_password)
+        if args.username and (args.password or args.ask_password):
+            run_sync(filenames, args)
         return
 
     counts = {}
@@ -685,12 +757,12 @@ def run_create(filenames, input=None, username=None, password=None,
             bar.afterword = " Imported %s." % t
         return True
 
-    username = live.SkypeExport.export_get_account(input)
-    db = live.SkypeExport(input, filename)
+    username, password = live.SkypeExport.export_get_account(args.input), args.password
+    db = live.SkypeExport(args.input, filename)
 
-    if ask_password and store_password: password = get_password(username)
+    if args.ask_password and args.store_password: password = get_password(username)
     logger.info("Creating new database %s from Skype export %s, user '%s'.",
-                filename, input, username)
+                filename, args.input, username)
     output()
     bar = ProgressBar(pulse=True, interval=0.05, static=conf.IsCLINonTerminal)
     bar.afterword =" Importing %s" % filename
@@ -708,37 +780,50 @@ def run_create(filenames, input=None, username=None, password=None,
     bar.pulse = False
     bar.update(100)
     db.close()
-    if password and store_password:
+    if password and args.store_password:
         conf.Login.setdefault(filename, {})
         conf.Login[filename].update(store=True, password=util.obfuscate(password))
         conf.save()
     sz = util.format_bytes(os.path.getsize(filename))
     t = " and ".join(util.plural(x[:-1], counts[x], sep=",") for x in sorted(counts))
-    output("\n\nCreated new database %s from Skype export archive %s." % (filename, input))
+    output("\n\nCreated new database %s from Skype export archive %s." % (filename, args.input))
     output("Database size %s, username '%s', with %s." % (sz, db.username, t))
 
 
-def run_export(filenames, format, output_dir, chatnames, authornames,
-               start_date, end_date, media_folder, ask_password, store_password):
-    """Exports the specified databases in specified format."""
+def run_export(filenames, args):
+    """
+    Exports the specified databases in specified format.
+
+    @param   args               argparse.Namespace
+               format           export type
+               output_dir       output directory if not current directory
+               chats            names of specific chats to export
+               authors          names of specific authors whose chats to export
+               start_date       date to export messages from, as YYYY-MM-DD
+               end_date         date to export messages until, as YYYY-MM-DD
+               media_folder     save shared media into a subfolder in HTML export
+               media_cache      cache downloaded media in user directory
+               ask_password     whether to ask password on the command line interactively
+               store_password   whether to store password in configuration file
+    """
     dbs = [skypedata.SkypeDatabase(f) for f in filenames]
-    is_xlsx_single = ("xlsx_single" == format)
+    is_xlsx_single, format = ("xlsx_single" == args.format), args.format
     if is_xlsx_single: format = "xlsx"
-    timerange = [util.datetime_to_epoch(x) for x in (start_date, end_date)]
-    output_dir = output_dir or os.getcwd()
+    timerange = [util.datetime_to_epoch(x) for x in (args.start_date, args.end_date)]
+    output_dir = args.output_dir or os.getcwd()
 
     for db in dbs:
 
-        if ask_password and db.username \
+        if args.ask_password and db.username \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-             or conf.SharedFileAutoDownload and media_folder) \
+             or conf.SharedFileAutoDownload and args.media_folder) \
         and "html" == format:
             while not db.live.is_logged_in():
                 password = get_password(db.username)
                 try: db.live.login(password=password)
                 except Exception as e: output("\n" + util.format_exc(e))
 
-            if store_password:
+            if args.store_password:
                 conf.Login.setdefault(db.filename, {})
                 conf.Login[db.filename].update(store=True, password=util.obfuscate(password))
                 conf.save()
@@ -755,13 +840,13 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
         path = util.unique_path(path)
         util.try_ignore(os.makedirs, output_dir)
         try:
-            extras = [("", chatnames)] if chatnames else []
-            extras += [(" with authors", authornames)] if authornames else []
+            extras = [("", args.chats)] if args.chats else []
+            extras += [(" with authors", args.authors)] if args.authors else []
             output("Exporting%s%s as %s %sto %s." %
                   (" chats" if extras else "",
                    ",".join("%s like %s" % (x, y) for x, y in extras),
                    format.upper(), dbstr, path))
-            chats = sorted(db.get_conversations(chatnames, authornames),
+            chats = sorted(db.get_conversations(args.chats, args.authors),
                            key=lambda x: x["title"].lower())
             db.get_conversations_stats(chats)
             bar_total = sum(c["message_count"] for c in chats)
@@ -777,7 +862,8 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
             opts = dict(progress=not conf.IsCLINonTerminal and bar.update,
                         timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
-            if media_folder: opts["media_folder"] = True
+            if args.media_folder: opts["media_folder"] = True
+            if args.media_cache:  opts["media_cache"]  = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
@@ -796,6 +882,94 @@ def run_export(filenames, format, output_dir, chatnames, authornames,
                 util.try_ignore((os.unlink if is_xlsx_single else os.rmdir), path)
         except Exception as e:
             output("Error exporting chats: %s\n\n%s" %
+                  (e, traceback.format_exc()))
+
+
+def run_contacts(filenames, args):
+    """
+    Exports contacts from the specified databases in specified format.
+
+    @param   args       argparse.Namespace
+               format   export type
+               output   output filename, auto-generated if not given
+               fields   values in profile fields to select contacts by
+               names    names to select contacts by
+               chats    specific chats to select contacts by
+    """
+    AFTER_MAX = sys.maxsize if conf.IsCLINonTerminal else 30
+    get_fields = lambda db, c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                               else skypedata.ACCOUNT_FIELD_TITLES
+
+    for filename in filenames:
+        try: db = skypedata.SkypeDatabase(filename)
+        except Exception as e:
+            logger.exception("Error opening %s.", filename)
+            output("Error opening %s: %s" % (filename, e))
+            continue # for filename
+
+        bartext = " Reading %s%s.." % (
+                  "..." if len(db.filename) > AFTER_MAX else "",
+                  db.filename[-AFTER_MAX:])
+        bar = ProgressBar(afterword=bartext, interval=0.05, pulse=True,
+                          static=conf.IsCLINonTerminal)
+        bar.start()
+
+        path = args.output
+        if not path:
+            formatargs = collections.defaultdict(str)
+            formatargs["skypename"] = os.path.basename(db.filename)
+            formatargs.update(db.account or {})
+            path = "%s.%s" % (util.safe_filename(conf.ExportContactsTemplate % formatargs), args.format)
+        path = util.unique_path(path)
+
+        chats    = db.get_conversations()
+        contacts = [db.account] + db.get_contacts()
+        db.get_conversations_stats(chats)
+        db.get_contacts_stats(contacts, chats)
+
+        if args.fields:
+            entries, texts = [], [x.lower() for x in args.fields]
+            for c in contacts:
+                ff = [(skypedata.format_contact_field(c, n) or "").lower()
+                      for n in get_fields(db, c)]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+        if args.names:
+            entries, texts = [], [x.lower() for x in args.names]
+            for c in contacts:
+                ff = [(c.get(n) or "").lower() for n in c if "name" in n]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+        if args.chats:
+            entries, texts = [], [x.lower() for x in args.chats]
+            chatmap = {x["id"]: x for x in chats}
+            chatmap.update({x["__link"]["id"]: x["__link"] for x in chats if x.get("__link")})
+            for c in contacts:
+                ff = [(chatmap[x["id"]].get("title") or "").lower()
+                      for x in c.get("conversations", [])]
+                if ff and all(any(t in f for f in ff) for t in texts):
+                    entries.append(c)
+            contacts = entries
+
+        util.try_ignore(os.makedirs, os.path.dirname(path))
+        bar.afterword = " Exporting %s%s.." % (
+                        "..." if len(db.filename) > AFTER_MAX else "",
+                        db.filename[-AFTER_MAX:])
+        bar.update()
+        try:
+            export.export_contacts(contacts, path, args.format, db)
+            bar.stop()
+            bar.afterword = " Exported %s from '%s' to '%s'. " % (
+                util.plural("contact", contacts), db, path)
+            bar.pulse = False
+            bar.update(bar.max)
+            output()
+            logger.info("Exported %s %sto %s as %s.", util.plural("contact", contacts),
+                        "from %s " % db if len(filenames) != 1 else "", path, args.format.upper())
+        except Exception as e:
+            output("Error exporting contacts: %s\n\n%s" %
                   (e, traceback.format_exc()))
 
 
@@ -905,6 +1079,7 @@ def run(nogui=False):
 
     if (getattr(sys, 'frozen', False) # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
+        conf.IsCLINonTerminal = None # Flag for ConsoleWriter.init_console()
         sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to
         sys.stderr = ConsoleWriter(sys.stderr) # a text console
     if "main" not in sys.modules: # E.g. setuptools install, calling main.run
@@ -972,9 +1147,7 @@ def run(nogui=False):
             logger.addHandler(logging.NullHandler())
 
     if "create" == arguments.command:
-        run_create(arguments.FILE, arguments.input,
-                   arguments.username, arguments.password,
-                   arguments.ask_password, arguments.store_password)
+        run_create(arguments.FILE, arguments)
     elif "diff" == arguments.command:
         run_diff(*arguments.FILE)
     elif "merge" == arguments.command:
@@ -983,20 +1156,15 @@ def run(nogui=False):
                    subparsers.choices["merge"].format_usage(),
                    os.path.basename(sys.argv[0])))
             return
-        run_merge(arguments.FILE, arguments.output)
+        run_merge(arguments.FILE, arguments)
     elif "export" == arguments.command:
-        run_export(arguments.FILE, arguments.type, arguments.output_dir,
-                   arguments.chat, arguments.author, arguments.start_date,
-                   arguments.end_date, arguments.media_folder,
-                   arguments.ask_password, arguments.store_password)
+        run_export(arguments.FILE, arguments)
+    elif "contacts" == arguments.command:
+        run_contacts(arguments.FILE, arguments)
     elif "search" == arguments.command:
-        run_search(arguments.FILE, arguments.QUERY, arguments.type,
-                   arguments.reverse, arguments.offset, arguments.limit)
+        run_search(arguments.FILE, arguments)
     elif "sync" == arguments.command:
-        run_sync(arguments.FILE, arguments.username, arguments.password,
-                 arguments.ask_password, arguments.store_password,
-                 arguments.sync_contacts, arguments.sync_older,
-                 arguments.chat, arguments.author)
+        run_sync(arguments.FILE, arguments)
     elif "gui" == arguments.command:
         try: run_gui(arguments.FILE)
         except Exception: traceback.print_exc()
@@ -1100,6 +1268,7 @@ class ConsoleWriter(object):
             t.daemon = True
             t.start()
         q.get()
+        os._exit(0)
 
 
 

@@ -57,7 +57,7 @@ automatically, or you can select specific files or folders.
 Once added to the database list, a file can be opened for reading, searching 
 and exporting, or compared with another database for merging.
 
-Searching an opened database supports a simple Google-like
+Searching an opened database supports a simple
 [query syntax](https://suurjaak.github.io/Skyperious/help.html).
 You can use keywords to search among specific authors or chats only
 (`from:john`, `chat:links`), or from certain dates only
@@ -93,6 +93,7 @@ Skyperious offers a number of options from the
   export FILE [-t format]    export Skype databases as HTML, text or spreadsheet
   search "query" FILE        search Skype databases for messages or data
   sync FILE                  download new messages from Skype online service
+  contacts FILE [-t format]  export Skype contacts as HTML, text or spreadsheet
   create FILE [-u user]      create new Skype database, blank or from a Skype source
   merge FILE FILE ...        merge two or more Skype databases into a new database
   diff FILE1 FILE2           compare chat history in two Skype databases
@@ -145,6 +146,7 @@ Source Dependencies
 If running from source code, Skyperious needs Python 3.5+ or Python 2.7,
 and the following 3rd-party Python packages:
 * wxPython 4.0+ (https://wxpython.org/)
+
 The following are also listed in `requirements.txt` for pip:
 * appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
@@ -157,6 +159,7 @@ The following are also listed in `requirements.txt` for pip:
 
 If wxPython is not available, the command line interface will function
 regardless.
+
 If other Python libraries are not available, the program will function 
 regardless, only with lesser service - like lacking Excel export or full 
 search syntax. `appdirs` and `six` are mandatory.

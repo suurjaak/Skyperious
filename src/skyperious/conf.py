@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.07.2022
+@modified    12.11.2022
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.3"
-VersionDate = "25.07.2022"
+Version = "5.4.dev65"
+VersionDate = "12.11.2022"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -35,8 +35,10 @@ else:
     ApplicationDirectory = os.path.abspath(os.path.dirname(__file__))
     ResourceDirectory = os.path.join(ApplicationDirectory, "res")
 
-"""Directory for variable content like login tokens."""
+"""Directory for variable content like login tokens and created databases."""
 VarDirectory = os.path.join(ApplicationDirectory, "var")
+"""Directory for cached files like downloaded shared content for export."""
+CacheDirectory = os.path.join(ApplicationDirectory, "var", "cache")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -53,15 +55,17 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
-OptionalFileDirectives = ["EmoticonsPlotWidth", "ExportChatTemplate",
-    "ExportDbTemplate", "HistoryFontSize", "LogSQL", "MinWindowSize",
-    "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
-    "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
+OptionalFileDirectives = [
+    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
+    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "HistoryZoom",
+    "LogSQL", "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedFileAutoDownload", "SharedImageAutoDownload", "StatisticsPlotWidth",
-    "StatusFlashLength", "UpdateCheckInterval", "WordCloudLengthMin",
-    "WordCloudCountMin", "WordCloudWordsMax", "WordCloudWordsAuthorMax"
+    "SharedFileAutoDownload", "SharedImageAutoDownload", "SharedContentUseCache",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
+    "WordCloudWordsAuthorMax"
 ]
 Defaults = {}
 
@@ -130,8 +134,14 @@ SearchInTables = False
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
 
+"""Automatically open exported files and directories in registered application."""
+ExportFileAutoOpen = True
+
 """Chat export filename template, format can use Skype.Conversations data."""
 ExportChatTemplate = u"Skype %(title_long_lc)s"
+
+"""Database contacts export filename template, format can use Skype.Accounts data."""
+ExportContactsTemplate = u"Skype contacts for %(name)s"
 
 """Database export filename template, format can use Skype.Accounts data."""
 ExportDbTemplate = u"Export from %(name)s"
@@ -217,6 +227,9 @@ HistoryFontName = "Tahoma"
 
 """Font size in chat history."""
 HistoryFontSize = 10
+
+"""Text zoom level in chat history, defaults to 1.0 (100%)."""
+HistoryZoom = 1.0
 
 """Window background colour."""
 BgColour = "#FFFFFF"
@@ -350,6 +363,15 @@ SharedFileAutoDownload = True
 """Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
 
+"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
+SharedContentUseCache = False
+
+"""
+Earliest message date to download shared content from Skype online service.
+Content from Skype's peer-to-peer era is unavailable for download.
+"""
+SharedContentDownloadMinDate = datetime.datetime(2017, 4, 1)
+
 """Duration of status message on program statusbar, in milliseconds."""
 StatusFlashLength = 30000
 
@@ -379,7 +401,7 @@ def load(configfile=None):
 
     @param   configfile  name of configuration file to use from now if not module defaults
     """
-    global Defaults, VarDirectory, ConfigFile, ConfigFileStatic
+    global Defaults, VarDirectory, CacheDirectory, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
     except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
@@ -389,13 +411,16 @@ def load(configfile=None):
     configpaths = [ConfigFile]
     if not Defaults and not ConfigFileStatic:
         # Instantiate OS- and user-specific paths
+        title = Title if "nt" == os.name else Title.lower()
         try:
-            p = appdirs.user_config_dir(Title, appauthor=False)
+            p = appdirs.user_config_dir(title, appauthor=False)
             userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Try user-specific path first, then path under application folder
             if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
-        try: VarDirectory = appdirs.user_data_dir(Title, False)
+        try: VarDirectory = appdirs.user_data_dir(title, appauthor=False)
+        except Exception: pass
+        try: CacheDirectory = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
         except Exception: pass
 
     section = "*"
@@ -435,8 +460,9 @@ def save(configfile=None):
     """
     configpaths = [configfile] if configfile else [ConfigFile]
     if not configfile and not ConfigFileStatic:
+        title = Title if "nt" == os.name else Title.lower()
         try:
-            p = appdirs.user_config_dir(Title, appauthor=False)
+            p = appdirs.user_config_dir(title, appauthor=False)
             userpath = os.path.join(p, "%s.ini" % Title.lower())
             # Pick only userpath if exists, else try application folder first
             if os.path.isfile(userpath): configpaths = [userpath]

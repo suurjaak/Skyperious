@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    01.05.2022
+@modified    12.11.2022
 ------------------------------------------------------------------------------
 """
 import base64
@@ -16,6 +16,7 @@ import calendar
 import codecs
 import ctypes
 import datetime
+import imghdr
 import io
 import locale
 import math
@@ -59,7 +60,7 @@ def safedivf(a, b):
 def safe_filename(filename):
     """Returns the filename with characters like \:*?"<>| removed."""
     result = re.sub(r"[\/\\\:\*\?\"\<\>\|\x00-\x1f]", "", filename)
-    return re.sub("\s+", " ", result)
+    return re.sub(r"\s+", " ", result)
 
 
 def format_bytes(size, precision=2, max_units=True):
@@ -137,6 +138,37 @@ def format_exc(e):
     return result
 
 
+def format_sql_name(name):
+    """Quotes name for use in an SQL expression, if name needs quoting."""
+    SQLITE_KEYWORDS = [
+        "ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE",
+        "AND", "AS", "ASC", "ATTACH", "AUTOINCREMENT", "BEFORE", "BEGIN",
+        "BETWEEN", "BY", "CASCADE", "CASE", "CAST", "CHECK", "COLLATE", "COLUMN",
+        "COMMIT", "CONFLICT", "CONSTRAINT", "CREATE", "CROSS", "CURRENT", 
+        "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "DATABASE", "DEFAULT",
+        "DEFERRABLE", "DEFERRED", "DELETE", "DESC", "DETACH", "DISTINCT", "DO",
+        "DROP",  "EACH", "ELSE", "END", "ESCAPE", "EXCEPT", "EXCLUDE", "EXCLUSIVE",
+        "EXISTS",  "EXPLAIN", "FAIL", "FILTER", "FIRST", "FOLLOWING", "FOR",
+        "FOREIGN", "FROM",  "FULL", "GENERATED", "GLOB", "GROUP", "GROUPS",
+        "HAVING", "IF", "IGNORE",  "IMMEDIATE", "IN", "INDEX", "INDEXED",
+        "INITIALLY", "INNER", "INSERT",  "INSTEAD", "INTERSECT", "INTO", "IS",
+        "ISNULL", "JOIN", "KEY", "LAST", "LEFT", "LIKE", "LIMIT", "MATCH",
+        "MATERIALIZED", "NATURAL", "NO", "NOT", "NOTHING", "NOTNULL", "NULL",
+        "NULLS", "OF", "OFFSET", "ON", "OR", "ORDER", "OTHERS", "OUTER", "OVER",
+        "PARTITION", "PLAN", "PRAGMA", "PRECEDING", "PRIMARY", "QUERY", "RAISE",
+        "RANGE", "RECURSIVE", "REFERENCES", "REGEXP", "REINDEX", "RELEASE",
+        "RENAME", "REPLACE", "RESTRICT", "RETURNING", "RIGHT", "ROLLBACK", "ROW",
+        "ROWS", "SAVEPOINT", "SELECT", "SET", "TABLE", "TEMP", "TEMPORARY", "THEN",
+        "TIES", "TO", "TRANSACTION", "TRIGGER", "UNBOUNDED", "UNION", "UNIQUE",
+        "UPDATE", "USING", "VACUUM", "VALUES", "VIEW", "VIRTUAL", "WHEN", "WHERE",
+        "WINDOW", "WITH", "WITHOUT",
+    ]
+    result = to_unicode(name)
+    if result.upper() in SQLITE_KEYWORDS or re.search(r"(^[\W\d])|(?=\W)", result, re.U):
+        result = u'"%s"' % result.replace('"', '""')
+    return result
+
+
 def format_sql_value(value):
     """Formats value to be suitable for use in an SQL expression."""
     UNPRINTABLES = "".join(set(six.unichr(i) for i in range(128)).difference(string.printable))
@@ -153,7 +185,8 @@ def format_sql_value(value):
         else:
             if isinstance(value, six.text_type):
                 value = value.encode("utf-8")
-            value = '"%s"' % codecs.encode(value.decode("latin1"), "unicode-escape").decode("latin1")
+            escaped = codecs.encode(value.decode("latin1"), "unicode-escape").decode("latin1")
+            value = '"%s"' % escaped.replace('"', '""')
     elif value is None:
         value = "NULL"
     else:
@@ -171,6 +204,30 @@ def b64decode(s):
     """Returns value decoded from Base64 as text; input may be text or bytes."""
     if isinstance(s, six.text_type): s = s.encode("latin1")
     return base64.b64decode(s).decode("latin1")
+
+
+def ellipsize(text, limit=50, front=False, ellipsis=".."):
+    """
+    Returns text ellipsized if beyond limit. If text is enclosed in quotes or
+    brackets ('' "" [] () <> {}), it is ellipsized inside the enclosure,
+    e.g. ellipsize('"0123456789"', 10) returns '"012345.."'.
+
+    @param   text      value to ellipsize, converted to string if not string
+    @param   limit     length beyond which text is truncated
+    @param   front     if true, ellipsis is inserted in front
+                       and text is truncated from the end
+    @param   ellipsis  the ellipsis string to use
+    """
+    if not isinstance(text, six.string_types): text = to_unicode(text)
+    if len(text) <= limit: return text
+
+    ENCLOSURES = "''", '""', "[]", "()", "<>", "{}"
+    extra = next((a if front else b for a, b in ENCLOSURES
+                  if a == text[0] and b == text[-1]), "")
+    if extra: limit -= 1
+
+    if front: return (extra + ellipsis + text[-limit + len(ellipsis):])
+    else:     return (text[:limit - len(ellipsis)] + ellipsis + extra)
 
 
 def hash_string(s):
@@ -414,6 +471,26 @@ def create_file(filepath, mode="w", handle=False, **kwargs):
         with open(filepath, mode, **kwargs): pass
 
 
+def get_file_type(content, category=None, filename=None):
+    """
+    Returns file type extension like "png", or category if detection failed
+    and known media category like "video", or "image".
+
+    @param   content   file as raw bytes
+    @param   category  type of content, e.g. "image" or "audio" or "video"
+    @param   filename  original name of file
+    """
+    category = category if category in ("audio", "video") else "image"
+    filetype = None
+    if filename:
+        filetype = os.path.splitext(filename)[-1][1:] or filetype
+    if "image" == category:
+        filetype = imghdr.what("", content) or filetype
+    elif not filetype:
+        filetype = "mp4" # Pretty safe bet for Skype audio/video
+    return filetype or category
+
+
 def is_os_64bit():
     """Returns whether the operating system is 64-bit (Windows-only)."""
     return ('PROCESSOR_ARCHITEW6432' in os.environ
@@ -620,7 +697,7 @@ def to_unicode(value, encoding=None, errors="strict"):
         except Exception:
             result = six.text_type(result, "utf-8", errors="backslashreplace")
     elif not isinstance(result, six.text_type):
-        try: result = str(result)
+        try: result = six.text_type(result)
         except Exception: result = repr(result)
     if not isinstance(result, six.text_type):
         result = six.text_type(result)

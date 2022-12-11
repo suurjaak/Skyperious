@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    17.07.2022
+@modified    13.10.2022
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, wx
+#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -1462,7 +1462,7 @@ HTML chat history export template for shared media message body.
 @param   ?media_folder   path to save files under, if not embedding
 """
 CHAT_MESSAGE_MEDIA = """<%
-import imghdr, logging, mimetypes, os
+import logging, mimetypes, os
 from six.moves import urllib
 from skyperious import conf, skypedata
 from skyperious.lib import util
@@ -1470,13 +1470,9 @@ from skyperious.lib import util
 category = category if isdef("category") else None
 filename = filename if isdef("filename") else None
 if category not in ("audio", "video"): category = "image"
-src, mimetype, filetype = url, None, None
-if filename:
-    filetype = os.path.splitext(filename)[-1][1:]
+src, mimetype, filetype = url, None, util.get_file_type(content, category, filename)
 if category in ("audio", "video"):
     mimetype = mimetypes.guess_type(filename or "")[0]
-else:
-    filetype = imghdr.what("", content) or filetype or "image"
 if filename and filetype and not os.path.splitext(filename)[-1]:
     filename = "%s.%s" % (filename, filetype)
 filetype = filetype or category
@@ -1796,19 +1792,19 @@ import datetime
 from skyperious import conf
 from skyperious.lib import util
 
-str_cols = ", ".join(columns)
+str_cols = ", ".join(map(util.format_sql_name, columns))
 %>-- {{ title }}.
 -- Source: {{ db.filename }}.
 -- Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
 %if sql:
 -- SQL: {{ sql }}
 %endif
-%if table:
+%if isdef("create_sql") and create_sql:
 {{ create_sql }}
 %endif
 
 %for row in rows:
-INSERT INTO {{ table }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
+INSERT INTO {{ util.format_sql_name(table) }} ({{ str_cols }}) VALUES ({{ ", ".join(util.format_sql_value(row[col]) for col in columns) }});
 %endfor
 """
 
@@ -1820,6 +1816,8 @@ HTML statistics template, for use with HtmlWindow.
 @param   db               SkypeDatabase instance
 @param   participants     [{contact data}, ]
 @param   chat             chat data dictionary
+@param   chat_image       memoryfs filename, if any
+@param   chat_image_size  chat image size as (w, h)
 @param   sort_by          the field stats are currently sorted by
 @param   stats            SkypeDatabase.get_collected_stats()
 @param   images           {histogram type: memoryfs filename}
@@ -1887,6 +1885,22 @@ interval = items[1][0] - items[0][0]
   </tr>
 %endfor
 
+%if chat_image:
+<%
+sz = None
+if chat_image_size[0] > 100:
+    ratio = 100. / chat_image_size[0]
+    sz = tuple(int(x * ratio) for x in chat_image_size)
+%>
+  <tr>
+    <td valign="top">Chat profile picture:</td>
+    <td valign="top">
+      <img src="memory:{{ chat_image }}" {{! 'width="%s" height="%s" ' % sz if sz else "" }}/><br />
+      <a href="picture"><font color="{{ conf.LinkColour }}">Save image</font></a>
+    </td>
+  </tr>
+%endif
+
 %if len(stats["counts"]) > 1 and len([x for x in ("messages", "smses", "calls", "transfers", "shares") if stats[x]]) > 1:
   <tr><td><br /><br /></td><td colspan="3" valign="bottom">
     <b>Sort by:&nbsp;&nbsp;&nbsp;</b>
@@ -1931,8 +1945,13 @@ if stats["counts"][p["identity"]]["shares"]:
   <tr>
     <td valign="top">
       <table cellpadding="0" cellspacing="0"><tr>
+%if p.get("id"):
+        <td valign="top"><a href="contact:{{ p["id"] }}"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/></a>&nbsp;&nbsp;</td>
+        <td valign="center"><a href="contact:{{ p["id"] }}"><font color="{{ conf.LinkColour }}">{{ p["name"] }}</font></a><br /><font size="2" color="gray">{{ p["identity"] }}</font></td>
+%else:
         <td valign="top"><img src="memory:{{ authorimages[p["identity"]]["avatar"] }}"/>&nbsp;&nbsp;</td>
         <td valign="center">{{ p["name"] }}<br /><font size="2" color="gray">{{ p["identity"] }}</font></td>
+%endif
       </tr></table>
     </td><td valign="top">
 %for type, label, count, total in stat_rows:
@@ -2200,11 +2219,14 @@ CHAT_COLS = [("title_long",             "Chat",                  "chat name"),
              ("first_message_datetime", "First message",         "first message date"),
              ("last_message_datetime",  "Last message",          "last message date")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
 TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
 HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
 
 bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
 phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
+account_contact = next((c for c in contacts if c["identity"] == db.id), None)
 contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
 %>
 <!DOCTYPE HTML><html lang="">
@@ -2251,6 +2273,7 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     .hidden { display: none; }
     td, th { text-align: left; vertical-align: top; }
     th { white-space: nowrap; }
+    th.account { color: green; font-size: 1.2em; }
     hr {
       border: none;
       border-top: 1px solid lightgray;
@@ -2277,6 +2300,9 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
       padding: 5px;
       margin-top: 30px;
       width: calc(100% - 10px);
+    }
+    div.contact.self {
+      border-color: green;
     }
     div.contact > table {
       width: 100%;
@@ -2401,6 +2427,18 @@ dct = {
 
     function sort_contacts(link, col) {
       var sort_direction = !link.classList.contains("asc"); // True for ascending
+
+      var linklist = document.getElementById("sort_header").getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        var elem = linklist[i], name = elem.getAttribute("data-name");
+        if (name != col) {
+          if (elem.classList.contains("asc")) sort_direction = true;
+          else if (elem.classList.contains("desc")) sort_direction = false;
+        };
+        elem.className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+
       var sortfn = function(a, b) {
         var n1 = a.id.replace(/^contact\//, "");
         var n2 = b.id.replace(/^contact\//, "");
@@ -2416,22 +2454,30 @@ dct = {
       var itemlist = document.getElementsByClassName("contact");
       var items = [];
       for (var i = 0, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
-
       items.sort(sortfn);
       var container = document.getElementById("content_wrapper");
       for (var i = 0; i < items.length; i++) {
         container.appendChild(items[i]);
       }
-      var linklist = document.getElementById("sort_header").getElementsByClassName("sort");
-      for (var i = 0; i < linklist.length; i++) {
-        linklist[i].className = "sort";
-      }
-      link.className = "sort " + (sort_direction ? "asc" : "desc");
       return false;
     }
 
     function sort_table(link, idx) {
       var sort_direction = !link.classList.contains("asc"); // True for ascending
+
+      var table = link.parentElement.parentElement.parentElement.parentElement;
+      var itemlist = table.getElementsByTagName("tr");
+      var linklist = itemlist[0].getElementsByClassName("sort");
+      for (var i = 0; i < linklist.length; i++) {
+        var elem = linklist[i];
+        if (i != idx) {
+          if (elem.classList.contains("asc")) sort_direction = true;
+          else if (elem.classList.contains("desc")) sort_direction = false;
+        };
+        elem.className = "sort";
+      }
+      link.className = "sort " + (sort_direction ? "asc" : "desc");
+
       var sortfn = function(a, b) {
         var v1 = a.children[idx].title || a.children[idx].innerText;
         var v2 = b.children[idx].title || b.children[idx].innerText;
@@ -2439,20 +2485,12 @@ dct = {
         return sort_direction ? result : -result;
       };
 
-      var table = link.parentElement.parentElement.parentElement.parentElement;
-      var itemlist = table.getElementsByTagName("tr");
       var items = [];
       for (var i = 1, ll = itemlist.length; i != ll; items.push(itemlist[i++]));
-
       items.sort(sortfn);
       for (var i = 0; i < items.length; i++) {
         table.tBodies[0].appendChild(items[i]);
       }
-      var linklist = itemlist[0].getElementsByClassName("sort");
-      for (var i = 0; i < linklist.length; i++) {
-        linklist[i].className = "sort";
-      }
-      link.className = "sort " + (sort_direction ? "asc" : "desc");
       return false;
     }
 
@@ -2532,23 +2570,24 @@ dct = {
 %>
       <a href="javascript:;" onclick="return toggle_darkmode()" id="darkmode" title="Click to toggle dark/light mode">&#x1F313;&#xFE0E;</a>
       <br />
-%if bots or phones:
-      <b>{{ len(contacts) }}</b> {{ util.plural("contact", contacts, numbers=False) }} in total.
+      <b>{{ len(contacts) }}</b> {{ util.plural("entry", contacts, numbers=False) }} in total. <br />
+%if account_contact:
+      <b>1</b> database account{{ ", " if phones or bots else "." }}
+%endif
 %if phones:
       <b>{{ len(phones) }}</b> {{ util.plural("phone number contact", phones, numbers=False) }}{{ "," if bots else "." }}
 %endif
 %if bots:
       <b>{{ len(bots) }}</b> {{ util.plural("bot contact", bots, numbers=False) }}.
 %endif
-%endif
     </td>
   </tr></table>
 </td></tr><tr><td>
 
 <div id="sort_header">
-    Sort contacts by:
+    Sort by:
 %for name, label, sortlabel in CONTACT_SORTS:
-    <a title="Sort contacts by {{ sortlabel }}" href="#" onClick="return sort_contacts(this, '{{ name }}');"
+    <a title="Sort contacts by {{ sortlabel }}" href="#" data-name="{{ name }}" onClick="return sort_contacts(this, '{{ name }}');"
        class="sort{{ " desc" if "last_message_datetime" == name else "" }}">{{ label }}</a>
 %endfor
 </div>
@@ -2569,9 +2608,10 @@ avatar = skypedata.get_avatar_raw(c)
 if avatar:
     try: filetype = imghdr.what("", avatar[:100].encode("latin1")) or "png"
     except Exception: filetype = "png"
+category = "account" if db.id == c["identity"] else "contact"
 %>
 
-  <div class="contact" id="contact/{{ c["identity"] }}">
+  <div class="contact{{ " self" if db.id == c["identity"] else "" }}" id="contact/{{ c["identity"] }}">
     <table>
       <tr><td class="avatar">
         <img title="{{ alt }}" alt="{{ alt }}"
@@ -2585,10 +2625,13 @@ if avatar:
       </td><td>
 
         <table class="fields">
-%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(c, n)):
+%if db.id == c["identity"]:
+        <tr><th class="account" colspan="2">Database account</th></tr>
+%endif
+%for name, label in ((n, t) for n, t in get_fields(c).items() if skypedata.format_contact_field(c, n)):
         <tr>
           <th>{{ label }}:</th>
-          <td>{{ skypedata.format_contact_field(c, name) }}</td>
+          <td>{{! escape(skypedata.format_contact_field(c, name)).replace("\\n", "<br />") }}</td>
         </tr>
 %endfor
 %if c.get("conversations"):
@@ -2596,14 +2639,22 @@ if avatar:
           <th colspan="2"><br /></th>
         </tr>
         <tr>
-          <th>Messages:</th>
+          <th>Messages in total:</th>
           <td>{{ c["message_count_single"] + c["message_count_group"] }}</td>
+        </tr>
+        <tr>
+          <th>Messages in 1:1 chat:</th>
+          <td>{{ c["message_count_single"] }}</td>
+        </tr>
+        <tr>
+          <th>Messages in group chats:</th>
+          <td>{{ c["message_count_group"] }}</td>
         </tr>
         <tr>
           <th>Chats:</th>
           <td>
             {{ len(c["conversations"]) }}
-            <a class="toggle open" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
+            <a class="toggle{{ "" if db.id == c["identity"] else " open" }}" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
           </td>
         </tr>
 %endif
@@ -2611,12 +2662,15 @@ if avatar:
 
       </td></tr>
 %if c.get("conversations"):
-      <tr id="contact/{{ c["identity"] }}/sep"><td colspan="2"><hr /></td></tr>
-      <tr id="contact/{{ c["identity"] }}/chats"><td></td><td>
+      <tr id="contact/{{ c["identity"] }}/sep"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td colspan="2"><hr /></td></tr>
+      <tr id="contact/{{ c["identity"] }}/chats"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td></td><td>
 
         <table class="chats"><tr>
 %for i, (name, label, sortlabel) in enumerate(CHAT_COLS):
-          <th><a href="#" title="Sort contact chats by {{ sortlabel }}"
+<%
+label, sortlabel = (x.replace("contact", category) for x in (label, sortlabel))
+%>
+          <th><a href="#" title="Sort {{ category }} chats by {{ sortlabel }}"
                  onClick="return sort_table(this, {{ i }});"
                  class="sort{{! " desc" if name == "last_message_datetime" else "" }}">
             {{ label }}
@@ -2653,12 +2707,114 @@ if avatar:
 
 
 """
+Contacts information template, for use in export.
+
+@param   db               SkypeDatabase instance
+@param   contacts         list of contacts dicts, as returned from SkypeDatabase,
+                          supplemented with statistics
+"""
+EXPORT_CONTACTS_TXT = """<%
+import datetime, textwrap
+from skyperious import conf, skypedata, templates
+from skyperious.lib import util
+
+
+CHAT_COLS = [("title_long",             "Chat"),
+             ("message_count",          "Messages from contact"),
+             ("ratio",                  "Message ratio"),
+             ("first_message_datetime", "First message"),
+             ("last_message_datetime",  "Last message")]
+datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
+wrap = lambda s, i: ("\\n" + i).join(sum((textwrap.wrap(x, width=80, break_long_words=False) or [""] for x in s.splitlines()), []))
+
+TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
+
+bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
+phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
+account_contact = next((c for c in contacts if c["identity"] == db.id), None)
+contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
+countstr = ", ".join(util.plural(n, v) for n, v in (
+    ("database account", bool(account_contact)),
+    ("phone number contact", phones),
+    ("bot contact", bots)
+) if v)
+%>Skype contacts
+==============
+
+Source: {{ db.filename }}
+{{ len(contacts) }} {{ util.plural("entry", contacts, numbers=False) }} in total.
+%if account_contact or phones or bots:
+{{ countstr }}.
+%endif
+Exported with {{ conf.Title }} on {{ datetime.datetime.now().strftime("%d.%m.%Y %H:%M") }}.
+%for c in contacts:
+
+
+
+%if db.id == c["identity"]:
+## Database account ##
+%endif
+<%
+maxw = max(len(x) for x in get_fields(c).values())
+indent = " " * (maxw + 2 + 1)
+%>
+%for name, label in ((n, t) for n, t in get_fields(c).items() if skypedata.format_contact_field(c, n)):
+{{ ("%s:" % label).ljust(maxw + 1) }}  {{ wrap(skypedata.format_contact_field(c, name), indent) }}
+%endfor
+%if c.get("conversations"):
+<%
+vals = [str(x) for x in (
+    c["message_count_single"] + c["message_count_group"],
+    c["message_count_single"], c["message_count_group"], len(c["conversations"])
+)]
+maxw = max(map(len, vals))
+%>
+
+Messages in total:       {{ vals[0].rjust(maxw) }}
+Messages in 1:1 chat:    {{ vals[1].rjust(maxw) }}
+Messages in group chats: {{ vals[2].rjust(maxw) }}
+Chats:                   {{ vals[3].rjust(maxw) }}
+
+<%
+category = "account" if db.id == c["identity"] else "contact"
+sortkey = lambda x: x["last_message_datetime"] or datetime.datetime.min
+justify = lambda i, v: (v.rjust if i else v.ljust)(widths[i])
+rows = [
+    [
+        util.ellipsize(TITLEMAP.get(d["id"]) or "", 80),
+        str(d["message_count"]),
+        util.round_float(d["ratio"], 0) + "%" if d.get("ratio") is not None else "",
+        datefmt(d["first_message_datetime"]),
+        datefmt(d["last_message_datetime"]),
+    ]
+    for d in sorted(c["conversations"], reverse=True, key=sortkey)
+]
+widths = [len(l) for _, l in CHAT_COLS]
+widths = [max(v, max(len(x[i]) for x in rows)) for i, v in enumerate(widths)]
+
+
+ren = lambda l: l.replace("contact", category) if "contact" in l and "contact" != category else l
+header = "  ".join([ren(l).ljust(widths[i]) for i, (_, l) in enumerate(CHAT_COLS[:-1])] + [CHAT_COLS[-1][1]])
+echo(header + "\\n")
+echo("-" * (2 * len(widths) - 2 + sum(widths)) + "\\n")
+for row in rows:
+    echo("%s\\n" % "  ".join(justify(i, v) for i, v in enumerate(row)))
+%>
+%endif
+%endfor
+"""
+
+
+"""
 Contact information template, for use with HtmlWindow.
 
 @param   db               SkypeDatabase instance
 @param   contact          contact data dictionary, including "conversations": [}
 @param   sort_by          the field that chats are currently sorted by
 @param   avatar           memoryfs filename
+@param   avatar_size      avatar image size as (w, h)
 """
 CONTACT_HTML = """<%
 from skyperious import conf, skypedata
@@ -2669,6 +2825,9 @@ CHAT_COLS = [("title_long", "Chat"), ("message_count", "Messages from contact"),
              ("first_message_datetime", "First message"),
              ("last_message_datetime", "Last message")]
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
+get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
+                       else skypedata.ACCOUNT_FIELD_TITLES
+category = "account" if db.id == contact["identity"] else "contact"
 %>
 <font color="{{ conf.FgColour }}" face="{{ conf.HistoryFontName }}" size="2">
 <table cellpadding="0" cellspacing="0" width="100%"><tr>
@@ -2691,7 +2850,10 @@ if avatar_size[0] > 300:
   </td>
   <td valign="top">
     <table>
-%for name, label in ((n, t) for n, t in skypedata.CONTACT_FIELD_TITLES.items() if skypedata.format_contact_field(contact, n)):
+%if db.id == contact["identity"]:
+      <tr><td nowrap valign="top" colspan="2"><font size="3"><b>Database account</b></font></td></tr>
+%endif
+%for name, label in ((n, t) for n, t in get_fields(contact).items() if skypedata.format_contact_field(contact, n)):
       <tr>
         <td nowrap valign="top"><b>{{ label }}:</b></td>
         <td>{{ skypedata.format_contact_field(contact, name) }}</td>
@@ -2702,8 +2864,16 @@ if avatar_size[0] > 300:
         <td colspan="2"></td>
       </tr>
       <tr>
-        <td nowrap valign="top"><b>Messages:</b></td>
+        <td nowrap valign="top"><b>Messages in total:</b></td>
         <td>{{ contact["message_count_single"] + contact["message_count_group"] }}</td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Messages in 1:1 chat:</b></td>
+        <td>{{ contact["message_count_single"] }}</td>
+      </tr>
+      <tr>
+        <td nowrap valign="top"><b>Messages in group chats:</b></td>
+        <td>{{ contact["message_count_group"] }}</td>
       </tr>
       <tr>
         <td nowrap valign="top"><b>Chats:</b></td>
@@ -2719,6 +2889,9 @@ if avatar_size[0] > 300:
 %if contact.get("conversations"):
 <table cellpadding="2" cellspacing="2"><tr>
 %for i, (name, label) in enumerate(CHAT_COLS):
+<%
+if "contact" in label and "contact" != category: label = label.replace("contact", category)
+%>
     <td nowrap width="{{ 100 if i else 400 }}" align="{{ "right" if i in (1, 2) else "left" }}" valign="top">
 %if name == sort_by:
         <font color="gray">
@@ -3166,7 +3339,7 @@ from skyperious import conf
     <table cellpadding="0" cellspacing="2"><tr><td>
         <a href="page:#search"><img src="memory:HelpSearch.png" /></a>
       </td><td width="10"></td><td valign="center">
-        Search over all Skype messages using a simple Google-like <a href="page:#help"><font color="{{ conf.LinkColour }}">syntax</font></a>.<br />
+        Search over all Skype messages using a simple <a href="page:#help"><font color="{{ conf.LinkColour }}">query syntax</font></a>.<br />
         <br />
         Or choose other search targets from the toolbar: <br />
         search in contact information, or in chat information, <br />
@@ -3266,7 +3439,7 @@ except ImportError:
 %if not pyparsing:
 <b><font color="red">Search syntax currently limited:</font></b>&nbsp;&nbsp;pyparsing not installed.<br /><br /><br />
 %endif
-{{ conf.Title }} supports a Google-like syntax for searching messages:<br /><br />
+{{ conf.Title }} supports a simple query syntax for searching messages:<br /><br />
 <table><tr><td width="500">
   <table border="0" cellpadding="5" cellspacing="1" bgcolor="{{ conf.HelpBorderColour }}"
    valign="top" width="500">
@@ -3362,8 +3535,8 @@ except ImportError:
   <tr>
     <td bgcolor="{{ conf.BgColour }}" width="150">
       <b>Search from specific time periods</b><br /><br />
-      <font color="{{ conf.HelpCodeColour }}"><code>date:2008<br />date:2009-01<br />
-      date:2005-12-24..2007</code></font>
+      <font color="{{ conf.HelpCodeColour }}"><code>date:2020<br />date:2022-01<br />
+      date:2020-12-24..2021</code></font>
       <br />
     </td>
     <td bgcolor="{{ conf.BgColour }}">
@@ -3387,7 +3560,7 @@ except ImportError:
       <b>Exclude words or keywords</b><br /><br />
       <font color="{{ conf.HelpCodeColour }}"><code>-notthisword<br />-"not this phrase"<br />
       -(none of these)<br/>-chat:notthischat<br/>-from:notthisauthor<br />
-      -date:2013</code></font>
+      -date:2021</code></font>
       <br />
     </td>
     <td bgcolor="{{ conf.BgColour }}">
@@ -3428,8 +3601,8 @@ except ImportError:
         <font color="{{ conf.HelpCodeColour }}">
         <code>flickr.com from:john from:jane chat:links</code></font><br />
     </li>
-    <li>search from John Smith up to 2011:<br /><br />
-        <font color="{{ conf.HelpCodeColour }}"><code>from:"john smith" date:..2011</code></font>
+    <li>search from John Smith up to 2021:<br /><br />
+        <font color="{{ conf.HelpCodeColour }}"><code>from:"john smith" date:..2021</code></font>
         <br />
     </li>
     <li>search for either "John" and "my side" or "Stark" and "your side":
@@ -3437,17 +3610,17 @@ except ImportError:
         <font color="{{ conf.HelpCodeColour }}">
         <code>(john "my side") OR (stark "your side")</code></font><br />
     </li>
-    <li>search for either "barbecue" or "grill" in 2012,
+    <li>search for either "barbecue" or "grill" in 2022,
         except from June to August:<br /><br />
         <font color="{{ conf.HelpCodeColour }}">
-        <code>barbecue OR grill date:2012 -date:2012-06..2012-08</code>
+        <code>barbecue OR grill date:2022 -date:2022-06..2022-08</code>
         </font><br />
     </li>
     <li>search for "TPS report" in chats named "office"
-        (but not named "backoffice") on the first day of the month in 2012:
+        (but not named "backoffice") on the first day of the month in 2022:
         <br /><br />
         <font color="{{ conf.HelpCodeColour }}">
-        <code>"tps report" chat:office -chat:backoffice date:2012-*-1</code>
+        <code>"tps report" chat:office -chat:backoffice date:2022-*-1</code>
         </font><br />
     </li>
   </ul>

@@ -1,6 +1,38 @@
 CHANGELOG
 =========
 
+5.4, 2022-10-17
+---------------
+- add chat and contact counts to chats and contacts lists
+- add database account as one entry among contacts in contacts-tab
+- add links to contacts page in chat statistics
+- add chat image to chat statistics
+- add option to delete contact from database
+- add contacts TXT export
+- add contacts export to command-line interface
+- add configuration flag to cache shared media on disk (issue #112)
+- add configuration flag to auto-open exported files
+- add 1:1 and group chat message counts to contact details
+- add chat history text size selection to chat toolbar and context menu
+- add context menu popup to contact list right-click
+- add support for exporting SQL query results as INSERT statements
+- add support for F2 and Ctrl-F key shortcuts in chats and contacts lists
+- add "Export chats" button to contacts tab
+- add context menu popups to all HTML controls
+- expose chats and contacts lists context menu options under actions button
+- add options to sync specific items in chats and contacts lists from live
+- list all chats a contact is participant in, including empty chats
+- convert linefeeds in profile fields to line break tags in contacts HTML export
+- retain sort direction on changing sort column in contacts HTML export
+- export contact list by current applied filter
+- order file types in save dialog by label
+- skip trying to download old shared content guaranteed to be unavailable
+- fix parsing quoted media messages
+- fix chat count on initial and info page not matching count in chat list
+- fix error on syncing a contact no longer available online
+- fix escaping quotes in SQL export
+- fix compiled exe and pythonw auto-closing window immediately on --help
+
 
 5.3, 2022-07-25
 ---------------

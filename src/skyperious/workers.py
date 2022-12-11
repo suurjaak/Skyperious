@@ -9,11 +9,10 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    17.07.2022
+@modified    29.09.2022
 ------------------------------------------------------------------------------
 """
 import datetime
-import functools
 import logging
 import re
 import threading
@@ -30,7 +29,6 @@ from . lib import util
 from . lib.vendor import step
 
 from . import conf
-from . import live
 from . import searchparser
 from . import skypedata
 from . import templates
@@ -69,6 +67,7 @@ class WorkerThread(threading.Thread):
         self._is_running   = False
         self._is_working   = False
         self._drop_results = drop_results
+        while not self._queue.empty(): self._queue.get_nowait()
         self._queue.put(None) # To wake up thread waiting on queue
 
 
@@ -79,11 +78,12 @@ class WorkerThread(threading.Thread):
         """
         self._is_working = False
         self._drop_results = drop_results
+        while not self._queue.empty(): self._queue.get_nowait()
 
 
     def is_working(self):
         """Returns whether the thread is currently doing work."""
-        return self._is_working
+        return self._is_working or self._is_running and not self._queue.empty()
 
 
     def postback(self, data):
@@ -707,7 +707,6 @@ class MergeThread(WorkerThread):
         c = chat
         participants1 = c["c1"]["participants"] if c["c1"] else []
         participants2 = c["c2"]["participants"] if c["c2"] else []
-        c1p_map = dict((p["identity"], p) for p in participants1)
         c2p_map = dict((p["identity"], p) for p in participants2
                        if p["contact"].get("id"))
         c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
@@ -849,16 +848,25 @@ class LiveThread(WorkerThread):
             if not action: continue # while self._is_running
 
             self._is_working, self._drop_results = True, False
-            result = {"action": action["action"], "opts": action, "done": True}
+            result = {"action": action["action"], "opts": action, "end": True}
             try:
                 if "login" == action["action"]:
                     self._skype.login(password=action["password"])
                 elif "populate" == action["action"]:
                     self._skype.populate(action.get("chats"))
+                elif "account" == action["action"]:
+                    self._skype.populate_account()
+                elif "contacts" == action["action"]:
+                    self._skype.populate_contacts(action.get("contacts"))
+                elif "history" == action["action"]:
+                    self._skype.populate_chats(action.get("chats"), messages=True)
+                elif "chats" == action["action"]:
+                    self._skype.populate_chats(action.get("chats"), messages=False)
             except Exception as e:
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)
-            if not self._is_working: result["stop"] = True
+            if self._queue.empty():   result["done"] = True
+            if not self.is_working(): result["stop"] = True
 
             if not self._drop_results: self.postback(result)
             self._is_working = False
@@ -897,7 +905,7 @@ class SkypeArchiveThread(WorkerThread):
                 logger.exception("Error parsing Skype export %s.", action["db"].export_path)
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)
-            if not self._is_working: result["stop"] = True
+            if not self.is_working(): result["stop"] = True
 
             if not self._drop_results: self.postback(result)
             self._is_working = False

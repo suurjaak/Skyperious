@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2022
+@modified    17.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -111,23 +111,22 @@ CONTACT_FIELD_TITLES = collections.OrderedDict([
     ("languages",           "Languages"),
 ])
 ACCOUNT_FIELD_TITLES = collections.OrderedDict([
-    ("fullname",            "Full name"),
-    ("given_displayname",   "Given display name"),
     ("skypename",           "Skype name"),
     ("liveid_membername",   "Skype name alias"),
-    ("mood_text",           "Mood"),
+    ("fullname",            "Full name"),
+    ("given_displayname",   "Given display name"),
     ("phone_mobile",        "Mobile phone"),
     ("phone_home",          "Home phone"),
     ("phone_office",        "Office phone"),
     ("emails",              "E-mails"),
-    ("country",             "Country"),
-    ("province",            "Province"),
-    ("city",                "City"),
     ("homepage",            "Website"),
-    ("gender",              "Gender"),
+    ("mood_text",           "Mood"),
     ("birthday",            "Birth date"),
+    ("gender",              "Gender"),
+    ("city",                "City"),
+    ("province",            "State/Province"),
+    ("country",             "Country/Region"),
     ("languages",           "Languages"),
-    ("nrof_authed_buddies", "Contacts"),
     ("about",               "About me"),
     ("skypeout_balance",    "SkypeOut balance"),
 ])
@@ -295,18 +294,34 @@ class SkypeDatabase(object):
 
 
     def clear_cache(self):
-        """Clears all the currently cached rows."""
+        """Clears all the currently cached rows, and refreshes row counts."""
         self.table_rows.clear()
         self.table_objects.clear()
         self.get_tables(refresh=True)
+
+
+    def clear_cache_rows(self, table, rows=None):
+        """Discards the specified rows from cache, or entire table cache if None."""
+        if rows:
+            for k in list(self.table_objects.get(table, {})):
+                if self.table_objects[table][k] in rows:
+                    self.table_objects[table].pop(k)
+            if table in self.table_rows:
+                self.table_rows[table] = [x for x in self.table_rows[table] if x not in rows]
+        if rows is None:
+            self.table_objects.pop(table, None)
+            self.table_rows.pop(table, None)
 
 
     def update_accountinfo(self, log_error=True):
         """Refreshes Skype account information."""
         try:
             titlecol = self.make_title_col("accounts")
-            self.account = self.execute("SELECT *, %s AS name, "
-                "skypename AS identity FROM accounts LIMIT 1" % titlecol).fetchone()
+            phonecol = "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office)"
+            self.account = self.execute(
+                "SELECT *, %s AS phone, %s AS name, skypename AS identity "
+                "FROM accounts LIMIT 1" % (phonecol, titlecol)
+            ).fetchone()
             self.id = self.account["skypename"]
             self.username = self.account.get("liveid_membername") or self.id
             tdata = next((x for x in self.tables_list
@@ -357,11 +372,15 @@ class SkypeDatabase(object):
             util.try_ignore(lambda: os.unlink(self.live.tokenpath))
 
 
-    def execute(self, sql, params=(), log=True):
-        """Shorthand for self.connection.execute()."""
+    def execute(self, sql, params=(), log=None):
+        """
+        Shorthand for self.connection.execute().
+
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        """
         result = None
         if self.connection:
-            if log and conf.LogSQL:
+            if conf.LogSQL if log is None else log:
                 logger.info("SQL: %s%s", sql,
                             ("\nParameters: %s" % params) if params else "")
             result = self.connection.execute(sql, params)
@@ -438,26 +457,22 @@ class SkypeDatabase(object):
         """
         Get up-to-date general statistics raw from the database.
 
-        @param   full  whether to return full statistics, or only tables
-                       and last chat
+        @param   full  whether to return full statistics, or only tables and last chat
         """
         result = collections.defaultdict(str)
         if self.account:
             result.update({"name": self.account.get("name"),
                            "skypename": self.id, "username": self.username})
-        COUNTS = ["Conversations", "Messages", "Contacts"]
-        if full: COUNTS += ["Transfers"]
-        for table in COUNTS:
+        for table in ["Messages", "Contacts"] + (["Transfers"] if full else []):
             res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
-            label = "chats" if "Conversations" == table else table.lower()
-            result[label] = next(res, {}).get("count")
-
-        for k, table in [("chats", "Conversations"), ("messages", "Messages"),
-                       ("contacts", "Contacts"), ("transfers", "Transfers")]:
-            res = self.execute("SELECT COUNT(*) AS count FROM %s" % table)
-            result[k] = next(res, {}).get("count")
+            result[table.lower()] = next(res, {}).get("count")
 
         titlecol = self.make_title_col()
+        chats = self.execute("SELECT id, identity, alt_identity, type, %s AS title "
+                             "FROM Conversations WHERE displayname IS NOT NULL" % titlecol
+        ).fetchall()
+        result["chats"] = len(chats) - len(self.populate_conversation_links(chats))
+
         typestr = ", ".join(map(str, MESSAGE_TYPES_MESSAGE))
 
         for i, label in enumerate(["last", "first"]):
@@ -467,12 +482,7 @@ class SkypeDatabase(object):
                                "ORDER BY timestamp %s LIMIT 1" % (typestr, direction))
             msg = next(res, None)
             if msg:
-                chat = next((x for x in self.table_rows.get("conversations", [])
-                             if x["id"] == msg["convo_id"]), None)
-                chat = chat or self.execute(
-                    "SELECT *, %s AS title FROM conversations "
-                    "WHERE id = ?" % titlecol, [msg["convo_id"]]
-                ).fetchone()
+                chat = next((x for x in chats if x["id"] == msg["convo_id"]), None)
                 if msg.get("timestamp"):
                     dt = self.stamp_to_date(msg["timestamp"])
                     result["%smessage_dt" % label] = dt.strftime("%Y-%m-%d %H:%M")
@@ -608,7 +618,7 @@ class SkypeDatabase(object):
 
 
     def get_conversations(self, chatnames=None, authornames=None, chatidentities=None,
-                          reload=False, log=True):
+                          reload=False, log=None):
         """
         Returns chats as
         [{"id": integer, "title": "chat title", "created_datetime": datetime,
@@ -621,11 +631,13 @@ class SkypeDatabase(object):
         @param   authornames     return chats with authors containing given values
         @param   chatidentities  return chats with given identities
         @param   reload          ignore cache, retrieve everything again
+        @param   log             whether to log SQL statement, defaults to conf.LogSQL if None
         """
         result = []
         if not self.is_open() or "conversations" not in self.tables:
             return result
 
+        log = conf.LogSQL if log is None else log
         if reload or "conversations" not in self.table_rows:
             participants = {}
             sortkey_participants = lambda x: (x["contact"].get("name") or "").lower()
@@ -673,22 +685,7 @@ class SkypeDatabase(object):
 
             # Chats can refer to older entries, prior to system from Skype 7.
             # Collate such chats automatically, with merged statistics.
-            idmap = dict((x["identity"], x) for x in rows)
-            for c in rows:
-                if c.get("alt_identity") in idmap: # Pointing to new ID
-                    idmap[c["alt_identity"]]["__link"] = c
-                if "thread.skype" not in c["identity"]: continue
-                # Can contain old chat ID base64-encoded into new identity:
-                # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
-                pattern = r"(\d+:)([^@]+)(.*)"
-                repl = lambda x: util.b64decode(x.group(2))
-                try:
-                    oldid = re.sub(pattern, repl, str(c["identity"]))
-                    if oldid in idmap:
-                        c["__link"] = idmap[oldid]
-                except Exception: pass
-            oldset = set(x["__link"]["identity"] for x in rows
-                         if x.get("__link"))
+            oldset = self.populate_conversation_links(rows)
             for chat in rows:
                 chat["participants"] = participants.get(chat["id"], [])
                 if authornames:
@@ -745,7 +742,7 @@ class SkypeDatabase(object):
         return result
 
 
-    def get_conversations_stats(self, chats, log=True):
+    def get_conversations_stats(self, chats, log=None):
         """
         Collects statistics for all conversations and fills in the values:
         {"first_message_timestamp": int, "first_message_datetime": datetime,
@@ -754,7 +751,9 @@ class SkypeDatabase(object):
         Combines linked chat statistics into parent chat statistics.
 
         @param   chats  list of chats, as returned from get_conversations()
+        @param   log    whether to log SQL statement, defaults to conf.LogSQL if None
         """
+        log = conf.LogSQL if log is None else log
         if log and chats:
             logger.info("Statistics collection starting (%s).", self.filename)
         stats = {}
@@ -797,9 +796,9 @@ class SkypeDatabase(object):
             logger.info("Statistics collected (%s).", self.filename)
 
 
-    def get_contacts_stats(self, contacts, chats, log=True):
+    def get_contacts_stats(self, contacts, chats, log=None):
         """
-        Collects statistics for all contacts and fills in the values:
+        Collects statistics for given contacts and fills in the values:
         {"first_message_datetime": datetime, "last_message_datetime": datetime,
          "message_count_single": message count in 1:1 chat,
          "message_count_group": message count in group chats,
@@ -807,11 +806,15 @@ class SkypeDatabase(object):
 
         @param   contacts  list of contacts, as returned from get_contacts()
         @param   chats     list of conversations, as returned from get_conversations_stats()
+        @param   log       whether to emit log messages, defaults to conf.LogSQL if None
         """
+        log = conf.LogSQL if log is None else log
         if log and contacts:
             logger.info("Contact statistics collection starting (%s).", self.filename)
         stats, chatmap, linkedchatmap, singlechatmap = {}, {}, {}, {} # {author: []}, {oldid: newid}, {id: {}}, {author: id}
         firstmsgs, lastmsgs = {}, {} # {(id, author): {}}
+        chatmap = {x["id"]: x for x in chats}
+        chatmap.update({x["__link"]["id"]: x["__link"] for x in chats if x.get("__link")})
         if self.is_open() and all(x in self.tables for x in ("contacts", "messages", "conversations")):
             and_str, and_val = "", []
             if 1 == len(contacts):
@@ -822,7 +825,8 @@ class SkypeDatabase(object):
                    "FROM messages WHERE type IN (%s)%s GROUP BY convo_id, author"
                    % (", ".join(map(str, MESSAGE_TYPES_MESSAGE)), and_str))
             for row in self.execute(sql, and_val).fetchall():
-                stats.setdefault(row["identity"], []).append(row)
+                if row["id"] in chatmap:
+                    stats.setdefault(row["identity"], []).append(row)
 
             sql = ("SELECT id AS first_message_id, convo_id AS id, author AS identity, "
                    "MIN(timestamp) AS first_message_timestamp "
@@ -837,16 +841,20 @@ class SkypeDatabase(object):
             for row in self.execute(sql, and_val).fetchall():
                 lastmsgs[(row["id"], row["identity"])] = row
 
-            chatmap = {x["id"]: x for x in chats}
             linkedchatmap = {x["__link"]["id"]: x["id"] for x in chats if x.get("__link")}
             singlechatmap = {x["identity"]: x["id"] for x in chats
                              if CHATS_TYPE_SINGLE == x["type"]}
         for contact in contacts:
+            contact["first_message_datetime"] = None
+            contact["last_message_datetime"] = None
             contact["message_count_single"] = 0
             contact["message_count_group"] = 0
             contact["conversations"] = []
-            datas, datas2 = stats.get(contact["identity"]), []
-            if not datas: continue # for contact
+            chatids = set(c["id"] for c in chats if any(
+                contact["identity"] == p["identity"] for p in c["participants"]
+            ))
+            datas, datas2 = stats.get(contact["identity"], []), []
+            if not chatids and not datas: continue # for contact
 
             # First pass: add first/last message IDs, combine linked chats
             datamap = {x["id"]: x for x in datas}
@@ -871,29 +879,64 @@ class SkypeDatabase(object):
                     else:
                         data = dict(data, id=newid)
                 datas2.append(data)
+            for chatid in chatids - set(x["id"] for x in datas2):
+                datas2.append({"id": chatid, "identity": contact["identity"], "message_count": 0,
+                               "first_message_timestamp": None, "last_message_timestamp": None})
 
             # Second pass: populate ratios and datetimes
             for data in datas2:
                 data["ratio"] = None
                 chat = chatmap.get(data["id"])
-                if chat and chat.get("message_count") is not None:
+                if chat and chat.get("message_count"):
                     data["ratio"] = 100. * data["message_count"] / chat["message_count"]
                 for n in ["first_message", "last_message"]: # Initialize datetime objects
+                    data[n + "_datetime"] = None
                     if data[n + "_timestamp"]:
                         dt = self.stamp_to_date(data[n + "_timestamp"])
                         data[n + "_datetime"] = dt
 
-            singlechat_id = singlechatmap.get(contact["identity"])
-            contact["message_count_single"] = next((x["message_count"] for x in datas2
-                                                    if x["id"] == singlechat_id), 0)
-            contact["message_count_group"] = sum((x["message_count"] for x in datas2
-                                                  if x["id"] != singlechat_id), 0)
+            if self.id == contact["identity"]:
+                chatids = set(singlechatmap.values())
+                contact["message_count_single"] = sum(x["message_count"] for x in datas2
+                                                      if x["id"] in chatids)
+                contact["message_count_group"] = sum(x["message_count"] for x in datas2
+                                                      if x["id"] not in chatids)
+            else:
+                singlechat_id = singlechatmap.get(contact["identity"])
+                contact["message_count_single"] = next((x["message_count"] for x in datas2
+                                                        if x["id"] == singlechat_id), 0)
+                contact["message_count_group"] = sum((x["message_count"] for x in datas2
+                                                      if x["id"] != singlechat_id), 0)
             for n, f in zip(["first_message_datetime", "last_message_datetime"], [min, max]):
-                contact[n] = f(d.get(n) for d in datas2) # Combine
+                vals = list(filter(bool, (d.get(n) for d in datas2)))
+                contact[n] = f(vals) if vals else None # Combine
             contact["conversations"] = datas2
 
         if log and contacts:
             logger.info("Contact statistics collected (%s).", self.filename)
+
+
+    def populate_conversation_links(self, chats):
+        """
+        Sets "__link" attribute for chats with an older database entry as well.
+
+        @return   a set of chat identities that have a newer entry available
+        """
+        idmap = {x["identity"]: x for x in chats}
+        for c in chats:
+            if c.get("alt_identity") in idmap: # Pointing to new ID
+                idmap[c["alt_identity"]]["__link"] = c
+            if "thread.skype" not in c["identity"]: continue
+            # Can contain old chat ID base64-encoded into new identity:
+            # 19:I3Vuby8kZG9zOzUxNzAyYzg3NmU0ZmVjNmU=@p2p.thread.skype
+            pattern = r"(\d+:)([^@]+)(.*)"
+            repl = lambda x: util.b64decode(x.group(2))
+            try:
+                oldid = re.sub(pattern, repl, str(c["identity"]))
+                if oldid in idmap:
+                    c["__link"] = idmap[oldid]
+            except Exception: pass
+        return set(x["__link"]["identity"] for x in chats if x.get("__link"))
 
 
     def get_contactgroups(self):
@@ -913,19 +956,19 @@ class SkypeDatabase(object):
                     self.table_objects["contactgroups"][group["id"]] = group
                 self.table_rows["contactgroups"] = groups
             else:
-                groups = self.table_rows["contactgroups"]
+                groups = self.table_rows["contactgroups"][:]
 
         return groups
 
 
-    def get_contacts(self, reload=False):
+    def get_contacts(self, identities=None, reload=False):
         """
-        Returns all the contacts in the database, as
-        [{"identity": skypename or pstnnumber,
-          "name": displayname or fullname, },]
+        Returns contacts in the database, as
+        [{"identity": skypename or pstnnumber, "name": displayname or fullname, }].
         Uses already retrieved cached values if possible.
 
-        @param   reload  ignore cache, retrieve everything again
+        @param   identities  contacts with specific identities to return if not all
+        @param   reload      ignore cache, retrieve everything again
         """
         result = []
         if not self.is_open() or "contacts" not in self.tables:
@@ -933,28 +976,34 @@ class SkypeDatabase(object):
 
         if reload or "contacts" not in self.table_rows:
             titlecol = self.make_title_col("contacts")
+            where, params = ("", ()) if not identities else \
+                            (" WHERE identity IN (%s)" % ", ".join("?" * len(identities)), identities)
             rows = self.execute(
                 "SELECT *, COALESCE(skypename, pstnnumber, '') AS identity, "
                 "COALESCE(pstnnumber, phone_mobile, phone_home, phone_office) AS phone, "
                 "NULL AS first_message_datetime, NULL AS last_message_datetime, "
                 "NULL AS message_count_single, NULL AS message_count_group, "
-                "%s AS name FROM contacts ORDER BY name COLLATE NOCASE"
-            % titlecol).fetchall()
-            self.table_objects["contacts"] = {}
+                "%s AS name FROM contacts%s ORDER BY name COLLATE NOCASE"
+            % (titlecol, where), params).fetchall()
+            if not identities: self.table_objects["contacts"] = {}
             for c in rows:
                 result.append(c)
                 self.table_objects["contacts"][c["identity"]] = c
-            self.table_rows["contacts"] = result
+            if identities:
+                contacts0, cmap = self.table_rows["contacts"], {c["identity"]: c for c in result}
+                self.table_rows["contacts"] = sorted([cmap.pop(c["identity"], c) for c in contacts0] + \
+                                                     list(cmap.values()), key=lambda x: x["name"].lower())
+            else: self.table_rows["contacts"] = result
         else:
-            result = self.table_rows["contacts"]
+            result = self.table_rows["contacts"][:]
+            if identities: result = [x for x in result if x["identity"] in identities]
 
         return result
 
 
     def get_contact_name(self, identity, contact=None):
         """
-        Returns the full name for the specified contact, or given identity if
-        not set.
+        Returns the full name for the specified contact, or given identity if not set.
 
         @param   identity  skypename or pstnnumber
         @param   contact   cached Contacts-row, if any
@@ -1005,7 +1054,7 @@ class SkypeDatabase(object):
                     for row in result:
                         self.table_objects[table][row[pk]] = row
             else:
-                result = self.table_rows[table]
+                result = self.table_rows[table][:]
         return result
 
 
@@ -1016,15 +1065,10 @@ class SkypeDatabase(object):
         """
         if self.is_open() and "smses" in self.tables:
             if "smses" not in self.table_rows:
-                rows = self.execute(
-                    "SELECT * FROM smses ORDER BY id").fetchall()
-                smses = []
-                for sms in rows:
-                    smses.append(sms)
-                self.table_rows["smses"] = smses
+                rows = self.execute("SELECT * FROM smses ORDER BY id").fetchall()
+                smses = self.table_rows["smses"] = list(rows)
             else:
-                smses = self.table_rows["smses"]
-
+                smses = self.table_rows["smses"][:]
         return smses
 
 
@@ -1036,15 +1080,10 @@ class SkypeDatabase(object):
         transfers = []
         if self.is_open() and "transfers" in self.tables:
             if "transfers" not in self.table_rows:
-                rows = self.execute(
-                    "SELECT * FROM transfers ORDER BY id").fetchall()
-                transfers = []
-                for transfer in rows:
-                    transfers.append(transfer)
-                self.table_rows["transfers"] = transfers
+                rows = self.execute("SELECT * FROM transfers ORDER BY id").fetchall()
+                transfers = self.table_rows["transfers"] = list(rows)
             else:
-                transfers = self.table_rows["transfers"]
-
+                transfers = self.table_rows["transfers"][:]
         return transfers
 
 
@@ -1071,7 +1110,7 @@ class SkypeDatabase(object):
                     self.table_objects["videos"][video["id"]] = video
                 self.table_rows["videos"] = videos
             else:
-                videos = self.table_rows["videos"]
+                videos = self.table_rows["videos"][:]
 
         if chat:
             ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]
@@ -1100,7 +1139,7 @@ class SkypeDatabase(object):
                     self.table_objects["calls"][call["id"]] = call
                 self.table_rows["calls"] = calls
             else:
-                calls = self.table_rows["calls"]
+                calls = self.table_rows["calls"][:]
 
         if chat:
             ids = [chat["id"], chat.get("__link", {}).get("id", chat["id"])]
@@ -1557,70 +1596,170 @@ class SkypeDatabase(object):
                     yield m
 
 
-    def delete_conversations(self, conversations):
-        """Deletes the specified conversations and all their related data."""
-        if not self.is_open() or not conversations or "conversations" not in self.tables:
-            return
+    def delete_data(self, conversations, contacts=()):
+        """
+        Deletes the specified conversations and contacts, and all their related data.
+
+        @return   {table: rows deleted}
+        """
+        result = {}
+        if not self.is_open() or not conversations and not contacts:
+            return result
+
+        # Cascading row deletions, as {parent table: {parent col: {foreign table: foreign col}}}
+        CASCADE_DELETES = {
+            "CallMembers": {
+                "call_db_id": {
+                    "Calls":               ["id"], },
+                "call_name": {
+                    "Calls":               ["name"],
+            }},
+            "Calls": {
+                "id": {
+                    "CallMembers":         ["call_db_id"],
+                    "ContentSharings":     ["call_id"],
+                    "LightWeightMeetings": ["call_id"], },
+                "name": {
+                    "CallMembers":         ["call_name"],
+            }},
+            "Chats": {
+                "name": {
+                    "ChatMembers":          ["chatname"],
+            }},
+            "Contacts": {
+                "identity": {
+                    "Alerts":              ["partner_name"],
+                    "CallMembers":         ["identity"],
+                    "Calls":               ["host_identity"],
+                    "ChatMembers":         ["identity"],
+                    "MessageAnnotations":  ["author"],
+                    "Messages":            ["author"],
+                    "Participants":        ["identity"],
+                    "SMSes":               ["convo_name", "TRIM(target_numbers)"],
+                    "Transfers":           ["partner_handle"],
+                    "VideoMessages":       ["author"],
+                    "Voicemails":          ["partner_handle"],
+            }},
+            "Conversations": {
+                "id": {
+                    "Calls":               ["conv_dbid"],
+                    "Chats":               ["conv_dbid"],
+                    "Messages":            ["convo_id"],
+                    "MediaDocuments":      ["convo_id"],
+                    "Participants":        ["convo_id"],
+                    "Transfers":           ["convo_id"],
+                    "Videos":              ["convo_id"],
+                    "Voicemails":          ["convo_id"], },
+                "identity": {
+                    "SMSes":               ["convo_name"],
+            }},
+            "Messages": {
+                "id": {
+                    "MessageAnnotations":  ["message_id"],
+                    "SMSes":               ["chatmsg_id"],
+                },
+            },
+        }
+        DEFERRED    = {"Calls": "id"}
+        REL_ALIASES = {"Contacts":      {"identity": "COALESCE(skypename, pstnnumber, '')"},
+                       "Conversations": {"identity": "identity"}}
+        DEL_ALIASES = {"Contacts": {"identity": "id"}, "Conversations": {"identity": "id"}}
+
         self.ensure_backup()
-        ids = [c["id"] for c in conversations]
-        idstr = ", ".join(map(str, ids))
-        TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
-                  "Participants", "Transfers", "Videos", "Voicemails"]
-
-        if "chats" in self.tables and "chatmembers" in self.tables:
-            # ChatMembers are matched by Chats.name
-            chats = self.execute("SELECT DISTINCT name FROM Chats "
-                                 "WHERE conv_dbid IN (%s)" % idstr).fetchall()
-            while chats: # Divide into chunks: SQLite can take up to 999 parameters.
-                argstr = ", ".join(":name%s" % i for i, _ in enumerate(chats[:999]))
-                args = {"name%s" % i: x["name"] for i, x in enumerate(chats[:999])}
-                self.execute("DELETE FROM ChatMembers WHERE chatname IN (%s)" % argstr, args)
-                chats = chats[999:]
-
-        KEYS = {"Calls": "conv_dbid", "Chats": "conv_dbid", "Conversations": "id"}
-        for table in TABLES:
-            ltable = table.lower()
-            if ltable not in self.tables: continue # for table
-            key = KEYS.get(table, "convo_id")
-            self.execute("DELETE FROM %s WHERE %s IN (%s)" % (table, key, idstr))
-            if "messages" == ltable and self.table_rows.get(ltable):
-                # Messages has {convo ID: [{msg}]} instead of [{msg}]
-                self.table_rows[ltable] = {k: v for k, v in self.table_rows[ltable].items()
-                                           if k not in ids}
-            elif self.table_rows.get(ltable):
-                self.table_rows[ltable] = [x for x in self.table_rows[ltable]
-                                           if x[key] not in ids]
-            if self.table_objects.get(ltable):
-                self.table_objects[ltable] = {k: v for k, v in self.table_objects[ltable].items()
-                                              if v[key] not in ids}
+        conversations = sorted(conversations, key=lambda x: x["title_long"].lower())
+        contacts      = sorted(contacts,      key=lambda x: x["name"].lower())
 
 
-    def delete_contacts(self, contacts):
-        """Deletes the specified contacts, from contact groups as well."""
-        if not self.is_open() or not contacts or "contacts" not in self.tables:
-            return
-        self.ensure_backup()
-        ids = [c["id"] for c in contacts if c.get("id")]
-        idstr = ", ".join(map(str, ids))
-        if ids: self.execute("DELETE FROM Contacts WHERE id IN (%s)" % idstr)
+        # [(table, "DELETE FROM ..")], {table}, {table: [where]}
+        sqls, clearables, deferreds = [], set(), collections.defaultdict(list)
+        tables = [("Conversations", conversations, "title_long_lc"), ("Contacts", contacts, "name")]
+        for table, deletables, labelcol in tables:
+            if not deletables: continue # for table
+            logger.info("Deleting %s: %s.",
+                        util.plural(table.lower()[:-1], deletables),
+                        ", ".join(x[labelcol] for x in deletables))
+            # First and last pair: table and column to select by, and to delete from.
+            # intermediary triplet: (link table, link column to parent, link column to child).
+            delstack = []
+            for pcol, rels in CASCADE_DELETES[table].items():
+                delstack.append((table, pcol))
+                for table2, cols2 in rels.items():
+                    if table2.lower() not in self.tables: continue # for table2
+                    delstack.extend((table, pcol, table2, col2) for col2 in cols2)
+                    for pcol2, rels2 in CASCADE_DELETES.get(table2, {}).items():
+                        for table3, cols3 in rels2.items(): # Use table2 as link table to table3
+                            if table3.lower() not in self.tables: continue # for table3
+                            for col2, col3 in ((a, b) for a in cols2 for b in cols3):
+                                delstack.append((table, pcol, table2, col2, pcol2, table3, col3))
+            # Start cascading deletes depth-first; Calls last at each depth due to cycles
+            delstack.sort(key=lambda x: (-len(x), x[-2] == "Calls", x[-2:]), reverse=True)
 
-        skypenames = [c["skypename"] for c in contacts]
+            rel_alias = lambda t, c: REL_ALIASES.get(t, {}).get(c, c)
+            del_alias = lambda t, c: DEL_ALIASES.get(t, {}).get(c, c)
+            while delstack: # Construct DELETE statements with zero or more nested SELECTs
+                path, index = delstack.pop(-1), 2
+                (stable, scol), (dtable, dcol) = path[:2], path[-2:]
+                svals = [x[del_alias(stable, scol)] for x in deletables]
+                if "Conversations" == table:
+                    svals.extend(y[del_alias(stable, scol)] for x in deletables
+                                 for y in [x.get("__link")] if y)
+                val = ", ".join(str(v) for v in svals)
+
+                if len(path) != 2 and scol in REL_ALIASES.get(stable, {}): # One level of indirection
+                    val = "SELECT %s FROM %s WHERE %s IN (%s)" % \
+                          (rel_alias(stable, scol), stable, del_alias(stable, scol), val)
+                while index + 3 < len(path):
+                    ftable, fcol, fkeycol = path[index:index + 3]
+                    val = "SELECT %s FROM %s WHERE %s IN (%s)" % (fkeycol, ftable, fcol, val)
+                    index += 3
+
+                if dtable != table: clearables.add(dtable)
+                if dtable in DEFERRED:
+                    deferreds[dtable].append("%s in (%s)" % (del_alias(dtable, dcol), val))
+                    continue # while
+
+                sql = "DELETE FROM %s WHERE %s IN (%s)" % (dtable, del_alias(dtable, dcol), val)
+                if (dtable, sql) not in sqls: sqls.append((dtable, sql))
+
+        for table, col, wheres in ((k, DEFERRED[k], v) for k, v in deferreds.items()):
+            selsql = "SELECT %s FROM %s WHERE %s" % (col, table, " OR ".join(wheres))
+            valstr = ", ".join(str(x[col]) for x in self.execute(selsql).fetchall())
+            if valstr:
+                sql = "DELETE FROM %s WHERE %s IN (%s)" % (table, col, valstr)
+                sqls.append((table, sql))
+
+        for table, sql in sqls:
+            delcount = self.execute(sql, log=True).rowcount
+            if delcount:
+                logger.info("Deleted from %s: %s.", table, util.plural("row", delcount))
+                result[table] = delcount
+        self.connection.commit()
+
+        identities = [c["identity"] for c in contacts]
         for group in self.get_contactgroups():
             members = (group["members"] or "").split()
-            members2 = [x for x in members if x not in skypenames]
+            members2 = [x for x in members if x not in identities]
             if members2 != members:
-                group["members"] = " ".join(members)
+                group["members"] = " ".join(members2)
                 self.execute("UPDATE ContactGroups SET members = :members "
-                             "WHERE id = :id", group)
+                             "WHERE id = :id", group, log=True)
+
+        for table, rows, _ in tables: self.clear_cache_rows(table, rows)
+        for table in sorted(clearables): self.clear_cache_rows(table)
+        self.get_tables(refresh=True)
+        return result
 
 
-    def update_row(self, table, row, original_row, rowid=None, log=True):
+    def update_row(self, table, row, original_row, rowid=None, log=None):
         """
         Updates the table row in the database, identified by its primary key
         in its original values, or the given rowid if table has no primary key.
+
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table, where, col_data = table.lower(), "", []
         colmap = {x["name"]: x for x in self.get_table_columns(table)}
         with warnings.catch_warnings():
@@ -1649,14 +1788,16 @@ class SkypeDatabase(object):
         self.last_modified = datetime.datetime.now()
 
 
-    def insert_row(self, table, row, log=True):
+    def insert_row(self, table, row, log=None):
         """
         Inserts the new table row in the database.
 
-        @return  ID of the inserted row
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        @return       ID of the inserted row
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table = table.lower()
         if log: logger.info("Inserting 1 row into table %s, %s.",
                             self.tables[table]["name"], self.filename)
@@ -1673,15 +1814,17 @@ class SkypeDatabase(object):
         return cursor.lastrowid
 
 
-    def delete_row(self, table, row, rowid=None, log=True):
+    def delete_row(self, table, row, rowid=None, log=None):
         """
         Deletes the table row from the database. Row is identified by its
         primary key, or by rowid if no primary key.
 
-        @return   success as boolean
+        @param   log  whether to log SQL statement, defaults to conf.LogSQL if None
+        @return       success as boolean
         """
         if not self.is_open():
             return
+        log = conf.LogSQL if log is None else log
         table, where = table.lower(), ""
         if log: logger.info("Deleting 1 row from table %s, %s.",
                             self.tables[table]["name"], self.filename)
@@ -1734,7 +1877,7 @@ class MessageParser(object):
                                            re.escape(".,;:?!'\"")),
                      m.string[m.start(1) + len(m.group(1)):])
         and not any(e in m.string[m.start(1) - len(e) + 1:m.end(1) + len(e) - 1]
-                    for e in MessageParser.COMMON_ENTITIES)
+                    for e in self.COMMON_ENTITIES)
         else m.group(1)
     )
 
@@ -2103,7 +2246,7 @@ class MessageParser(object):
 
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
-            url, filename, dom0 = dom.find("URIObject").get("uri"), None, dom
+            url, filename, dom0 = next(dom.iter("URIObject")).get("uri"), None, dom
             nametag = next(dom.iter("OriginalName"), None)
             if nametag is not None: filename = nametag.get("v")
             if not filename:
@@ -2113,7 +2256,7 @@ class MessageParser(object):
             if not url and link:
                 url = link.get("href")
             elif not url: # Parse link from message contents
-                text = ElementTree.tostring(dom, "unicode", "text")
+                text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
                 match = re.search(r"(https?://[^\s<]+)", text)
                 if match: # Make link clickable
                     url = match.group(0)
@@ -2130,7 +2273,7 @@ class MessageParser(object):
                 try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
                 except Exception: pass
 
-                objtype = (dom0.find("URIObject").get("type") or "").lower()
+                objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
                 if   "audio"   in objtype: data["category"] = "audio"
                 elif "video"   in objtype: data["category"] = "video"
                 elif "sticker" in objtype: data["category"] = "sticker"
@@ -2144,14 +2287,16 @@ class MessageParser(object):
                             url = pkg["attachments"][0]["content"]["images"][0]["url"]
                             data.update(category="card", url=live.make_content_url(url, "card"))
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
-                                                (urllib.parse.quote(url, ":/=?&#"), url), message)
+                                                (urllib.parse.quote(url, safe=":/=?&#"), url), message)
                     except Exception: pass
 
                 url = data["url"] = live.make_content_url(data["url"], data.get("category"))
                 a = next(dom.iter("a"), None)
                 if a is not None: a.set("href", url); a.text = url
 
-                if self.stats: self.stats["shared_media"][message["id"]] = data
+                # If not root element, then this message quotes a media message
+                if self.stats and dom0.find("URIObject"):
+                    self.stats["shared_media"][message["id"]] = data
             # Sanitize XML tags like Title|Text|Description|..
             dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
@@ -2244,7 +2389,8 @@ class MessageParser(object):
         if message.get("__files") and output.get("export"):
             files = []
             do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
-                          and output.get("media_folder")
+                          and output.get("media_folder") \
+                          and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
                 content = None
                 if do_download and f.get("fileurl"):
@@ -2255,9 +2401,10 @@ class MessageParser(object):
 
         media = self.stats.get("shared_media", {}).get(message["id"])
         if media and output.get("export") \
-        and (conf.SharedImageAutoDownload      and media.get("category") not in ("audio", "video") or
-             conf.SharedAudioVideoAutoDownload and media.get("category")     in ("audio", "video")) \
-        and self.db.live.is_logged_in():
+        and (conf.SharedAudioVideoAutoDownload if media.get("category") in ("audio", "video")
+             else conf.SharedImageAutoDownload) \
+        and self.db.live.is_logged_in() \
+        and message["datetime"] >= conf.SharedContentDownloadMinDate:
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
             raw = self.db.live.get_api_content(media["url"], category)
@@ -2926,7 +3073,7 @@ def format_contact_field(datadict, name):
     if value is not None and not isinstance(value, six.string_types):
         value = str(value)
 
-    return None if value in (b"", "", None) else value
+    return None if value in (b"", "", None) else value.strip()
 
 
 
@@ -3072,5 +3219,5 @@ Transfers:
 
 
 Videos:
-  convo_id        foreign key on Calls.id
+  convo_id        foreign key on Conversations.id
 """

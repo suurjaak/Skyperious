@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    19.07.2022
+@modified    06.10.2022
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1278,7 +1278,7 @@ class Patch(object):
 class PropertyDialog(wx.Dialog):
     """
     Dialog for displaying an editable property grid. Supports strings,
-    integers, booleans, and wx classes like wx.Size interpreted as tuples.
+    integers, floats, booleans, and wx classes like wx.Size interpreted as tuples.
     """
 
 
@@ -1401,7 +1401,7 @@ class PropertyDialog(wx.Dialog):
         """Returns value in type expected, or None on failure."""
         try:
             result = typeclass(value)
-            if isinstance(result, integer_types) and result < 0:
+            if isinstance(result, integer_types + (float, )) and result < 0:
                 raise ValueError() # Reject negative numbers
             isinstance(result, string_types) and result.strip()[0] # Reject empty
             return result
@@ -1415,7 +1415,8 @@ class PropertyDialog(wx.Dialog):
         if isinstance(value, tuple):
             value = tuple(str(x) if isinstance(x, text_type) else x for x in value)
         return "" if value is None else value \
-               if isinstance(value, string_types + (bool, )) else text_type(value)
+               if isinstance(value, string_types + (bool, )) else \
+               str(round(value, 4)) if isinstance(value, float) else text_type(value)
 
 
 
@@ -1772,7 +1773,6 @@ class RangeSlider(wx.Panel):
         return formatted
 
 
-
     def Draw(self, dc):
         global BRUSH, PEN
         width, height = self.GetClientSize()
@@ -2071,10 +2071,10 @@ class RangeSlider(wx.Panel):
                 self.TopLevelParent.SetCursor(self._cursor_default)
                 self._mousepos_special = False
                 refresh = True
-            elif self._grip_area:
-                if (self._grip_area.Contains(self._mousepos) \
+            elif self._grip_area and self._mousepos and last_pos:
+                if (self._grip_area.Contains(self._mousepos)
                 and not self._grip_area.Contains(last_pos)) \
-                or (self._grip_area.Contains(last_pos) \
+                or (self._grip_area.Contains(last_pos)
                 and not self._grip_area.Contains(self._mousepos)):
                     refresh = True
                 else:
@@ -2433,7 +2433,8 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)
         self.Bind(wx.EVT_MENU, self.OnSelectAll, id=id_selectall)
-        self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
+        self.counter = lambda reset=False, x={"c": 0}: \
+                              x.update(c=0 if reset else 1+x["c"]) or x["c"]
 
 
     def SetColumnFormatters(self, formatters):
@@ -2456,6 +2457,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         """
         self._col_widths.clear()
         self._row_colours.clear()
+        self.counter(reset=True)
         self._id_rows = [(self.counter(), r) for r in rows]
         self.RefreshRows()
 
@@ -4412,6 +4414,11 @@ class TabbedHtmlWindow(wx.Panel):
         return len(self._tabs)
 
 
+    def GetHtmlWindow(self):
+        """Returns the internal wx.HtmlWindow."""
+        return self._html
+    HtmlWindow = property(GetHtmlWindow)
+
 
 class TextCtrlAutoComplete(wx.TextCtrl):
     """
@@ -4860,6 +4867,18 @@ def get_key_state(keycode):
     """Returns true if specified key is currently down (swallows Linux exceptions)."""
     try: return wx.GetKeyState(keycode)
     except Exception: return False  # wx3 can raise for non-modifier keys in Linux non-X11 backends
+
+
+def get_tool_rect(toolbar, id_tool):
+    """Returns position and size of a toolbar tool by ID."""
+    bmpsize, toolsize, packing = toolbar.ToolBitmapSize, toolbar.ToolSize, toolbar.ToolPacking
+    result = wx.Rect(0, 0, *toolsize)
+    for i in range(toolbar.GetToolPos(id_tool)):
+        tool = toolbar.GetToolByPos(i)
+        result.x += packing + (1 if tool.IsSeparator() else bmpsize[0] if tool.IsButton()
+                               else tool.Control.Size[0])
+
+    return result
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):
