@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+5.5, 2022-12-13
+---------------
+- fix --version flag being ignored
+
+
 5.4, 2022-10-17
 ---------------
 - add chat and contact counts to chats and contacts lists
