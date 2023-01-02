@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.5, 2022-12-13
----------------
+5.4.1, 2023-01-02
+-----------------
+- fix v5.4 release binaries containing outdated code
 - fix --version flag being ignored
 
 
