@@ -1,7 +1,12 @@
 CHANGELOG
 =========
 
-5.5, 2022-12-13
+5.4.2, 2023-01-09
+---------------
+- add config option to disable automatic update checks and downloads
+
+
+5.4.1, 2023-01-02
 ---------------
 - fix --version flag being ignored
 

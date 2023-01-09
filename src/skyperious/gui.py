@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.10.2022
+@modified    09.01.2023
 ------------------------------------------------------------------------------
 """
 import ast
@@ -525,7 +525,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         if self.trayicon.IsAvailable():
             menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
+        menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
+        menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
 
         self.Bind(wx.EVT_MENU, self.on_new_blank,               menu_new_blank)
         if menu_new_live:
@@ -553,7 +554,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         from last check has passed, and opens a dialog for upgrading
         if new version available. Schedules a new check on due date.
         """
-        if self or not conf.UpdateCheckAutomatic: return
+        if not self or not conf.UpdateCheckEnabled or not conf.UpdateCheckAutomatic: return
 
         interval = datetime.timedelta(days=conf.UpdateCheckInterval)
         due_date = datetime.datetime.now() - interval
@@ -930,7 +931,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             MAX = 1000
             changes = changes[:MAX] + ".." if len(changes) > MAX else changes
             guibase.status("New %s version %s available.", conf.Title, version)
-            if wx.OK == wx.MessageBox(
+            if not conf.UpdateCheckEnabled: wx.MessageBox(
+                "Newer version (%s) available. You are currently on version %s.%s" %
+                (version, conf.Version, "\n\n%s\n" % changes),
+                "Update information", wx.OK | wx.ICON_INFORMATION
+            )
+            elif wx.OK == wx.MessageBox(
                 "Newer version (%s) available. You are currently on "
                 "version %s.%s\nDownload and install %s %s?" %
                 (version, conf.Version, "\n\n%s\n" % changes,
