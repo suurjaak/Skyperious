@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.01.2023
+@modified    01.06.2023
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6447,7 +6447,7 @@ class DatabasePage(wx.Panel):
             img, imgkey = self.imagecache.get(("chat", self.chat["id"])), ("chat", self.chat["id"])
             try:
                 raw = skypedata.fix_image_raw(pic) if pic and not img else None
-                img = img or wx.Image(io.BytesIO(raw.encode("latin1")))
+                img = img or (wx.Image(io.BytesIO(raw.encode("latin1"))) if raw else None)
             except Exception:
                 logger.exception("Error loading image for %s.", self.chat["title_long_lc"])
             if img:
