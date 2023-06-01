@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.4.2, 2023-01-09
+5.4.2, 2023-06-01
 ---------------
+- fix importing latest Skype export archives (issue #119)
 - add config option to disable automatic update checks and downloads
 
 

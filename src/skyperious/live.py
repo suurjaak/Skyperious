@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    12.10.2022
+@modified    01.06.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1133,6 +1133,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     def export_parse(self, f, progress=None):
         """Parses JSON data from file pointer and inserts to database."""
         parser = ijson.parse(f)
+        PREFIX_RGX = re.compile(r"^\d+\:")  # Matching and stripping numeric prefix
 
         self.get_tables()
         self.table_objects.setdefault("contacts", {})
@@ -1217,8 +1218,9 @@ class SkypeExport(skypedata.SkypeDatabase):
                         skip_chat = value.startswith(skypedata.ID_PREFIX_SPECIAL)
                         chat["identity"] = value
                         chat["type"] = skypedata.CHATS_TYPE_GROUP
-                        if value.startswith(skypedata.ID_PREFIX_SINGLE):
-                            chat["identity"] = value[len(skypedata.ID_PREFIX_SINGLE):]
+                        if not value.startswith(skypedata.ID_PREFIX_GROUP):
+                            if not value.startswith(skypedata.ID_PREFIX_BOT):
+                                chat["identity"] = PREFIX_RGX.sub("", value)
                             chat["type"] = skypedata.CHATS_TYPE_SINGLE
                     except Exception:
                         logger.warning("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
@@ -1235,12 +1237,18 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
                     try:
-                        for identity in map(id_to_identity, json.loads(value)):
+                        if value is not None or skypedata.CHATS_TYPE_GROUP == chat["type"]:
+                            identities = map(id_to_identity, json.loads(value))
+                        else: identities = [self.id, chat["identity"]]
+                        for identity in identities:
                             if not identity: continue # for identity
                             if identity not in self.table_objects["contacts"] and identity != self.id:
                                 contact = dict(skypename=identity, is_permanent=1)
                                 if identity.startswith(skypedata.ID_PREFIX_BOT):
                                     contact["type"] = skypedata.CONTACT_TYPE_NORMAL
+                                if skypedata.CHATS_TYPE_GROUP != chat["type"] \
+                                and identity == chat["identity"] and chat.get("displayname"):
+                                    contact["displayname"] = chat["displayname"]
                                 contact["id"] = self.insert_row("contacts", contact)
                                 self.table_objects["contacts"][identity] = contact
                             p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
