@@ -1,14 +1,15 @@
 CHANGELOG
 =========
 
-5.4.2, 2023-06-01
----------------
+5.4.2, 2023-07-15
+-----------------
+- fix Bing-bot not being synced properly (issue #117)
 - fix importing latest Skype export archives (issue #119)
 - add config option to disable automatic update checks and downloads
 
 
 5.4.1, 2023-01-02
----------------
+-----------------
 - fix --version flag being ignored
 
 
@@ -83,7 +84,7 @@ CHANGELOG
 
 
 4.8.1, 2021-08-05
----------------
+-----------------
 - fixed audio/video messages imported from live as simple file transfers (issue #102)
 
 
@@ -219,7 +220,7 @@ CHANGELOG
 
 
 3.5.1c, 2015-12-21
----------------
+------------------
 - added support for updated Skype chat structure (issue #40)
 - added "Remove by type" button to start page (issue #47)
 - fixed escaping bolded words in search chat title and participants link

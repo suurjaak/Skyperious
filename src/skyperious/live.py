@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    01.06.2023
+@modified    15.07.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -272,7 +272,7 @@ class SkypeLogin(object):
 
         if "contacts" == table and not dbitem0 \
         and not (identity or "").startswith(skypedata.ID_PREFIX_BOT):
-            # Bot accounts from live are without bot prefix
+            # Bot accounts from live can be without bot prefix
             dbitem0 = self.cache[table].get(skypedata.ID_PREFIX_BOT + identity)
             if dbitem0:
                 identity = skypedata.ID_PREFIX_BOT + identity
@@ -422,7 +422,7 @@ class SkypeLogin(object):
                 uidentity = user.id if user else uid
                 # Keep bot prefixes on bot accounts
                 if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
-                and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
+                and (is_bot(user) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
                     uidentity = skypedata.ID_PREFIX_BOT + uidentity
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
                 if isinstance(chat, skpy.SkypeGroupChat) and (user.id if user else uid) == chat.creatorId:
@@ -570,8 +570,7 @@ class SkypeLogin(object):
             else: result = None
 
         elif "contacts" == table:
-            result.update(type=skypedata.CONTACT_TYPE_BOT
-                          if isinstance(item, skpy.SkypeBotUser)
+            result.update(type=skypedata.CONTACT_TYPE_BOT if is_bot(item)
                           else skypedata.CONTACT_TYPE_NORMAL,
                           isblocked=getattr(item, "blocked", False),
                           isauthorized=getattr(item, "authorised", False))
@@ -583,8 +582,7 @@ class SkypeLogin(object):
                 result.update(mood_text=item.mood.plain, rich_mood_text=item.mood.rich)
             if item.avatar:
                 result.update(avatar_url=item.avatar)
-            if isinstance(item, skpy.SkypeBotUser) \
-            and not item.id.startswith(skypedata.ID_PREFIX_BOT):
+            if is_bot(item) and not item.id.startswith(skypedata.ID_PREFIX_BOT):
                 result.update(skypename=skypedata.ID_PREFIX_BOT + item.id)
 
         elif "messages" == table:
@@ -598,7 +596,7 @@ class SkypeLogin(object):
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
-                           or isinstance(parent.user, skpy.SkypeBotUser) \
+                           or is_bot(parent.user) \
                            or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
@@ -849,8 +847,7 @@ class SkypeLogin(object):
         @return                      whether further progress should continue
         """
         result = True
-        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
-                    or isinstance(chat.user, skpy.SkypeBotUser) \
+        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) or is_bot(chat.user) \
                     or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
         if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
             return result
@@ -1603,6 +1600,15 @@ def identity_to_id(identity):
         elif not result.endswith("thread.skype") and not re.match(r"^\d+\:", result):
             result = "%s%s" % (skypedata.ID_PREFIX_SINGLE, result)
     return result
+
+
+def is_bot(user):
+    """Returns whether the given skpy.SkypeUser is a bot."""
+    return isinstance(user, skpy.SkypeBotUser) \
+    or (isinstance(user, skpy.SkypeUser) and isinstance(getattr(user, "raw", None), dict)
+        and isinstance(user.raw.get("person_id"), six.string_types)
+        and user.raw["person_id"].startswith(skypedata.ID_PREFIX_BOT)
+    ) # Workaround for skpy bug of presenting bots in some contexts as plain contacts
 
 
 def make_db_path(username):
