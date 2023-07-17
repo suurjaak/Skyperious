@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    15.07.2023
+@modified    18.07.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -279,6 +279,11 @@ class SkypeLogin(object):
                 dbitem["skypename"] = dbitem1["skypename"] = identity
                 dbitem["type"] = dbitem1["type"] = skypedata.CONTACT_TYPE_BOT
 
+        if "contacts" == table and not dbitem0 \
+        and (identity or "").startswith(skypedata.ID_PREFIX_BOT):
+            # Fix bot entries in database not having bot prefix
+            dbitem0 = self.cache[table].get(identity[len(skypedata.ID_PREFIX_BOT):])
+
         if "messages" == table and dbitem.get("remote_id") \
         and not isinstance(item, (skpy.SkypeCallMsg, skpy.SkypeMemberMsg, skpy.msg.SkypePropertyMsg)):
             # Look up message by remote_id instead, to detect edited messages
@@ -344,6 +349,17 @@ class SkypeLogin(object):
             for k, v in dbitem0.items():
                 if k not in dbitem: dbitem[k] = v
             dbitem["__updated__"] = True
+
+            if "contacts" == table and identity.startswith(skypedata.ID_PREFIX_BOT) \
+            and not dbitem0["skypename"].startswith(skypedata.ID_PREFIX_BOT):
+                # Fix bot entries in database not having bot prefix
+                self.db.execute("UPDATE participants SET identity = :id WHERE identity = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                self.db.execute("UPDATE transfers SET partner_handle = :id WHERE partner_handle = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                self.db.execute("UPDATE messages SET author = :id WHERE author = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                dbitem0["skypename"] = identity
         else:
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
@@ -994,12 +1010,17 @@ class SkypeLogin(object):
 
     def get_contact(self, identity):
         """Returns cached contact, if any."""
-        return self.cache["contacts"].get(identity) if identity else None
+        result = self.cache["contacts"].get(identity) if identity else None
+        if not result and identity and not identity.startswith(skypedata.ID_PREFIX_BOT):
+            result = self.cache["contacts"].get(skypedata.ID_PREFIX_BOT + identity)
+        return result
 
 
     def get_contact_name(self, identity):
         """Returns contact displayname or fullname or identity."""
         result, contact = None, self.get_contact(identity)
+        if not contact: contact = self.get_contact(identity)
+            
         if contact:
             result = contact.get("displayname") or contact.get("fullname")
         result = result or identity
