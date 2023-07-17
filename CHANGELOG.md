@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-5.4.2, 2023-07-15
------------------
+5.5, 2023-07-17
+---------------
 - fix Bing-bot not being synced properly (issue #117)
 - fix importing latest Skype export archives (issue #119)
 - add config option to disable automatic update checks and downloads

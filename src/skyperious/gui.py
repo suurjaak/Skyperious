@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    01.06.2023
+@modified    17.07.2023
 ------------------------------------------------------------------------------
 """
 import ast
@@ -559,10 +559,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         interval = datetime.timedelta(days=conf.UpdateCheckInterval)
         due_date = datetime.datetime.now() - interval
         if not (conf.WindowIconized or support.update_window) \
-        and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
+        and (not conf.LastUpdateCheck or conf.LastUpdateCheck < due_date.strftime("%Y%m%d")):
             callback = lambda resp: self.on_check_update_callback(resp, False)
             support.check_newest_version(callback)
-        elif not support.update_window:
+        elif not support.update_window and conf.LastUpdateCheck:
             try:
                 dt = datetime.datetime.strptime(conf.LastUpdateCheck, "%Y%m%d")
                 interval = (dt + interval) - datetime.datetime.now()
