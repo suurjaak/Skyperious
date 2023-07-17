@@ -6,6 +6,7 @@ CHANGELOG
 - fix Bing-bot not being synced properly (issue #117)
 - fix importing latest Skype export archives (issue #119)
 - add config option to disable automatic update checks and downloads
+- upgrade all dependency libraries in compiled binaries
 
 
 5.4.1, 2023-01-02
