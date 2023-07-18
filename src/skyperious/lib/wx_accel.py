@@ -12,8 +12,9 @@ Supported controls:
 - wx.TextCtrl     control focused, all text selected
 - wx.RadioButton  control focused, value selected
 - wx.Control      control focused
-- wx.ToolBar      tool event is called, if the tool shorthelp includes a
-                  parseable shortcut key like (Alt-S)
+- wx.ToolBar      tool event is called, if the tool label contains shortcut
+                  or if the tool shorthelp includes a parseable shortcut key
+                  like "(Alt-S)"
 - wx.ToggleButton ToggleButton handler called
 
 Uses primitive heuristic analysis to detect connected label-control pairs:
@@ -30,7 +31,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     19.11.2011
-@modified    26.03.2022
+@modified    18.07.2023
 ------------------------------------------------------------------------------
 """
 import functools
@@ -87,6 +88,42 @@ class AutoAcceleratorMixIn(object):
 
 
 
+def parse_label(text):
+    """Returns first suitable ampersanded shortcut key from text, in lowercase, or None."""
+    for part in filter(len, text.split("&")[1:]):
+        key = part[0].lower() # Find usable ampersand, preceding a valid character
+        if key > " ": return key
+    return None
+
+
+def parse_shortcuts(ctrl):
+    """
+    Parses the shortcut keys from the control label, if any.
+    If wx.ToolBar, parses tool labels, and shorthelps for explicit shortcut texts.
+
+    @return    {key: control or toolbar tool ID}
+    """
+    result = {}
+    if isinstance(ctrl, wx.ToolBar):
+        for i in range(ctrl.GetToolsCount()):
+            tool = ctrl.GetToolByPos(i)
+            if not tool: continue  # for i
+            key = parse_label(tool.Label)
+            if key:
+                result.setdefault(key, tool.Id)
+                if DEBUG: print("Parsed '%s' in tool label '%s'." % (key, tool.Label))
+            parts = re.split("\\(Alt-(.)\\)", tool.ShortHelp, maxsplit=1)
+            if len(parts) > 1:
+                result.setdefault(parts[1].lower(), tool.Id)
+    # wx.TextCtrl.Label is the same as its value, so must not use that
+    elif hasattr(ctrl, "Label") and not isinstance(ctrl, wx.TextCtrl):
+        key = parse_label(ctrl.Label)
+        if key:
+            result[key] = ctrl.Id
+            if DEBUG: print("Parsed '%s' in label '%s'." % (key, ctrl.Label))
+    return result
+
+
 def collect_shortcuts(control, use_heuristics=True):
     """
     Returns a map of detected shortcut keys and target controls under the
@@ -105,35 +142,6 @@ def collect_shortcuts(control, use_heuristics=True):
     nameds  = {} # collected controls with Name {name: control, }
     statics = {} # collected StaticTexts with a shortcut {control: char, }
 
-    def parse_shortcuts(ctrl):
-        """
-        Parses the shortcut keys from the control label, if any.
-
-        @return    [keys]
-        """
-        result = []
-        # wx.TextCtrl.Label is the same as its value, so must not use that
-        if isinstance(ctrl, wx.ToolBar):
-            for i in range(ctrl.GetToolsCount()):
-                tool = ctrl.GetToolByPos(i)
-                if not tool: continue  # for i
-                text = ctrl.GetToolShortHelp(tool.GetId())
-                parts = re.split("\\(Alt-(.)\\)", text, maxsplit=1)
-                if len(parts) > 1:
-                    result.append(parts[1].lower())
-        elif hasattr(ctrl, "Label") and not isinstance(ctrl, wx.TextCtrl):
-            for part in filter(len, ctrl.Label.split("&")[1:]):
-                # Labels have potentially multiple ampersands - find one that
-                # is usable (preceding a valid character. 32 and lower are
-                # spaces, punctuation, control characters, etc).
-                key = part[0].lower()
-                if ord(key) > 32:
-                    result.append(key)
-                    if DEBUG and key:
-                        print("Parsed '%s' in label '%s'." % (key, ctrl.Label))
-                    break # for part
-        return result
-
 
     def collect_recurse(ctrl, result, nameds, statics):
         """
@@ -147,8 +155,7 @@ def collect_shortcuts(control, use_heuristics=True):
             for i in range(len(children)):
                 collect_recurse(children[i], result, nameds, statics)
 
-        keys = parse_shortcuts(ctrl)
-        for key in keys:
+        for key in parse_shortcuts(ctrl):
             if isinstance(ctrl, wx.StaticText):
                 statics[ctrl] = key
             else:
@@ -230,10 +237,9 @@ def collect_shortcuts(control, use_heuristics=True):
         if not target:
             continue # for name, ctrl
 
-        key = (parse_shortcuts(ctrl) + [""]).pop(0)
+        key = next(iter(parse_shortcuts(ctrl)), "")
         if DEBUG:
-            print("Name %s matches potential %s, key=%s." % (
-                  name, basename, key))
+            print("Name %s matches potential %s, key=%s." % (name, basename, key))
         if target not in result_values:
             if target not in result.get(key, []):
                 result.setdefault(key, []).append((target, ctrl))
@@ -245,7 +251,6 @@ def collect_shortcuts(control, use_heuristics=True):
                        target.Id, target.Name, ctrl.Name))
 
     return result
-
 
 
 def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=None):
@@ -280,8 +285,7 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
         @param   shortcut_event  menu event generated by the accelerator table
         """
         if DEBUG:
-            print("Handling target %s" %
-                  [(type(t), t.Id, t.Label) for t in targets])
+            print("Handling target %s" % [(type(t), t.Id, t.Label) for t in targets])
         event, target = None, None
         for target in targets:
             if not target or not isinstance(target, wx.Control) \
@@ -308,23 +312,14 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
                 else: target.Value = not target.Value
                 target.SetFocus()
             elif isinstance(target, wx.ToolBar):
-                # Toolbar shortcuts are defined in their shorthelp texts
-                toolsmap, tb = dict(), target
-                for i in range(tb.GetToolsCount() + 1):
-                    try:
-                        tool = tb.FindToolForPosition(i * tb.ToolSize[0], 0)
-                        toolsmap[repr(tool)] = tool
-                    except Exception: pass # FindTool not implemented in GTK
-                for tool in filter(bool, toolsmap.values()):
-                    id = tool.GetId()
-                    text = tb.GetToolShortHelp(id)
-                    parts = re.split("\\(Alt-(%s)\\)" % key, text,
-                                     maxsplit=1, flags=re.IGNORECASE)
-                    if len(parts) > 1:
-                        event = wx.CommandEvent(wx.EVT_TOOL.typeId, id)
-                        event.SetEventObject(target)
-                        target.ToggleTool(id, not target.GetToolState(id))
-                        break # for tool
+                # Toolbar shortcuts are defined in tool labels and shorthelp texts
+                id_tool = parse_shortcuts(target).get(key)
+                if id_tool:
+                    event = wx.CommandEvent(wx.EVT_TOOL.typeId, id_tool)
+                    event.SetEventObject(target)
+                    event.SetInt(not target.GetToolState(id_tool))
+                    target.ToggleTool(id_tool, not target.GetToolState(id_tool))
+                    break # for tool
             else:
                 target.SetFocus()
                 if isinstance(target, wx.TextCtrl):
@@ -356,8 +351,7 @@ def accelerate(window, use_heuristics=True, skipclicklabels=None, accelerators=N
                 skipclicklabels.add(label)
             if not key: continue # for key, targets
             ctrls = [t[0] for t in targets]
-            if DEBUG: print("Binding %s to targets %s." %
-                            (key, [type(t) for t in ctrls]))
+            if DEBUG: print("Binding %s to targets %s." % (key, [type(t) for t in ctrls]))
             menu_item = dummy_menu.Append(wx.ID_ANY, "&%s" % key)
             window.Bind(wx.EVT_MENU, functools.partial(eventhandler, ctrls, key),
                         menu_item)
