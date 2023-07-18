@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.10.2022
+@modified    17.07.2023
 ------------------------------------------------------------------------------
 """
 import ast
@@ -525,7 +525,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         if self.trayicon.IsAvailable():
             menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckAutomatic)
+        menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
+        menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
 
         self.Bind(wx.EVT_MENU, self.on_new_blank,               menu_new_blank)
         if menu_new_live:
@@ -553,15 +554,15 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         from last check has passed, and opens a dialog for upgrading
         if new version available. Schedules a new check on due date.
         """
-        if self or not conf.UpdateCheckAutomatic: return
+        if not self or not conf.UpdateCheckEnabled or not conf.UpdateCheckAutomatic: return
 
         interval = datetime.timedelta(days=conf.UpdateCheckInterval)
         due_date = datetime.datetime.now() - interval
         if not (conf.WindowIconized or support.update_window) \
-        and conf.LastUpdateCheck < due_date.strftime("%Y%m%d"):
+        and (not conf.LastUpdateCheck or conf.LastUpdateCheck < due_date.strftime("%Y%m%d")):
             callback = lambda resp: self.on_check_update_callback(resp, False)
             support.check_newest_version(callback)
-        elif not support.update_window:
+        elif not support.update_window and conf.LastUpdateCheck:
             try:
                 dt = datetime.datetime.strptime(conf.LastUpdateCheck, "%Y%m%d")
                 interval = (dt + interval) - datetime.datetime.now()
@@ -930,7 +931,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             MAX = 1000
             changes = changes[:MAX] + ".." if len(changes) > MAX else changes
             guibase.status("New %s version %s available.", conf.Title, version)
-            if wx.OK == wx.MessageBox(
+            if not conf.UpdateCheckEnabled: wx.MessageBox(
+                "Newer version (%s) available. You are currently on version %s.%s" %
+                (version, conf.Version, "\n\n%s\n" % changes),
+                "Update information", wx.OK | wx.ICON_INFORMATION
+            )
+            elif wx.OK == wx.MessageBox(
                 "Newer version (%s) available. You are currently on "
                 "version %s.%s\nDownload and install %s %s?" %
                 (version, conf.Version, "\n\n%s\n" % changes,
@@ -6441,7 +6447,7 @@ class DatabasePage(wx.Panel):
             img, imgkey = self.imagecache.get(("chat", self.chat["id"])), ("chat", self.chat["id"])
             try:
                 raw = skypedata.fix_image_raw(pic) if pic and not img else None
-                img = img or wx.Image(io.BytesIO(raw.encode("latin1")))
+                img = img or (wx.Image(io.BytesIO(raw.encode("latin1"))) if raw else None)
             except Exception:
                 logger.exception("Error loading image for %s.", self.chat["title_long_lc"])
             if img:

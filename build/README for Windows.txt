@@ -68,9 +68,8 @@ scratch, by downloading all available history.
 Skyperious can read chat history archives exported from Skype, and merge their
 contents into an existing database, or create a new database from their contents.
 
-(Skype export is available in Skype client v8.5 under
- Settings -> Messaging -> Export chat history from Skype 7.x;
- and in Skype web interface under My account -> Export files and chat history.
+(Skype export is available in Skype web interface under
+ My account -> Export files and chat history.
  The result is a .tar archive containing a messages.json file.)
 
 HTML export can download shared photos and embed them in the resulting HTML,

@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.01.2023
+@modified    18.07.2023
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -24,8 +24,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.4.1"
-VersionDate = "02.01.2023"
+Version = "5.5.dev7"
+VersionDate = "18.07.2023"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -149,8 +149,11 @@ ExportDbTemplate = u"Export from %(name)s"
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
-"""Whether the program checks for updates every UpdateCheckInterval."""
+"""Whether the program checks for updates every UpdateCheckInterval if UpdateCheckEnabled."""
 UpdateCheckAutomatic = True
+
+"""Whether the program supports automatic update check and download."""
+UpdateCheckEnabled = True
 
 """Whether the program has been minimized and hidden."""
 WindowIconized = False

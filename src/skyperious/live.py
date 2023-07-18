@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    12.10.2022
+@modified    18.07.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Avoid BeautifulSoup popup warnings like MarkupResemblesLocatorWarning
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
+warnings.filterwarnings("ignore", category=UserWarning, module="skpy")
 
 
 class SkypeLogin(object):
@@ -272,12 +273,17 @@ class SkypeLogin(object):
 
         if "contacts" == table and not dbitem0 \
         and not (identity or "").startswith(skypedata.ID_PREFIX_BOT):
-            # Bot accounts from live are without bot prefix
+            # Bot accounts from live can be without bot prefix
             dbitem0 = self.cache[table].get(skypedata.ID_PREFIX_BOT + identity)
             if dbitem0:
                 identity = skypedata.ID_PREFIX_BOT + identity
                 dbitem["skypename"] = dbitem1["skypename"] = identity
                 dbitem["type"] = dbitem1["type"] = skypedata.CONTACT_TYPE_BOT
+
+        if "contacts" == table and not dbitem0 \
+        and (identity or "").startswith(skypedata.ID_PREFIX_BOT):
+            # Fix bot entries in database not having bot prefix
+            dbitem0 = self.cache[table].get(identity[len(skypedata.ID_PREFIX_BOT):])
 
         if "messages" == table and dbitem.get("remote_id") \
         and not isinstance(item, (skpy.SkypeCallMsg, skpy.SkypeMemberMsg, skpy.msg.SkypePropertyMsg)):
@@ -344,6 +350,17 @@ class SkypeLogin(object):
             for k, v in dbitem0.items():
                 if k not in dbitem: dbitem[k] = v
             dbitem["__updated__"] = True
+
+            if "contacts" == table and identity.startswith(skypedata.ID_PREFIX_BOT) \
+            and not dbitem0["skypename"].startswith(skypedata.ID_PREFIX_BOT):
+                # Fix bot entries in database not having bot prefix
+                self.db.execute("UPDATE participants SET identity = :id WHERE identity = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                self.db.execute("UPDATE transfers SET partner_handle = :id WHERE partner_handle = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                self.db.execute("UPDATE messages SET author = :id WHERE author = :id0",
+                                {"id": identity, "id0": dbitem0["skypename"]})
+                dbitem0["skypename"] = identity
         else:
             dbitem["id"] = self.db.insert_row(dbtable, dbitem, log=False)
             dbitem["__inserted__"] = True
@@ -422,7 +439,7 @@ class SkypeLogin(object):
                 uidentity = user.id if user else uid
                 # Keep bot prefixes on bot accounts
                 if uidentity != self.skype.userId and not uidentity.startswith(skypedata.ID_PREFIX_BOT) \
-                and (isinstance(user, skpy.SkypeBotUser) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
+                and (is_bot(user) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
                     uidentity = skypedata.ID_PREFIX_BOT + uidentity
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
                 if isinstance(chat, skpy.SkypeGroupChat) and (user.id if user else uid) == chat.creatorId:
@@ -570,8 +587,7 @@ class SkypeLogin(object):
             else: result = None
 
         elif "contacts" == table:
-            result.update(type=skypedata.CONTACT_TYPE_BOT
-                          if isinstance(item, skpy.SkypeBotUser)
+            result.update(type=skypedata.CONTACT_TYPE_BOT if is_bot(item)
                           else skypedata.CONTACT_TYPE_NORMAL,
                           isblocked=getattr(item, "blocked", False),
                           isauthorized=getattr(item, "authorised", False))
@@ -583,8 +599,7 @@ class SkypeLogin(object):
                 result.update(mood_text=item.mood.plain, rich_mood_text=item.mood.rich)
             if item.avatar:
                 result.update(avatar_url=item.avatar)
-            if isinstance(item, skpy.SkypeBotUser) \
-            and not item.id.startswith(skypedata.ID_PREFIX_BOT):
+            if is_bot(item) and not item.id.startswith(skypedata.ID_PREFIX_BOT):
                 result.update(skypename=skypedata.ID_PREFIX_BOT + item.id)
 
         elif "messages" == table:
@@ -598,7 +613,7 @@ class SkypeLogin(object):
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
-                           or isinstance(parent.user, skpy.SkypeBotUser) \
+                           or is_bot(parent.user) \
                            or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
@@ -849,8 +864,7 @@ class SkypeLogin(object):
         @return                      whether further progress should continue
         """
         result = True
-        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
-                    or isinstance(chat.user, skpy.SkypeBotUser) \
+        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) or is_bot(chat.user) \
                     or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
         if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
             return result
@@ -997,12 +1011,17 @@ class SkypeLogin(object):
 
     def get_contact(self, identity):
         """Returns cached contact, if any."""
-        return self.cache["contacts"].get(identity) if identity else None
+        result = self.cache["contacts"].get(identity) if identity else None
+        if not result and identity and not identity.startswith(skypedata.ID_PREFIX_BOT):
+            result = self.cache["contacts"].get(skypedata.ID_PREFIX_BOT + identity)
+        return result
 
 
     def get_contact_name(self, identity):
         """Returns contact displayname or fullname or identity."""
         result, contact = None, self.get_contact(identity)
+        if not contact: contact = self.get_contact(identity)
+            
         if contact:
             result = contact.get("displayname") or contact.get("fullname")
         result = result or identity
@@ -1133,6 +1152,7 @@ class SkypeExport(skypedata.SkypeDatabase):
     def export_parse(self, f, progress=None):
         """Parses JSON data from file pointer and inserts to database."""
         parser = ijson.parse(f)
+        PREFIX_RGX = re.compile(r"^\d+\:")  # Matching and stripping numeric prefix
 
         self.get_tables()
         self.table_objects.setdefault("contacts", {})
@@ -1217,8 +1237,9 @@ class SkypeExport(skypedata.SkypeDatabase):
                         skip_chat = value.startswith(skypedata.ID_PREFIX_SPECIAL)
                         chat["identity"] = value
                         chat["type"] = skypedata.CHATS_TYPE_GROUP
-                        if value.startswith(skypedata.ID_PREFIX_SINGLE):
-                            chat["identity"] = value[len(skypedata.ID_PREFIX_SINGLE):]
+                        if not value.startswith(skypedata.ID_PREFIX_GROUP):
+                            if not value.startswith(skypedata.ID_PREFIX_BOT):
+                                chat["identity"] = PREFIX_RGX.sub("", value)
                             chat["type"] = skypedata.CHATS_TYPE_SINGLE
                     except Exception:
                         logger.warning("Error parsing chat identity %r for %s.", value, chat, exc_info=True)
@@ -1235,12 +1256,18 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
                     try:
-                        for identity in map(id_to_identity, json.loads(value)):
+                        if value is not None or skypedata.CHATS_TYPE_GROUP == chat["type"]:
+                            identities = map(id_to_identity, json.loads(value))
+                        else: identities = [self.id, chat["identity"]]
+                        for identity in identities:
                             if not identity: continue # for identity
                             if identity not in self.table_objects["contacts"] and identity != self.id:
                                 contact = dict(skypename=identity, is_permanent=1)
                                 if identity.startswith(skypedata.ID_PREFIX_BOT):
                                     contact["type"] = skypedata.CONTACT_TYPE_NORMAL
+                                if skypedata.CHATS_TYPE_GROUP != chat["type"] \
+                                and identity == chat["identity"] and chat.get("displayname"):
+                                    contact["displayname"] = chat["displayname"]
                                 contact["id"] = self.insert_row("contacts", contact)
                                 self.table_objects["contacts"][identity] = contact
                             p = dict(is_permanent=1, convo_id=chat["id"], identity=identity)
@@ -1595,6 +1622,15 @@ def identity_to_id(identity):
         elif not result.endswith("thread.skype") and not re.match(r"^\d+\:", result):
             result = "%s%s" % (skypedata.ID_PREFIX_SINGLE, result)
     return result
+
+
+def is_bot(user):
+    """Returns whether the given skpy.SkypeUser is a bot."""
+    return isinstance(user, skpy.SkypeBotUser) \
+    or (isinstance(user, skpy.SkypeUser) and isinstance(getattr(user, "raw", None), dict)
+        and isinstance(user.raw.get("person_id"), six.string_types)
+        and user.raw["person_id"].startswith(skypedata.ID_PREFIX_BOT)
+    ) # Workaround for skpy bug of presenting bots in some contexts as plain contacts
 
 
 def make_db_path(username):

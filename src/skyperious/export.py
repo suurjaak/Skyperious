@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    20.09.2022
+@modified    17.07.2023
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -558,9 +558,9 @@ class xlsx_writer(object):
         # For calculating column widths
         self._fonts = collections.defaultdict(lambda: FONT_XLSX)
         self._fonts["bold"] = FONT_XLSX_BOLD
-        unit_width_default = self._fonts[None].getsize("0")[0]
+        unit_width_default = get_extent(self._fonts[None], "0")[0]
         self._unit_widths = collections.defaultdict(lambda: unit_width_default)
-        self._unit_widths["bold"] = self._fonts["bold"].getsize("0")[0]
+        self._unit_widths["bold"] = get_extent(self._fonts["bold"], "0")[0]
 
         if sheetname: # Create default sheet
             self.add_sheet(sheetname)
@@ -645,7 +645,7 @@ class xlsx_writer(object):
                       if isinstance(v, six.text_type)
                       else v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime.datetime)
                       else v if isinstance(v, six.string_types) else str(v))
-            pixels = max(self._fonts[fmt_name].getsize(x)[0]
+            pixels = max(get_extent(self._fonts[fmt_name], x)[0]
                          for x in strval.split("\n"))
             width = float(pixels) / self._unit_widths[fmt_name] + 1
             if not merge_cols and width > self._col_widths[self._sheet.name][c]:
@@ -667,3 +667,9 @@ class xlsx_writer(object):
             (conf.Title, datetime.datetime.now().strftime("%d.%m.%Y %H:%M")),
             "author": "%s %s" % (conf.Title, conf.Version)})
         self._workbook.close()
+
+
+def get_extent(font, text):
+    """Returns (width, height) for specified font and text."""
+    if hasattr(font, "getsize"): return font.getsize(text)     # <  PIL v10
+    if hasattr(font, "getbbox"): return font.getbbox(text)[2:] # >= PIL v10
