@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Avoid BeautifulSoup popup warnings like MarkupResemblesLocatorWarning
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
+warnings.filterwarnings("ignore", category=UserWarning, module="skpy")
 
 
 class SkypeLogin(object):
