@@ -8,13 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    13.10.2022
+@modified    22.07.2023
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
+#import codecs, collections, datetime, functools, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
 #from skyperious.lib.vendor import step
@@ -45,7 +45,7 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import collections, datetime, functools, imghdr, json
+import collections, datetime, functools, json
 import six
 from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
@@ -974,7 +974,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 %endfor
 %elif chat_picture_raw:
 <%
-try: filetype = imghdr.what("", chat_picture_raw[:100].encode("latin1")) or "png"
+try: filetype = util.get_file_type(chat_picture_raw[:100].encode("latin1")) or "png"
 except Exception: filetype = "png"
 %>
       <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/{{ filetype }};base64,{{! util.b64encode(chat_picture_raw) }}" />
@@ -2202,7 +2202,7 @@ Contacts information template, for use in export.
                           supplemented with statistics
 """
 EXPORT_CONTACTS_HTML = """<%
-import datetime, imghdr, json
+import datetime, json
 from skyperious import conf, images, skypedata, templates
 from skyperious.lib import util
 
@@ -2606,7 +2606,7 @@ dct = {
 alt = "%s%s" % (c["name"], (" (%s)" % c["identity"]) if c["name"] != c["identity"] else "")
 avatar = skypedata.get_avatar_raw(c)
 if avatar:
-    try: filetype = imghdr.what("", avatar[:100].encode("latin1")) or "png"
+    try: filetype = util.get_file_type(avatar[:100].encode("latin1")) or "png"
     except Exception: filetype = "png"
 category = "account" if db.id == c["identity"] else "contact"
 %>
@@ -3247,6 +3247,8 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(valu
 """Text shown in Help -> About dialog (HTML content)."""
 ABOUT_TEXT = """<%
 import sys
+try: import filetype
+except ImportError: filetype = None
 from skyperious import conf
 
 %>
@@ -3273,6 +3275,10 @@ under the MIT License.
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4,
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
+%if filetype:
+  <li>filetype,
+      <a href="https://pypi.org/project/filetype"><font color="{{ conf.LinkColour }}">pypi.org/project/filetype</font></a></li>
+%endif
   <li>ijson,
       <a href="https://pypi.org/project/ijson"><font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
   <li>Pillow,

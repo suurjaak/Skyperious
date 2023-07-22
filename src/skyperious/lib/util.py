@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    12.11.2022
+@modified    22.07.2023
 ------------------------------------------------------------------------------
 """
 import base64
@@ -16,7 +16,8 @@ import calendar
 import codecs
 import ctypes
 import datetime
-import imghdr
+try: import imghdr
+except ImportError: imghdr = None  # Py3.13+
 import io
 import locale
 import math
@@ -30,6 +31,8 @@ import time
 import warnings
 
 Image = ImageFile = wx = None # For image resize, most functions work without
+try: import filetype_lib  # For image detection in Py3.13+
+except Exception: filetype_lib = None
 try: from PIL import Image, ImageFile
 except ImportError: pass
 try: import wx
@@ -485,7 +488,8 @@ def get_file_type(content, category=None, filename=None):
     if filename:
         filetype = os.path.splitext(filename)[-1][1:] or filetype
     if "image" == category:
-        filetype = imghdr.what("", content) or filetype
+        if imghdr: filetype = imghdr.what("", content)
+        elif filetype_lib: filetype = filetype_lib.guess_extension(content)
     elif not filetype:
         filetype = "mp4" # Pretty safe bet for Skype audio/video
     return filetype or category

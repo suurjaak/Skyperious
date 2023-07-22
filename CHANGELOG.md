@@ -4,6 +4,7 @@ CHANGELOG
 5.5.1, 2023-07-22
 -----------------
 - compatibility with Python 3.9+
+- introduce optional filetype dependency
 
 
 5.5, 2023-07-18

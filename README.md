@@ -149,6 +149,7 @@ and the following 3rd-party Python packages:
 The following are also listed in `requirements.txt` for pip:
 * appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
+* filetype (https://pypi.org/project/filetype, Py3 only)
 * ijson (https://pypi.org/project/ijson)
 * Pillow (https://pypi.org/project/Pillow)
 * pyparsing (https://pypi.org/project/pyparsing)

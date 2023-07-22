@@ -1,5 +1,6 @@
 appdirs
 beautifulsoup4
+filetype  # Py3 only
 ijson
 Pillow
 pyparsing
