@@ -1,7 +1,12 @@
 CHANGELOG
 =========
 
-5.5, 2023-07-17
+5.5.1, 2023-07-22
+-----------------
+- compatibility with Python 3.9+
+
+
+5.5, 2023-07-18
 ---------------
 - fix Bing-bot not being synced properly (issue #117)
 - fix importing latest Skype export archives (issue #119)

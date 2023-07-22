@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    18.07.2023
+@modified    22.07.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -229,7 +229,7 @@ class SkypeLogin(object):
         @param   __raise  special keyword argument, does not raise if falsy
         @param   __log    special keyword argument, does not log error if falsy
         """
-        self.query_stamps.append(datetime.datetime.utcnow())
+        self.query_stamps.append(datetime.datetime.now())
         while len(self.query_stamps) > self.RATE_LIMIT:
             self.query_stamps.pop(0)
 
@@ -250,7 +250,7 @@ class SkypeLogin(object):
                     return None
                 time.sleep(self.RETRY_DELAY)
             finally: # Replace with final
-                self.query_stamps[-1] = datetime.datetime.utcnow()
+                self.query_stamps[-1] = datetime.datetime.now()
 
 
     def save(self, table, item, parent=None):
