@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    22.07.2023
+@modified    31.07.2023
 ------------------------------------------------------------------------------
 """
 import re
@@ -2549,7 +2549,7 @@ dct = {
 
     /** Escapes special characters in a string for RegExp. */
     var escapeRegExp = function(string) {
-      return string.replace(/[-[\]{}()*+!<=:?.\/\^$|#\s,]/g, "\$&");
+        return string.replace(/[\\\\\\^$.|?*+()[{]/g, "\\\\\\$&");
     };
 
 %if HAS_AVATARS:

@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-5.5.1, 2023-07-22
+5.5.1, 2023-07-31
 -----------------
 - compatibility with Python 3.9+
 - introduce optional filetype dependency
+- fix escaping special characters for regex in exported HTML search functions
 
 
 5.5, 2023-07-18
