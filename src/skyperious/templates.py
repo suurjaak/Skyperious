@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    31.07.2023
+@modified    05.08.2023
 ------------------------------------------------------------------------------
 """
 import re
@@ -716,7 +716,7 @@ MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(t
       if (-1 == val.toLowerCase().indexOf(keyword)) return;
       // As JavaScript regex character classes are not Unicode aware,
       // match word boundaries on non-word and non-Unicode characters.
-      pattern = new RegExp("(^|[^\\\\\\\\w\\\\\\\\u0081-\\\\\\\\uFFFF])(" + keyword + ")([^\\\\\\\\w\\\\\\\\u0081-\\\\\\\\uFFFF]|$)", "ig");
+      pattern = new RegExp("(^|[^\\\w\\\\u0081-\\\\uFFFF])(" + keyword + ")([^\\\w\\\\u0081-\\\\uFFFF]|$)", "ig");
       replaceWith = '$1<span class="' + style + '">$2</span>$3';
       html = val.replace(pattern, replaceWith);
       found = (html != val);
@@ -2267,8 +2267,8 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     a.sort.desc::after { content: "↑"; }
     a.toggle { display: inline-block; position: absolute; white-space: nowrap; }
     a.toggle:hover { cursor: pointer; text-decoration: none; }
-    a.toggle::after { content: " \\\\25b6"; position: absolute; top: 0; left: 3px; }
-    a.toggle.open::after { content: " \\\\25bc"; font-size: 0.7em; top: 3px; }
+    a.toggle::after { content: " \\25b6"; position: absolute; top: 0; left: 3px; }
+    a.toggle.open::after { content: " \\25bc"; font-size: 0.7em; top: 3px; }
     #title { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
     .hidden { display: none; }
     td, th { text-align: left; vertical-align: top; }
@@ -2549,7 +2549,7 @@ dct = {
 
     /** Escapes special characters in a string for RegExp. */
     var escapeRegExp = function(string) {
-        return string.replace(/[\\\\\\^$.|?*+()[{]/g, "\\\\\\$&");
+      return string.replace(/[\\\^$.|?*+()[{]/g, "\\\$&");
     };
 
 %if HAS_AVATARS:
