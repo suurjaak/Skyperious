@@ -10,11 +10,12 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    05.08.2023
+@modified    12.09.2023
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
 except ImportError: from configparser import RawConfigParser  # Py3
+import copy
 import datetime
 import json
 import os
@@ -24,8 +25,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.5.1.dev2"
-VersionDate = "05.08.2023"
+Version = "5.5.1.dev3"
+VersionDate = "12.09.2023"
 
 if getattr(sys, "frozen", False):
     # Running as a pyinstaller executable
@@ -409,6 +410,12 @@ def load(configfile=None):
     try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
     except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
 
+    def safecopy(v):
+        """Tries to return a deep copy, or a shallow copy, or given value if copy fails."""
+        for f in (copy.deepcopy, copy.copy, lambda x: x):
+            try: return f(v)
+            except Exception: pass
+
     if configfile:
         ConfigFile, ConfigFileStatic = configfile, True
     configpaths = [ConfigFile]
@@ -428,8 +435,8 @@ def load(configfile=None):
 
     section = "*"
     module = sys.modules[__name__]
-    Defaults = {k: v for k, v in vars(module).items() if not k.startswith("_")
-                and isinstance(v, VARTYPES)}
+    Defaults = {k: safecopy(v) for k, v in vars(module).items()
+                if not k.startswith("_") and isinstance(v, VARTYPES)}
 
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names
