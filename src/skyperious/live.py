@@ -8,12 +8,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    22.07.2023
+@modified    17.12.2023
 ------------------------------------------------------------------------------
 """
 import collections
 import datetime
 import glob
+import inspect
 import json
 import logging
 import os
@@ -253,6 +254,12 @@ class SkypeLogin(object):
                 self.query_stamps[-1] = datetime.datetime.now()
 
 
+    def reqattr(self, obj, name):
+        """Returns Skype object attribute value, channeling via request() if class property."""
+        prop = getattr(type(obj), name, None)
+        return self.request(prop.fget, obj) if inspect.isdatadescriptor(prop) else getattr(obj, name)
+
+
     def save(self, table, item, parent=None):
         """
         Saves the item to SQLite table.
@@ -312,7 +319,7 @@ class SkypeLogin(object):
                 dbitem["displayname"] = dbitem0["displayname"]
             else: # Assemble name from participants
                 names = []
-                for uid in item.userIds[:4]: # Use up to 4 names
+                for uid in self.reqattr(item, "userIds")[:4]: # Use up to 4 names
                     name = self.get_contact_name(uid)
                     if not self.get_contact(uid) \
                     or conf.Login.get(self.db.filename, {}).get("sync_contacts", True):
@@ -320,7 +327,7 @@ class SkypeLogin(object):
                         if user and user.name: name = util.to_unicode(user.name)
                     names.append(name)
                 dbitem["displayname"] = ", ".join(names)
-                if len(item.userIds) > 4: dbitem["displayname"] += ", ..."
+                if len(self.reqattr(item, "userIds")) > 4: dbitem["displayname"] += ", ..."
             dbitem1 = dict(dbitem)
 
         dbtable = "conversations" if "chats" == table else table
@@ -432,7 +439,7 @@ class SkypeLogin(object):
         try:
             participants, savecontacts = [], []
 
-            uids = chat.userIds if isinstance(chat, skpy.SkypeGroupChat) \
+            uids = self.reqattr(chat, "userIds") if isinstance(chat, skpy.SkypeGroupChat) \
                    else set([self.skype.userId, chat.userId])
             for uid in uids:
                 user = self.request(self.skype.contacts.__getitem__, uid)
@@ -613,7 +620,7 @@ class SkypeLogin(object):
 
             if parent:
                 identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
-                           or is_bot(parent.user) \
+                           or is_bot(self.reqattr(parent, "user")) \
                            or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
                 chat = self.cache["chats"].get(identity)
                 if not chat:
@@ -747,7 +754,7 @@ class SkypeLogin(object):
         logger.info("Synchronizing database account profile from live.")
         updateds = set()
         try:
-            account = self.request(type(self.skype).user.fget, self.skype)
+            account = self.reqattr(self.skype, "user")
             _, action = self.save("accounts", account)
             if action in (self.SAVE.INSERT, self.SAVE.UPDATE):
                 updateds.add(self.db.id)
@@ -864,11 +871,12 @@ class SkypeLogin(object):
         @return                      whether further progress should continue
         """
         result = True
-        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) or is_bot(chat.user) \
+        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
+                    or is_bot(self.reqattr(chat, "user")) \
                     or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
         if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
             return result
-        if isinstance(chat, skpy.SkypeGroupChat) and not chat.userIds:
+        if isinstance(chat, skpy.SkypeGroupChat) and not self.reqattr(chat, "userIds"):
             # Weird empty conversation, getMsgs raises 404
             return result
         if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.userId:

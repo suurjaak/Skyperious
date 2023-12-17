@@ -1,11 +1,12 @@
 CHANGELOG
 =========
 
-5.5.1, 2023-08-05
+5.5.1, 2023-12-17
 -----------------
 - update step, the vendored template library
 - compatibility with Python 3.9+
 - introduce optional filetype dependency
+- improve rate limiting for live sync (issue #123)
 - fix escaping special characters for regex in exported HTML search functions
 
 
