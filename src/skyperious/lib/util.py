@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    22.07.2023
+@modified    25.09.2023
 ------------------------------------------------------------------------------
 """
 import base64
@@ -579,10 +579,10 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
                 size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
                 align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
             if size1[0] > size[0] or size1[1] > size[1]:
-                if result is not img: result = result.Copy()
+                if result is img: result = result.Copy()
                 result.Rescale(*size2)
             if align_pos:
-                if result is not img: result = result.Copy()
+                if result is img: result = result.Copy()
                 result.Resize(size, align_pos, *bg)
     return result
 
