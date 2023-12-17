@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    10.07.2022
+@modified    06.08.2023
 """
 import datetime
 import logging
@@ -28,7 +28,7 @@ try:
     import wx.stc
 except ImportError: wx = None
 
-from . lib.controls import ColourManager, KEYS
+from . lib.controls import ColourManager, NewId, KEYS
 from . lib import util
 from . lib import wx_accel
 
@@ -168,14 +168,14 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         menu_file = wx.Menu()
         menu.Insert(0, menu_file, "&File")
         menu_recent = self.menu_recent = wx.Menu()
-        menu_file.AppendMenu(id=wx.NewIdRef().Id, text="&Recent files",
+        menu_file.AppendMenu(id=NewId(), text="&Recent files",
             submenu=menu_recent, help="Recently opened files.")
         menu_file.AppendSeparator()
         menu_console = self.menu_console = menu_file.Append(
-            id=wx.NewIdRef().Id, kind=wx.ITEM_CHECK, text="Show &console\tCtrl-E",
+            id=NewId(), kind=wx.ITEM_CHECK, text="Show &console\tCtrl-E",
             help="Show/hide a Python shell environment window")
         menu_inspect = self.menu_inspect = menu_file.Append(
-            id=wx.NewIdRef().Id, kind=wx.ITEM_CHECK, text="Show &widget inspector",
+            id=NewId(), kind=wx.ITEM_CHECK, text="Show &widget inspector",
             help="Show/hide the widget inspector")
 
         self.file_history = wx.FileHistory(conf.MaxRecentFiles)

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2023
+@modified    06.08.2023
 ------------------------------------------------------------------------------
 """
 import ast
@@ -222,10 +222,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 notebook.SetSelection(number)
                 self.on_change_page(None)
 
-        id_close = wx.NewIdRef().Id
+        id_close = controls.NewId()
         accelerators = [(wx.ACCEL_CMD, k, id_close) for k in (ord('W'), wx.WXK_F4)]
         for i in range(9):
-            id_tab = wx.NewIdRef().Id
+            id_tab = controls.NewId()
             accelerators += [(wx.ACCEL_CMD, ord(str(i + 1)), id_tab)]
             notebook.Bind(wx.EVT_MENU, functools.partial(on_tab_hotkey, i), id=id_tab)
         notebook.SetAcceleratorTable(wx.AcceleratorTable(accelerators))
