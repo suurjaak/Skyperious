@@ -127,10 +127,10 @@ Windows: download and launch the latest setup from
 https://suurjaak.github.io/Skyperious/downloads.html.
 
 Linux Snap Store: install Skyperious, or run
-`snap install skyperious`
+`snap install skyperious`.
 
 Mac/Linux/other: install Python, wxPython, pip, and run
-`pip install skyperious`
+`pip install skyperious`.
 
 The pip installation will add the `skyperious` command to path.
 For more thorough instructions, see [INSTALL.md](INSTALL.md).
