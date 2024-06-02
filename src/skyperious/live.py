@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    17.12.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import collections
@@ -58,6 +58,7 @@ class SkypeLogin(object):
     RATE_WINDOW =   2 # Length of rate window, in seconds
     RETRY_LIMIT =   3 # Number of attempts to overcome transient I/O errors
     RETRY_DELAY = 0.5 # Sleep interval between retries, in seconds
+    AUTH_RATE_LIMIT_DELAY = 5 # Sleep interval upon hitting server rate limit, in seconds
 
     # Enum for save() results
     SAVE = type('', (), dict(SKIP=0, INSERT=1, UPDATE=2, NOCHANGE=3))
@@ -243,13 +244,20 @@ class SkypeLogin(object):
         tries = 0
         while True:
             try: return func(*args, **kwargs)
-            except Exception:
+            except Exception as e:
                 tries += 1
                 if tries > self.RETRY_LIMIT or not doretry:
                     if dolog: logger.exception("Error calling %r.", func)
                     if doraise: raise
                     return None
-                time.sleep(self.RETRY_DELAY)
+                delay = self.RETRY_DELAY
+                try: code = e.args[1].status_code
+                except Exception: code = None
+                if 429 == code: # TOO_MANY_REQUESTS
+                    delay = self.AUTH_RATE_LIMIT_DELAY
+                    logger.debug("Hit Skype online rate limit when calling %r, "
+                                 "sleeping %s seconds.\n%r", func, delay, e)
+                time.sleep(delay)
             finally: # Replace with final
                 self.query_stamps[-1] = datetime.datetime.now()
 
