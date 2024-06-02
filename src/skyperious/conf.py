@@ -25,7 +25,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.5.1.dev9"
+Version = "5.5.1.dev10"
 VersionDate = "02.06.2024"
 
 if getattr(sys, "frozen", False):
@@ -57,8 +57,9 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
-    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
-    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "HistoryZoom",
+    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate", "ExportContactsTemplate",
+    "ExportDbTemplate", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
+    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryLimit", "LiveSyncRetryDelay",
     "LogSQL", "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
     "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
@@ -202,6 +203,21 @@ UpdateCheckInterval = 7
 
 """Date string of last time updates were checked."""
 LastUpdateCheck = None
+
+"""Sleep interval upon hitting server rate limit, in seconds."""
+LiveSyncAuthRateLimitDelay = 5
+
+"""Max number of requests in rate window."""
+LiveSyncRateLimit = 30
+
+"""Length of rate window, in seconds."""
+LiveSyncRateWindow = 2 
+
+"""Number of attempts to overcome rate limit and transient I/O errors."""
+LiveSyncRetryLimit = 3
+
+"""Sleep interval between retries, in seconds."""
+LiveSyncRetryDelay = 0.5
 
 """Maximum number of console history commands to store."""
 MaxConsoleHistory = 1000

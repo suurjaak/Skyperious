@@ -54,12 +54,6 @@ class SkypeLogin(object):
     Class for logging into Skype web account and retrieving chat history.
     """
 
-    RATE_LIMIT  =  30 # Max number of requests in rate window
-    RATE_WINDOW =   2 # Length of rate window, in seconds
-    RETRY_LIMIT =   3 # Number of attempts to overcome transient I/O errors
-    RETRY_DELAY = 0.5 # Sleep interval between retries, in seconds
-    AUTH_RATE_LIMIT_DELAY = 5 # Sleep interval upon hitting server rate limit, in seconds
-
     # Enum for save() results
     SAVE = type('', (), dict(SKIP=0, INSERT=1, UPDATE=2, NOCHANGE=3))
 
@@ -232,13 +226,13 @@ class SkypeLogin(object):
         @param   __log    special keyword argument, does not log error if falsy
         """
         self.query_stamps.append(datetime.datetime.now())
-        while len(self.query_stamps) > self.RATE_LIMIT:
+        while len(self.query_stamps) > conf.LiveSyncRateLimit:
             self.query_stamps.pop(0)
 
         dts = self.query_stamps
-        delta = (dts[-1] - dts[0]) if len(dts) == self.RATE_LIMIT else 0
-        if isinstance(delta, datetime.timedelta) and delta.total_seconds() < self.RATE_WINDOW:
-            time.sleep(self.RATE_WINDOW - delta.total_seconds())
+        delta = (dts[-1] - dts[0]) if len(dts) >= conf.LiveSyncRateLimit else 0
+        if isinstance(delta, datetime.timedelta) and delta.total_seconds() < conf.LiveSyncRateWindow:
+            time.sleep(conf.LiveSyncRateWindow - delta.total_seconds())
         doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__retry", "__raise", "__log"))
 
         tries = 0
@@ -246,15 +240,15 @@ class SkypeLogin(object):
             try: return func(*args, **kwargs)
             except Exception as e:
                 tries += 1
-                if tries > self.RETRY_LIMIT or not doretry:
+                if tries > conf.LiveSyncRetryLimit or not doretry:
                     if dolog: logger.exception("Error calling %r.", func)
                     if doraise: raise
                     return None
-                delay = self.RETRY_DELAY
+                delay = conf.LiveSyncRetryDelay
                 try: code = e.args[1].status_code
                 except Exception: code = None
                 if 429 == code: # TOO_MANY_REQUESTS
-                    delay = self.AUTH_RATE_LIMIT_DELAY
+                    delay = conf.LiveSyncAuthRateLimitDelay
                     logger.debug("Hit Skype online rate limit when calling %r, "
                                  "sleeping %s seconds.\n%r", func, delay, e)
                 time.sleep(delay)
