@@ -776,6 +776,7 @@ class SkypeLogin(object):
 
         @param   contacts  list of contact identities to populate if not all
         """
+        self.request(self.skype.contacts.sync) # Populate contacts in skpy
         total = len(contacts or self.skype.contacts)
         if not self.progress(action="populate", table="contacts", start=True):
             return
