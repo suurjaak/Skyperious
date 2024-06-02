@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    05.08.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import re
@@ -3246,10 +3246,11 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(valu
 
 """Text shown in Help -> About dialog (HTML content)."""
 ABOUT_TEXT = """<%
-import sys
+import os, sys
 try: import filetype
 except ImportError: filetype = None
 from skyperious import conf
+from skyperious.lib import util
 
 %>
 <font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
@@ -3325,7 +3326,11 @@ Includes fonts Carlito Regular and Carlito bold,
 Installer created with Nullsoft Scriptable Install System,
 <a href="https://nsis.sourceforge.io"><font color="{{ conf.LinkColour }}">nsis.sourceforge.io</font></a>
 %endif
-
+%if conf.LicenseFile:
+<br /><br />
+Licensing for bundled software and resources:
+<a href="{{ util.path_to_url(conf.LicenseFile) }}"><font color="{{ conf.LinkColour }}">{{ os.path.basename(conf.LicenseFile) }}</font></a>
+%endif
 </font>
 """
 

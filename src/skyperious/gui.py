@@ -10021,8 +10021,7 @@ class AboutDialog(wx.Dialog):
 
         html.SetPage(content() if callable(content) else content)
         html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
-        html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                  lambda e: webbrowser.open(e.GetLinkInfo().Href))
+        html.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.OnLink)
         button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
         button_feedback.Bind(wx.EVT_BUTTON, self.OnOpenFeedback)
 
@@ -10038,6 +10037,13 @@ class AboutDialog(wx.Dialog):
         if "win32" != sys.platform: self.MinSize = (550, -1)
         self.Size = (self.Size[0], html.VirtualSize[1] + (10 if "win32" != sys.platform else 70))
         self.CenterOnParent()
+
+
+    def OnLink(self, event):
+        """Handler for clicking link, opens URLs in browser and files in registered application."""
+        href = event.GetLinkInfo().Href
+        if not href.startswith("file://"): webbrowser.open(href)
+        else: util.start_file(util.url_to_path(href, double_decode=True))
 
 
     def OnOpenFeedback(self, event):

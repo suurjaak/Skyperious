@@ -11,6 +11,7 @@ CHANGELOG
 - fix potential error on comparing messages in live sync
 - fix escaping special characters for regex in exported HTML search functions
 - disable automatic update check and download popup in snapped version
+- include third-party license texts in snaps and stand-alone exes
 
 
 5.5, 2023-07-18

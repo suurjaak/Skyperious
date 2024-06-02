@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    25.09.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import base64
@@ -687,6 +687,19 @@ def path_to_url(path, encoding="utf-8"):
             url += "/" + urllib.parse.quote(part)
     url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
     return url
+
+
+def url_to_path(url, double_decode=False):
+    """Returns file URL as path, e.g. "file:///my%20file" as "/my file"."""
+    if not url.startswith("file:"): return url
+    path = urllib.request.url2pathname(url[5:])
+    if any(path.startswith(x) for x in ["\\\\\\", "///"]):
+        path = path[3:] # Strip redundant filelink slashes
+    if double_decode and isinstance(path, six.text_type):
+        # Workaround for wx.html.HtmlWindow double encoding
+        try: path = path.encode("latin1", errors="xmlcharrefreplace").decode("utf-8")
+        except Exception: pass
+    return path
 
 
 def to_unicode(value, encoding=None, errors="strict"):

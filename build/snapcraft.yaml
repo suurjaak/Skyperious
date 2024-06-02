@@ -4,6 +4,8 @@
 #
 # mkdir -p snap/gui && cp build/snapcraft.yaml snap/ && cp build/skyperious.desktop snap/gui/ \
 #   && cp res/Icon256x256_32bit.png snap/gui/skyperious.png \
+#   && cp "build/3rd-party licenses.txt" src/skyperious/res \
+#   && sed -i 's/ttf \*\.zip/ttf *.txt *.zip/' MANIFEST.in \
 #   && sed -i 's/Icon=.*/Icon=${SNAP}\/meta\/gui\/skyperious.png/' snap/gui/skyperious.desktop
 #
 # To build, execute the following in project directory:
@@ -13,7 +15,7 @@
 #
 # @author      Erki Suurjaak
 # @created     01.05.2022
-# @modified    24.07.2022
+# @modified    02.06.2024
 name:    skyperious
 title:   Skyperious
 summary: Skype chat history tool

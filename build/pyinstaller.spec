@@ -6,7 +6,7 @@ depending on Python environment.
 Pyinstaller-provided names and variables: Analysis, EXE, PYZ, SPEC, TOC.
 
 @created   03.04.2012
-@modified  26.03.2022
+@modified  02.06.2024
 """
 import os
 import struct
@@ -38,10 +38,11 @@ a = Analysis(
     hiddenimports=["imghdr", "mimetypes",   # Imported within templates
                    "ijson.backends.python"] # ijson imports backends indirectly
 )
-a.datas += [("conf.py",             "src/%s/conf.py"             % NAME, "DATA"), # For configuration docstrings
-            ("res/Carlito.ttf",     "src/%s/res/Carlito.ttf"     % NAME, "DATA"),
-            ("res/CarlitoBold.ttf", "src/%s/res/CarlitoBold.ttf" % NAME, "DATA"),
-            ("res/emoticons.zip",   "src/%s/res/emoticons.zip"   % NAME, "DATA"), ]
+a.datas += [("conf.py",                    "src/%s/conf.py"             % NAME, "DATA"), # For configuration docstrings
+            ("res/3rd-party licenses.txt", "build/3rd-party licenses.txt", "DATA"),
+            ("res/Carlito.ttf",            "src/%s/res/Carlito.ttf"     % NAME, "DATA"),
+            ("res/CarlitoBold.ttf",        "src/%s/res/CarlitoBold.ttf" % NAME, "DATA"),
+            ("res/emoticons.zip",          "src/%s/res/emoticons.zip"   % NAME, "DATA"), ]
 a.binaries = a.binaries - TOC([
     ('tcl85.dll', None, None), ('tk85.dll',  None, None), ('_tkinter',  None, None)
 ])

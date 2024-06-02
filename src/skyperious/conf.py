@@ -415,6 +415,10 @@ WordCloudWordsMax = 100
 """Maximum number of words to include in per-author word cloud."""
 WordCloudWordsAuthorMax = 50
 
+"""Path for licences of bundled open-source software."""
+LicenseFile = os.path.join(ResourceDirectory, "3rd-party licenses.txt") \
+              if Frozen or Snapped else None
+
 
 def load(configfile=None):
     """
