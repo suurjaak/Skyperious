@@ -428,8 +428,8 @@ def load(configfile=None):
     """
     global Defaults, VarDirectory, CacheDirectory, ConfigFile, ConfigFileStatic
 
-    try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
-    except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
+    try: VARTYPES = (basestring, bool, float, int, long, list, tuple, dict, type(None))        # Py2
+    except Exception: VARTYPES = (bytes, str, bool, float, int, list, tuple, dict, type(None)) # Py3
 
     def safecopy(v):
         """Tries to return a deep copy, or a shallow copy, or given value if copy fails."""
