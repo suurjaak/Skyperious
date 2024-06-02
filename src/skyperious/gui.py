@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.07.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import ast
@@ -33,6 +33,7 @@ import traceback
 import webbrowser
 
 import six
+import step
 from six.moves import urllib
 import wx
 import wx.adv
@@ -54,7 +55,6 @@ from . lib import controls
 from . lib.controls import ColourManager
 from . lib import util
 from . lib import wx_accel
-from . lib.vendor import step
 
 from . import conf
 from . import emoticons
@@ -222,10 +222,10 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 notebook.SetSelection(number)
                 self.on_change_page(None)
 
-        id_close = wx.NewIdRef().Id
+        id_close = controls.NewId()
         accelerators = [(wx.ACCEL_CMD, k, id_close) for k in (ord('W'), wx.WXK_F4)]
         for i in range(9):
-            id_tab = wx.NewIdRef().Id
+            id_tab = controls.NewId()
             accelerators += [(wx.ACCEL_CMD, ord(str(i + 1)), id_tab)]
             notebook.Bind(wx.EVT_MENU, functools.partial(on_tab_hotkey, i), id=id_tab)
         notebook.SetAcceleratorTable(wx.AcceleratorTable(accelerators))
@@ -271,7 +271,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(self.on_toggle_iconize)
         else:
             self.Show(True)
-        wx.CallLater(20000, self.update_check)
+        wx.CallLater(20000, self.update_check) if not conf.Snapped else None
         wx.CallLater(1, self.populate_database_list)
 
 
@@ -511,7 +511,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
         menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(wx.ID_ANY,
             "Automatic up&date check",
-            "Automatically check for program updates periodically", wx.ITEM_CHECK)
+            "Automatically check for program updates periodically", wx.ITEM_CHECK
+        ) if not conf.Snapped else None
         menu_help.AppendSeparator()
         menu_about = self.menu_about = menu_help.Append(
             wx.ID_ANY, "&About %s" % conf.Title,
@@ -525,8 +526,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         if self.trayicon.IsAvailable():
             menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
-        menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
+        if menu_autoupdate_check:
+            menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
+            menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
 
         self.Bind(wx.EVT_MENU, self.on_new_blank,               menu_new_blank)
         if menu_new_live:
@@ -544,7 +546,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_menu_homepage,           menu_homepage)
         self.Bind(wx.EVT_MENU, self.on_showhide_log,            menu_log)
         self.Bind(wx.EVT_MENU, self.on_showhide_console,        menu_console)
-        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
+        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check,
+                  menu_autoupdate_check) if menu_autoupdate_check else None
         self.Bind(wx.EVT_MENU, self.on_about,                   menu_about)
 
 
@@ -931,7 +934,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             MAX = 1000
             changes = changes[:MAX] + ".." if len(changes) > MAX else changes
             guibase.status("New %s version %s available.", conf.Title, version)
-            if not conf.UpdateCheckEnabled: wx.MessageBox(
+            if not conf.UpdateCheckEnabled or conf.Snapped: wx.MessageBox(
                 "Newer version (%s) available. You are currently on version %s.%s" %
                 (version, conf.Version, "\n\n%s\n" % changes),
                 "Update information", wx.OK | wx.ICON_INFORMATION
@@ -1560,7 +1563,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def get_field_doc(name, tree=ast.parse(source)):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
-                if i and isinstance(node, ast.Assign) and node.targets[0].id == name:
+                if i and isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) \
+                and node.targets[0].id == name:
                     prev = tree.body[i - 1]
                     if isinstance(prev, ast.Expr) \
                     and isinstance(prev.value, (ast.Str, ast.Constant)):  # Py2: Str, Py3: Constant
@@ -1591,11 +1595,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         if wx.ID_OK == dialog.ShowModal():
             for k, v in dialog.GetProperties():
-                # Keep numbers in sane regions
+                # Keep numbers in sane regions (no isinstance as bool is an int)
                 if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
                 setattr(conf, k, v)
             util.run_once(conf.save)
             self.MinSize = conf.MinWindowSize
+        dialog.Destroy()
 
 
     def on_new_database(self, event):
@@ -10018,8 +10023,7 @@ class AboutDialog(wx.Dialog):
 
         html.SetPage(content() if callable(content) else content)
         html.BackgroundColour = ColourManager.GetColour(wx.SYS_COLOUR_WINDOW)
-        html.Bind(wx.html.EVT_HTML_LINK_CLICKED,
-                  lambda e: webbrowser.open(e.GetLinkInfo().Href))
+        html.Bind(wx.html.EVT_HTML_LINK_CLICKED, self.OnLink)
         button_update.Bind(wx.EVT_BUTTON, parent.on_check_update)
         button_feedback.Bind(wx.EVT_BUTTON, self.OnOpenFeedback)
 
@@ -10035,6 +10039,13 @@ class AboutDialog(wx.Dialog):
         if "win32" != sys.platform: self.MinSize = (550, -1)
         self.Size = (self.Size[0], html.VirtualSize[1] + (10 if "win32" != sys.platform else 70))
         self.CenterOnParent()
+
+
+    def OnLink(self, event):
+        """Handler for clicking link, opens URLs in browser and files in registered application."""
+        href = event.GetLinkInfo().Href
+        if not href.startswith("file://"): webbrowser.open(href)
+        else: util.start_file(util.url_to_path(href, double_decode=True))
 
 
     def OnOpenFeedback(self, event):

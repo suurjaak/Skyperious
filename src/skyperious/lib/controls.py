@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.10.2022
+@modified    06.08.2023
 ------------------------------------------------------------------------------
 """
 import collections
@@ -145,6 +145,8 @@ PEN   = lambda c, w=1, s=wx.PENSTYLE_SOLID:   wx.ThePenList  .FindOrCreatePen  (
 # Multiplier for wx.ComboBox width ~100px ranges
 COMBO_WIDTH_FACTOR = 1.5 if "linux" in sys.platform else 1
 
+# wx.NewId() deprecated from around wxPython 4
+NewId = (lambda: wx.NewIdRef().Id) if hasattr(wx, "NewIdRef") else wx.NewId
 
 
 class KEYS(object):
@@ -1244,7 +1246,7 @@ class Patch(object):
         STC__StartStyling = wx.stc.StyledTextCtrl.StartStyling
         def StartStyling__Patched(self, *args, **kwargs):
             try: return STC__StartStyling(self, *args, **kwargs)
-            except TypeError: return STC__StartStyling(self, *(args + [255]), **kwargs)
+            except TypeError: return STC__StartStyling(self, *(args + (255, )), **kwargs)
         wx.stc.StyledTextCtrl.StartStyling = StartStyling__Patched
         Patch._PATCHED = True
 
@@ -2426,7 +2428,7 @@ class SortableListView(wx.ListView, wx.lib.mixins.listctrl.ColumnSorterMixin):
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else text_type(r[c])
         self._formatters = collections.defaultdict(frmt)
-        id_copy, id_selectall = wx.NewIdRef().Id, wx.NewIdRef().Id
+        id_copy, id_selectall = NewId(), NewId()
         entries = [(wx.ACCEL_CTRL, x, id_copy)
                    for x in (ord("C"), wx.WXK_INSERT, wx.WXK_NUMPAD_INSERT)]
         entries += [(wx.ACCEL_CTRL, ord("A"), id_selectall)]
@@ -2832,7 +2834,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
         # Default row column formatter function
         frmt = lambda: lambda r, c: "" if r.get(c) is None else text_type(r[c])
         self._formatters = collections.defaultdict(frmt)
-        id_copy = wx.NewIdRef().Id
+        id_copy = NewId()
         entries = [(wx.ACCEL_CMD, x, id_copy) for x in KEYS.INSERT + (ord("C"), )]
         self.SetAcceleratorTable(wx.AcceleratorTable(entries))
         self.Bind(wx.EVT_MENU, self.OnCopy, id=id_copy)

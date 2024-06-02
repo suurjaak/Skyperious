@@ -8,16 +8,15 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    13.10.2022
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import re
 
 # Modules imported inside templates:
-#import codecs, collections, datetime, functools, imghdr, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
+#import codecs, collections, datetime, functools, json, logging, mimetypes, os, pyparsing, re, string, sys, six, step, textwrap, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
-#from skyperious.lib.vendor import step
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
@@ -45,12 +44,12 @@ HTML chat history export template.
 @param   timeline_units     (topunit, ?subunit)
 """
 CHAT_HTML = """<%
-import collections, datetime, functools, imghdr, json
+import collections, datetime, functools, json
 import six
+import step
 from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
-from skyperious.lib.vendor import step
 
 %>
 <!DOCTYPE HTML><html lang="">
@@ -716,7 +715,7 @@ MESSAGE_TIMELINES = functools.reduce(lambda a, b: ([a.setdefault(m, []).append(t
       if (-1 == val.toLowerCase().indexOf(keyword)) return;
       // As JavaScript regex character classes are not Unicode aware,
       // match word boundaries on non-word and non-Unicode characters.
-      pattern = new RegExp("(^|[^\\\\\\\\w\\\\\\\\u0081-\\\\\\\\uFFFF])(" + keyword + ")([^\\\\\\\\w\\\\\\\\u0081-\\\\\\\\uFFFF]|$)", "ig");
+      pattern = new RegExp("(^|[^\\\w\\\\u0081-\\\\uFFFF])(" + keyword + ")([^\\\w\\\\u0081-\\\\uFFFF]|$)", "ig");
       replaceWith = '$1<span class="' + style + '">$2</span>$3';
       html = val.replace(pattern, replaceWith);
       found = (html != val);
@@ -974,7 +973,7 @@ alt = "%s%s" % (p["name"], (" (%s)" % p["identity"]) if p["name"] != p["identity
 %endfor
 %elif chat_picture_raw:
 <%
-try: filetype = imghdr.what("", chat_picture_raw[:100].encode("latin1")) or "png"
+try: filetype = util.get_file_type(chat_picture_raw[:100].encode("latin1")) or "png"
 except Exception: filetype = "png"
 %>
       <img id="chat_picture" title="{{ chat["title"] }}" alt="{{ chat["title"] }}" src="data:image/{{ filetype }};base64,{{! util.b64encode(chat_picture_raw) }}" />
@@ -2202,7 +2201,7 @@ Contacts information template, for use in export.
                           supplemented with statistics
 """
 EXPORT_CONTACTS_HTML = """<%
-import datetime, imghdr, json
+import datetime, json
 from skyperious import conf, images, skypedata, templates
 from skyperious.lib import util
 
@@ -2267,8 +2266,8 @@ contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime
     a.sort.desc::after { content: "↑"; }
     a.toggle { display: inline-block; position: absolute; white-space: nowrap; }
     a.toggle:hover { cursor: pointer; text-decoration: none; }
-    a.toggle::after { content: " \\\\25b6"; position: absolute; top: 0; left: 3px; }
-    a.toggle.open::after { content: " \\\\25bc"; font-size: 0.7em; top: 3px; }
+    a.toggle::after { content: " \\25b6"; position: absolute; top: 0; left: 3px; }
+    a.toggle.open::after { content: " \\25bc"; font-size: 0.7em; top: 3px; }
     #title { font-size: 1.1em; font-weight: bold; color: {{ conf.ExportLinkColour }}; }
     .hidden { display: none; }
     td, th { text-align: left; vertical-align: top; }
@@ -2549,7 +2548,7 @@ dct = {
 
     /** Escapes special characters in a string for RegExp. */
     var escapeRegExp = function(string) {
-      return string.replace(/[-[\]{}()*+!<=:?.\/\^$|#\s,]/g, "\$&");
+      return string.replace(/[\\\^$.|?*+()[{]/g, "\\\$&");
     };
 
 %if HAS_AVATARS:
@@ -2606,7 +2605,7 @@ dct = {
 alt = "%s%s" % (c["name"], (" (%s)" % c["identity"]) if c["name"] != c["identity"] else "")
 avatar = skypedata.get_avatar_raw(c)
 if avatar:
-    try: filetype = imghdr.what("", avatar[:100].encode("latin1")) or "png"
+    try: filetype = util.get_file_type(avatar[:100].encode("latin1")) or "png"
     except Exception: filetype = "png"
 category = "account" if db.id == c["identity"] else "contact"
 %>
@@ -2944,10 +2943,10 @@ HTML template for search result row for a matched chat, HTML table row.
 """
 SEARCH_ROW_CHAT_HTML = """<%
 import re
+import step
 from skyperious import conf
-from skyperious.lib.vendor import step
 
-title = step.escape_html(chat["title"])
+title = step.step.escape_html(chat["title"])
 if title_matches:
     title = pattern_replace.sub(lambda x: "<b>%s</b>" % x.group(0), title)
 %>
@@ -3246,8 +3245,11 @@ value = templates.SAFEBYTE_RGX.sub(templates.SAFEBYTE_REPL, util.to_unicode(valu
 
 """Text shown in Help -> About dialog (HTML content)."""
 ABOUT_TEXT = """<%
-import sys
+import os, sys
+try: import filetype
+except ImportError: filetype = None
 from skyperious import conf
+from skyperious.lib import util
 
 %>
 <font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
@@ -3273,6 +3275,10 @@ under the MIT License.
       <a href="https://pypi.org/project/appdirs"><font color="{{ conf.LinkColour }}">pypi.org/project/appdirs</font></a></li>
   <li>beautifulsoup4,
       <a href="https://pypi.org/project/beautifulsoup4"><font color="{{ conf.LinkColour }}">pypi.org/project/beautifulsoup4</font></a></li>
+%if filetype:
+  <li>filetype,
+      <a href="https://pypi.org/project/filetype"><font color="{{ conf.LinkColour }}">pypi.org/project/filetype</font></a></li>
+%endif
   <li>ijson,
       <a href="https://pypi.org/project/ijson"><font color="{{ conf.LinkColour }}">pypi.org/project/ijson</font></a></li>
   <li>Pillow,
@@ -3290,7 +3296,7 @@ under the MIT License.
           pypi.org/project/XlsxWriter</font></a></li>
   <li>jsOnlyLightbox,
       <a href="https://github.com/felixhagspiel/jsOnlyLightbox"><font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
-%if getattr(sys, 'frozen', False):
+%if conf.Frozen:
   <li>Python,
       <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
   <li>PyInstaller,
@@ -3314,12 +3320,16 @@ Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
 <br /><br />
 Includes fonts Carlito Regular and Carlito bold,
 <a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{ conf.LinkColour }}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
-%if getattr(sys, 'frozen', False):
+%if conf.Frozen:
 <br /><br />
 Installer created with Nullsoft Scriptable Install System,
 <a href="https://nsis.sourceforge.io"><font color="{{ conf.LinkColour }}">nsis.sourceforge.io</font></a>
 %endif
-
+%if conf.LicenseFile:
+<br /><br />
+Licensing for bundled software and resources:
+<a href="{{ util.path_to_url(conf.LicenseFile) }}"><font color="{{ conf.LinkColour }}">{{ os.path.basename(conf.LicenseFile) }}</font></a>
+%endif
 </font>
 """
 

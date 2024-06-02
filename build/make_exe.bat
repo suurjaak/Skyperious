@@ -3,7 +3,7 @@
 ::
 :: @author    Erki Suurjaak
 :: @created   15.01.2013
-:: @modified  06.07.2020
+:: @modified  02.06.2024
 @echo off
 set SOURCE_DIR=%CD%
 set WILDCARD=*.spec
@@ -15,7 +15,7 @@ goto :EOF
 :: Runs pyinstaller with %1 spec, copies exe, cleans up.
 :LOOPBODY
 echo Making EXE for %1.
-pyinstaller --clean --onefile "%1" >> "makeexe.log" 2>&1
+pyinstaller --clean "%1" >> "makeexe.log" 2>&1
 if exist dist\*.exe (
     FOR %%E IN (dist\*.exe) DO (
         move %%E . > NUL

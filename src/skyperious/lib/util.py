@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    12.11.2022
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import base64
@@ -16,7 +16,8 @@ import calendar
 import codecs
 import ctypes
 import datetime
-import imghdr
+try: import imghdr
+except ImportError: imghdr = None  # Py3.13+
 import io
 import locale
 import math
@@ -30,6 +31,8 @@ import time
 import warnings
 
 Image = ImageFile = wx = None # For image resize, most functions work without
+try: import filetype_lib  # For image detection in Py3.13+
+except Exception: filetype_lib = None
 try: from PIL import Image, ImageFile
 except ImportError: pass
 try: import wx
@@ -485,7 +488,8 @@ def get_file_type(content, category=None, filename=None):
     if filename:
         filetype = os.path.splitext(filename)[-1][1:] or filetype
     if "image" == category:
-        filetype = imghdr.what("", content) or filetype
+        if imghdr: filetype = imghdr.what("", content)
+        elif filetype_lib: filetype = filetype_lib.guess_extension(content)
     elif not filetype:
         filetype = "mp4" # Pretty safe bet for Skype audio/video
     return filetype or category
@@ -575,10 +579,10 @@ def img_wx_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
                 size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
                 align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
             if size1[0] > size[0] or size1[1] > size[1]:
-                if result is not img: result = result.Copy()
+                if result is img: result = result.Copy()
                 result.Rescale(*size2)
             if align_pos:
-                if result is not img: result = result.Copy()
+                if result is img: result = result.Copy()
                 result.Resize(size, align_pos, *bg)
     return result
 
@@ -599,7 +603,7 @@ def img_pil_resize(img, size, aspect_ratio=True, bg=(255, 255, 255)):
             size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
             align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
         if result.size[0] > size[0] or result.size[1] > size[1]:
-            result.thumbnail(tuple(map(int, size2)), Image.ANTIALIAS)
+            result.thumbnail(tuple(map(int, size2)), Image.LANCZOS)
         if align_pos:
             result, result0 = Image.new(img.mode, size, bg), result
             result.paste(result0, tuple(map(int, align_pos)))
@@ -683,6 +687,19 @@ def path_to_url(path, encoding="utf-8"):
             url += "/" + urllib.parse.quote(part)
     url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
     return url
+
+
+def url_to_path(url, double_decode=False):
+    """Returns file URL as path, e.g. "file:///my%20file" as "/my file"."""
+    if not url.startswith("file:"): return url
+    path = urllib.request.url2pathname(url[5:])
+    if any(path.startswith(x) for x in ["\\\\\\", "///"]):
+        path = path[3:] # Strip redundant filelink slashes
+    if double_decode and isinstance(path, six.text_type):
+        # Workaround for wx.html.HtmlWindow double encoding
+        try: path = path.encode("latin1", errors="xmlcharrefreplace").decode("utf-8")
+        except Exception: pass
+    return path
 
 
 def to_unicode(value, encoding=None, errors="strict"):

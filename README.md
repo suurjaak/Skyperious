@@ -127,10 +127,10 @@ Windows: download and launch the latest setup from
 https://suurjaak.github.io/Skyperious/downloads.html.
 
 Linux Snap Store: install Skyperious, or run
-`snap install skyperious`
+`snap install skyperious`.
 
 Mac/Linux/other: install Python, wxPython, pip, and run
-`pip install skyperious`
+`pip install skyperious`.
 
 The pip installation will add the `skyperious` command to path.
 For more thorough instructions, see [INSTALL.md](INSTALL.md).
@@ -149,11 +149,13 @@ and the following 3rd-party Python packages:
 The following are also listed in `requirements.txt` for pip:
 * appdirs (https://pypi.org/project/appdirs)
 * beautifulsoup4 (https://pypi.org/project/beautifulsoup4)
+* filetype (https://pypi.org/project/filetype, Py3 only)
 * ijson (https://pypi.org/project/ijson)
 * Pillow (https://pypi.org/project/Pillow)
 * pyparsing (https://pypi.org/project/pyparsing)
 * six (https://pypi.org/project/six)
 * SkPy (https://pypi.org/project/SkPy)
+* step (https://pypi.org/project/step-template/)
 * XlsxWriter (https://pypi.org/project/XlsxWriter)
 
 If wxPython is not available, the command line interface will function
@@ -166,9 +168,6 @@ search syntax. `appdirs` and `six` are mandatory.
 
 Attribution
 -----------
-
-Skyperious includes step, Simple Template Engine for Python,
-(c) 2012, Daniele Mazzocchio (https://github.com/dotpy/step).
 
 Shared images slideshow in HTML export implemented with jsOnlyLightbox, 
 (c) 2014, Felix Hagspiel (https://github.com/felixhagspiel/jsOnlyLightbox).

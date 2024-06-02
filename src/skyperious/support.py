@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    09.01.2023
+@modified    22.07.2023
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -20,7 +20,12 @@ import ssl
 import sys
 import tempfile
 
-from six.moves import html_parser, urllib
+try: from html import unescape as html_unescape  # Py3
+except ImportError:                              # Py2
+    from six.moves import html_parser
+    html_unescape = html_parser.HTMLParser().unescape
+
+from six.moves import urllib
 import wx
 import wx.adv
 
@@ -94,7 +99,7 @@ def check_newest_version(callback=None):
                         ul = html[match.end(0):html.find("</ul", match.end(0))]
                         lis = re.findall("(<li[^>]*>(.+)</li\\s*>)+", ul, re.I)
                         items = [re.sub("<[^>]+>", "", x[1]) for x in lis]
-                        items = list(map(html_parser.HTMLParser().unescape, items))
+                        items = list(map(html_unescape, items))
                         changes = "\n".join("- " + i.strip() for i in items)
                         if changes:
                             title = match.group(1)

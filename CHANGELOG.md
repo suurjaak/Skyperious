@@ -1,6 +1,21 @@
 CHANGELOG
 =========
 
+5.5.1, 2024-06-02
+-----------------
+- compatibility with Python 3.9+
+- introduce optional filetype dependency
+- improve rate limiting for live sync (issue #123)
+- expose live sync rate limit settings in advanced options
+- add command-line export flag --password (issue #126)
+- fix potential error on comparing messages in live sync
+- fix escaping special characters for regex in exported HTML search functions
+- disable automatic update check and download popup in snapped version
+- include third-party license texts in snaps and stand-alone exes
+- drop step as a vendored library, use from public package index instead
+- use latest custom-built PyInstaller 6.7 for producing binaries
+
+
 5.5, 2023-07-18
 ---------------
 - fix Bing-bot not being synced properly (issue #117)

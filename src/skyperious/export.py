@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    17.07.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -22,6 +22,7 @@ import re
 import sys
 
 import six
+import step
 try: # ImageFont for calculating column widths in Excel export, not required.
     from PIL import ImageFont
 except ImportError:
@@ -36,7 +37,6 @@ except ImportError:
     xlsxwriter = None
 
 from . lib import util
-from . lib.vendor import step
 
 from . import conf
 from . import emoticons
@@ -327,7 +327,8 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         namespace["message_buffer"] = iter(lambda: tmpfile.read(65536), b"")
         with util.create_file(filename, "wb", handle=True) as f:
             t = templates.CHAT_HTML if is_html else templates.CHAT_TXT
-            step.Template(t, strip=False, escape=is_html).stream(f, namespace, newline=os.linesep)
+            template = step.Template(t, strip=False, escape=is_html, postprocess=convert_lf)
+            template.stream(f, namespace)
         count = bool(namespace["message_count"])
         message_count = namespace["message_count"]
     finally:
@@ -383,7 +384,8 @@ def export_contacts(contacts, filename, format, db):
         namespace = {"contacts": contacts, "db": db}
         t = templates.EXPORT_CONTACTS_HTML if is_html else templates.EXPORT_CONTACTS_TXT
         with util.create_file(filename, "wb", handle=True) as f:
-            step.Template(t, escape=is_html, strip=False).stream(f, namespace, newline=os.linesep)
+            template = step.Template(t, escape=is_html, strip=False, postprocess=convert_lf)
+            template.stream(f, namespace)
         return
 
     FIELDS = skypedata.CONTACT_FIELD_TITLES
@@ -477,9 +479,9 @@ def export_grid(grid, filename, title, db, sql_query="", table=""):
                     create_sql = "CREATE TABLE %s (%s)" % (util.format_sql_name(mytable), colstr)
                     namespace.update(table=mytable, create_sql=create_sql)
 
-                template = step.Template(templates.GRID_HTML if is_html else
-                           templates.SQL_TXT, strip=False, escape=is_html)
-                template.stream(f, namespace, newline=os.linesep)
+                t = templates.GRID_HTML if is_html else templates.SQL_TXT
+                template = step.Template(t, strip=False, escape=is_html, postprocess=convert_lf)
+                template.stream(f, namespace)
 
             result = True
     finally:
@@ -667,6 +669,11 @@ class xlsx_writer(object):
             (conf.Title, datetime.datetime.now().strftime("%d.%m.%Y %H:%M")),
             "author": "%s %s" % (conf.Title, conf.Version)})
         self._workbook.close()
+
+
+def convert_lf(s, newline=os.linesep):
+    r"""Returns string with \r \n \r\n linefeeds replaced with given."""
+    return re.sub("(\r(?!\n))|((?<!\r)\n)|(\r\n)", newline, s)
 
 
 def get_extent(font, text):

@@ -10,11 +10,12 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.07.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
 except ImportError: from configparser import RawConfigParser  # Py3
+import copy
 import datetime
 import json
 import os
@@ -24,10 +25,11 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.5"
-VersionDate = "18.07.2023"
+Version = "5.5.1.dev17"
+VersionDate = "02.06.2024"
 
-if getattr(sys, "frozen", False):
+Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
+if Frozen:
     # Running as a pyinstaller executable
     ApplicationDirectory = os.path.dirname(sys.executable)
     ResourceDirectory = os.path.join(getattr(sys, "_MEIPASS", ""), "res")
@@ -56,8 +58,9 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
-    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate",
-    "ExportContactsTemplate", "ExportDbTemplate", "HistoryFontSize", "HistoryZoom",
+    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate", "ExportContactsTemplate",
+    "ExportDbTemplate", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
+    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryLimit", "LiveSyncRetryDelay",
     "LogSQL", "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
     "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
@@ -201,6 +204,21 @@ UpdateCheckInterval = 7
 
 """Date string of last time updates were checked."""
 LastUpdateCheck = None
+
+"""Sleep interval upon hitting server rate limit, in seconds."""
+LiveSyncAuthRateLimitDelay = 5
+
+"""Max number of requests in rate window."""
+LiveSyncRateLimit = 30
+
+"""Length of rate window, in seconds."""
+LiveSyncRateWindow = 2 
+
+"""Number of attempts to overcome rate limit and transient I/O errors."""
+LiveSyncRetryLimit = 3
+
+"""Sleep interval between retries, in seconds."""
+LiveSyncRetryDelay = 0.5
 
 """Maximum number of console history commands to store."""
 MaxConsoleHistory = 1000
@@ -397,6 +415,10 @@ WordCloudWordsMax = 100
 """Maximum number of words to include in per-author word cloud."""
 WordCloudWordsAuthorMax = 50
 
+"""Path for licences of bundled open-source software."""
+LicenseFile = os.path.join(ResourceDirectory, "3rd-party licenses.txt") \
+              if Frozen or Snapped else None
+
 
 def load(configfile=None):
     """
@@ -406,8 +428,14 @@ def load(configfile=None):
     """
     global Defaults, VarDirectory, CacheDirectory, ConfigFile, ConfigFileStatic
 
-    try: VARTYPES = (basestring, bool, int, long, list, tuple, dict, type(None))         # Py2
-    except Exception: VARTYPES = (bytes, str, bool, int, list, tuple, dict, type(None))  # Py3
+    try: VARTYPES = (basestring, bool, float, int, long, list, tuple, dict, type(None))        # Py2
+    except Exception: VARTYPES = (bytes, str, bool, float, int, list, tuple, dict, type(None)) # Py3
+
+    def safecopy(v):
+        """Tries to return a deep copy, or a shallow copy, or given value if copy fails."""
+        for f in (copy.deepcopy, copy.copy, lambda x: x):
+            try: return f(v)
+            except Exception: pass
 
     if configfile:
         ConfigFile, ConfigFileStatic = configfile, True
@@ -428,8 +456,8 @@ def load(configfile=None):
 
     section = "*"
     module = sys.modules[__name__]
-    Defaults = {k: v for k, v in vars(module).items() if not k.startswith("_")
-                and isinstance(v, VARTYPES)}
+    Defaults = {k: safecopy(v) for k, v in vars(module).items()
+                if not k.startswith("_") and isinstance(v, VARTYPES)}
 
     parser = RawConfigParser()
     parser.optionxform = str # Force case-sensitivity on names

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.10.2022
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import collections
@@ -29,13 +29,13 @@ import warnings
 from xml.etree import cElementTree as ElementTree
 
 import six
+import step
 from six.moves import urllib
 try: import wx # For avatar bitmaps in GUI program
 except ImportError: pass
 
 from . lib import util
 from . lib import wordcloud
-from . lib.vendor import step
 
 from . import conf
 from . import emoticons
