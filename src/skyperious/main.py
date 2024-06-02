@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.12.2022
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -1087,7 +1087,9 @@ def run(nogui=False):
         if srcdir not in sys.path: sys.path.append(srcdir)
         #sys.modules["main"] = __import__("main")
 
-    argparser = argparse.ArgumentParser(description=ARGUMENTS["description"])
+    argparser = argparse.ArgumentParser(description=ARGUMENTS["description"],
+        prog=None if conf.Frozen else conf.Title.lower()
+    )
     for arg in map(dict, ARGUMENTS["arguments"]):
         argparser.add_argument(*arg.pop("args"), **arg)
     subparsers = argparser.add_subparsers(dest="command")
