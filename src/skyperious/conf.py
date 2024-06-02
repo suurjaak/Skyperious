@@ -25,10 +25,10 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.5.1.dev12"
+Version = "5.5.1.dev13"
 VersionDate = "02.06.2024"
 
-Frozen = getattr(sys, "frozen", False)
+Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
     # Running as a pyinstaller executable
     ApplicationDirectory = os.path.dirname(sys.executable)

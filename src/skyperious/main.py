@@ -1088,7 +1088,7 @@ def run(nogui=False):
         #sys.modules["main"] = __import__("main")
 
     argparser = argparse.ArgumentParser(description=ARGUMENTS["description"],
-        prog=None if conf.Frozen else conf.Title.lower()
+        prog=None if conf.Frozen or conf.Snapped else conf.Title.lower()
     )
     for arg in map(dict, ARGUMENTS["arguments"]):
         argparser.add_argument(*arg.pop("args"), **arg)
