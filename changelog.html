@@ -40,14 +40,29 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.5_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.5_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.5-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.6_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.6_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.6-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+        <h4>v5.6, 2024-06-02:</h4>
+        <ul>
+          <li>compatibility with Python 3.9+</li>
+          <li>introduce optional filetype dependency</li>
+          <li>improve rate limiting for live sync (issue #123)</li>
+          <li>expose live sync rate limit settings in advanced options</li>
+          <li>add command-line export flag --password (issue #126)</li>
+          <li>fix potential error on comparing messages in live sync</li>
+          <li>fix escaping special characters for regex in exported HTML search functions</li>
+          <li>disable automatic update check and download popup in snapped version</li>
+          <li>include third-party license texts in snaps and stand-alone exes</li>
+          <li>drop step as a vendored library, use from public package index instead</li>
+          <li>use latest custom-built PyInstaller 6.7 for producing binaries</li>
+        </ul>
 
         <h4>v5.5, 2023-07-18:</h4>
         <ul>
