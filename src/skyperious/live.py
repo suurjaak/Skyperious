@@ -349,7 +349,7 @@ class SkypeLogin(object):
                 # Different messages with same remote_id -> edited or deleted message
                 dbitem["edited_by"] = dbitem["author"]
                 dbitem["edited_timestamp"] = max(dbitem["timestamp"], dbitem0["timestamp"])
-                dbitem["edited_timestamp"] = max(dbitem["edited_timestamp"], dbitem0.get("edited_timestamp", 0))
+                dbitem["edited_timestamp"] = max(dbitem["edited_timestamp"], (dbitem0.get("edited_timestamp") or 0))
                 self.msg_stamps[dbitem["remote_id"]] = max(dbitem["timestamp__ms"],
                                                            self.msg_stamps.get(dbitem["remote_id"],
                                                                                -sys.maxsize))
