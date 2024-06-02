@@ -116,6 +116,9 @@ ARGUMENTS = {
               "action": "store_true", "required": False,
               "help": "cache downloaded media in user directory, "
                       "for faster repeated exports"},
+             {"args": ["-p", "--password"], "dest": "password",
+              "help": "password for Skype account to download shared media in HTML export,\n"
+                      "if not using stored or prompted"},
              {"args": ["--ask-password"], "dest": "ask_password",
               "action": "store_true", "required": False,
               "help": "prompt for Skype password on HTML export "
@@ -803,6 +806,7 @@ def run_export(filenames, args):
                end_date         date to export messages until, as YYYY-MM-DD
                media_folder     save shared media into a subfolder in HTML export
                media_cache      cache downloaded media in user directory
+               password         Skype password
                ask_password     whether to ask password on the command line interactively
                store_password   whether to store password in configuration file
     """
@@ -814,16 +818,17 @@ def run_export(filenames, args):
 
     for db in dbs:
 
-        if args.ask_password and db.username \
+        if (args.password or args.ask_password) and db.username \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
              or conf.SharedFileAutoDownload and args.media_folder) \
         and "html" == format:
+            password = None
             while not db.live.is_logged_in():
-                password = get_password(db.username)
+                password = args.password or get_password(db.username)
                 try: db.live.login(password=password)
                 except Exception as e: output("\n" + util.format_exc(e))
 
-            if args.store_password:
+            if password and args.store_password:
                 conf.Login.setdefault(db.filename, {})
                 conf.Login[db.filename].update(store=True, password=util.obfuscate(password))
                 conf.save()

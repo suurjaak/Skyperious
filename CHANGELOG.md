@@ -7,6 +7,7 @@ CHANGELOG
 - introduce optional filetype dependency
 - improve rate limiting for live sync (issue #123)
 - expose live sync rate limit settings in advanced options
+- add command-line export flag --password (issue #126)
 - fix potential error on comparing messages in live sync
 - fix escaping special characters for regex in exported HTML search functions
 - disable automatic update check and download popup in snapped version
