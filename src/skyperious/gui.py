@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    06.08.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import ast
@@ -271,7 +271,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             wx.CallAfter(self.on_toggle_iconize)
         else:
             self.Show(True)
-        wx.CallLater(20000, self.update_check)
+        wx.CallLater(20000, self.update_check) if not conf.Snapped else None
         wx.CallLater(1, self.populate_database_list)
 
 
@@ -511,7 +511,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 "Show/hide %s icon in system tray" % conf.Title, wx.ITEM_CHECK)
         menu_autoupdate_check = self.menu_autoupdate_check = menu_help.Append(wx.ID_ANY,
             "Automatic up&date check",
-            "Automatically check for program updates periodically", wx.ITEM_CHECK)
+            "Automatically check for program updates periodically", wx.ITEM_CHECK
+        ) if not conf.Snapped else None
         menu_help.AppendSeparator()
         menu_about = self.menu_about = menu_help.Append(
             wx.ID_ANY, "&About %s" % conf.Title,
@@ -525,8 +526,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                   id2=wx.ID_FILE1 + conf.MaxRecentFiles)
         if self.trayicon.IsAvailable():
             menu_tray.Check(conf.TrayIconEnabled)
-        menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
-        menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
+        if menu_autoupdate_check:
+            menu_autoupdate_check.Check(conf.UpdateCheckEnabled and conf.UpdateCheckAutomatic)
+            menu_autoupdate_check.Enable(conf.UpdateCheckEnabled)
 
         self.Bind(wx.EVT_MENU, self.on_new_blank,               menu_new_blank)
         if menu_new_live:
@@ -544,7 +546,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_menu_homepage,           menu_homepage)
         self.Bind(wx.EVT_MENU, self.on_showhide_log,            menu_log)
         self.Bind(wx.EVT_MENU, self.on_showhide_console,        menu_console)
-        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check, menu_autoupdate_check)
+        self.Bind(wx.EVT_MENU, self.on_toggle_autoupdate_check,
+                  menu_autoupdate_check) if menu_autoupdate_check else None
         self.Bind(wx.EVT_MENU, self.on_about,                   menu_about)
 
 
@@ -931,7 +934,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             MAX = 1000
             changes = changes[:MAX] + ".." if len(changes) > MAX else changes
             guibase.status("New %s version %s available.", conf.Title, version)
-            if not conf.UpdateCheckEnabled: wx.MessageBox(
+            if not conf.UpdateCheckEnabled or conf.Snapped: wx.MessageBox(
                 "Newer version (%s) available. You are currently on version %s.%s" %
                 (version, conf.Version, "\n\n%s\n" % changes),
                 "Update information", wx.OK | wx.ICON_INFORMATION
