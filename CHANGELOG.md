@@ -3,7 +3,6 @@ CHANGELOG
 
 5.5.1, 2024-06-02
 -----------------
-- update step, the vendored template library
 - compatibility with Python 3.9+
 - introduce optional filetype dependency
 - improve rate limiting for live sync (issue #123)
@@ -12,6 +11,7 @@ CHANGELOG
 - fix escaping special characters for regex in exported HTML search functions
 - disable automatic update check and download popup in snapped version
 - include third-party license texts in snaps and stand-alone exes
+- drop step as a vendored library, use from public package index instead
 
 
 5.5, 2023-07-18

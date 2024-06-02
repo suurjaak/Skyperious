@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    29.09.2022
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -19,6 +19,7 @@ import threading
 import traceback
 
 from six.moves import queue
+import step
 try:
     import wx
 except ImportError:
@@ -26,7 +27,6 @@ except ImportError:
 
 from . lib import controls
 from . lib import util
-from . lib.vendor import step
 
 from . import conf
 from . import searchparser
@@ -330,7 +330,7 @@ class SearchThread(WorkerThread):
                         row = rows.fetchone()
                         namepre, namesuf = ("<b>", "</b>") if row else ("", "")
                         countpre, countsuf = (("<a href='#%s'>" %
-                            step.escape_html(table["name"]), "</a>") if row
+                            step.step.escape_html(table["name"]), "</a>") if row
                             else ("", ""))
                         infotext += (", " if infotext else "") \
                                     + namepre + table["name"] + namesuf

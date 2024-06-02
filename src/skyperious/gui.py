@@ -33,6 +33,7 @@ import traceback
 import webbrowser
 
 import six
+import step
 from six.moves import urllib
 import wx
 import wx.adv
@@ -54,7 +55,6 @@ from . lib import controls
 from . lib.controls import ColourManager
 from . lib import util
 from . lib import wx_accel
-from . lib.vendor import step
 
 from . import conf
 from . import emoticons

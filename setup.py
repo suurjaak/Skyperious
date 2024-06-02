@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.12.2014
-@modified    22.07.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import os
@@ -56,8 +56,8 @@ setuptools.setup(
     platforms            = ["any"],
     keywords             = "skype sqlite merge export",
 
-    install_requires     = ["appdirs", "beautifulsoup4", "filetype", "ijson", "pyparsing",
-                            "Pillow", "six", "SkPy", "wxPython>=4.0", "XlsxWriter"],
+    install_requires     = ["appdirs", "beautifulsoup4", "filetype", "ijson", "pyparsing", "Pillow",
+                            "six", "step-template>=0.0.4", "SkPy", "wxPython>=4.0", "XlsxWriter"],
     entry_points         = {"gui_scripts": ["{0} = {0}.main:run".format(PACKAGE)]},
 
     package_dir          = {"": "src"},

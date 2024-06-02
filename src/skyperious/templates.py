@@ -14,10 +14,9 @@ Released under the MIT License.
 import re
 
 # Modules imported inside templates:
-#import codecs, collections, datetime, functools, json, logging, mimetypes, os, pyparsing, re, string, sys, six, textwrap, wx
+#import codecs, collections, datetime, functools, json, logging, mimetypes, os, pyparsing, re, string, sys, six, step, textwrap, wx
 #from skyperious import conf, emoticons, images, skypedata, templates
 #from skyperious.lib import util
-#from skyperious.lib.vendor import step
 
 """Regex for replacing low bytes unusable in wx.HtmlWindow (\x00 etc)."""
 SAFEBYTE_RGX = re.compile("[\x00-\x08,\x0B-\x0C,\x0E-x1F,\x7F]")
@@ -47,10 +46,10 @@ HTML chat history export template.
 CHAT_HTML = """<%
 import collections, datetime, functools, json
 import six
+import step
 from six.moves import urllib
 from skyperious import conf, emoticons, images, skypedata, templates
 from skyperious.lib import util
-from skyperious.lib.vendor import step
 
 %>
 <!DOCTYPE HTML><html lang="">
@@ -2944,10 +2943,10 @@ HTML template for search result row for a matched chat, HTML table row.
 """
 SEARCH_ROW_CHAT_HTML = """<%
 import re
+import step
 from skyperious import conf
-from skyperious.lib.vendor import step
 
-title = step.escape_html(chat["title"])
+title = step.step.escape_html(chat["title"])
 if title_matches:
     title = pattern_replace.sub(lambda x: "<b>%s</b>" % x.group(0), title)
 %>

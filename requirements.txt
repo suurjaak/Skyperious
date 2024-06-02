@@ -6,5 +6,6 @@ Pillow
 pyparsing
 six
 SkPy
+step-template>=0.0.4
 XlsxWriter
 wxPython>=4.0

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    05.08.2023
+@modified    02.06.2024
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -22,6 +22,7 @@ import re
 import sys
 
 import six
+import step
 try: # ImageFont for calculating column widths in Excel export, not required.
     from PIL import ImageFont
 except ImportError:
@@ -36,7 +37,6 @@ except ImportError:
     xlsxwriter = None
 
 from . lib import util
-from . lib.vendor import step
 
 from . import conf
 from . import emoticons
