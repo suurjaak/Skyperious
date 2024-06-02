@@ -13,6 +13,7 @@ CHANGELOG
 - disable automatic update check and download popup in snapped version
 - include third-party license texts in snaps and stand-alone exes
 - drop step as a vendored library, use from public package index instead
+- use latest custom-built PyInstaller 6.7 for producing binaries
 
 
 5.5, 2023-07-18
