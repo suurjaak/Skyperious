@@ -1563,7 +1563,8 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         def get_field_doc(name, tree=ast.parse(source)):
             """Returns the docstring immediately before name assignment."""
             for i, node in enumerate(tree.body):
-                if i and isinstance(node, ast.Assign) and node.targets[0].id == name:
+                if i and isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) \
+                and node.targets[0].id == name:
                     prev = tree.body[i - 1]
                     if isinstance(prev, ast.Expr) \
                     and isinstance(prev.value, (ast.Str, ast.Constant)):  # Py2: Str, Py3: Constant
@@ -1594,11 +1595,12 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
         if wx.ID_OK == dialog.ShowModal():
             for k, v in dialog.GetProperties():
-                # Keep numbers in sane regions
+                # Keep numbers in sane regions (no isinstance as bool is an int)
                 if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
                 setattr(conf, k, v)
             util.run_once(conf.save)
             self.MinSize = conf.MinWindowSize
+        dialog.Destroy()
 
 
     def on_new_database(self, event):
