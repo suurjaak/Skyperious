@@ -25,10 +25,11 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.5.1.dev10"
+Version = "5.5.1.dev11"
 VersionDate = "02.06.2024"
 
-if getattr(sys, "frozen", False):
+Frozen = getattr(sys, "frozen", False)
+if Frozen:
     # Running as a pyinstaller executable
     ApplicationDirectory = os.path.dirname(sys.executable)
     ResourceDirectory = os.path.join(getattr(sys, "_MEIPASS", ""), "res")

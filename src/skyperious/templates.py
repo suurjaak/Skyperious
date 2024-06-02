@@ -3296,7 +3296,7 @@ under the MIT License.
           pypi.org/project/XlsxWriter</font></a></li>
   <li>jsOnlyLightbox,
       <a href="https://github.com/felixhagspiel/jsOnlyLightbox"><font color="{{ conf.LinkColour }}">github.com/felixhagspiel/jsOnlyLightbox</font></a></li>
-%if getattr(sys, 'frozen', False):
+%if conf.Frozen:
   <li>Python,
       <a href="http://www.python.org"><font color="{{ conf.LinkColour }}">www.python.org</font></a></li>
   <li>PyInstaller,
@@ -3320,7 +3320,7 @@ Several icons from Fugue Icons, &copy; 2010 Yusuke Kamiyamane<br />
 <br /><br />
 Includes fonts Carlito Regular and Carlito bold,
 <a href="https://fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts"><font color="{{ conf.LinkColour }}">fedoraproject.org/wiki/Google_Crosextra_Carlito_fonts</font></a>
-%if getattr(sys, 'frozen', False):
+%if conf.Frozen:
 <br /><br />
 Installer created with Nullsoft Scriptable Install System,
 <a href="https://nsis.sourceforge.io"><font color="{{ conf.LinkColour }}">nsis.sourceforge.io</font></a>

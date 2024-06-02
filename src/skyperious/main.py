@@ -1077,7 +1077,7 @@ def run(nogui=False):
 
     warnings.simplefilter("ignore", UnicodeWarning)
 
-    if (getattr(sys, 'frozen', False) # Binary application
+    if (conf.Frozen # Binary application
     or sys.executable.lower().endswith("pythonw.exe")):
         conf.IsCLINonTerminal = None # Flag for ConsoleWriter.init_console()
         sys.stdout = ConsoleWriter(sys.stdout) # Hooks for attaching to
