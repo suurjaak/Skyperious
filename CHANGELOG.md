@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-5.5.1, 2024-06-02
------------------
+5.6, 2024-06-02
+---------------
 - compatibility with Python 3.9+
 - introduce optional filetype dependency
 - improve rate limiting for live sync (issue #123)
