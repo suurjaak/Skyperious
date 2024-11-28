@@ -7,6 +7,7 @@ CHANGELOG
 - fix error on right-dragging in database list (issue #128)
 - improve compatibility Python 3.10+
 - fix selection issues after removing databases from index page
+- fix saving search help text into configuration file
 
 
 5.6, 2024-06-02

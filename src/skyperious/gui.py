@@ -4211,14 +4211,9 @@ class DatabasePage(wx.Panel):
 
         # Save last search results HTML
         search_data = self.html_searchall.GetActiveTabData()
-        if search_data:
-            info = {}
-            if search_data.get("info"):
-                info["map"] = search_data["info"].get("map")
-                info["text"] = search_data["info"].get("text")
-            data = {"content": search_data["content"],
-                    "id": search_data["id"], "info": info,
-                    "title": search_data["title"], }
+        if search_data and search_data.get("info"):
+            data = {k: search_data[k] for k in ("content", "id", "title")}
+            data["info"] = {k: search_data["info"].get(k) for k in ("map", "text")}
             conf.LastSearchResults[self.db.filename] = data
         elif self.db.filename in conf.LastSearchResults:
             del conf.LastSearchResults[self.db.filename]
