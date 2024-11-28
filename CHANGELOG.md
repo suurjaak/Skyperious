@@ -4,6 +4,7 @@ CHANGELOG
 5.7, 2024-11-28
 ---------------
 - fix opening third-party license link in snaps
+- fix error on right-dragging in database list (issue #128)
 - fix selection issues after removing databases from index page
 
 
