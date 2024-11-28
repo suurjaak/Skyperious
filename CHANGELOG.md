@@ -1,9 +1,10 @@
 CHANGELOG
 =========
 
-5.7, 2024-07-10
+5.7, 2024-11-28
 ---------------
 - fix opening third-party license link in snaps
+- fix selection issues after removing databases from index page
 
 
 5.6, 2024-06-02

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.06.2024
+@modified    28.11.2024
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1160,6 +1160,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
+        self.list_db.Select(0) # UltimateListCtrl loses proper selection state after DeleteItem
         util.run_once(conf.save)
         guibase.status("Removed %s from database list.",
                        util.plural("non-existing file", filenames))
@@ -1175,6 +1176,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
+        self.list_db.Select(0) # UltimateListCtrl loses proper selection state after DeleteItem
         util.run_once(conf.save)
         t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
         guibase.status("Removed %s from database list.", t)
