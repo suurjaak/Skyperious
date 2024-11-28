@@ -572,7 +572,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             except (TypeError, ValueError): pass
 
         # Schedule a check for next due date, should the program run that long.
-        millis = min(sys.maxsize, util.timedelta_seconds(interval) * 1000)
+        millis = min(sys.maxsize, int(util.timedelta_seconds(interval) * 1000))
         wx.CallLater(millis, self.update_check)
 
 

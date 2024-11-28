@@ -5,6 +5,7 @@ CHANGELOG
 ---------------
 - fix opening third-party license link in snaps
 - fix error on right-dragging in database list (issue #128)
+- improve compatibility Python 3.10+
 - fix selection issues after removing databases from index page
 
 
