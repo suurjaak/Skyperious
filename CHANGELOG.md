@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-5.7, 2024-11-28
+5.7, 2024-12-02
 ---------------
 - fix opening third-party license link in snaps
 - fix error on right-dragging in database list (issue #128)
+- fix startup error on Windows with no English locale available (issue #129)
 - improve compatibility Python 3.10+
 - fix selection issues after removing databases from index page
 - fix saving search help text into configuration file
