@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.12.2024
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -25,8 +25,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.7.dev5"
-VersionDate = "02.12.2024"
+Version = "5.7.dev6"
+VersionDate = "07.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
@@ -53,26 +53,28 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
     "LastActivePage", "LastSearchResults", "LastSelectedFiles",
     "LastUpdateCheck", "Login", "RecentFiles", "SearchHistory",
     "SearchInChatInfo", "SearchInContacts", "SearchInMessages",
-    "SearchUseNewTab", "SearchInTables", "SQLWindowTexts", "TrayIconEnabled",
+    "SearchInTables", "SearchUseNewTab", "SQLWindowTexts", "TrayIconEnabled",
     "UpdateCheckAutomatic", "WindowIconized", "WindowPosition", "WindowSize",
 ]
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
-    "EmoticonsPlotWidth", "ExportFileAutoOpen", "ExportChatTemplate", "ExportContactsTemplate",
-    "ExportDbTemplate", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
-    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryLimit", "LiveSyncRetryDelay",
-    "LogSQL", "MinWindowSize", "MaxConsoleHistory", "MaxHistoryInitialMessages",
-    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
+    "EmoticonsPlotWidth", "ExportChatTemplate", "ExportContactsTemplate", "ExportDbTemplate",
+    "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
+    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay", "LiveSyncRetryLimit",
+    "LogSQL", "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
+    "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows", "MinWindowSize",
     "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedFileAutoDownload", "SharedImageAutoDownload", "SharedContentUseCache",
+    "SharedContentUseCache", "SharedFileAutoDownload", "SharedImageAutoDownload",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudLengthMin", "WordCloudCountMin", "WordCloudWordsMax",
-    "WordCloudWordsAuthorMax"
+    "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
 ]
 Defaults = {}
 
 """---------------------------- FileDirectives: ----------------------------"""
+
+"""History of commands entered in console."""
+ConsoleHistoryCommands = []
 
 """Whether a backup copy is made of a database before it's changed."""
 DBDoBackup = False
@@ -83,21 +85,6 @@ DBFiles = []
 """Database list sort state, [col, ascending]."""
 DBSort = []
 
-"""History of commands entered in console."""
-ConsoleHistoryCommands = []
-
-"""Is program running in command-line interface mode."""
-IsCLI = False
-
-"""Is command-line interface verbose."""
-IsCLIVerbose = False
-
-"""
-Is command-line interface using output suitable for non-terminals
-like piping to a file, skips progress bars and user interaction.
-"""
-IsCLINonTerminal = True
-
 """Index of last active page in database tab, {db path: index}."""
 LastActivePage = {}
 
@@ -106,6 +93,9 @@ LastSearchResults = {}
 
 """Files selected in the database lists on last run."""
 LastSelectedFiles = ["", ""]
+
+"""Date string of last time updates were checked."""
+LastUpdateCheck = None
 
 """Skype login settings, {db path: {"store", "auto", "password"}}."""
 Login = {}
@@ -128,35 +118,20 @@ SearchInContacts = False
 """Whether to search in message body."""
 SearchInMessages = True
 
-"""Whether to create a new tab for each search or reuse current."""
-SearchUseNewTab = True
-
 """Whether to search in all columns of all tables."""
 SearchInTables = False
 
+"""Whether to create a new tab for each search or reuse current."""
+SearchUseNewTab = True
+
 """Texts in SQL window, loaded on reopening a database {filename: text, }."""
 SQLWindowTexts = {}
-
-"""Automatically open exported files and directories in registered application."""
-ExportFileAutoOpen = True
-
-"""Chat export filename template, format can use Skype.Conversations data."""
-ExportChatTemplate = u"Skype %(title_long_lc)s"
-
-"""Database contacts export filename template, format can use Skype.Accounts data."""
-ExportContactsTemplate = u"Skype contacts for %(name)s"
-
-"""Database export filename template, format can use Skype.Accounts data."""
-ExportDbTemplate = u"Export from %(name)s"
 
 """Whether the program tray icon is used."""
 TrayIconEnabled = True
 
 """Whether the program checks for updates every UpdateCheckInterval if UpdateCheckEnabled."""
 UpdateCheckAutomatic = True
-
-"""Whether the program supports automatic update check and download."""
-UpdateCheckEnabled = True
 
 """Whether the program has been minimized and hidden."""
 WindowIconized = False
@@ -169,14 +144,135 @@ WindowSize = (1080, 710)
 
 """---------------------------- /FileDirectives ----------------------------"""
 
-"""Whether logging to log window is enabled."""
-LogEnabled = True
+"""------------------------ OptionalFileDirectives: ------------------------"""
+
+"""Width of the chat emoticons plots, in pixels."""
+EmoticonsPlotWidth = 200
+
+"""Chat export filename template, format can use Skype.Conversations data."""
+ExportChatTemplate = u"Skype %(title_long_lc)s"
+
+"""Database contacts export filename template, format can use Skype.Accounts data."""
+ExportContactsTemplate = u"Skype contacts for %(name)s"
+
+"""Database export filename template, format can use Skype.Accounts data."""
+ExportDbTemplate = u"Export from %(name)s"
+
+"""Automatically open exported files and directories in registered application."""
+ExportFileAutoOpen = True
+
+"""Font size in chat history."""
+HistoryFontSize = 10
+
+"""Text zoom level in chat history, defaults to 1.0 (100%)."""
+HistoryZoom = 1.0
+
+"""Sleep interval upon hitting server rate limit, in seconds."""
+LiveSyncAuthRateLimitDelay = 5
+
+"""Max number of requests in rate window."""
+LiveSyncRateLimit = 30
+
+"""Length of rate window, in seconds."""
+LiveSyncRateWindow = 2 
+
+"""Sleep interval between retries, in seconds."""
+LiveSyncRetryDelay = 0.5
+
+"""Number of attempts to overcome rate limit and transient I/O errors."""
+LiveSyncRetryLimit = 3
 
 """Whether to log all SQL statements to log window."""
 LogSQL = False
 
+"""Maximum number of console history commands to store."""
+MaxConsoleHistory = 1000
+
+"""Maximum number of messages shown initially in chat history."""
+MaxHistoryInitialMessages = 1500
+
+"""How many items in the Recent Files menu."""
+MaxRecentFiles = 20
+
+"""Maximum number of search texts to store."""
+MaxSearchHistory = 500
+
+"""Maximum number of messages to show in search results."""
+MaxSearchMessages = 500
+
+"""Maximum number of table rows to show in search results."""
+MaxSearchTableRows = 500
+
+"""Minimum allowed size for the main window, as (width, height)."""
+MinWindowSize = (600, 400)
+
+"""Colour for date histogram plot foreground, as HTML colour string."""
+PlotDaysColour = "#2d8b57"
+
+"""Date histogram bar single rectangle size as (width, height)."""
+PlotDaysUnitSize = (13, 30)
+
+"""Colour for 24h histogram plot foreground, as HTML colour string."""
+PlotHoursColour = "#2d578b"
+
+"""24h histogram bar single rectangle size as (width, height)."""
+PlotHoursUnitSize = (4, 30)
+
 """Whether to pop up message dialogs for unhandled errors."""
 PopupUnexpectedErrors = True
+
+"""Number of search results to yield in one chunk from search thread."""
+SearchResultsChunk = 50
+
+"""Download shared audio & video from Skype online service for HTML export."""
+SharedAudioVideoAutoDownload = True
+
+"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
+SharedContentUseCache = False
+
+"""Download shared files from Skype online service for HTML export."""
+SharedFileAutoDownload = True
+
+"""Download shared images from Skype online service for HTML export."""
+SharedImageAutoDownload = True
+
+"""Width of the chat statistics plots, in pixels."""
+StatisticsPlotWidth = 150
+
+"""Duration of status message on program statusbar, in milliseconds."""
+StatusFlashLength = 30000
+
+"""Days between automatic update checks."""
+UpdateCheckInterval = 7
+
+"""Minimum occurrence count for words to be included in word cloud."""
+WordCloudCountMin = 2
+
+"""Minimum length of words to include in word cloud."""
+WordCloudLengthMin = 2
+
+"""Maximum number of words to include in per-author word cloud."""
+WordCloudWordsAuthorMax = 50
+
+"""Maximum number of words to include in word cloud."""
+WordCloudWordsMax = 100
+
+"""------------------------ /OptionalFileDirectives ------------------------"""
+
+"""Is program running in command-line interface mode."""
+IsCLI = False
+
+"""Is command-line interface verbose."""
+IsCLIVerbose = False
+
+"""
+Is command-line interface using output suitable for non-terminals
+like piping to a file, skips progress bars and user interaction.
+"""
+IsCLINonTerminal = True
+
+"""Whether logging to log window is enabled."""
+LogEnabled = True
 
 """Number of unhandled errors encountered during current runtime."""
 UnexpectedErrorCount = 0
@@ -193,64 +289,17 @@ ErrorReportsPerDay = 5
 """Maximum number of error hashes and report days to keep."""
 ErrorsStoredMax = 1000
 
-"""Minimum allowed size for the main window, as (width, height)."""
-MinWindowSize = (600, 400)
-
 """Console window size in pixels, (width, height)."""
 ConsoleSize = (800, 300)
 
-"""Days between automatic update checks."""
-UpdateCheckInterval = 7
-
-"""Date string of last time updates were checked."""
-LastUpdateCheck = None
-
-"""Sleep interval upon hitting server rate limit, in seconds."""
-LiveSyncAuthRateLimitDelay = 5
-
-"""Max number of requests in rate window."""
-LiveSyncRateLimit = 30
-
-"""Length of rate window, in seconds."""
-LiveSyncRateWindow = 2 
-
-"""Number of attempts to overcome rate limit and transient I/O errors."""
-LiveSyncRetryLimit = 3
-
-"""Sleep interval between retries, in seconds."""
-LiveSyncRetryDelay = 0.5
-
-"""Maximum number of console history commands to store."""
-MaxConsoleHistory = 1000
-
-"""Maximum number of search texts to store."""
-MaxSearchHistory = 500
-
-"""Maximum number of messages shown initially in chat history."""
-MaxHistoryInitialMessages = 1500
+"""Whether the program supports automatic update check and download."""
+UpdateCheckEnabled = True
 
 """Maximum length of a tab title, overflow will be cut on the left."""
 MaxTabTitleLength = 60
 
-"""
-Maximum number of messages to show in search results.
-"""
-MaxSearchMessages = 500
-
-"""Maximum number of table rows to show in search results."""
-MaxSearchTableRows = 500
-
-"""Number of search results to yield in one chunk from search thread."""
-SearchResultsChunk = 50
-
 """Name of font used in chat history."""
 HistoryFontName = "Tahoma"
-
-"""Font size in chat history."""
-HistoryFontSize = 10
-
-"""Text zoom level in chat history, defaults to 1.0 (100%)."""
-HistoryZoom = 1.0
 
 """Window background colour."""
 BgColour = "#FFFFFF"
@@ -349,18 +398,6 @@ PlotSharesColour = "#FFB333"
 """Background colour for plots in chat statistics."""
 PlotBgColour = "#DDDDDD"
 
-"""Colour for 24h histogram plot foreground, as HTML colour string."""
-PlotHoursColour = "#2d578b"
-
-"""Colour for date histogram plot foreground, as HTML colour string."""
-PlotDaysColour = "#2d8b57"
-
-"""24h histogram bar single rectangle size as (width, height)."""
-PlotHoursUnitSize = (4, 30)
-
-"""Date histogram bar single rectangle size as (width, height)."""
-PlotDaysUnitSize = (13, 30)
-
 """
 Width and height tuple of the avatar image, shown in chat data and export HTML
 statistics."""
@@ -369,51 +406,15 @@ AvatarImageSize = (32, 32)
 """Width and height tuple of the large avatar image, shown in HTML export."""
 AvatarImageLargeSize = (96, 96)
 
-"""Width of the chat statistics plots, in pixels."""
-StatisticsPlotWidth = 150
-
-"""Width of the chat emoticons plots, in pixels."""
-EmoticonsPlotWidth = 200
-
-"""Download shared audio & video from Skype online service for HTML export."""
-SharedAudioVideoAutoDownload = True
-
-"""Download shared files from Skype online service for HTML export."""
-SharedFileAutoDownload = True
-
-"""Download shared images from Skype online service for HTML export."""
-SharedImageAutoDownload = True
-
-"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
-SharedContentUseCache = False
-
 """
 Earliest message date to download shared content from Skype online service.
 Content from Skype's peer-to-peer era is unavailable for download.
 """
 SharedContentDownloadMinDate = datetime.datetime(2017, 4, 1)
 
-"""Duration of status message on program statusbar, in milliseconds."""
-StatusFlashLength = 30000
-
-"""How many items in the Recent Files menu."""
-MaxRecentFiles = 20
-
 """Font files used for measuring text extent in export."""
 FontXlsxFile = os.path.join(ResourceDirectory, "Carlito.ttf")
 FontXlsxBoldFile = os.path.join(ResourceDirectory, "CarlitoBold.ttf")
-
-"""Minimum length of words to include in word cloud."""
-WordCloudLengthMin = 2
-
-"""Minimum occurrence count for words to be included in word cloud."""
-WordCloudCountMin = 2
-
-"""Maximum number of words to include in word cloud."""
-WordCloudWordsMax = 100
-
-"""Maximum number of words to include in per-author word cloud."""
-WordCloudWordsAuthorMax = 50
 
 """Path for licences of bundled open-source software."""
 LicenseFile = os.path.join(ResourceDirectory, "3rd-party licenses.txt") \
