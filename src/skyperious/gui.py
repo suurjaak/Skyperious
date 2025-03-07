@@ -327,19 +327,22 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
         label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        newextra = ", or populated from a Skype source" if live.skpy or live.ijson else ""
+        newextra = ", or populated from Skype online" if live.skpy else ""
         BUTTONS_MAIN = [
             ("button_opena", "&Open a database..", images.ButtonOpenA,
              "Choose a database from your computer to open."),
             ("button_detect", "Detect databases", images.ButtonDetect,
              "Auto-detect Skype databases from user folders."),
-            ("button_folder", "&Import from folder.", images.ButtonFolder,
+            ("button_folder", "&Import from folder", images.ButtonFolder,
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
             ("button_new", "Create a &new Skype database", images.ButtonNew,
              "Create a blank database%s." % newextra),
+            ("button_import", "Create from &Skype export", images.ButtonNewImport,
+             "Create database from a Skype export archive (messages.json)."),
             ("button_clear", "&Remove..", images.ButtonClear,
              "Select category to remove from database list."), ]
+        if not live.ijson: del BUTTONS_MAIN[-2]
         for name, label, img, note in BUTTONS_MAIN:
             button = controls.NoteButton(panel_main, label, note, img.Bitmap)
             setattr(self, name, button)
@@ -405,6 +408,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
         self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
         self.button_new.Bind(wx.EVT_BUTTON,     self.on_new_database)
+        self.button_import.Bind(wx.EVT_BUTTON,  self.on_new_export) if hasattr(self, "button_import") else None 
         self.button_clear.Bind(wx.EVT_BUTTON,   self.on_remove_databases)
         self.button_open.Bind(wx.EVT_BUTTON,    self.on_open_current_database)
         self.button_compare.Bind(wx.EVT_BUTTON, self.on_compare_databases)
@@ -425,6 +429,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(self.button_detect, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_folder, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_new,    flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_import, flag=wx.GROW) if hasattr(self, "button_import") else None
         panel_main.Sizer.AddStretchSpacer()
         panel_main.Sizer.Add(self.button_clear,   flag=wx.GROW)
 
@@ -1609,18 +1614,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Handler for clicking new-button on main screen, opens popup menu."""
         if not live.skpy and not live.ijson: return self.on_new_blank(event)
         menu = wx.lib.agw.flatmenu.FlatMenu()
-        item_blank  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+        item_blank = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                                       "&Blank Skype database, populated with username only"))
-        item_live   = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                                      "From Skype on&line service, by logging in "
-                                      "and downloading available history"
+        item_live  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                     "From Skype on&line service, by logging in "
+                                     "and downloading available history"
         )) if live.skpy else None
-        item_export = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                                     "From a Skype &export archive (*.json;*.tar)"
-        )) if live.ijson else None
         self.Bind(wx.EVT_MENU, self.on_new_blank, item_blank)
-        if item_live:   self.Bind(wx.EVT_MENU, self.on_new_live,   item_live)
-        if item_export: self.Bind(wx.EVT_MENU, self.on_new_export, item_export)
+        if item_live: self.Bind(wx.EVT_MENU, self.on_new_live, item_live)
 
         btn = self.button_new
         sz_btn, pt_btn = btn.Size, btn.Position

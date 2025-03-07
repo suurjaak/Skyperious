@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    02.10.2022
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 try:
@@ -819,6 +819,34 @@ ButtonNew = PyEmbeddedImage(
     "LBIB3/e9IAjCXq/3kOM4rKysTHMgy+lFMVEak+kcIwxCUnPg4pJRkIS+73cX2QVXgNUwDI83"
     "Nja+GnZCWut5VSAAhBAIMahIIQS8wQ4wiALw4nNXvwZ+BR4HzoFw3r9jd0L+MyNWb/JnUH+/"
     "Cjq4wxNACSR1aWbDuf8CgMlR7Y0Q0vUAAAAASUVORK5CYII="
+)
+
+
+"""Large icon for new database imported from Skype export on start page."""
+ButtonNewImport = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAElklEQVRYw8WX22scdRTHP7+Z"
+    "38zuZHfTXJo0K5g26Q2Lxt60imhQFOwFQaR/QJ9EEUueBR996FMRiw8++AfUF2kRKwq2FGxr"
+    "00usodW2opiItdntbnZmdm6/nw+bTTbLbtqYBHc4DDM7zDm/c77nc34D//NPtLp5+PDhvcDu"
+    "VfZ15eTJk5ebb8pWTyZJsvv48eMfZbPZ3ub/tNb4fozrhnheRJKAYQgMw8Q0TaS0sCyJZVlI"
+    "KZFSUq16hbGxIx8AjxYAgJSy9969e3ieh+u6BEGA1hqtoVoNKZcDfD9Ga4GUFrZtk0qlcByH"
+    "jg4Hx3FIp9Ok0ylyuVxPOz/GyjOrGw4abPH16gcgAKHRc+d5W+Ty4SEYK1l5y0wITatjTUqg"
+    "F5WgYcVCA2qtMzAXhKhXXLVYt5o/r00AQi8EIWgIRNVKsSgTayHChrTX69+s/4dpoB0Hxk+c"
+    "OHF6ZGTkkO/7hGGI1rWXxHGM67rzbAAwTRPLWmBBrf8XbGJi4qtWEFoqgD1jY2OHkiQhSRKU"
+    "UnMQqplfjXDdAM8PiROFMASGaSJlPRAL27KwbAspLZ5/6dUD77195NSySBiGIeVyuT0JKz5e"
+    "NSLWClMaWLY1v/qODgcnncZJO6RTKXK53NpoQNMMn+baq3lboy5oRrFCi7pD1QTo5YnwETHU"
+    "QD9Raz2lG3igE9ScAezfv795/AtjJf3fmAWoOUcspL4+H9q0oQD0iodRPQtKK0S9JKI+E9Q8"
+    "DVs5X51xPOdICBYI2IRlFotQNIpiVUFkWRZRFJFELvlclUD0MLhlpBFEolmRbUF09OjRQ0EQ"
+    "EEURURQRx/HClqwaMuv6VHyfWMdMT/1Jd3CdvlSR4X7BpoE0QaQ4e3Wab8//zVD37IE39qqt"
+    "N+4Gn303Xjzd399/yzAMvWQX1FfaEkRBQMl1cYOQmIjEAq8wi+OEXJ30+OacR6Uc0J8V9JSm"
+    "sRKDopZbn92SO/bCk+uOnblUuHJhsvRuPp+/9J/bUAgxJ0BQSYxpKCpeRKFQJagEPN5lzGUM"
+    "vFCT6jAwDUF3ThLF6pN8Pn8JEHLFIkTzz80LvPOmjS37YF8fM+WI89cKfD9+n4MvPsbubZ30"
+    "dFoLdTeNT9//+JefN2wY+LFlAEopczkk7HtiHx9+eY3XNs0wsjlLX5eNZZns3N5NxpH0dFrM"
+    "ejFXf61wZ8rj86//er2jIzPeVgO+72cfdS+gAWlb2OvW89y2iMk/XC7cKPHUpgy3TUHONjhz"
+    "cYZsymTnUAYdK4LY+GF9V061DaBUKtnL35xqSm7MjsEMOwYzANye9hkacBgacJY3jIrFYnq5"
+    "XwYImPzdXXrj3OJWyww8ePDAKZVK5Ww222nbNplMZjEHgpCs6+FWPQIVooXGLxTJ99oP/fIs"
+    "u8mSj3QB6xzHGQV21XdCSql2KhAAhmFgmqbcPNg/9NbLG7e/smvDxp1bsubFm2We2dbJT79V"
+    "1MTd8q3rd2a/ODcxc2p4ePjyfDc3vTjdYEvOCdOsNYphGEIptSizvb293aN7Nh7s6Uw9fWeq"
+    "cv76ramzhULhvmmavpQyHB0dDetY/hcu3sC/mGBKAQAAAABJRU5ErkJggg=="
 )
 
 

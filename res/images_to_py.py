@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  30.09.2022
+@modified  07.03.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -55,6 +55,8 @@ IMAGES = {
         "Small icon for left merge multi button on merger page.",
     "ButtonNew.png":
         "Large icon for new database on start page.",
+    "ButtonNewImport.png":
+        "Large icon for new database imported from Skype export on start page.",
     "ButtonOpen.png":
         "Button for open file on main page.",
     "ButtonOpenA.png":
