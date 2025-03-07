@@ -25,7 +25,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.7.dev7"
+Version = "5.7.dev8"
 VersionDate = "07.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
@@ -92,7 +92,7 @@ LastActivePage = {}
 LastSearchResults = {}
 
 """Files selected in the database lists on last run."""
-LastSelectedFiles = ["", ""]
+LastSelectedFiles = []
 
 """Date string of last time updates were checked."""
 LastUpdateCheck = None
