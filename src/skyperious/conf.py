@@ -25,7 +25,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.7.dev6"
+Version = "5.7.dev7"
 VersionDate = "07.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
@@ -281,7 +281,7 @@ UnexpectedErrorCount = 0
 DownloadURL  = "https://erki.lap.ee/downloads/Skyperious/"
 ChangelogURL = "https://suurjaak.github.io/Skyperious/changelog.html"
 ReportURL    = "https://erki.lap.ee/downloads/Skyperious/feedback"
-HomeUrl = "https://suurjaak.github.io/Skyperious/"
+HomeURL      = "https://suurjaak.github.io/Skyperious/"
 
 """Maximum number of error reports sent per day."""
 ErrorReportsPerDay = 5

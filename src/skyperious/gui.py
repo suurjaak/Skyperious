@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    28.11.2024
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -497,7 +497,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
             "Go to &homepage",
-            "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
+            "Open the %s homepage, %s" % (conf.Title, conf.HomeURL))
         menu_help.AppendSeparator()
         menu_log = self.menu_log = menu_help.Append(wx.ID_ANY,
             "Show &log window", "Show/hide the log messages window", wx.ITEM_CHECK)
@@ -894,7 +894,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_menu_homepage(self, event):
         """Handler for opening Skyperious webpage from menu,"""
-        webbrowser.open(conf.HomeUrl)
+        webbrowser.open(conf.HomeURL)
 
 
     def on_about(self, event):

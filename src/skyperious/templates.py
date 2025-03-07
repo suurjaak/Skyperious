@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    14.06.2024
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -3263,7 +3263,7 @@ under the MIT License.
 
 
 &copy; 2011, Erki Suurjaak.
-<a href="{{ conf.HomeUrl }}"><font color="{{ conf.LinkColour }}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
+<a href="{{ conf.HomeURL }}"><font color="{{ conf.LinkColour }}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
 
 
 
