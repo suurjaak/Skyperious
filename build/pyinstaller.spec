@@ -6,7 +6,7 @@ depending on Python environment.
 Pyinstaller-provided names and variables: Analysis, EXE, PYZ, SPEC, TOC.
 
 @created   03.04.2012
-@modified  02.06.2024
+@modified  09.03.2025
 """
 import os
 import struct
@@ -24,7 +24,7 @@ sys.path.insert(0, APPPATH)
 
 from skyperious import conf
 
-app_file = "%s_%s%s%s" % (NAME, conf.Version, "_x64" if DO_64BIT else "",
+app_file = "%s_%s%s%s" % (NAME, conf.Version, "" if DO_64BIT else "_x86",
                           ".exe" if "nt" == os.name else "")
 entrypoint = os.path.join(ROOTPATH, "launch.py")
 

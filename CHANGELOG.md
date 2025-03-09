@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+5.8, 2025-03-09
+---------------
+- use _x86 suffix for 32-bit binaries, drop _x64 suffix from 64-bit binaries
+
+
 5.7, 2025-03-09
 ---------------
 - add separate button for creating database from Skype export archive (issue #129)

@@ -3,10 +3,10 @@
 ;
 ; Expected command-line parameters:
 ; /DVERSION=<program version>
-; /DSUFFIX64=<"_x64" for 64-bit installer>
+; /DARCH_SUFFIX=<"_x86" for 32-bit installer>
 ;
 ; @created   13.01.2013
-; @modified  22.09.2020
+; @modified  09.03.2025
 
 Unicode True
 
@@ -20,9 +20,9 @@ Unicode True
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${PROGEXE}"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
-; VERSION and SUFFIX64 *should* come from command-line parameter
+; VERSION and ARCH_SUFFIX *should* come from command-line parameter
 !define /ifndef VERSION "2.0"
-!define /ifndef SUFFIX64 ""
+!define /ifndef ARCH_SUFFIX ""
 
 
 !define UNINSTALL_FILENAME "uninstall.exe"
@@ -38,7 +38,7 @@ Unicode True
 !define MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
 ; only available if MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
 !define MULTIUSER_INSTALLMODE_DEFAULT_ALLUSERS
-!if "${SUFFIX64}" == "_x64"
+!if "${ARCH_SUFFIX}" == "_x86"
   !define MULTIUSER_INSTALLMODE_64_BIT 1
 !endif
 !define LANG_ENGLISH 1033
@@ -85,7 +85,7 @@ Unicode True
 
 
 Name "${PRODUCT_NAME} ${VERSION}"
-OutFile "${BASENAME}_${VERSION}${SUFFIX64}_setup.exe"
+OutFile "${BASENAME}_${VERSION}${ARCH_SUFFIX}_setup.exe"
 ShowInstDetails show
 ShowUnInstDetails show
 

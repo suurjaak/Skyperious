@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.04.2013
-@modified    22.07.2023
+@modified    09.03.2025
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -75,8 +75,12 @@ def check_newest_version(callback=None):
                     linkmap["src"] = link
                 elif link_text.endswith(".exe") and "_x64" in link_text:
                     linkmap["x64"] = link
-                elif link_text.endswith(".exe"):
+                elif link_text.endswith(".exe") and "_x86" in link_text:
                     linkmap["x86"] = link
+            for category in (x for x in ("x86", "x64") if x not in linkmap):
+                for link in links[:3]:
+                    if link.lower().endswith(".exe") and link not in linkmap.values():
+                        linkmap[category] = link
 
             install_type = get_install_type()
             link = linkmap[install_type]
@@ -453,5 +457,5 @@ url_opener.addheaders = [("User-agent", "%s %s (%s) (Python %s; wx %s; %s)" % (
     conf.Title, conf.Version, get_install_type(),
     ".".join(map(str, sys.version_info[:3])),
     ".".join(map(str, wx.VERSION[:4])),
-    platform.platform() + ("-x64" if platform.machine().endswith("64") else "")
+    platform.platform() + ("-x64" if util.is_os_64bit() else "")
 ))]
