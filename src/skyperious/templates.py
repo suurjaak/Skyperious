@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    02.06.2024
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -3255,7 +3255,7 @@ from skyperious.lib import util
 <font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.FgColour }}">
 <table cellpadding="0" cellspacing="0"><tr><td valign="top">
 <img src="memory:skyperious.png" /></td><td width="10"></td><td valign="center">
-<b>{{ conf.Title }} version {{ conf.Version }}</b>, {{ conf.VersionDate }}.<br /><br />
+<b>{{ conf.Title }}</b> version {{ conf.Version }}, {{ conf.VersionDate }}.<br /><br />
 
 {{ conf.Title }} is written in Python, released as free open source software
 under the MIT License.
@@ -3263,7 +3263,7 @@ under the MIT License.
 
 
 &copy; 2011, Erki Suurjaak.
-<a href="{{ conf.HomeUrl }}"><font color="{{ conf.LinkColour }}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
+<a href="{{ conf.HomeURL }}"><font color="{{ conf.LinkColour }}">suurjaak.github.io/Skyperious</font></a><br /><br /><br />
 
 
 

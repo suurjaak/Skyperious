@@ -15,7 +15,7 @@
 #
 # @author      Erki Suurjaak
 # @created     01.05.2022
-# @modified    02.06.2024
+# @modified    09.03.2025
 name:    skyperious
 title:   Skyperious
 summary: Skype chat history tool
@@ -39,31 +39,30 @@ description: |
   - synchronize messages in two Skype databases, merging their differences
 icon: snap/gui/skyperious.png  # Icon for Snap store
 
-base:        core18      # Ubuntu 18.04 LTS
+base:        core22      # Ubuntu 22.04 LTS
 confinement: strict      # 'strict' when ready, else 'devmode'
 grade:       stable      # 'stable' to release into candidate/stable channels, else 'devel'
 adopt-info:  skyperious  # Version info from parts.skyperious
 
 architectures:
-- build-on: [amd64, arm64, armhf]
+- build-on:  [amd64]
+  build-for: [amd64]
+- build-on:  [arm64]
+  build-for: [arm64]
 
 apps:
   skyperious:
-    command:    python3 -m skyperious
+    command:    bin/skyperious
     plugs:      [home, network, network-bind, removable-media, unity7]
-    extensions: [gnome-3-28]  # Adds plugs: desktop, desktop-legacy, gsettings, x11, wayland
+    extensions: [gnome]  # Adds plugs: desktop, desktop-legacy, gsettings, x11, wayland
 
 parts:
   skyperious:
     source: https://github.com/suurjaak/skyperious.git
     plugin: python
-    stage-packages:
-    - libgtk-3-0
-    - libsdl2-2.0-0
-    - libwebkitgtk-3.0-0
     python-packages:
-    - https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04/wxPython-4.1.1-cp36-cp36m-linux_x86_64.whl
-    requirements:
+    - https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04/wxPython-4.2.0-cp310-cp310-linux_x86_64.whl
+    python-requirements:
     - /root/project/requirements.txt
     override-pull: |  # Set build version from current git tag, drop leading letters ("v5.2" -> "5.2")
       snapcraftctl pull

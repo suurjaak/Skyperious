@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.06.2024
+@modified    07.03.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -327,19 +327,22 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         ColourManager.Manage(label_main, "ForegroundColour", "SkypeLinkColour")
         label_main.Font = wx.Font(14, wx.FONTFAMILY_SWISS,
             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
-        newextra = ", or populated from a Skype source" if live.skpy or live.ijson else ""
+        newextra = ", or populated from Skype online" if live.skpy else ""
         BUTTONS_MAIN = [
             ("button_opena", "&Open a database..", images.ButtonOpenA,
              "Choose a database from your computer to open."),
             ("button_detect", "Detect databases", images.ButtonDetect,
              "Auto-detect Skype databases from user folders."),
-            ("button_folder", "&Import from folder.", images.ButtonFolder,
+            ("button_folder", "&Import from folder", images.ButtonFolder,
              "Select a folder where to look for SQLite databases "
              "(*.db files)."),
             ("button_new", "Create a &new Skype database", images.ButtonNew,
              "Create a blank database%s." % newextra),
+            ("button_import", "Create from &Skype export", images.ButtonNewImport,
+             "Create database from a Skype export archive (messages.json)."),
             ("button_clear", "&Remove..", images.ButtonClear,
              "Select category to remove from database list."), ]
+        if not live.ijson: del BUTTONS_MAIN[-2]
         for name, label, img, note in BUTTONS_MAIN:
             button = controls.NoteButton(panel_main, label, note, img.Bitmap)
             setattr(self, name, button)
@@ -405,6 +408,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.button_detect.Bind(wx.EVT_BUTTON,  self.on_detect_databases)
         self.button_folder.Bind(wx.EVT_BUTTON,  self.on_add_from_folder)
         self.button_new.Bind(wx.EVT_BUTTON,     self.on_new_database)
+        self.button_import.Bind(wx.EVT_BUTTON,  self.on_new_export) if hasattr(self, "button_import") else None 
         self.button_clear.Bind(wx.EVT_BUTTON,   self.on_remove_databases)
         self.button_open.Bind(wx.EVT_BUTTON,    self.on_open_current_database)
         self.button_compare.Bind(wx.EVT_BUTTON, self.on_compare_databases)
@@ -425,6 +429,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         panel_main.Sizer.Add(self.button_detect, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_folder, flag=wx.GROW)
         panel_main.Sizer.Add(self.button_new,    flag=wx.GROW)
+        panel_main.Sizer.Add(self.button_import, flag=wx.GROW) if hasattr(self, "button_import") else None
         panel_main.Sizer.AddStretchSpacer()
         panel_main.Sizer.Add(self.button_clear,   flag=wx.GROW)
 
@@ -497,7 +502,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             "Send feedback or report a problem to program author")
         menu_homepage = self.menu_homepage = menu_help.Append(wx.ID_ANY,
             "Go to &homepage",
-            "Open the %s homepage, %s" % (conf.Title, conf.HomeUrl))
+            "Open the %s homepage, %s" % (conf.Title, conf.HomeURL))
         menu_help.AppendSeparator()
         menu_log = self.menu_log = menu_help.Append(wx.ID_ANY,
             "Show &log window", "Show/hide the log messages window", wx.ITEM_CHECK)
@@ -572,7 +577,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             except (TypeError, ValueError): pass
 
         # Schedule a check for next due date, should the program run that long.
-        millis = min(sys.maxsize, util.timedelta_seconds(interval) * 1000)
+        millis = min(sys.maxsize, int(util.timedelta_seconds(interval) * 1000))
         wx.CallLater(millis, self.update_check)
 
 
@@ -894,7 +899,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
 
     def on_menu_homepage(self, event):
         """Handler for opening Skyperious webpage from menu,"""
-        webbrowser.open(conf.HomeUrl)
+        webbrowser.open(conf.HomeURL)
 
 
     def on_about(self, event):
@@ -1160,6 +1165,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
+        self.list_db.Select(0) # UltimateListCtrl loses proper selection state after DeleteItem
         util.run_once(conf.save)
         guibase.status("Removed %s from database list.",
                        util.plural("non-existing file", filenames))
@@ -1175,6 +1181,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not filenames: return
 
         self.remove_databases(filenames)
+        self.list_db.Select(0) # UltimateListCtrl loses proper selection state after DeleteItem
         util.run_once(conf.save)
         t = util.plural("%sSkype database" % ("non-" if other else ""), filenames)
         guibase.status("Removed %s from database list.", t)
@@ -1607,18 +1614,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         """Handler for clicking new-button on main screen, opens popup menu."""
         if not live.skpy and not live.ijson: return self.on_new_blank(event)
         menu = wx.lib.agw.flatmenu.FlatMenu()
-        item_blank  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+        item_blank = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
                                       "&Blank Skype database, populated with username only"))
-        item_live   = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                                      "From Skype on&line service, by logging in "
-                                      "and downloading available history"
+        item_live  = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
+                                     "From Skype on&line service, by logging in "
+                                     "and downloading available history"
         )) if live.skpy else None
-        item_export = menu.AppendItem(wx.lib.agw.flatmenu.FlatMenuItem(menu, wx.ID_ANY,
-                                     "From a Skype &export archive (*.json;*.tar)"
-        )) if live.ijson else None
         self.Bind(wx.EVT_MENU, self.on_new_blank, item_blank)
-        if item_live:   self.Bind(wx.EVT_MENU, self.on_new_live,   item_live)
-        if item_export: self.Bind(wx.EVT_MENU, self.on_new_export, item_export)
+        if item_live: self.Bind(wx.EVT_MENU, self.on_new_live, item_live)
 
         btn = self.button_new
         sz_btn, pt_btn = btn.Size, btn.Position
@@ -4209,14 +4212,9 @@ class DatabasePage(wx.Panel):
 
         # Save last search results HTML
         search_data = self.html_searchall.GetActiveTabData()
-        if search_data:
-            info = {}
-            if search_data.get("info"):
-                info["map"] = search_data["info"].get("map")
-                info["text"] = search_data["info"].get("text")
-            data = {"content": search_data["content"],
-                    "id": search_data["id"], "info": info,
-                    "title": search_data["title"], }
+        if search_data and search_data.get("info"):
+            data = {k: search_data[k] for k in ("content", "id", "title")}
+            data["info"] = {k: search_data["info"].get(k) for k in ("map", "text")}
             conf.LastSearchResults[self.db.filename] = data
         elif self.db.filename in conf.LastSearchResults:
             del conf.LastSearchResults[self.db.filename]

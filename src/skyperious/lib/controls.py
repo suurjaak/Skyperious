@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    06.08.2023
+@modified    28.11.2024
 ------------------------------------------------------------------------------
 """
 import collections
@@ -3172,6 +3172,7 @@ class SortableUltimateListCtrl(wx.lib.agw.ultimatelistctrl.UltimateListCtrl,
 
     def OnDragStop(self, event):
         """Handler for stopping drag in the list, rearranges list."""
+        if event.GetIndex() is None: return
         start, stop = self._drag_start, max(1, event.GetIndex())
         if not start or start == stop: return
 

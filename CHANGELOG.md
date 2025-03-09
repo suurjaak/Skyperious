@@ -1,6 +1,18 @@
 CHANGELOG
 =========
 
+5.7, 2025-03-09
+---------------
+- add separate button for creating database from Skype export archive (issue #129)
+- fix opening third-party license link in snaps
+- fix error on right-dragging in database list (issue #128)
+- fix startup error on Windows with no English locale available (issue #129)
+- improve compatibility with Python 3.10+
+- fix selection issues after removing databases from index page
+- fix saving search help text into configuration file
+- upgrade snap distribution to Ubuntu 22 base using wxPython 4.2.0
+
+
 5.6, 2024-06-02
 ---------------
 - compatibility with Python 3.9+

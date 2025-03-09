@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.06.2024
+@modified    02.12.2024
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -339,7 +339,8 @@ class MainApp(wx.App if wx else object):
             # Py3 provides "en[-_]US" in wx.Locale names and accepts "en" in locale.setlocale();
             # Py2 provides "English_United States.1252" in wx.Locale.SysName and accepts only that.
             name = mylocale.SysName if sys.version_info < (3, ) else mylocale.Name.split("_", 1)[0]
-            locale.setlocale(locale.LC_ALL, name)
+            try: locale.setlocale(locale.LC_ALL, name)
+            except Exception: logger.warning("Failed to set locale %r.", name, exc_info=True)
 
 
 class LineSplitFormatter(argparse.HelpFormatter):
