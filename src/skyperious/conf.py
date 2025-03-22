@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.03.2025
+@modified    23.03.2025
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -25,8 +25,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.8.dev1"
-VersionDate = "13.03.2025"
+Version = "5.8.dev2"
+VersionDate = "23.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
@@ -168,16 +168,16 @@ HistoryFontSize = 10
 HistoryZoom = 1.0
 
 """Sleep interval upon hitting server rate limit, in seconds."""
-LiveSyncAuthRateLimitDelay = 5
+LiveSyncAuthRateLimitDelay = 20
 
 """Max number of requests in rate window."""
-LiveSyncRateLimit = 30
+LiveSyncRateLimit = 10
 
 """Length of rate window, in seconds."""
-LiveSyncRateWindow = 2 
+LiveSyncRateWindow = 60
 
 """Sleep interval between retries, in seconds."""
-LiveSyncRetryDelay = 0.5
+LiveSyncRetryDelay = 20
 
 """Number of attempts to overcome rate limit and transient I/O errors."""
 LiveSyncRetryLimit = 3

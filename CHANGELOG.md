@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.8, 2025-03-13
+5.8, 2025-03-23
 ---------------
+- rate-limit live sync severely, to follow latest requirements at Skype online service (issue #138)
 - fall back to setting empty locale if setting English fails at startup (issue #130)
 - use _x86 suffix for 32-bit binaries, drop _x64 suffix from 64-bit binaries
 

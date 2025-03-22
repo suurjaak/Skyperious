@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    02.06.2024
+@modified    23.03.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -229,12 +229,21 @@ class SkypeLogin(object):
         while len(self.query_stamps) > conf.LiveSyncRateLimit:
             self.query_stamps.pop(0)
 
+        delay = 0
         dts = self.query_stamps
-        delta = (dts[-1] - dts[0]) if len(dts) >= conf.LiveSyncRateLimit else 0
-        if isinstance(delta, datetime.timedelta) and delta.total_seconds() < conf.LiveSyncRateWindow:
-            time.sleep(conf.LiveSyncRateWindow - delta.total_seconds())
-        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__retry", "__raise", "__log"))
+        if len(dts) >= conf.LiveSyncRateLimit:
+            span = (dts[-1] - dts[0]).total_seconds()
+            if span < conf.LiveSyncRateWindow:
+                delay = conf.LiveSyncRateWindow - span
+        elif len(dts) > 1:
+            RATE_INTERVAL = conf.LiveSyncRateWindow / float(conf.LiveSyncRateLimit)
+            span = (dts[-1] - dts[-2]).total_seconds()
+            if span < RATE_INTERVAL:
+                delay = RATE_INTERVAL - span
+        if delay > 0:
+            time.sleep(delay)
 
+        doretry, doraise, dolog = (kwargs.pop(k, True) for k in ("__retry", "__raise", "__log"))
         tries = 0
         while True:
             try: return func(*args, **kwargs)
