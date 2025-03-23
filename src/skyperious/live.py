@@ -324,7 +324,7 @@ class SkypeLogin(object):
                 b2 = as_text(dbitem)
                 dbitem0 = next((v for v in candidates if as_text(v) == b2), None)
 
-        if "chats" == table and isinstance(item, skpy.SkypeGroupChat) \
+        if "chats" == table and skypedata.CHATS_TYPE_GROUP == dbitem.get("type") \
         and not dbitem.get("displayname"):
             if dbitem0 and dbitem0["displayname"]:
                 dbitem["displayname"] = dbitem0["displayname"]
@@ -399,7 +399,7 @@ class SkypeLogin(object):
         if "chats" == table:
             self.insert_participants(item, dbitem, dbitem0)
             self.insert_chats(item, dbitem, dbitem0)
-        if "chats" == table and isinstance(item, skpy.SkypeGroupChat):
+        if "chats" == table and skypedata.CHATS_TYPE_GROUP == dbitem.get("type"):
             # See if older-style chat entry is present
             identity0 = id_to_identity(item.id)
             chat0 = self.cache["chats"].get(identity0) if identity0 != item.id else None
@@ -449,8 +449,7 @@ class SkypeLogin(object):
         """Inserts Participants-rows for SkypeChat, if not already present."""
         try:
             participants, savecontacts = [], []
-
-            uids = self.reqattr(chat, "userIds") if isinstance(chat, skpy.SkypeGroupChat) \
+            uids = self.reqattr(chat, "userIds") if hasattr(chat, "userIds") \
                    else set([self.skype.userId, chat.userId])
             for uid in uids:
                 user = self.request(self.skype.contacts.__getitem__, uid)
@@ -460,7 +459,8 @@ class SkypeLogin(object):
                 and (is_bot(user) or chat.id.startswith(skypedata.ID_PREFIX_BOT)):
                     uidentity = skypedata.ID_PREFIX_BOT + uidentity
                 p = dict(is_permanent=1, convo_id=row["id"], identity=uidentity)
-                if isinstance(chat, skpy.SkypeGroupChat) and (user.id if user else uid) == chat.creatorId:
+                if skypedata.CHATS_TYPE_SINGLE == row.get("type") \
+                and (user.id if user else uid) == row.get("creator"):
                     p.update(rank=1)
                 participants.append(p)
 
@@ -591,11 +591,31 @@ class SkypeLogin(object):
             elif isinstance(item, skpy.SkypeGroupChat):
                 # SkypeGroupChat(id='19:xyz==@p2p.thread.skype', alerts=True, topic='chat topic', creatorId='username;epid={87e22f7c-d816-ea21-6cb3-05b477922f95}', userIds=['username1', 'username2'], adminIds=['username'], open=False, history=True, picture='https://experimental-api.asm.skype.com/..')
 
-                result.update(type=skypedata.CHATS_TYPE_GROUP, meta_topic=item.topic)
-                if item.topic:
-                    result.update(displayname=item.topic)
+                is_one_to_one = False # 2025 March: Skype API provides single chats as group chats
+                if item.id.endswith("@oneToOne.skype") and len(item.userIds) == 2:
+                    # SkypeGroupChat(id='19:xyz@oneToOne.skype', alerts=True, topic='username1, username2', creatorId='cid-(-..)@outlook.com;cid=-..;skypeid=username', userIds=[username1, username2], adminIds=[], open=False, history=False, active=True, moderated=False)
+                    if not item.open and self.username in item.userIds:
+                        is_one_to_one = True
+                if is_one_to_one:
+                    uidentity = uidentity0 = next(x for x in item.userIds if x != self.username)
+                    if item.id.startswith(skypedata.ID_PREFIX_BOT):
+                        if not uidentity.startswith(skypedata.ID_PREFIX_BOT):
+                            uidentity = skypedata.ID_PREFIX_BOT + uidentity
+                    result.update(identity=uidentity, type=skypedata.CHATS_TYPE_SINGLE)
+
+                    if uidentity not in self.cache["contacts"]:
+                        citem = self.request(self.skype.contacts.__getitem__, uidentity0, __raise=False)
+                        if citem: self.save("contacts", citem)
+                    result.update(displayname=self.get_contact_name(uidentity0))
+                else:
+                    result.update(type=skypedata.CHATS_TYPE_GROUP, meta_topic=item.topic)
+                    if item.topic:
+                        result.update(displayname=item.topic)
+
                 if item.creatorId:
-                    creator = re.sub(";.+$", "", item.creatorId)
+                    if ";skypeid=" in item.creatorId:
+                        creator = re.sub("^.+;skypeid=", "", item.creatorId) # Trailing identity
+                    else: creator = re.sub(";.+$", "", item.creatorId) # Leading identity
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
@@ -629,20 +649,24 @@ class SkypeLogin(object):
                           from_dispname=self.get_contact_name(item.userId),
                           body_xml=item.content, timestamp__ms=ts__ms)
 
+            chat = None
             if parent:
-                identity = parent.id if isinstance(parent, skpy.SkypeGroupChat) \
-                           or is_bot(self.reqattr(parent, "user")) \
-                           or result["author"].startswith(skypedata.ID_PREFIX_BOT) else parent.userId
+                identity = self.get_chat_identity(parent)
                 chat = self.cache["chats"].get(identity)
                 if not chat:
                     self.save("chats", parent)
                     chat = self.cache["chats"].get(identity)
-                result.update(convo_id=chat["id"])
+            if not chat:
+                logger.error("Failed to identify chat for message %s from %s.", item, parent)
+                return None
+            result.update(convo_id=chat["id"])
+
             remote_id = item.raw.get("skypeeditedid") or item.clientId
             if remote_id: result.update(remote_id=util.hash_string(remote_id))
 
-            if isinstance(parent, skpy.SkypeSingleChat):
-                partner = result["author"] if result["author"] != self.skype.userId else parent.userId
+            if skypedata.CHATS_TYPE_SINGLE == chat.get("type"):
+                partner = result["author"] if result["author"] != self.skype.userId else \
+                          chat["identity"]
                 result.update(dialog_partner=partner)
 
             if isinstance(item, skpy.SkypeTextMsg):
@@ -837,10 +861,13 @@ class SkypeLogin(object):
         processeds, updateds, completeds, msgids = set(), set(), set(), set()
         run = True
         while run:
+            mychats = []
             if chats: mychats = selchats
             elif not self.progress(action="info", message="Querying recent chats.."):
                 break # while run
-            else: mychats = self.request(self.skype.chats.recent, __raise=False).values()
+            else:
+                recent_batch = self.request(self.skype.chats.recent, __raise=False) # {id: SkypeChat}
+                if recent_batch: mychats = list(recent_batch.values())
 
             for chat in mychats:
                 if not self.process_chat(chat, messages, processeds, updateds, completeds, msgids):
@@ -883,9 +910,6 @@ class SkypeLogin(object):
         @return                      whether further progress should continue
         """
         result = True
-        cidentity = chat.id if isinstance(chat, skpy.SkypeGroupChat) \
-                    or is_bot(self.reqattr(chat, "user")) \
-                    or chat.id.startswith(skypedata.ID_PREFIX_BOT) else chat.userId
         if chat.id.startswith(skypedata.ID_PREFIX_SPECIAL): # Skip specials like "48:calllogs"
             return result
         if isinstance(chat, skpy.SkypeGroupChat) and not self.reqattr(chat, "userIds"):
@@ -894,6 +918,8 @@ class SkypeLogin(object):
         if isinstance(chat, skpy.SkypeSingleChat) and chat.userId == self.skype.userId:
             # Conversation with self?
             return result
+
+        cidentity = self.get_chat_identity(chat)
         if cidentity in chats_processed: return result
         chats_processed.add(cidentity)
 
@@ -1027,6 +1053,19 @@ class SkypeLogin(object):
                 return r.content
         except Exception: pass
         return None
+
+
+    def get_chat_identity(self, chat):
+        """Returns SkypeChat identity for database."""
+        if isinstance(chat, skpy.SkypeGroupChat): # Possible single chat in 2025 form
+            dbitem = self.convert("chats", chat)
+            if skypedata.CHATS_TYPE_SINGLE == dbitem.get("type"):
+                return dbitem["identity"]
+        if isinstance(chat, skpy.SkypeGroupChat) \
+        or is_bot(self.reqattr(chat, "user")) \
+        or self.prefixify(chat.userId).startswith(skypedata.ID_PREFIX_BOT):
+            return chat.id
+        return chat.userId # SkypeSingleChat
 
 
     def get_contact(self, identity):
