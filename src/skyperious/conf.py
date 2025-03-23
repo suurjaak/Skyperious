@@ -25,7 +25,7 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.8.dev4"
+Version = "5.8.dev5"
 VersionDate = "23.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")

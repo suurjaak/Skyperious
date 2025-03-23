@@ -3188,6 +3188,7 @@ class DatabasePage(wx.Panel):
         label_info   = wx.html.HtmlWindow(panel1)
 
         label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
+        label_warn = wx.StaticText(parent=panel2, label="Note: this may take a long time.")
         list_chats = controls.SortableListView(parent=panel_sync1, style=wx.LC_REPORT)
         gauge = wx.Gauge(panel_sync2, size=(300, 15), style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
         label_progress   = wx.StaticText(panel_sync2)
@@ -3224,6 +3225,7 @@ class DatabasePage(wx.Panel):
 
         label_sync.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                                   wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        ColourManager.Manage(label_warn, "ForegroundColour", "DisabledColour")
         columns = [("title", "Chat"), ("message_count", "Updates"),
                    ("first_message_datetime", "From"),
                    ("last_message_datetime", "Until") ]
@@ -3321,6 +3323,7 @@ class DatabasePage(wx.Panel):
         sizer1.Add(label_info,   border=15, flag=wx.ALL | wx.GROW, proportion=1)
 
         sizer2.Add(label_sync, border=5, flag=wx.ALL | wx.GROW)
+        sizer2.Add(label_warn, border=5, flag=wx.LEFT | wx.GROW)
 
         sizer_sync1.Add(list_chats, proportion=1, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(gauge, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
