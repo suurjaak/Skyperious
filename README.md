@@ -5,13 +5,17 @@ Skyperious
 Regarding Skype 2025 Shutdown
 -----------------------------
 
-As of 2025 May, there is no more Skype service, and with this,
+As of 2025 May, there is no more Skype service, and after that,
 Skyperious can obviously no longer download message history from online service.
 
 It can still import Skype export archives into a local database.
 
-Important Notice
-----------------
+Note that in 2025 March, the online service became strongly rate limited,
+making live sync in Skyperious rather slow.
+
+
+Important Notice from 2020
+--------------------------
 
 Around 2017, starting from Skype version 8, Skype moved away from its famous
 peer-to-peer architecture to a client-server system, and started to store 
