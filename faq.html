@@ -50,6 +50,7 @@
 
         <ul>
           <li><a href="#obsolete">Does Skyperious work with modern Skype?</a></li>
+          <li><a href="#sync-fail">Why am I getting an error on live sync?</a></li>
           <li><a href="#login-fail">Why am I getting login failure from Skype online?</a></li>
           <li><a href="#shared-media">Can I download my shared pictures and other files?</a></li>
           <li><a href="#automation">Can I automate backing up my Skype history?</a></li>
@@ -65,10 +66,24 @@
 
         <h3><a name="obsolete"></a>Does Skyperious work with modern Skype?</h3>
         <p>
-          Partially. Skype chat history is no longer available locally in main.db files, 
+          Partially, up to 2025 May. Skype chat history is no longer available locally in main.db files, 
           but Skyperious can still be used to download new messages from Skype online service,
           for keeping an archive of all chat history. <br />
-          But any changes done to the database no longer affect what is visible in the official Skype program.
+          <b>After 2025 shutdown</b>: Skyperious can no longer download messages from Skype online service.<br />
+          It can still import Skype export archives into a local database.
+        </p>
+        <br />
+
+
+        <h3><a name="sync-fail"></a>Why am I getting an error on live sync?</h3>
+        <p>
+          If live sync from Skype online service starts and fails, the reason can be rate limits:
+          the online service was heavily constrained from 2025 March, and the limits are unclear.
+          Trying the live sync a few hours later may succeed; sometimes may even require waiting a day or more.
+          <br />
+          <br />
+          Another possibility is that the Skype online service has made unexpected changes
+          and Skyperious is incompatible with the new version.
         </p>
         <br />
 
