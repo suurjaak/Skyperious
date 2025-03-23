@@ -868,6 +868,10 @@ class SkypeLogin(object):
             else:
                 recent_batch = self.request(self.skype.chats.recent, __raise=False) # {id: SkypeChat}
                 if recent_batch: mychats = list(recent_batch.values())
+                elif recent_batch is None:
+                    self.progress(action="text", message="Received empty response from server.\n"
+                        "Possible rate limiting in effect, sync cancelled.\nRetry later.")
+                    break # while run
 
             for chat in mychats:
                 if not self.process_chat(chat, messages, processeds, updateds, completeds, msgids):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    07.03.2025
+@modified    23.03.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3900,6 +3900,11 @@ class DatabasePage(wx.Panel):
                     percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
                     self.gauge_sync.Value = percent
                 self.gauge_sync.ContainingSizer.Layout()
+            elif "text" == result["action"] and "message" in result:
+                if self.edit_sync_status.Value: self.edit_sync_status.Value += "\n\n" 
+                self.edit_sync_status.Value += result["message"]
+                self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+                logger.info(result["message"])
             elif result.get("error") or result.get("done"):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
