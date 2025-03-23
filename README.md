@@ -2,6 +2,14 @@ Skyperious
 ==========
 
 
+Regarding Skype 2025 Shutdown
+-----------------------------
+
+As of 2025 May, there is no more Skype service, and with this,
+Skyperious can obviously no longer download message history from online service.
+
+It can still import Skype export archives into a local database.
+
 Important Notice
 ----------------
 
