@@ -1113,8 +1113,8 @@ def run(nogui=False):
     rootflags = tuple(subparsers.choices) + ("-h", "--help", "-v", "--version")
     if not argv or not any(x in argv for x in rootflags):
         argv[:0] = ["gui"] # argparse hack: force default argument
-    if argv[0] in ("-h", "--help") and len(argv) > 1:
-        argv[:2] = argv[:2][::-1] # Swap "-h option" to "option -h"
+    if len(argv) > 1 and ("-h" in argv or "--help" in argv) and argv[-1] not in ("-h", "--help"):
+        argv = [x for x in argv if x not in ("-h", "--help")] + ["-h"] # "-h option" to "option -h"
 
     arguments, _ = argparser.parse_known_args(argv)
 
