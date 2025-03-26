@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.03.2025
+@modified    26.03.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -8931,15 +8931,17 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   rgx_highlight  if set, substrings matching the regex are added
                                 in highlighted style
         """
-        text = text or ""
+        text = text_bytes = text or ""
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
         if isinstance(text, six.text_type):
+            # AppendText() uses Unicode, GetTextLength() StartStyling() SetStyling() use bytes
+            text_bytes = text_bytes.encode("utf-8")
             text_parts = [x.encode("utf-8") for x in text_parts]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
         len_self = self.GetTextLength()
         self.STC.AppendText(text)
         self.STC.StartStyling(len_self)
-        self.STC.SetStyling(len(text), self._styles[style])
+        self.STC.SetStyling(len(text_bytes), self._styles[style])
         for i, t in enumerate(text_parts):
             if i % 2:
                 self.STC.StartStyling(len_self)
