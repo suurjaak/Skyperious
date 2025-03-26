@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    10.07.2024
+@modified    26.03.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -435,6 +435,19 @@ def unique_path(pathname):
     return result
 
 
+def select_file(path):
+    """
+    Tries to open the file directory, and select file if path is a file.
+    Falls back to opening directory only (select is Windows-only).
+    """
+    folder = path if os.path.isdir(path) else os.path.dirname(path)
+    if "nt" != os.name or not os.path.exists(path) or path is folder:
+        start_file(folder)
+        return
+    try: subprocess.Popen('explorer /select, "%s"' % shortpath(path))
+    except Exception: start_file(folder)
+
+
 def start_file(filepath):
     """
     Tries to open the specified file in the operating system.
@@ -734,3 +747,18 @@ def longpath(path):
                 result = os.path.join(buf.value, tail)
     except Exception: pass
     return result
+
+
+def shortpath(path):
+    """Returns the path in short Windows form (PROGRA~1 not "Program Files")."""
+    if isinstance(path, bytes): return path
+    from ctypes import wintypes
+
+    ctypes.windll.kernel32.GetShortPathNameW.argtypes = [
+        # lpszLongPath, lpszShortPath, cchBuffer
+        wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD
+    ]
+    ctypes.windll.kernel32.GetShortPathNameW.restype = wintypes.DWORD
+    buf = ctypes.create_unicode_buffer(4 * len(path))
+    ctypes.windll.kernel32.GetShortPathNameW(path, buf, len(buf))
+    return buf.value

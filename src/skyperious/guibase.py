@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    06.08.2023
+@modified    26.03.2025
 """
 import datetime
 import logging
@@ -129,15 +129,26 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         """Creates and returns the log output panel."""
         panel = wx.Panel(parent)
         sizer = panel.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_top = wx.BoxSizer(wx.HORIZONTAL)
         ColourManager.Manage(panel, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
 
+        button_open  = wx.Button(parent=panel, label="&Open log folder", size=(120, -1))
         button_clear = wx.Button(parent=panel, label="C&lear log", size=(100, -1))
         edit_log = self.log = wx.stc.StyledTextCtrl(panel)
+
+        is_file_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
+        button_open.Enable(bool(conf.LogToFile and conf.LogFile and is_file_logging))
+        button_open.ToolTip = "Open file manager to log directory"
+        button_clear.ToolTip = "Clear current log in program window"
         hasattr(edit_log, "SetMarginCount") and edit_log.SetMarginCount(0)  # Since wx 3.1.1
         edit_log.SetReadOnly(True)
         edit_log.SetTabWidth(edit_log.TabWidth * 2)
         edit_log.SetWrapMode(wx.stc.STC_WRAP_WORD)
 
+        self.button_open_log = button_open
+
+        def on_open(event=None):
+            if conf.LogFile: util.select_file(conf.LogFile)
         def on_clear(event=None):
             edit_log.SetReadOnly(False)
             edit_log.ClearAll()
@@ -152,12 +163,14 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
                                   "back:%s,fore:%s" % (bgcolour, fgcolour))
             edit_log.StyleClearAll() # Apply the new default style to all styles
 
+        button_open .Bind(wx.EVT_BUTTON,     on_open)
         button_clear.Bind(wx.EVT_BUTTON,     on_clear)
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, on_colour)
         on_colour()
 
-        sizer.Add(button_clear, border=5, flag=wx.ALIGN_RIGHT | wx.TOP |
-                  wx.RIGHT)
+        sizer_top.Add(button_open, border=10, flag=wx.RIGHT)
+        sizer_top.Add(button_clear)
+        sizer.Add(sizer_top, border=5, flag=wx.ALIGN_RIGHT | wx.TOP | wx.RIGHT)
         sizer.Add(edit_log, border=5, proportion=1, flag=wx.GROW | wx.ALL)
         return panel
 

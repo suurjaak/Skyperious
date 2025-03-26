@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.03.2025
+@modified    26.03.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -1052,10 +1052,6 @@ def run_gui(filenames):
     """Main GUI program entrance."""
     global logger, window
 
-    # Set up logging to GUI log window
-    logger.addHandler(guibase.GUILogHandler())
-    logger.setLevel(logging.DEBUG)
-
     install_thread_excepthook()
     sys.excepthook = except_hook
 
@@ -1140,7 +1136,12 @@ def run(nogui=False):
         if not nogui: status = ("\n\nwxPython not found. %s graphical program "
                                 "will not run." % conf.Title)
         sys.exit(status)
-    elif "gui" != arguments.command:
+
+    if "gui" == arguments.command:
+        # Set up logging to GUI log window
+        logger.addHandler(guibase.GUILogHandler())
+        logger.setLevel(logging.DEBUG)
+    else:
         conf.IsCLI = True
         conf.IsCLIVerbose     = arguments.verbose
         conf.IsCLINonTerminal = arguments.no_terminal
@@ -1154,9 +1155,20 @@ def run(nogui=False):
             handler = logging.StreamHandler(sys.stderr)
             handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
             logger.addHandler(handler)
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.addHandler(logging.NullHandler())
+        logger.setLevel(logging.DEBUG)
+    if conf.LogToFile and conf.LogFile:
+        try: os.makedirs(os.path.dirname(conf.LogFile))
+        except Exception: pass
+        try:
+            handler = logging.FileHandler(conf.LogFile)
+            handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+            logger.addHandler(handler)
+            logger.info("Logging to file %r.", conf.LogFile)
+        except Exception:
+            logger.exception("Error starting logging to %r.", conf.LogFile)
+    if not logger.hasHandlers():
+        logger.addHandler(logging.NullHandler())
+        logger.setLevel(logging.DEBUG)
 
     if "create" == arguments.command:
         run_create(arguments.FILE, arguments)
