@@ -166,7 +166,7 @@ The following are also listed in `requirements.txt` for pip:
 * Pillow (https://pypi.org/project/Pillow)
 * pyparsing (https://pypi.org/project/pyparsing)
 * six (https://pypi.org/project/six)
-* SkPy (https://pypi.org/project/SkPy)
+* SkPy (https://pypi.org/project/SkPy; requires the `teams-migration` branch)
 * step (https://pypi.org/project/step-template/)
 * XlsxWriter (https://pypi.org/project/XlsxWriter)
 

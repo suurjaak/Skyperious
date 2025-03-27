@@ -5,7 +5,7 @@ ijson
 Pillow
 pyparsing
 six
-SkPy
+SkPy @ git+https://github.com/Terrance/SkPy@teams-migration
 step-template>=0.0.4
 XlsxWriter
 wxPython>=4.0
