@@ -21,7 +21,8 @@ import json
 import os
 import sys
 
-import appdirs
+try: import appdirs
+except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
