@@ -40,14 +40,25 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.7_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.7_x64_setup.exe">Download <strong>64bit Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.7-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8.exe">Download <strong>Executable</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
       <section>
         <h2>Changelog</h2>
+
+        <h4>v5.8, 2023-03-27:</h4>
+        <ul>
+          <li>adapt to recent changes in Skype online API regarding 1:1 chats</li>
+          <li>rate-limit live sync severely, to follow latest requirements at Skype online service (issue #138)</li>
+          <li>fall back to setting empty locale if setting English fails at startup (issue #130)</li>
+          <li>add option to write log to file, enabled by default (issue #129)</li>
+          <li>fix in-program chat history mis-styling links with Unicode characters</li>
+          <li>use _x86 suffix for 32-bit binaries, drop _x64 suffix from 64-bit binaries</li>
+        </ul>
+        <br />
 
         <h4>v5.7, 2023-03-09:</h4>
         <ul>
