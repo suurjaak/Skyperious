@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.8, 2025-03-26
+5.8, 2025-03-27
 ---------------
 - adapt to recent changes in Skype online API regarding 1:1 chats
 - rate-limit live sync severely, to follow latest requirements at Skype online service (issue #138)
