@@ -21,11 +21,12 @@ import json
 import os
 import sys
 
-import appdirs
+try: import appdirs
+except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.8.dev10"
+Version = "5.8.dev11"
 VersionDate = "27.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
