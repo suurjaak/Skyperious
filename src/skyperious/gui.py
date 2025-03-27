@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    07.03.2025
+@modified    26.03.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1587,6 +1587,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             convert.__name__ = "tuple(%s)" % mytype.__name__
             return convert
 
+        opts1, opts2 = {}, {} # {name: value}
         for name in sorted(conf.OptionalFileDirectives):
             value, help = getattr(conf, name, None), get_field_doc(name)
             default = conf.Defaults.get(name)
@@ -1598,6 +1599,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 kind = typelist(type(value[0]))
                 default = kind(default)
             dialog.AddProperty(name, value, help, default, kind)
+            opts1[name] = value
         dialog.Realize()
 
         if wx.ID_OK == dialog.ShowModal():
@@ -1605,8 +1607,32 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 # Keep numbers in sane regions (no isinstance as bool is an int)
                 if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
                 setattr(conf, k, v)
+                opts2[k] = v
             util.run_once(conf.save)
             self.MinSize = conf.MinWindowSize
+            if any(opts1.get(k) != opts2.get(k) for k in ("LogFile", "LogToFile")):
+                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
+                should_log = all(opts2.get(k) for k in ("LogFile", "LogToFile"))
+                path_changed = (opts1.get("LogFile") != opts2.get("LogFile"))
+                should_remove = is_logging and (not should_log or path_changed)
+                if is_logging and (path_changed or not should_log):
+                    logger.info("Closing log file %r.", opts1.get("LogFile"))
+                    handler = next(x for x in logger.parent.handlers
+                                   if isinstance(x, logging.FileHandler))
+                    logger.parent.removeHandler(handler)
+                    handler.close()
+                if should_log and (path_changed or not is_logging):
+                    try: os.makedirs(os.path.dirname(conf.LogFile))
+                    except Exception: pass
+                    try:
+                        handler = logging.FileHandler(conf.LogFile)
+                        handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+                        logger.parent.addHandler(handler)
+                        logger.info("Logging to file %r.", conf.LogFile)
+                    except Exception as e:
+                        logger.exception("Error starting logging to %r.", conf.LogFile)
+                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
+                self.button_open_log.Enable(is_logging)
         dialog.Destroy()
 
 
@@ -3188,6 +3214,7 @@ class DatabasePage(wx.Panel):
         label_info   = wx.html.HtmlWindow(panel1)
 
         label_sync = wx.StaticText(parent=panel2, label="Update database from Skype online")
+        label_warn = wx.StaticText(parent=panel2, label="Note: this may take a long time.")
         list_chats = controls.SortableListView(parent=panel_sync1, style=wx.LC_REPORT)
         gauge = wx.Gauge(panel_sync2, size=(300, 15), style=wx.GA_HORIZONTAL | wx.PD_SMOOTH)
         label_progress   = wx.StaticText(panel_sync2)
@@ -3224,6 +3251,7 @@ class DatabasePage(wx.Panel):
 
         label_sync.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                                   wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
+        ColourManager.Manage(label_warn, "ForegroundColour", "DisabledColour")
         columns = [("title", "Chat"), ("message_count", "Updates"),
                    ("first_message_datetime", "From"),
                    ("last_message_datetime", "Until") ]
@@ -3321,6 +3349,7 @@ class DatabasePage(wx.Panel):
         sizer1.Add(label_info,   border=15, flag=wx.ALL | wx.GROW, proportion=1)
 
         sizer2.Add(label_sync, border=5, flag=wx.ALL | wx.GROW)
+        sizer2.Add(label_warn, border=5, flag=wx.LEFT | wx.GROW)
 
         sizer_sync1.Add(list_chats, proportion=1, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(gauge, border=5, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL)
@@ -3900,6 +3929,11 @@ class DatabasePage(wx.Panel):
                     percent = min(100, math.ceil(100 * util.safedivf(result["index"], result["count"])))
                     self.gauge_sync.Value = percent
                 self.gauge_sync.ContainingSizer.Layout()
+            elif "text" == result["action"] and "message" in result:
+                if self.edit_sync_status.Value: self.edit_sync_status.Value += "\n\n" 
+                self.edit_sync_status.Value += result["message"]
+                self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
+                logger.info(result["message"])
             elif result.get("error") or result.get("done"):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
@@ -8923,15 +8957,17 @@ class ChatContentSTC(controls.SearchableStyledTextCtrl):
         @param   rgx_highlight  if set, substrings matching the regex are added
                                 in highlighted style
         """
-        text = text or ""
+        text = text_bytes = text or ""
         text_parts = rgx_highlight.split(text) if rgx_highlight else [text]
         if isinstance(text, six.text_type):
+            # AppendText() uses Unicode, GetTextLength() StartStyling() SetStyling() use bytes
+            text_bytes = text_bytes.encode("utf-8")
             text_parts = [x.encode("utf-8") for x in text_parts]
         bold = "bold%s" % style if "bold%s" % style in self._styles else style
         len_self = self.GetTextLength()
         self.STC.AppendText(text)
         self.STC.StartStyling(len_self)
-        self.STC.SetStyling(len(text), self._styles[style])
+        self.STC.SetStyling(len(text_bytes), self._styles[style])
         for i, t in enumerate(text_parts):
             if i % 2:
                 self.STC.StartStyling(len_self)

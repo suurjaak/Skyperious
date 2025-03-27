@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.12.2024
+@modified    26.03.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -340,7 +340,10 @@ class MainApp(wx.App if wx else object):
             # Py2 provides "English_United States.1252" in wx.Locale.SysName and accepts only that.
             name = mylocale.SysName if sys.version_info < (3, ) else mylocale.Name.split("_", 1)[0]
             try: locale.setlocale(locale.LC_ALL, name)
-            except Exception: logger.warning("Failed to set locale %r.", name, exc_info=True)
+            except Exception:
+                logger.warning("Failed to set locale %r.", name, exc_info=True)
+                try: locale.setlocale(locale.LC_ALL, "")
+                except Exception: logger.warning("Failed to set locale ''.", exc_info=True)
 
 
 class LineSplitFormatter(argparse.HelpFormatter):
@@ -1049,10 +1052,6 @@ def run_gui(filenames):
     """Main GUI program entrance."""
     global logger, window
 
-    # Set up logging to GUI log window
-    logger.addHandler(guibase.GUILogHandler())
-    logger.setLevel(logging.DEBUG)
-
     install_thread_excepthook()
     sys.excepthook = except_hook
 
@@ -1114,8 +1113,8 @@ def run(nogui=False):
     rootflags = tuple(subparsers.choices) + ("-h", "--help", "-v", "--version")
     if not argv or not any(x in argv for x in rootflags):
         argv[:0] = ["gui"] # argparse hack: force default argument
-    if argv[0] in ("-h", "--help") and len(argv) > 1:
-        argv[:2] = argv[:2][::-1] # Swap "-h option" to "option -h"
+    if len(argv) > 1 and ("-h" in argv or "--help" in argv) and argv[-1] not in ("-h", "--help"):
+        argv = [x for x in argv if x not in ("-h", "--help")] + ["-h"] # "-h option" to "option -h"
 
     arguments, _ = argparser.parse_known_args(argv)
 
@@ -1137,7 +1136,12 @@ def run(nogui=False):
         if not nogui: status = ("\n\nwxPython not found. %s graphical program "
                                 "will not run." % conf.Title)
         sys.exit(status)
-    elif "gui" != arguments.command:
+
+    if "gui" == arguments.command:
+        # Set up logging to GUI log window
+        logger.addHandler(guibase.GUILogHandler())
+        logger.setLevel(logging.DEBUG)
+    else:
         conf.IsCLI = True
         conf.IsCLIVerbose     = arguments.verbose
         conf.IsCLINonTerminal = arguments.no_terminal
@@ -1151,9 +1155,20 @@ def run(nogui=False):
             handler = logging.StreamHandler(sys.stderr)
             handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
             logger.addHandler(handler)
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.addHandler(logging.NullHandler())
+        logger.setLevel(logging.DEBUG)
+    if conf.LogToFile and conf.LogFile:
+        try: os.makedirs(os.path.dirname(conf.LogFile))
+        except Exception: pass
+        try:
+            handler = logging.FileHandler(conf.LogFile)
+            handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+            logger.addHandler(handler)
+            logger.info("Logging to file %r.", conf.LogFile)
+        except Exception:
+            logger.exception("Error starting logging to %r.", conf.LogFile)
+    if not logger.hasHandlers():
+        logger.addHandler(logging.NullHandler())
+        logger.setLevel(logging.DEBUG)
 
     if "create" == arguments.command:
         run_create(arguments.FILE, arguments)

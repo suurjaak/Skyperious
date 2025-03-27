@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    09.03.2025
+@modified    27.03.2025
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -25,8 +25,8 @@ import appdirs
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.7"
-VersionDate = "09.03.2025"
+Version = "5.8.dev10"
+VersionDate = "27.03.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
@@ -61,9 +61,9 @@ OptionalFileDirectives = [
     "EmoticonsPlotWidth", "ExportChatTemplate", "ExportContactsTemplate", "ExportDbTemplate",
     "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
     "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay", "LiveSyncRetryLimit",
-    "LogSQL", "MaxConsoleHistory", "MaxHistoryInitialMessages", "MaxRecentFiles",
-    "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows", "MinWindowSize",
-    "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
+    "LogFile", "LogSQL", "LogToFile", "MaxConsoleHistory", "MaxHistoryInitialMessages",
+    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
+    "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
     "SharedContentUseCache", "SharedFileAutoDownload", "SharedImageAutoDownload",
     "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
@@ -168,22 +168,28 @@ HistoryFontSize = 10
 HistoryZoom = 1.0
 
 """Sleep interval upon hitting server rate limit, in seconds."""
-LiveSyncAuthRateLimitDelay = 5
+LiveSyncAuthRateLimitDelay = 20
 
 """Max number of requests in rate window."""
-LiveSyncRateLimit = 30
+LiveSyncRateLimit = 10
 
 """Length of rate window, in seconds."""
-LiveSyncRateWindow = 2 
+LiveSyncRateWindow = 60
 
 """Sleep interval between retries, in seconds."""
-LiveSyncRetryDelay = 0.5
+LiveSyncRetryDelay = 20
 
 """Number of attempts to overcome rate limit and transient I/O errors."""
 LiveSyncRetryLimit = 3
 
+"""Path to log file on disk."""
+LogFile = os.path.join(VarDirectory, "%s.log" % Title.lower())
+
 """Whether to log all SQL statements to log window."""
 LogSQL = False
+
+"""Whether to write log to file as well."""
+LogToFile = True
 
 """Maximum number of console history commands to store."""
 MaxConsoleHistory = 1000
@@ -427,7 +433,7 @@ def load(configfile=None):
 
     @param   configfile  name of configuration file to use from now if not module defaults
     """
-    global Defaults, VarDirectory, CacheDirectory, ConfigFile, ConfigFileStatic
+    global Defaults, VarDirectory, CacheDirectory, LogFile, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, float, int, long, list, tuple, dict, type(None))        # Py2
     except Exception: VARTYPES = (bytes, str, bool, float, int, list, tuple, dict, type(None)) # Py3
@@ -450,7 +456,9 @@ def load(configfile=None):
             # Try user-specific path first, then path under application folder
             if userpath not in configpaths: configpaths.insert(0, userpath)
         except Exception: pass
-        try: VarDirectory = appdirs.user_data_dir(title, appauthor=False)
+        try:
+            VarDirectory = appdirs.user_data_dir(title, appauthor=False)
+            LogFile = os.path.join(VarDirectory, "%s.log" % Title.lower())
         except Exception: pass
         try: CacheDirectory = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
         except Exception: pass

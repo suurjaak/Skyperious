@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+5.8, 2025-03-26
+---------------
+- adapt to recent changes in Skype online API regarding 1:1 chats
+- rate-limit live sync severely, to follow latest requirements at Skype online service (issue #138)
+- fall back to setting empty locale if setting English fails at startup (issue #130)
+- add option to write log to file, enabled by default (issue #129)
+- fix in-program chat history mis-styling links with Unicode characters
+- use _x86 suffix for 32-bit binaries, drop _x64 suffix from 64-bit binaries
+
+
 5.7, 2025-03-09
 ---------------
 - add separate button for creating database from Skype export archive (issue #129)
