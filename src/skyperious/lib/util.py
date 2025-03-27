@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    26.03.2025
+@modified    27.03.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -22,6 +22,7 @@ import io
 import locale
 import math
 import os
+import platform
 import re
 import string
 import subprocess
@@ -509,9 +510,8 @@ def get_file_type(content, category=None, filename=None):
 
 
 def is_os_64bit():
-    """Returns whether the operating system is 64-bit (Windows-only)."""
-    return ('PROCESSOR_ARCHITEW6432' in os.environ
-            or os.environ['PROCESSOR_ARCHITECTURE'].endswith('64'))
+    """Returns whether the operating system is 64-bit."""
+    return "64" in platform.architecture()[0]
 
 
 def round_float(value, precision=1):
