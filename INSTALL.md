@@ -61,6 +61,13 @@ If pip scripts-folder is not yet in path, run before reopening terminal:
 If wxPython installation fails, consult https://wxpython.org/pages/downloads/.
 
 
+### Note for pip installation from 2025 March ###
+
+SkPy dependency needs to be from the special Teams migration branch:
+
+`pip install git+https://github.com/Terrance/SkPy@teams-migration`
+
+
 ### Docker ###
 
 Skyperious has a [Dockerfile](Dockerfile), see
