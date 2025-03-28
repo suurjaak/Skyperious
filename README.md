@@ -150,6 +150,12 @@ For more thorough instructions, see [INSTALL.md](INSTALL.md).
 Skyperious has a [Dockerfile](build/Dockerfile), see
 [build/README for Docker.md](build/README%20for%20Docker.md).
 
+#### Note for pip installation from 2025 March ####
+
+SkPy dependency needs to be from the special Teams migration branch:
+
+`pip install git+https://github.com/Terrance/SkPy@teams-migration`
+
 
 Source Dependencies
 -------------------
