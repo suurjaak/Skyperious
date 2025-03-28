@@ -6,7 +6,7 @@
 ; /DARCH_SUFFIX=<"_x86" for 32-bit installer>
 ;
 ; @created   13.01.2013
-; @modified  09.03.2025
+; @modified  28.03.2025
 
 Unicode True
 
@@ -38,7 +38,7 @@ Unicode True
 !define MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
 ; only available if MULTIUSER_INSTALLMODE_ALLOW_ELEVATION
 !define MULTIUSER_INSTALLMODE_DEFAULT_ALLUSERS
-!if "${ARCH_SUFFIX}" == "_x86"
+!if "${ARCH_SUFFIX}" != "_x86"
   !define MULTIUSER_INSTALLMODE_64_BIT 1
 !endif
 !define LANG_ENGLISH 1033
