@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.06.2024
+@modified    10.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -171,6 +171,23 @@ class SkypeDatabase(object):
         "videomessages":       "CREATE TABLE VideoMessages (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, qik_id BLOB, attached_msg_ids TEXT, sharing_id TEXT, status INTEGER, vod_status INTEGER, vod_path TEXT, local_path TEXT, public_link TEXT, progress INTEGER, title TEXT, description TEXT, author TEXT, creation_timestamp INTEGER, type TEXT)",
         "videos":              "CREATE TABLE Videos (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, status INTEGER, dimensions TEXT, error TEXT, debuginfo TEXT, duration_1080 INTEGER, duration_720 INTEGER, duration_hqv INTEGER, duration_vgad2 INTEGER, duration_ltvgad2 INTEGER, timestamp INTEGER, hq_present INTEGER, duration_ss INTEGER, ss_timestamp INTEGER, media_type INTEGER, convo_id INTEGER, device_path TEXT, device_name TEXT, participant_id INTEGER, rank INTEGER)",
         "voicemails":          "CREATE TABLE Voicemails (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, partner_handle TEXT, partner_dispname TEXT, status INTEGER, failurereason INTEGER, subject TEXT, timestamp INTEGER, duration INTEGER, allowed_duration INTEGER, playback_progress INTEGER, convo_id INTEGER, chatmsg_guid BLOB, notification_id INTEGER, flags INTEGER, size INTEGER, path TEXT, failures INTEGER, vflags INTEGER, xmsg TEXT, extprop_hide_from_history INTEGER)",
+    }
+
+    """SQL CREATE statements for Skyperious tables."""
+    INTERNAL_CREATE_STATEMENTS = {
+        "_options_":          "CREATE TABLE _options_ (name TEXT PRIMARY KEY, value NOT NULL)",
+        "_shared_files_":     """
+                              CREATE TABLE _shared_files_ (
+                                id       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                convo_id INTEGER NOT NULL, -- Conversations.id
+                                msg_id   INTEGER NOT NULL, -- Messages.id
+                                docid    TEXT, -- Skype online ID like "0-wus-d7-4f8248..."
+                                category TEXT, -- "audio" "video" "image"
+                                mimetype TEXT, -- "image/png" "video/mp4" etc
+                                filesize INTEGER NOT NULL DEFAULT 0,
+                                filename TEXT NOT NULL, -- Original filename
+                                filepath TEXT NOT NULL  -- Unique filename under share cache directory
+                              )""",
     }
 
 
@@ -1238,6 +1255,46 @@ class SkypeDatabase(object):
                 self.create_table(t, sql)
                 refresh = True
         if refresh: self.get_tables(refresh=True)
+
+
+    def ensure_internal_schema(self):
+        """Adds Skyperious schema tables and columns not present."""
+        if not self.is_open(): return
+        if all(t in self.tables for t in self.INTERNAL_CREATE_STATEMENTS): return
+        self.get_tables()
+        refresh = []
+        for table, sql in self.INTERNAL_CREATE_STATEMENTS.items():
+            if table not in self.tables:
+                self.create_table(table, sql)
+                refresh.append(table)
+        for table in refresh: self.get_tables(refresh=True, this_table=table)
+
+
+    def get_internal_option(self, name, reload=False):
+        """
+        Returns value of specified program option like "SharedFilesPath", or None if not set.
+
+        @param   reload  whether to requery from database
+        """
+        self.ensure_internal_schema()
+        if reload or "_options_" not in self.table_objects:
+            self.get_table_rows("_options_", reload=True)
+        return self.table_objects["_options_"].get(name)
+
+
+    def set_internal_option(self, name, value):
+        """
+        Sets value of specified program option like "SharedFilesPath" in options table.
+
+        Setting `None` clears option from table.
+        """
+        if value == self.get_internal_option(name, reload=True): return
+        if value is None: self.execute("DELETE FROM _options_ WHERE name = ?", [name])
+        else:
+            self.execute("INSERT INTO _options_ (name, value) VALUES (:name, :value) "
+                         "ON CONFLICT (name) DO UPDATE SET value = :value WHERE name = :name",
+                         {"name": name, "value": value})
+        self.get_internal_option(name, reload=True) # Update cache
 
 
     def blobs_to_binary(self, values, list_columns, col_data):
