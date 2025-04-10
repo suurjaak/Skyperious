@@ -1307,6 +1307,38 @@ class SkypeDatabase(object):
         return path
 
 
+    def get_shared_file(self, msg_id):
+        """Returns data dictionary of shared file in conversation, or None if no such."""
+        self.ensure_internal_schema()
+        if msg_id not in self.table_objects.get("_shared_files_", {}):
+            row = self.execute("SELECT * FROM _shared_files_ WHERE msg_id = ?", [msg_id]).fetchone()
+            if row:
+                self.table_objects.setdefault("_shared_files_", {})[msg_id] = row
+        return self.table_objects.get("_shared_files_", {}).get(msg_id)
+
+
+    def get_shared_file_content(self, msg_id):
+        """Returns shared file raw binary from share folder, or None if no such."""
+        path = self.get_shared_file_path(msg_id)
+        if path and os.path.isfile(path):
+            try:
+                with open(path, "rb") as f:
+                    return f.read()
+            except Exception:
+                logger.exception("Error reading %s.", path)
+        return None
+
+
+    def get_shared_file_path(self, msg_id):
+        """Returns absolute calculated path of shared file, whether on disk or not."""
+        data = self.get_shared_file(msg_id)
+        if not data: return None
+        path = data["filepath"]
+        if not os.path.isabs(path):
+            path = os.path.join(self.get_share_path(), path)
+        return path
+
+
     def blobs_to_binary(self, values, list_columns, col_data):
         """
         Converts blob columns in the list to sqlite3.Binary, suitable
