@@ -26,7 +26,7 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.9.dev0"
+Version = "5.9.dev1"
 VersionDate = "10.04.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
@@ -67,8 +67,9 @@ OptionalFileDirectives = [
     "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
     "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
     "SharedContentUseCache", "SharedFileAutoDownload", "SharedImageAutoDownload",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
+    "ShareDirectoryEnabled", "ShareDirectoryTemplate", "StatisticsPlotWidth", "StatusFlashLength",
+    "UpdateCheckInterval", "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax",
+    "WordCloudWordsMax",
 ]
 Defaults = {}
 
@@ -242,6 +243,12 @@ SharedFileAutoDownload = True
 
 """Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
+
+"""Use local folder for storing files shared in chats."""
+ShareDirectoryEnabled = True
+
+"""Template for local shared files folder name, format can use "filename" parameter."""
+ShareDirectoryTemplate = "%(filename)s files"
 
 """Width of the chat statistics plots, in pixels."""
 StatisticsPlotWidth = 150

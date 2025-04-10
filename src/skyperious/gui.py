@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2025
+@modified    10.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3127,6 +3127,7 @@ class DatabasePage(wx.Panel):
 
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_file = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
+        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         label_file = wx.StaticText(parent=panel2, label="Database information")
         label_file.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                                   wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
@@ -3135,11 +3136,11 @@ class DatabasePage(wx.Panel):
         names = ["edit_info_chats", "edit_info_contacts",
                  "edit_info_transfers", "edit_info_messages",
                  "edit_info_lastmessage", "edit_info_firstmessage", "",
-                 "edit_info_path", "edit_info_size", "edit_info_modified",
-                 "edit_info_sha1", "edit_info_md5", ]
+                 "edit_info_path", "edit_info_sharepath", "edit_info_size",
+                 "edit_info_modified", "edit_info_sha1", "edit_info_md5", ]
         labels = ["Conversations", "Contacts", "File transfers", "Messages",
                   "Last message", "First message", "",
-                  "Full path", "File size", "Last modified",
+                  "Full path", "Shared files path", "File size", "Last modified",
                   "SHA-1 checksum", "MD5 checksum",  ]
         for name, label in zip(names, labels):
             if not name and not label:
@@ -3156,22 +3157,32 @@ class DatabasePage(wx.Panel):
             sizer_file.Add(valuetext, proportion=1, flag=wx.GROW)
             setattr(self, name, valuetext)
         self.edit_info_path.Value = self.db.filename
+        self.edit_info_sharepath.Value = self.db.get_share_path()
 
         button_check = self.button_check_integrity = \
             wx.Button(parent=panel2, label="Check for corruption")
+        button_setshare = self.button_set_sharepath = \
+            wx.Button(parent=panel2, label="Set shared files path")
         button_refresh = self.button_refresh_fileinfo = \
             wx.Button(parent=panel2, label="Refresh")
         button_check.Enabled = button_refresh.Enabled = False
+        button_setshare.Enabled = conf.ShareDirectoryEnabled
+        button_setshare.ToolTip = "Set or clear database-specific path for local shared files cache"
         button_check.SetToolTip("Check database integrity for corruption and recovery.")
-        sizer_file.Add(button_check)
-        sizer_file.Add(button_refresh, border=15,
-                       flag=wx.ALIGN_RIGHT | wx.RIGHT)
+        sizer_buttons.Add(button_check)
+        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.Add(button_setshare)
+        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.Add(button_refresh)
+        
         self.Bind(wx.EVT_BUTTON, self.on_check_integrity, button_check)
+        self.Bind(wx.EVT_BUTTON, self.on_set_sharepath,   button_setshare)
         self.Bind(wx.EVT_BUTTON, lambda e: self.update_info_page(),
                   button_refresh)
 
         sizer_file.AddGrowableCol(1, 1)
-        sizer2.Add(sizer_file, border=20, proportion=1, flag=wx.TOP | wx.GROW)
+        sizer2.Add(sizer_file, border=20, flag=wx.TOP | wx.GROW)
+        sizer2.Add(sizer_buttons, border=15, flag=wx.RIGHT | wx.GROW)
 
         sizer.Add(panel1, proportion=1, border=5,
                   flag=wx.LEFT  | wx.TOP | wx.BOTTOM | wx.GROW)
@@ -4379,6 +4390,21 @@ class DatabasePage(wx.Panel):
                 self.button_export_table.Enabled = False
             grid.Thaw()
             self.page_tables.Refresh()
+
+
+    def on_set_sharepath(self, event):
+        """Handler for selecting to set or clear local shared files path for database."""
+        value = self.db.get_internal_option("ShareDirectory") or ""
+
+        message = "Set relative or absolute path for local shared files folder\n" \
+                  "or leave blank for default:"
+        with wx.TextEntryDialog(self, message, conf.Title, value=value) as dlg:
+            dlg.CenterOnParent()
+            if wx.ID_OK != dlg.ShowModal(): return
+            value2 = dlg.GetValue().strip()
+        if value2 == value: return
+        self.db.set_internal_option("ShareDirectory", value2 or None)
+        self.edit_info_sharepath.Value = self.db.get_share_path()
 
 
     def on_change_range_date(self, event):

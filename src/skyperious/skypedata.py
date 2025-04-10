@@ -1272,21 +1272,21 @@ class SkypeDatabase(object):
 
     def get_internal_option(self, name, reload=False):
         """
-        Returns value of specified program option like "SharedFilesPath", or None if not set.
+        Returns value of specified program option like "ShareDirectory", or None if not set.
 
         @param   reload  whether to requery from database
         """
         self.ensure_internal_schema()
         if reload or "_options_" not in self.table_objects:
             self.get_table_rows("_options_", reload=True)
-        return self.table_objects["_options_"].get(name)
+        return self.table_objects["_options_"].get(name, {}).get("value")
 
 
     def set_internal_option(self, name, value):
         """
-        Sets value of specified program option like "SharedFilesPath" in options table.
+        Sets value of specified program option like "ShareDirectory" in options table.
 
-        Setting `None` clears option from table.
+        Setting None clears option from table.
         """
         if value == self.get_internal_option(name, reload=True): return
         if value is None: self.execute("DELETE FROM _options_ WHERE name = ?", [name])
@@ -1295,6 +1295,16 @@ class SkypeDatabase(object):
                          "ON CONFLICT (name) DO UPDATE SET value = :value WHERE name = :name",
                          {"name": name, "value": value})
         self.get_internal_option(name, reload=True) # Update cache
+
+
+    def get_share_path(self):
+        """Gets absolute path of local shared files path for this database as configured."""
+        path = self.get_internal_option("ShareDirectory")
+        if not path:
+            try:              path = conf.ShareDirectoryTemplate % {"filename": self.filename}
+            except Exception: path = conf.ShareDirectoryTemplate
+        if not os.path.isabs(path): path = os.path.join(os.path.dirname(self.filename), path)
+        return path
 
 
     def blobs_to_binary(self, values, list_columns, col_data):
