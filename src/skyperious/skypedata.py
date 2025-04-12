@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2025
+@modified    12.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2078,8 +2078,10 @@ class MessageParser(object):
         output = output or {}
         is_html = "html" == output.get("format")
 
-        if not output.get("merge") and "dom" in message:
-            dom = message["dom"] # Cached DOM already exists
+        if "dom" in message:
+            if not output.get("merge") \
+            and not (output.get("export") and "html" == output.get("format")):
+                dom = message["dom"] # Cached DOM already exists
         if dom is None:
             dom = self.parse_message_dom(message, output)
             if not (output.get("merge")
@@ -2112,7 +2114,7 @@ class MessageParser(object):
         Parses the body of the Skype message according to message type.
 
         @param   message  message data dict
-        @param   options  output options, {merge: True} has different content
+        @param   options  output options, e.g. {merge: True} has different content
         @return           ElementTree instance
         """
         body = message["body_xml"] or ""
@@ -2178,19 +2180,30 @@ class MessageParser(object):
                          if f["chatmsg_guid"] == message["guid"])
 
             domfiles = {}
+            use_local = not options.get("export") or \
+                        ("html" == options.get("format") and options.get("media_folder"))
+            localdata = self.db.get_shared_file(message["id"]) if use_local else None
             for f in dom.findall("*/file"):
-                domfiles[int(f.get("index"))] = {
-                    "filename": f.text, "filepath": "",
+                domfiles[int(f.get("index"))] = domfile = {
+                    "filename": f.text,
+                    "filepath": "",
                     "filesize": f.get("size", 0),
                     "fileurl": live.make_content_url(f.get("url", None), "file"),
                     "partner_handle": message["author"],
                     "partner_dispname": get_author_name(message),
                     "starttime": message["timestamp"],
                     "type": TRANSFER_TYPE_OUTBOUND}
+                if localdata: # Ok to be within loop: only early messages had multiple files
+                    path = self.db.get_shared_file_path(message["id"])
+                    if os.path.isfile(path): domfile.update({
+                        "filepath": path,
+                        "filesize": localdata["filesize"],
+                        "fileurl": None})
             if files and domfiles:
-                # Attach file URLs if available
+                # Attach local data or URLs if available
                 for i, f in files.items():
-                    f.update(fileurl=domfiles.get(i, {}).get("fileurl"))
+                    if i in domfiles:
+                        f.update({k: domfiles[i][k] for k in ("filepath", "filesize", "fileurl")})
             elif not files:
                 # No rows in Transfers, try to find data from message body
                 # and create replacements for Transfers fields
@@ -2343,6 +2356,27 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
+        # Photo/video/file sharing: make file link for local share folder, if any
+        if any(dom.iter("URIObject")):
+            path = self.db.get_shared_file_path(message["id"])
+            if path and os.path.isfile(path):
+                filedata = self.db.get_shared_file(message["id"])
+                url = util.path_to_url(path)
+                text = step.Template('Shared file <a href="{{url}}">{{name}}</a>'
+                                    ).expand(url=url, name=filedata["filename"])
+                dom = self.make_xml(text, message)
+
+                if self.stats:
+                    use_local = not options.get("export") or \
+                                ("html" == options.get("format") and options.get("media_folder"))
+                    data = dict(url=url, author_name=get_author_name(message),
+                                author=message["author"], success=True,
+                                datetime=message.get("datetime")
+                                         or self.db.stamp_to_date(message["timestamp"]),
+                                filename=filedata["filename"], filesize=filedata["filesize"])
+                    if use_local: data.update(filepath=path, url=None)
+                    self.stats["shared_media"][message["id"]] = data
+
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
             url, filename, dom0 = next(dom.iter("URIObject")).get("uri"), None, dom
@@ -2492,13 +2526,25 @@ class MessageParser(object):
                           and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
                 content = None
-                if do_download and f.get("fileurl"):
+                if self.db.get_shared_file(message["id"]):
+                    if output.get("media_folder"):
+                        content = self.db.get_shared_file_content(message["id"])
+                elif do_download and f.get("fileurl"):
                     content = self.db.live.get_api_content(f.get("fileurl"), "file")
                 files.append(dict(f, content=content))
             ns = dict(files=files)
             return step.Template(templates.CHAT_MESSAGE_FILE).expand(ns, **output)
 
         media = self.stats.get("shared_media", {}).get(message["id"])
+        if media and output.get("export") and media.get("success"):
+            path, raw = self.db.get_shared_file_path(message["id"]), None
+            if path and os.path.isfile(path):
+                raw = self.db.get_shared_file_content(message["id"])
+            if raw:
+                media.update(success=True)
+                ns = dict(media, content=raw, message=message)
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
+
         if media and output.get("export") \
         and (conf.SharedAudioVideoAutoDownload if media.get("category") in ("audio", "video")
              else conf.SharedImageAutoDownload) \

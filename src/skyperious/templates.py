@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    07.03.2025
+@modified    12.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -430,56 +430,39 @@ from skyperious.lib import util
       position: relative;
       top: 2px;
     }
-    #shared_media, #transfers {
+    .shared_files {
       margin-top: 10px;
       padding-top: 5px;
       border-top: 1px solid #99BBFF;
     }
-    #transfers table {
+    .shared_files table {
       display: none;
       margin-top: 10px;
       width: 100%;
     }
-    #shared_media table {
-      display: none;
-      margin-top: 10px;
-      width: 100%;
-    }
-    #shared_media table td, #transfers table td {
+    .shared_files table td {
+      text-align: right;
       vertical-align: top;
       white-space: nowrap;
     }
-    #shared_media table a, #transfers table a {
-      color: blue;
-    }
-    #shared_media table td:first-child, #transfers table td:first-child { /* author */
+    .shared_files table td:first-child { /* author */
       padding-right: 15px;
-      text-align: right;
       white-space: normal;
     }
-    #shared_media table td:last-child, #transfers table td:last-child { /* timestamp */
-      text-align: right;
-    }
-    #shared_media table td:last-child a, #transfers table td:last-child a { /* timestamp link */
+    .shared_files table td.timestamp a {
       color: inherit;
     }
-    #shared_media table td:last-child a:hover, #transfers table td:last-child a:hover {
+    .shared_files table td.timestamp a:hover {
       text-decoration: underline;
     }
-    #shared_media td:nth-child(2) { /* filename and filesize */
-      display: flex;
-      justify-content: space-between;
-    }
-    #shared_media td:nth-child(3) { /* live-link */
-      text-align: right;
-    }
-    #transfers td:nth-child(3) { /* filesize */
-      text-align: right;
-    }
-    #shared_media .filename {
+    .shared_files table td.filename {
       color: {{ conf.HistoryBackgroundColour }};
+      text-align: left;
     }
-    #shared_media .filename, #transfers .filename {
+    .shared_files td.link {
+      padding-left: 15px
+    }
+    .shared_files table td.link a {
       color: blue;
     }
     #timeline {
@@ -624,9 +607,9 @@ from skyperious.lib import util
     body.darkmode #timeline h3,
     body.darkmode .wordcloud span,
     body.darkmode a, body.darkmode a.visited,
-    body.darkmode #transfers .filename,
+    body.darkmode .shared_files .filename,
     body.darkmode .toggle_plusminus,
-    body.darkmode #shared_media table td:not(:first-child) a {
+    body.darkmode .shared_files table td:not(:first-child) a {
       color: #80FF74;
     }
     body.darkmode #stats_data > tbody > tr > td:nth-child(3),
@@ -1303,22 +1286,24 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 
 
 %if stats["shared_media"]:
-    <div id="shared_media">
+    <div class="shared_files">
 
     <b>Shared media</b>&nbsp;&nbsp;[<a title="Click to show/hide shared media links" href="#" onClick="return toggle_plusminus(this, 'shared_media_table');" class="toggle_plusminus">+</a>]
     <table id="shared_media_table">
 %for message_id, data in sorted(stats["shared_media"].items(), key=lambda x: x[1]["datetime"]):
       <tr>
         <td class="{{ "remote" if data["author"] != db.id else "local" }}" title="{{ data["author"] }}">{{ data["author_name"] }}</td>
+        <td class="filename">{{ data.get("filename") or "" }}</td>
         <td>
-          <span class="filename">{{ data.get("filename") or "" }}</span>
 %if data.get("filesize") is not None:
-          <span class="filesize" title="{{ util.plural("byte", data["filesize"], sep=",") }}">{{ util.format_bytes(data["filesize"]) }}</span>
+          <span title="{{ util.plural("byte", data["filesize"], sep=",") }}">{{ util.format_bytes(data["filesize"]) }}</span>
 %endif
         </td>
-        <td>
-%if data.get("url"):
-            <a href="{{ data["url"] }}" target="_blank">Online</a>
+        <td class="link">
+%if data.get("filepath"):
+        <a href="{{ util.path_to_url(data["filepath"]) }}" target="_blank">Open</a>
+%elif data.get("url"):
+        <a href="{{ data["url"] }}" target="_blank">Online</a>
 %endif
         </td>
         <td class="timestamp" title="{{ data["datetime"].strftime("%Y-%m-%d %H:%M:%S") }}"><a href="#message:{{ message_id }}">{{ data["datetime"].strftime("%Y-%m-%d %H:%M") }}</a></td>
@@ -1330,7 +1315,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 
 
 %if stats["transfers"]:
-    <div id="transfers">
+    <div class="shared_files">
       <b>Sent and received files</b>&nbsp;&nbsp;[<a title="Click to show/hide file transfers" href="#" onClick="return toggle_plusminus(this, 'transfers_table');" class="toggle_plusminus">+</a>]
       <table id="transfers_table">
 %for f in stats["transfers"]:
@@ -1342,14 +1327,15 @@ dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
 %>
-        <tr><td class="{{ "remote" if from_remote else "local" }}" title="{{ f["partner_handle"] if from_remote else db.username }}">{{ partner if from_remote else db.account["name"] }}</td><td>
-%if f["filepath"]:
-          <a href="{{ util.path_to_url(f["filepath"]) }}" target="_blank" class="filename">{{ f["filepath"] }}</a>
-%else:
-          <span class="filename">{{ f["filename"] }}</span>
-%endif
+        <tr><td class="{{ "remote" if from_remote else "local" }}" title="{{ f["partner_handle"] if from_remote else db.username }}">{{ partner if from_remote else db.account["name"] }}</td><td class="filename">
+          {{ f["filename"] }}
         </td><td title="{{ util.plural("byte", int(f["filesize"]), sep=",") }}">
           {{ util.format_bytes(int(f["filesize"])) }}
+        </td><td class="link">
+%if f["filepath"]:
+          <a href="{{ util.path_to_url(f["filepath"]) }}" target="_blank">Open</a>
+%endif
+        </td>
         </td><td class="timestamp" title="{{ f_datetime_title }}">
           <a href="#message:{{ f["__message_id"] }}">{{ f_datetime }}</a>
         </td></tr>
@@ -1535,7 +1521,7 @@ except Exception: pass
 """
 HTML chat history export template for shared files message body.
 
-@param   files         [{filename, filepath, fileurl, content}]
+@param   files         [{filename, filepath, content}]
 @param   media_folder  path to save files under
 """
 CHAT_MESSAGE_FILE = """<%
@@ -2150,7 +2136,9 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 %endif
     </td>
     <td valign="top">
-%if data.get("url"):
+%if data.get("filepath"):
+      <font size="2" face="{{ conf.HistoryFontName }}"><a href="{{ util.path_to_url(data["filepath"]) }}"><font color="{{ conf.LinkColour }}">Open</font></a></font>
+%elif data.get("url"):
       <font size="2" face="{{ conf.HistoryFontName }}"><a href="{{ data["url"] }}"><font color="{{ conf.LinkColour }}">Online</font></a></font>
 %endif
     </td>
@@ -2174,16 +2162,13 @@ f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.ge
 %>
   <tr>
     <td align="right" valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.HistoryRemoteAuthorColour if from_remote else conf.HistoryLocalAuthorColour }}">{{ partner if from_remote else db.account["name"] }}</font></td>
-    <td valign="top"><font size="2" face="{{ conf.HistoryFontName }}">
+    <td valign="top"><font size="2" face="{{ conf.HistoryFontName }}" color="{{ conf.LinkColour }}">{{ f["filename"] }}</font></td>
+    <td align="right" valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}">{{ util.format_bytes(int(f["filesize"])) }}</font></td>
+    <td valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}">
 %if f["filepath"]:
-    <a href="{{ util.path_to_url(f["filepath"]) }}">
-      <font color="{{ conf.LinkColour }}">{{ f["filepath"] }}</font>
-    </a>
-%else:
-    <font color="{{ conf.LinkColour }}">{{ f["filename"] }}</font>
+    <a href="{{ util.path_to_url(f["filepath"]) }}"><font color="{{ conf.LinkColour }}">Open</font></a>
 %endif
     </font></td>
-    <td align="right" valign="top" nowrap=""><font size="2" face="{{ conf.HistoryFontName }}">{{ util.format_bytes(int(f["filesize"])) }}</font></td>
     <td align="right" valign="top" nowrap=""><a href="message:{{ f["__message_id"] }}"><font size="2" color="{{ conf.HistoryTimestampColour }}" face="{{ conf.HistoryFontName }}">{{ f_datetime }}</font></a></td>
   </tr>
 %endfor
