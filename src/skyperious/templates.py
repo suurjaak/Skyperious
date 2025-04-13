@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    12.04.2025
+@modified    13.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1444,12 +1444,12 @@ HTML chat history export template for shared media message body.
 @param   message         message data dict
 @param   ?category       media category like "video", defaults to "image"
 @param   ?filename       media filename, if any
-@param   ?media_folder   path to save files under, if not embedding
+@param   ?filepath       path to link file from, if not embedding
 """
 CHAT_MESSAGE_MEDIA = """<%
 import logging, mimetypes, os
 from six.moves import urllib
-from skyperious import conf, skypedata
+from skyperious import skypedata
 from skyperious.lib import util
 
 category = category if isdef("category") else None
@@ -1467,16 +1467,9 @@ caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author
 title = "Click to %s." % ("enlarge" if "image" == category else "play")
 if filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
-if isdef("media_folder") and media_folder:
-    basename = filename or "%s.%s" % (message["id"], filetype)
-    basename = util.safe_filename(basename)
-    filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
-    try:
-        with util.create_file(filepath, "wb", handle=True) as f: f.write(content)
-    except Exception:
-        logger = logging.getLogger(conf.Title.lower())
-        logger.exception("Error saving export image %s.", filepath)
+if isdef("filepath") and filepath:
+    folder, basename = os.path.basename(os.path.split(filepath)[0]), os.path.basename(filepath)
+    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (folder, basename))
 else:
     src = "data:%s;base64,%s" % (mimetype, util.b64encode(content))
 %>
@@ -1504,12 +1497,12 @@ try:
         size = w * ratio, h * ratio
 except Exception: pass
 %>
-    %if isdef("media_folder") and media_folder:
+    %if isdef("filepath") and filepath:
   <a href="{{ src }}" target="_blank" onclick="return false">
     %endif
   <img src="{{ src }}" title="{{ title }}" alt="{{ title }}" data-jslghtbx data-jslghtbx-group="shared_media" data-jslghtbx-caption="{{ caption }}" />
   <div class="cover"{{ ' style="width: %spx; height: %spx;"' % size if size else '' }}></div>
-    %if isdef("media_folder") and media_folder:
+    %if isdef("filepath") and filepath:
   </a>
     %endif
 %endif
@@ -1521,36 +1514,18 @@ except Exception: pass
 """
 HTML chat history export template for shared files message body.
 
-@param   files         [{filename, filepath, content}]
-@param   media_folder  path to save files under
+@param   files         [{filename, ?filepath}]
 """
 CHAT_MESSAGE_FILE = """<%
-import logging, os
 from six.moves import urllib
-from skyperious import conf
 from skyperious.lib import util
 
 punct = lambda i: "." if i == len(files) - 1 else ","
 %>
 Sent {{ util.plural("file", files, numbers=False) }}
 %for i, file in enumerate(files):
-<%
-if file["content"]:
-    basename = util.safe_filename(file["filename"])
-    filepath = util.unique_path(os.path.join(media_folder, basename))
-    src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (media_folder, filepath))
-    try:
-        with util.create_file(filepath, "wb", handle=True) as f:
-            f.write(file["content"])
-    except Exception:
-        src = None
-        logger = logging.getLogger(conf.Title.lower())
-        logger.exception("Error saving export file %s.", filepath)
-else:
-    src = util.path_to_url(file["filepath"]) if file["filepath"] else None
-%>
-%if src:
-  <a href="{{ src }}" target="_blank">{{ file["filename"] }}</a>{{ punct(i) }}
+%if file.get("filepath"):
+  <a href="{{ util.path_to_url(file["filepath"]) }}" target="_blank">{{ file["filename"] }}</a>{{ punct(i) }}
 %else:
   <span class="filename">{{ file["filename"] }}</span>{{ punct(i) }}
 %endif

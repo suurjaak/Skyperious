@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    12.04.2025
+@modified    13.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2077,15 +2077,14 @@ class MessageParser(object):
         result = dom = None
         output = output or {}
         is_html = "html" == output.get("format")
+        use_cache = not self.stats and not output.get("merge") \
+                    and not (output.get("export") and "html" == output.get("format"))
 
-        if "dom" in message:
-            if not output.get("merge") \
-            and not (output.get("export") and "html" == output.get("format")):
+        if "dom" in message and use_cache:
                 dom = message["dom"] # Cached DOM already exists
         if dom is None:
             dom = self.parse_message_dom(message, output)
-            if not (output.get("merge")
-            or message["id"] in self.stats.get("shared_media", {})):
+            if use_cache:
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
@@ -2180,9 +2179,7 @@ class MessageParser(object):
                          if f["chatmsg_guid"] == message["guid"])
 
             domfiles = {}
-            use_local = not options.get("export") or \
-                        ("html" == options.get("format") and options.get("media_folder"))
-            localdata = self.db.get_shared_file(message["id"]) if use_local else None
+            localdata = None if options.get("export") else self.db.get_shared_file(message["id"])
             for f in dom.findall("*/file"):
                 domfiles[int(f.get("index"))] = domfile = {
                     "filename": f.text,
@@ -2367,14 +2364,12 @@ class MessageParser(object):
                 dom = self.make_xml(text, message)
 
                 if self.stats:
-                    use_local = not options.get("export") or \
-                                ("html" == options.get("format") and options.get("media_folder"))
                     data = dict(url=url, author_name=get_author_name(message),
                                 author=message["author"], success=True,
                                 datetime=message.get("datetime")
                                          or self.db.stamp_to_date(message["timestamp"]),
                                 filename=filedata["filename"], filesize=filedata["filesize"])
-                    if use_local: data.update(filepath=path, url=None)
+                    if not options.get("export"): data.update(filepath=path)
                     self.stats["shared_media"][message["id"]] = data
 
         # Photo/video/file sharing: take file link, if any
@@ -2520,30 +2515,23 @@ class MessageParser(object):
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
         if message.get("__files") and output.get("export"):
-            files = []
             do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
                           and output.get("media_folder") \
                           and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
-                content = None
                 if self.db.get_shared_file(message["id"]):
-                    if output.get("media_folder"):
-                        content = self.db.get_shared_file_content(message["id"])
+                    self.handle_shared_content(message, output, f)
                 elif do_download and f.get("fileurl"):
                     content = self.db.live.get_api_content(f.get("fileurl"), "file")
-                files.append(dict(f, content=content))
-            ns = dict(files=files)
-            return step.Template(templates.CHAT_MESSAGE_FILE).expand(ns, **output)
+                    if content is not None: self.handle_shared_content(message, output, f, content)
+            return step.Template(templates.CHAT_MESSAGE_FILE).expand(files=message["__files"])
 
         media = self.stats.get("shared_media", {}).get(message["id"])
         if media and output.get("export") and media.get("success"):
-            path, raw = self.db.get_shared_file_path(message["id"]), None
-            if path and os.path.isfile(path):
-                raw = self.db.get_shared_file_content(message["id"])
-            if raw:
-                media.update(success=True)
-                ns = dict(media, content=raw, message=message)
-                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
+            content = self.handle_shared_content(message, output, media)
+            if content is not None:
+                ns = dict(media, content=content, message=message)
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
 
         if media and output.get("export") \
         and (conf.SharedAudioVideoAutoDownload if media.get("category") in ("audio", "video")
@@ -2552,11 +2540,12 @@ class MessageParser(object):
         and message["datetime"] >= conf.SharedContentDownloadMinDate:
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
-            raw = self.db.live.get_api_content(media["url"], category)
-            if raw is not None:
-                media.update(success=True, filesize=len(raw))
-                ns = dict(media, content=raw, message=message)
-                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
+            content = self.db.live.get_api_content(media["url"], category)
+            if content is not None:
+                self.handle_shared_content(message, output, media, content)
+                media.update(success=True)
+                ns = dict(media, content=content, message=message)
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
@@ -2715,6 +2704,62 @@ class MessageParser(object):
         while len(dom) == 1 and "span" == dom[0].tag and not dom[0].tail:
             dom, dom.tag = dom[0], dom.tag # Collapse single spans to root
         return dom
+
+
+    def handle_shared_content(self, message, output, metadata=None, content=None):
+        """
+        Handles shared file/media content for HTML export, ensuring valid stats.
+
+        Populates local share directory if enabled and content given.
+
+        @param   options   output options like {"media_folder": directory/to/write/under}
+        @param   metadata  metadata dictionary to update, containing at least "filename"
+        @param   content   raw binary content if not using local share directory
+        @return            binary content if media and no error else None
+        """
+        if content is not None:
+            if conf.ShareDirectoryEnabled:
+                self.db.todo_write_shared_file(message, content, metadata)
+        else:
+            localpath = self.db.get_shared_file_path(message["id"])
+            if not localpath or not os.path.isfile(localpath): return None
+        filedata = self.db.get_shared_file(message["id"]) or {}
+
+        outpath = None
+        if output.get("media_folder"):
+            basename = metadata.get("filename")
+            if not basename:
+                peek = content
+                if peek is None:
+                    try:
+                        with open(localpath, "rb") as f: peek = f.read(100)
+                    except Exception:
+                        logger.exception("Error reading local shared %s.", localpath)
+                        return None
+                filetype = util.get_file_type(peek, filedata.get("category"))
+                basename = "%s.%s" % (message["id"], filetype)
+            basename = util.safe_filename(basename)
+            outpath = util.unique_path(os.path.join(output["media_folder"], basename))
+        if outpath:
+            try: os.makedirs(output["media_folder"])
+            except Exception: pass
+            try:
+                if content is None: shutil.copyfile(localpath, outpath)
+                else:
+                    with open(outpath, "wb") as f: f.write(content)
+            except Exception:
+                logger.exception("Error producing %s.", outpath)
+                return content
+
+        if content is None and MESSAGE_TYPE_FILE != message["type"]:
+            try:
+                with open(localpath, "rb") as f: content = f.read()
+            except Exception:
+                logger.exception("Error reading file %s.", localpath)
+                return None
+
+        if outpath: metadata.update(filepath=outpath)
+        return content
 
 
     def add_dict_text(self, dictionary, key, text, inter=" "):
