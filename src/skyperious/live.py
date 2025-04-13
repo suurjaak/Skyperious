@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.03.2025
+@modified    13.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1762,3 +1762,15 @@ def make_content_url(url, category=None):
         url += "/views/imgpsh_fullsize"
 
     return url
+
+
+def get_content_id(url):
+    """
+    Returns Skype live content ID from Skype online URL, or None if not detected.
+
+    @param   url  like "https://api.asm.skype.com/../0-weu-d4-73d../views/audio"
+                  or "https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-ab2.."
+    """
+    if "docid=" not in url: match = re.search("/([a-z0-9-]{20,})(/|$)", url, re.I)
+    else: match = re.search("[^a-z0-9]docid=([a-z0-9-]{20,})([^a-z0-9]|$)", url, re.I)
+    return match[1] if match else None

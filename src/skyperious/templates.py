@@ -1302,7 +1302,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
         <td class="link">
 %if data.get("filepath"):
         <a href="{{ util.path_to_url(data["filepath"]) }}" target="_blank">Open</a>
-%elif data.get("url"):
+%elif not data.get("success") and data.get("url"):
         <a href="{{ data["url"] }}" target="_blank">Online</a>
 %endif
         </td>

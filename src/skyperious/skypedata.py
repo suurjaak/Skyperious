@@ -1339,6 +1339,48 @@ class SkypeDatabase(object):
         return path
 
 
+    def store_shared_file(self, message, content, data):
+        """
+        Saves file or media shared in message; replaces existing data if present.
+
+        @param   content  raw binary content bytes
+        @param   data     file metadata dictionary, as {?filename, ?docid, ?category, ?mimetype}
+        """
+        self.ensure_internal_schema()
+        filedata0 = self.get_shared_file(message["id"])
+
+        basename = data.get("filename")
+        if not basename:
+            filetype = util.get_file_type(content, data.get("category"))
+            basename = "%s.%s" % (message["id"], filetype)
+        dt = message.get("datetime") or self.stamp_to_date(message["timestamp"])
+        basename = "_".join((dt.strftime("%Y%m%d_%H%I%S"), message["author"], basename))
+        basename = util.safe_filename(basename)
+
+        if filedata0:
+            outpath0 = self.get_shared_file_path(message["id"])
+            try: os.unlink(outpath0)
+            except Exception: pass
+        directory = self.get_share_path()
+        outpath = util.unique_path(os.path.join(directory, basename))
+        try: os.makedirs(directory)
+        except Exception: pass
+        try:
+            with open(outpath, "wb") as f:
+                f.write(content)
+        except Exception:
+            logger.exception("Failed to store local shared file %s.", outpath)
+            return
+
+        filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
+                        filename=data.get("filename") or "", filepath=basename)
+        filedata.update({k: data[k] for k in ("docid", "category", "mimetype") if data.get(k)})
+        if not data.get("docid") and data.get("url"):
+            filedata.update(docid=live.get_content_id(data["url"]))
+        if filedata0: self.update_row("_shared_files_", filedata, filedata0)
+        else: self.insert_row("_shared_files_", filedata)
+             
+
     def blobs_to_binary(self, values, list_columns, col_data):
         """
         Converts blob columns in the list to sqlite3.Binary, suitable
@@ -2185,7 +2227,7 @@ class MessageParser(object):
                     "filename": f.text,
                     "filepath": "",
                     "filesize": f.get("size", 0),
-                    "fileurl": live.make_content_url(f.get("url", None), "file"),
+                    "url": live.make_content_url(f.get("url", None), category="file"),
                     "partner_handle": message["author"],
                     "partner_dispname": get_author_name(message),
                     "starttime": message["timestamp"],
@@ -2193,14 +2235,13 @@ class MessageParser(object):
                 if localdata: # Ok to be within loop: only early messages had multiple files
                     path = self.db.get_shared_file_path(message["id"])
                     if os.path.isfile(path): domfile.update({
-                        "filepath": path,
-                        "filesize": localdata["filesize"],
-                        "fileurl": None})
+                        "filepath": path, "filesize": localdata["filesize"], "url": None
+                    })
             if files and domfiles:
                 # Attach local data or URLs if available
                 for i, f in files.items():
                     if i in domfiles:
-                        f.update({k: domfiles[i][k] for k in ("filepath", "filesize", "fileurl")})
+                        f.update({k: domfiles[i][k] for k in ("filepath", "filesize", "url")})
             elif not files:
                 # No rows in Transfers, try to find data from message body
                 # and create replacements for Transfers fields
@@ -2213,7 +2254,7 @@ class MessageParser(object):
             for i, f in enumerate(files[i] for i in sorted(files)):
                 if len(dom) > 0:
                     a.tail = ", "
-                h = f["fileurl"] or util.path_to_url(f["filepath"] or f["filename"])
+                h = f["url"] or util.path_to_url(f["filepath"] or f["filename"])
                 a = ElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
                 a.tail = "" if i < len(files) - 1 else "."
@@ -2521,8 +2562,8 @@ class MessageParser(object):
             for f in message["__files"]:
                 if self.db.get_shared_file(message["id"]):
                     self.handle_shared_content(message, output, f)
-                elif do_download and f.get("fileurl"):
-                    content = self.db.live.get_api_content(f.get("fileurl"), "file")
+                elif do_download and f.get("url"):
+                    content = self.db.live.get_api_content(f["url"], "file")
                     if content is not None: self.handle_shared_content(message, output, f, content)
             return step.Template(templates.CHAT_MESSAGE_FILE).expand(files=message["__files"])
 
@@ -2719,7 +2760,7 @@ class MessageParser(object):
         """
         if content is not None:
             if conf.ShareDirectoryEnabled:
-                self.db.todo_write_shared_file(message, content, metadata)
+                self.db.store_shared_file(message, content, metadata)
         else:
             localpath = self.db.get_shared_file_path(message["id"])
             if not localpath or not os.path.isfile(localpath): return None
