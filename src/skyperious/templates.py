@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    13.04.2025
+@modified    14.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1445,6 +1445,7 @@ HTML chat history export template for shared media message body.
 @param   ?category       media category like "video", defaults to "image"
 @param   ?filename       media filename, if any
 @param   ?filepath       path to link file from, if not embedding
+@param   ?mimetype       file MIME type, if any
 """
 CHAT_MESSAGE_MEDIA = """<%
 import logging, mimetypes, os
@@ -1454,15 +1455,18 @@ from skyperious.lib import util
 
 category = category if isdef("category") else None
 filename = filename if isdef("filename") else None
+mimetype = mimetype if isdef("mimetype") else None
 if category not in ("audio", "video"): category = "image"
-src, mimetype, filetype = url, None, util.get_file_type(content, category, filename)
-if category in ("audio", "video"):
-    mimetype = mimetypes.guess_type(filename or "")[0]
+
+filetype = util.get_file_type(content, category, filename)
 if filename and filetype and not os.path.splitext(filename)[-1]:
     filename = "%s.%s" % (filename, filetype)
-filetype = filetype or category
-mimetype = mimetype or "%s/%s" % (category, escape(filetype))
+if not mimetype:
+    mimetype = util.get_mime_type(content, category, filename)
+if not mimetype:
+    mimetype = "%s/%s" % (category, escape(filetype or category))
 
+src = url
 caption = "From %s at <a href='#message:%s'>%s</a>." % tuple(map(escape, [author_name, message["id"], datetime.strftime("%Y-%m-%d %H:%M")]))
 title = "Click to %s." % ("enlarge" if "image" == category else "play")
 if filename:

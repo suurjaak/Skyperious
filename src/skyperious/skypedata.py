@@ -2578,7 +2578,8 @@ class MessageParser(object):
         if media and output.get("export") and media.get("success"):
             content = self.handle_shared_content(message, output, media)
             if content is not None:
-                ns = dict(media, content=content, message=message)
+                filedata = self.db.get_shared_file(message["id"])
+                ns = dict(media, content=content, message=message, mimetype=filedata.get("mimetype"))
                 return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
 
         if media and output.get("export") \
@@ -2592,7 +2593,8 @@ class MessageParser(object):
             if content is not None:
                 self.handle_shared_content(message, output, media, content)
                 media.update(success=True)
-                ns = dict(media, content=content, message=message)
+                filedata = self.db.get_shared_file(message["id"])
+                ns = dict(media, content=content, message=message, mimetype=filedata.get("mimetype"))
                 return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
