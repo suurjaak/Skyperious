@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    27.03.2025
+@modified    14.04.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -21,6 +21,7 @@ except ImportError: imghdr = None  # Py3.13+
 import io
 import locale
 import math
+import mimetypes
 import os
 import platform
 import re
@@ -497,16 +498,36 @@ def get_file_type(content, category=None, filename=None):
     @param   category  type of content, e.g. "image" or "audio" or "video"
     @param   filename  original name of file
     """
-    category = category if category in ("audio", "video") else "image"
     filetype = None
-    if filename:
-        filetype = os.path.splitext(filename)[-1][1:] or filetype
-    if "image" == category:
-        if imghdr: filetype = imghdr.what("", content)
-        elif filetype_lib: filetype = filetype_lib.guess_extension(content)
-    elif not filetype:
-        filetype = "mp4" # Pretty safe bet for Skype audio/video
-    return filetype or category
+    fileext = os.path.splitext(filename)[1].lstrip(".") if filename else None
+    if category not in ("audio", "video") and imghdr:
+        filetype = imghdr.what("", content)
+    if not filetype and filetype_lib:
+        filetype = filetype_lib.guess_extension(content)
+    if not filetype and fileext:
+        mimetype, _ = mimetypes.guess_type("name.%s" % fileext)
+        if mimetype: filetype = mimetype.split("/")[-1]
+    if not filetype and not fileext:
+        if   "video" == category: filetype = "mp4" # Rather safe bets for Skype audio/video
+        elif "audio" == category: filetype = "mp3"
+    return filetype or fileext or category
+
+
+def get_mime_type(content, category=None, filename=None):
+    """
+    Returns file MIME type like "image/png", or None if not detected.
+
+    @param   content   file as raw bytes
+    @param   category  type of content, e.g. "image" or "audio" or "video"
+    @param   filename  original name of file
+    """
+    filetype = get_file_type(content, category, filename)
+    if filetype or filename:
+        mimetype, _ = mimetypes.guess_type(filename or "name.%s" % filetype)
+        if mimetype: return mimetype
+    if filetype and category in ("image", "audio", "video"):
+        return "%s/%s" % (category, filetype)
+    return None
 
 
 def is_os_64bit():
