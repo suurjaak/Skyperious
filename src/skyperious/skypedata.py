@@ -1375,11 +1375,13 @@ class SkypeDatabase(object):
         filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
                         filename=data.get("filename") or "", filepath=basename)
         filedata.update({k: data[k] for k in ("docid", "category", "mimetype") if data.get(k)})
-        if not data.get("docid") and data.get("url"):
+        if not filedata.get("docid") and data.get("url"):
             filedata.update(docid=live.get_content_id(data["url"]))
+        if not filedata.get("mimetype"):
+            filedata.update(mimetype=util.get_mime_type(content, data.get("category"), basename))
         if filedata0: self.update_row("_shared_files_", filedata, filedata0)
         else: self.insert_row("_shared_files_", filedata)
-             
+
 
     def blobs_to_binary(self, values, list_columns, col_data):
         """
