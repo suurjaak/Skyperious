@@ -2403,8 +2403,8 @@ class MessageParser(object):
                 objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
                 filedata = self.db.get_shared_file(message["id"])
                 url = util.path_to_url(path)
-                text = step.Template('Shared file <a href="{{url}}">{{name}}</a>'
-                                    ).expand(url=url, name=filedata["filename"])
+                text = step.Template('Shared {{category}} <a href="{{url}}">{{name}}</a>').expand(
+                    category=filedata["category"] or "file", url=url, name=filedata["filename"])
                 dom = self.make_xml(text, message)
 
                 if self.stats:
