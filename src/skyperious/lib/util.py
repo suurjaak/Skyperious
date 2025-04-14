@@ -33,7 +33,7 @@ import time
 import warnings
 
 Image = ImageFile = wx = None # For image resize, most functions work without
-try: import filetype_lib  # For image detection in Py3.13+
+try: import filetype as filetype_lib  # For image detection in Py3.13+
 except Exception: filetype_lib = None
 try: from PIL import Image, ImageFile
 except ImportError: pass
