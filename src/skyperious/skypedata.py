@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    13.04.2025
+@modified    14.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2398,6 +2398,7 @@ class MessageParser(object):
         if any(dom.iter("URIObject")):
             path = self.db.get_shared_file_path(message["id"])
             if path and os.path.isfile(path):
+                objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
                 filedata = self.db.get_shared_file(message["id"])
                 url = util.path_to_url(path)
                 text = step.Template('Shared file <a href="{{url}}">{{name}}</a>'
@@ -2411,6 +2412,9 @@ class MessageParser(object):
                                          or self.db.stamp_to_date(message["timestamp"]),
                                 filename=filedata["filename"], filesize=filedata["filesize"])
                     if not options.get("export"): data.update(filepath=path)
+                    if   "picture" in objtype: data["category"] = "image"
+                    elif "audio"   in objtype: data["category"] = "audio"
+                    elif "video"   in objtype: data["category"] = "video"
                     self.stats["shared_media"][message["id"]] = data
 
         # Photo/video/file sharing: take file link, if any
@@ -2443,7 +2447,8 @@ class MessageParser(object):
                 except Exception: pass
 
                 objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
-                if   "audio"   in objtype: data["category"] = "audio"
+                if   "picture" in objtype: data["category"] = "image"
+                elif "audio"   in objtype: data["category"] = "audio"
                 elif "video"   in objtype: data["category"] = "video"
                 elif "sticker" in objtype: data["category"] = "sticker"
                 elif "swift"   in objtype:
