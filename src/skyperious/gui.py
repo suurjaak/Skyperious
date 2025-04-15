@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    10.04.2025
+@modified    15.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -4039,6 +4039,9 @@ class DatabasePage(wx.Panel):
                             slabel += "."
 
                     if slabel and not slabel.endswith("."): slabel += "."
+
+                    if "shared_files" in result:
+                        slabel += "\n\nStored %s locally." % util.plural("shared file", result["shared_files"])
 
                 elif not result.get("start"):
                     if "chats" == result["table"] and result.get("chat"):

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    13.04.2025
+@modified    15.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -412,6 +412,17 @@ class SkypeLogin(object):
 
         if "messages" == table and isinstance(item, skpy.SkypeCallMsg):
             self.insert_calls(item, dbitem, dbitem0)
+
+        if "messages" == table and "<URIObject" in item.content and conf.LiveSyncAutoDownload:
+            metadata, content = None, None
+            localpath = self.db.get_shared_file_path(dbitem["id"])
+            if not localpath or not os.path.exists(localpath):
+                metadata = self.msg_parser.get_message_share_data(body=item.content)
+            if metadata:
+                content = self.download_content(metadata["url"], metadata["category"] or "file")
+            if content is not None:
+                if self.db.store_shared_file(dbitem, content, metadata):
+                    self.sync_counts["shared_files"] += 1
 
         if result is None and dbitem0 and dbitem0.get("__inserted__"):
             result = self.SAVE.SKIP # Primary was inserted during this run, no need to count
@@ -891,6 +902,8 @@ class SkypeLogin(object):
             message_count_new=self.sync_counts["messages_new"],
             message_count_updated=self.sync_counts["messages_updated"],
         ) if messages else {}
+        if self.sync_counts.get("shared_files"):
+            pargs["shared_files"] = self.sync_counts["shared_files"]
         self.progress(
             action="populate", table="chats", end=True, count=len(updateds),
             new=self.sync_counts["chats_new"], identities=list(updateds),

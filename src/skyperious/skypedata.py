@@ -1345,6 +1345,7 @@ class SkypeDatabase(object):
 
         @param   content  raw binary content bytes
         @param   data     file metadata dictionary, as {?filename, ?docid, ?category, ?mimetype}
+        @return           True if file was stored
         """
         self.ensure_internal_schema()
         filedata0 = self.get_shared_file(message["id"])
@@ -1363,6 +1364,7 @@ class SkypeDatabase(object):
             except Exception: pass
         directory = self.get_share_path()
         outpath = util.unique_path(os.path.join(directory, basename))
+        logger.info("Storing local shared file %s for message #%s.", outpath, message["id"])
         try: os.makedirs(directory)
         except Exception: pass
         try:
@@ -1370,7 +1372,7 @@ class SkypeDatabase(object):
                 f.write(content)
         except Exception:
             logger.exception("Failed to store local shared file %s.", outpath)
-            return
+            return False
 
         filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
                         filename=data.get("filename") or "", filepath=basename)
@@ -1381,6 +1383,7 @@ class SkypeDatabase(object):
             filedata.update(mimetype=util.get_mime_type(content, data.get("category"), basename))
         if filedata0: self.update_row("_shared_files_", filedata, filedata0)
         else: self.insert_row("_shared_files_", filedata)
+        return True
 
 
     def blobs_to_binary(self, values, list_columns, col_data):
@@ -2400,7 +2403,6 @@ class MessageParser(object):
         if any(dom.iter("URIObject")):
             path = self.db.get_shared_file_path(message["id"])
             if path and os.path.isfile(path):
-                objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
                 filedata = self.db.get_shared_file(message["id"])
                 url = util.path_to_url(path)
                 text = step.Template('Shared {{category}} <a href="{{url}}">{{name}}</a>').expand(
@@ -2412,47 +2414,23 @@ class MessageParser(object):
                                 author=message["author"], success=True,
                                 datetime=message.get("datetime")
                                          or self.db.stamp_to_date(message["timestamp"]),
-                                filename=filedata["filename"], filesize=filedata["filesize"])
+                                filename=filedata["filename"], filesize=filedata["filesize"],
+                                category=filedata["category"])
                     if not options.get("export"): data.update(filepath=path)
-                    if   "picture" in objtype: data["category"] = "image"
-                    elif "audio"   in objtype: data["category"] = "audio"
-                    elif "video"   in objtype: data["category"] = "video"
                     self.stats["shared_media"][message["id"]] = data
 
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
-            url, filename, dom0 = next(dom.iter("URIObject")).get("uri"), None, dom
-            nametag = next(dom.iter("OriginalName"), None)
-            if nametag is not None: filename = nametag.get("v")
-            if not filename:
-                metatag = next(dom.iter("meta"), None)
-                if metatag is not None: filename = metatag.get("originalName")
-            link = next(dom.iter("a"), None)
-            if not url and link:
-                url = link.get("href")
-            elif not url: # Parse link from message contents
-                text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
-                match = re.search(r"(https?://[^\s<]+)", text)
-                if match: # Make link clickable
-                    url = match.group(0)
-                    a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
-                    text2 = text.replace(url, a.encode("utf-8").decode("latin1"))
-                    dom = self.make_xml(text2, message) or dom
-            if url:
-                data = dict(url=url, author_name=get_author_name(message),
+            dom0 = dom
+            data = self.get_message_share_data(dom=dom)
+            if data:
+                data.update(author_name=get_author_name(message),
                             author=message["author"], success=False,
                             datetime=message.get("datetime")
                                      or self.db.stamp_to_date(message["timestamp"]))
-                if filename: data.update(filename=filename)
-
-                try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
-                except Exception: pass
 
                 objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
-                if   "picture" in objtype: data["category"] = "image"
-                elif "audio"   in objtype: data["category"] = "audio"
-                elif "video"   in objtype: data["category"] = "video"
-                elif "sticker" in objtype: data["category"] = "sticker"
+                if   "sticker" in objtype: data["category"] = "sticker"
                 elif "swift"   in objtype:
                     # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
                     try:
@@ -2460,15 +2438,14 @@ class MessageParser(object):
                         pkg = json.loads(util.b64decode(val))
                         if "message/card" == pkg["type"]:
                             # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
-                            url = pkg["attachments"][0]["content"]["images"][0]["url"]
-                            data.update(category="card", url=live.make_content_url(url, "card"))
+                            data.update(category="card")
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
-                                                (urllib.parse.quote(url, safe=":/=?&#"), url), message)
+                                                (urllib.parse.quote(data["url"], safe=":/=?&#"),
+                                                 data["url"]), message)
                     except Exception: pass
 
-                url = data["url"] = live.make_content_url(data["url"], data.get("category"))
                 a = next(dom.iter("a"), None)
-                if a is not None: a.set("href", url); a.text = url
+                if a is not None: a.set("href", data["url"]); a.text = data["url"]
 
                 # If not root element, then this message quotes a media message
                 if self.stats and dom0.find("URIObject"):
@@ -2497,7 +2474,7 @@ class MessageParser(object):
         return dom
 
 
-    def make_xml(self, text, message):
+    def make_xml(self, text, message=None):
         """Returns a new xml.etree.cElementTree node from the text."""
         result = None
         TAG = "<xml>%s</xml>"
@@ -2513,7 +2490,7 @@ class MessageParser(object):
                     result = ElementTree.fromstring(TAG % text)
                 except Exception:
                     logger.exception('Error parsing message %s, body "%s".',
-                                     message.get("id", message), text)
+                                     message.get("id", message) if message else "", text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
         return result
@@ -2754,6 +2731,61 @@ class MessageParser(object):
         while len(dom) == 1 and "span" == dom[0].tag and not dom[0].tail:
             dom, dom.tag = dom[0], dom.tag # Collapse single spans to root
         return dom
+
+
+    def get_message_share_data(self, body=None, dom=None):
+        """
+        Returns metadata dictionary for Skype file/media message body or DOM.
+
+        @return  {url, ?docid, ?category, ?filename, ?filesize} or None
+        """
+        if not dom and body:
+            try: dom = self.make_xml(body)
+            except Exception: return None
+        if not dom or not any(dom.iter("URIObject")): return None
+
+        url = next(dom.iter("URIObject")).get("uri")
+        if not url:
+            linktag = next(dom.iter("a"), None)
+            if linktag is not None: url = linktag.get("href")
+        elif not url: # Parse link from message contents
+            text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
+            match = re.search(r"(https?://[^\s<]+)", text)
+            if match: url = match.group(0)
+        if not url: return None
+
+        docid = live.get_content_id(url) 
+
+        filename = None
+        nametag = next(dom.iter("OriginalName"), None) # <OriginalName v="..">
+        if nametag is not None: filename = nametag.get("v")
+        if not filename:
+            metatag = next(dom.iter("meta"), None) # <meta type="photo" originalName="..">
+            if metatag is not None: filename = metatag.get("originalName")
+
+        data = dict()
+        if filename: data.update(filename=filename)
+        if docid: data.update(docid=docid)
+        try: data["filesize"] = int(next(dom.iter("FileSize")).get("v"))
+        except Exception: pass
+
+        objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
+        if   "picture" in objtype: data["category"] = "image"
+        elif "audio"   in objtype: data["category"] = "audio"
+        elif "video"   in objtype: data["category"] = "video"
+        elif "file"    in objtype: data["category"] = "file"
+        elif "swift"   in objtype:
+            # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
+            try:
+                val = next(dom0.iter("Swift")).get("b64")
+                pkg = json.loads(util.b64decode(val))
+                if "message/card" == pkg["type"]:
+                    # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
+                    url = pkg["attachments"][0]["content"]["images"][0]["url"]
+            except Exception: pass
+
+        data["url"] = live.make_content_url(url, data.get("category"))
+        return data
 
 
     def handle_shared_content(self, message, output, metadata=None, content=None):

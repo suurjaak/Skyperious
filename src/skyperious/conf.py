@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.04.2025
+@modified    15.04.2025
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -26,8 +26,8 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.9.dev11"
-VersionDate = "14.04.2025"
+Version = "5.9.dev12"
+VersionDate = "15.04.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
@@ -60,16 +60,16 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
     "EmoticonsPlotWidth", "ExportChatTemplate", "ExportContactsTemplate", "ExportDbTemplate",
-    "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
-    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay", "LiveSyncRetryLimit",
-    "LogFile", "LogSQL", "LogToFile", "MaxConsoleHistory", "MaxHistoryInitialMessages",
-    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
-    "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedContentUseCache", "SharedFileAutoDownload", "SharedImageAutoDownload",
-    "ShareDirectoryEnabled", "ShareDirectoryTemplate", "StatisticsPlotWidth", "StatusFlashLength",
-    "UpdateCheckInterval", "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax",
-    "WordCloudWordsMax",
+    "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAutoDownload",
+    "LiveSyncAuthRateLimitDelay", "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay",
+    "LiveSyncRetryLimit", "LogFile", "LogSQL", "LogToFile", "MaxConsoleHistory",
+    "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
+    "MaxSearchTableRows", "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour",
+    "PlotHoursUnitSize", "PopupUnexpectedErrors", "SearchResultsChunk",
+    "SharedAudioVideoAutoDownload", "SharedContentUseCache", "SharedFileAutoDownload",
+    "SharedImageAutoDownload", "ShareDirectoryEnabled", "ShareDirectoryTemplate",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval", "WordCloudCountMin",
+    "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
 ]
 Defaults = {}
 
@@ -171,6 +171,9 @@ HistoryZoom = 1.0
 
 """Sleep interval upon hitting server rate limit, in seconds."""
 LiveSyncAuthRateLimitDelay = 20
+
+"""Download shared files and media to local share folder automatically during live sync."""
+LiveSyncAutoDownload = True
 
 """Max number of requests in rate window."""
 LiveSyncRateLimit = 10
