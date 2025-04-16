@@ -2352,6 +2352,7 @@ class DatabasePage(wx.Panel):
         self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
         ColourManager.Manage(self, "BackgroundColour", "WidgetColour")
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
+        self.TopLevelParent.Bind(guibase.EVT_CONFIGURATION, self.on_change_configuration)
 
         self.chat = None # Currently viewed chat
         self.chats = []  # All chats in database
@@ -3137,8 +3138,11 @@ class DatabasePage(wx.Panel):
             sizer_file.Add(labeltext, border=5, flag=wx.LEFT)
             sizer_file.Add(valuetext, proportion=1, flag=wx.GROW)
             setattr(self, name, valuetext)
+            setattr(self, "label_%s" % name, labeltext)
         self.edit_info_path.Value = self.db.filename
         self.edit_info_sharepath.Value = self.db.get_share_path()
+        self.edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.label_edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
 
         button_check = self.button_check_integrity = \
             wx.Button(parent=panel2, label="Check for corruption")
@@ -3146,8 +3150,8 @@ class DatabasePage(wx.Panel):
             wx.Button(parent=panel2, label="Set shared files path")
         button_refresh = self.button_refresh_fileinfo = \
             wx.Button(parent=panel2, label="Refresh")
-        button_check.Enabled = button_refresh.Enabled = False
-        button_setshare.Enabled = conf.ShareDirectoryEnabled
+        button_check.Enabled = button_setshare.Enabled = button_refresh.Enabled = False
+        button_setshare.Shown = conf.ShareDirectoryEnabled
         button_setshare.ToolTip = "Set or clear database-specific path for local shared files cache"
         button_check.SetToolTip("Check database integrity for corruption and recovery.")
         sizer_buttons.Add(button_check)
@@ -3394,6 +3398,22 @@ class DatabasePage(wx.Panel):
             self.load_contact(self.contact)
 
         wx.CallAfter(dorefresh) # Postpone to allow conf update
+
+
+    def on_change_configuration(self, event):
+        """Handler for changing advanced options, updates local share directory related UI."""
+        opts1, opts2 = event.opts1, event.opts2
+        if all(opts1.get(k) == opts2.get(k)
+               for k in ("ShareDirectoryEnabled", "ShareDirectoryTemplate")): return
+
+        self.edit_info_sharepath.Value = self.db.get_share_path()
+        self.edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.label_edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.button_set_sharepath.Enabled = conf.ShareDirectoryEnabled
+        self.button_set_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.page_info.Layout()
+        self.button_sync_file.Shown = conf.ShareDirectoryEnabled
+        self.button_sync_file.ContainingSizer.Layout()
 
 
     def update_liveinfo(self):
@@ -4387,6 +4407,7 @@ class DatabasePage(wx.Panel):
         except Exception as e:
             self.edit_info_sha1.Value = self.edit_info_md5.Value = util.format_exc(e)
         self.button_check_integrity.Enabled = True
+        self.button_set_sharepath.Enabled = conf.ShareDirectoryEnabled
         self.button_refresh_fileinfo.Enabled = True
 
 
