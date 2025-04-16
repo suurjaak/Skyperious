@@ -68,7 +68,7 @@ from . import templates
 from . import workers
 
 
-"""Custom application events for worker results."""
+"""Custom application events for in-program signaling."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
 DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
@@ -1601,39 +1601,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             dialog.AddProperty(name, value, help, default, kind)
             opts1[name] = value
         dialog.Realize()
+        with dialog:
+            if wx.ID_OK != dialog.ShowModal(): return
 
-        if wx.ID_OK == dialog.ShowModal():
             for k, v in dialog.GetProperties():
                 # Keep numbers in sane regions (no isinstance as bool is an int)
                 if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
-                setattr(conf, k, v)
                 opts2[k] = v
-            util.run_once(conf.save)
+        if opts1 == opts2: return
+
+        for k, v in opts2.items(): setattr(conf, k, v)
+        util.run_once(conf.save)
+        if opts1.get("MinWindowSize") != opts2.get("MinWindowSize"):
             self.MinSize = conf.MinWindowSize
-            if any(opts1.get(k) != opts2.get(k) for k in ("LogFile", "LogToFile")):
-                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
-                should_log = all(opts2.get(k) for k in ("LogFile", "LogToFile"))
-                path_changed = (opts1.get("LogFile") != opts2.get("LogFile"))
-                should_remove = is_logging and (not should_log or path_changed)
-                if is_logging and (path_changed or not should_log):
-                    logger.info("Closing log file %r.", opts1.get("LogFile"))
-                    handler = next(x for x in logger.parent.handlers
-                                   if isinstance(x, logging.FileHandler))
-                    logger.parent.removeHandler(handler)
-                    handler.close()
-                if should_log and (path_changed or not is_logging):
-                    try: os.makedirs(os.path.dirname(conf.LogFile))
-                    except Exception: pass
-                    try:
-                        handler = logging.FileHandler(conf.LogFile)
-                        handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
-                        logger.parent.addHandler(handler)
-                        logger.info("Logging to file %r.", conf.LogFile)
-                    except Exception as e:
-                        logger.exception("Error starting logging to %r.", conf.LogFile)
-                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
-                self.button_open_log.Enable(is_logging)
-        dialog.Destroy()
+        wx.PostEvent(self, guibase.ConfigurationEvent(opts1=opts1, opts2=opts2))
 
 
     def on_new_database(self, event):
