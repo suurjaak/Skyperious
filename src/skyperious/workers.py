@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    02.06.2024
+@modified    15.04.2025
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -862,6 +862,8 @@ class LiveThread(WorkerThread):
                     self._skype.populate_chats(action.get("chats"), messages=True)
                 elif "chats" == action["action"]:
                     self._skype.populate_chats(action.get("chats"), messages=False)
+                elif "shared_files" == action["action"]:
+                    self._skype.populate_files(action.get("chats"))
             except Exception as e:
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)

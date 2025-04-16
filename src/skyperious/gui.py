@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2025
+@modified    16.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3234,6 +3234,7 @@ class DatabasePage(wx.Panel):
         check_older      = wx.CheckBox(panel_sync2, label="Check &older database chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync_file = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
 
         ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
@@ -3282,11 +3283,14 @@ class DatabasePage(wx.Panel):
         check_contacts.Enabled = check_older.Enabled = False
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_sync_file, "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
         button_sync.Label = "S&ynchronize history in local database"
         button_sync.Note  = "Query Skype online services for new messages and save them in local database."
         button_sync_sel.Label = "Synchronize selec&ted chats"
         button_sync_sel.Note  = "Select specific chats to update in local database."
+        button_sync_file.Label = "Synchronize shared files only"
+        button_sync_file.Note  = "Download shared files and media of existing messages to local share folder."
         button_sync_stop.Label = "Stop synchronizing"
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
@@ -3306,6 +3310,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_files,   button_sync_file)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
         label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,          self.on_click_html_link)
@@ -3328,6 +3333,7 @@ class DatabasePage(wx.Panel):
         self.check_sync_older    = check_older
         self.button_sync         = button_sync
         self.button_sync_sel     = button_sync_sel
+        self.button_sync_file    = button_sync_file
         self.button_sync_stop    = button_sync_stop
 
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -3370,13 +3376,14 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(check_older,    border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2.Add(button_sync_file, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
 
         sizer2.Add(splitter_sync, proportion=1, flag=wx.GROW)
 
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
-        pos = self.Size[1] // 4
+        pos = self.Size[1] // 5
         splitter_sync.SplitHorizontally(panel_sync1, panel_sync2, sashPosition=pos)
 
 
@@ -3830,7 +3837,7 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate"})
@@ -3868,10 +3875,54 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate", "chats": [x["identity"] for x in selchats]})
+
+
+    def on_live_sync_files(self, event=None):
+        """
+        Opens dialogs for choosing all or selected chats and starts downloading
+        shared files and media of existing messages to local share folder.
+        """
+        response = wx.MessageBox(
+            "Download shared files and media for all existing chat messages in local database?\n\n"
+            'Choosing "No" will allow to select specific chats only.', conf.Title,
+            wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION)
+        if wx.CANCEL == response: return
+
+        selchats = None
+        if wx.NO == response:
+            FIELDS = ["identity", "title", "title_long", "type"]
+            chats = sorted(self.chats, key=lambda x: (x["type"], x["title"].lower()))
+            chats = [{k: x.get(k) for k in FIELDS} for x in chats]
+            for x in chats:
+                t = x["title"] if skypedata.CHATS_TYPE_SINGLE == x["type"] else x["title_long"]
+                if len(t) > 60:
+                    t = "%s.." % t[:60]
+                    if skypedata.CHATS_TYPE_SINGLE != x["type"]: t += '"'
+                if skypedata.CHATS_TYPE_SINGLE == x["type"] and x["identity"] != x["title"]:
+                    t += " (%s)" % x["identity"]
+                x["title"] = t
+
+            dlg = wx.MultiChoiceDialog(self, "Select chats to update:",
+                                       conf.Title, [x["title"] for x in chats])
+            with dlg:
+                if wx.ID_OK != dlg.ShowModal() or not dlg.GetSelections(): return
+                selchats = [chats[i] for i in dlg.GetSelections()]
+
+        self.label_sync_progress.Label = "Updating local database from Skype online service.."
+        self.list_chats_sync.DeleteAllItems()
+        self.edit_sync_status.Clear()
+        self.gauge_sync.Pulse()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
+        self.button_sync_stop.Enable()
+        self.gauge_sync.ContainingSizer.Layout()
+        workdata = {"action": "shared_files"}
+        if selchats: workdata["chats"] = [x["identity"] for x in selchats]
+        self.worker_live.work(workdata)
 
 
     def on_live_sync_stop(self, event=None):
@@ -3881,7 +3932,7 @@ class DatabasePage(wx.Panel):
         ) or not self.worker_live.is_working(): return
         self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = True
         self.button_sync_stop.Disable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.stop_work()
@@ -3906,7 +3957,7 @@ class DatabasePage(wx.Panel):
             return
 
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         if not self.worker_live.is_working():
             self.list_chats_sync.DeleteAllItems()
@@ -3949,7 +4000,7 @@ class DatabasePage(wx.Panel):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
                 reloads = {} # {category: whether to reload in full or refresh UI only}
-                tlabel = ("account" if "accounts" == result["table"] else result["table"])
+                tlabel = ("account" if "accounts" == result["table"] else result["table"].replace("_", " "))
                 plabel, slabel, chat = u"Synchronizing %s" % tlabel, None, None
                 if result.get("chat"):
                     chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
@@ -3958,16 +4009,22 @@ class DatabasePage(wx.Panel):
                         self.chats.extend(cc)
                         if cc: chat = cc[0]
 
-                if "messages" == result["table"] and result.get("chat"):
+                if "messages" == result["table"] and result.get("chat") \
+                or "shared_files" == result["table"] and result.get("chat"):
                     title = chat["title_long_lc"] if chat else result["chat"]
                     if len(title) > 35:
                         title = title[:35] + ".."
                         if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
                     plabel += " in %s" % title
 
-                if result.get("count"):
+                if result.get("count") and "shared_files" == result["table"]:
+                    clabel = ", %s processed" % util.plural("message", result["count"])
+                    if result.get("saved"):
+                        clabel += ", %s saved" % util.plural("file", result["saved"])
+                    plabel += clabel + "."
+                elif result.get("count"):
                     clabel = ", %s processed" % result["count"]
-                    for k in "new", "updated":
+                    for k in ("new", "updated"):
                         if result.get(k): clabel += ", %s %s" % (result[k], k)
                     plabel += clabel + "."
                 elif result.get("start") and "chats" == result["table"] and "cidentity" in result:
@@ -3993,7 +4050,7 @@ class DatabasePage(wx.Panel):
                             util.plural("new message", result["message_count_new"], sep=","),
                             ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                         )
-                        if result["contact_count_new"] or result["contact_count_updated"]:
+                        if result.get("contact_count_new") or result.get("contact_count_updated"):
                             slabel += "\n%s." % ", ".join(filter(bool, [
                                 util.plural("new contact", result["contact_count_new"], sep=",")
                                 if result["contact_count_new"] else "",
@@ -4038,9 +4095,24 @@ class DatabasePage(wx.Panel):
                             if result["updated"]: slabel += ", %s updated" % result["updated"]
                             slabel += "."
 
+                    if "shared_files" == result["table"] and result.get("chat"):
+                        slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
+
+                        if chat and result.get("saved"):
+                            row = dict(title=chat["title"], identity=chat["identity"],
+                                       first_message_datetime=result["first"],
+                                       last_message_datetime=result["last"],
+                                       message_count=result["saved"])
+                            self.list_chats_sync.AppendRow(row)
+                            self.list_chats_sync.ResetColumnWidths()
+
+                            slabel += ": %s stored." % result["saved"]
+                    elif "shared_files" == result["table"] and "saved" in result:
+                        slabel += ", stored %s" % result["saved"]
+
                     if slabel and not slabel.endswith("."): slabel += "."
 
-                    if "shared_files" in result:
+                    if "shared_files" in result and "chat" not in result:
                         slabel += "\n\nStored %s locally." % util.plural("shared file", result["shared_files"])
 
                 elif not result.get("start"):
@@ -4155,7 +4227,7 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
         self.gauge_sync.ContainingSizer.Layout()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = True
         self.button_sync_stop.Disable()
         if not self.get_unsaved_grids(): self.on_refresh_tables()
         wx.Bell()

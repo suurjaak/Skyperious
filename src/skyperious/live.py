@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    15.04.2025
+@modified    16.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -842,6 +842,91 @@ class SkypeLogin(object):
                           new=self.sync_counts["contacts_new"], identities=list(updateds))
 
 
+    def populate_files(self, chats=()):
+        """
+        Downloads all shared files and media of existing messages and stores to local share folder.
+
+        @param   chats     list of chat identities to populate if not all
+        """
+
+        cstr = util.plural("chat", chats) if chats else "all chats"
+        logger.info("Starting to download shared files for %s in '%s' from Skype online service "
+                    "as '%s'.", cstr, self.db, self.username)
+        if not self.progress(action="populate", table="shared_files", start=True):
+            return
+        chatmap = {c["id"]: c for c in self.db.get_conversations()}
+        counts = collections.defaultdict(int) # {convo_id: stored file count}
+
+        sql = "SELECT convo_id FROM Messages WHERE "
+        if chats: sql += " convo_id IN (%s) AND " % \
+                         ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+        sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
+        sql += "GROUP BY convo_id"
+        chats_queue = [x["convo_id"] for x in self.db.execute(sql)]
+        chats_queue.sort(key=lambda k: chatmap[k]["title_long_lc"], reverse=True)
+
+        run = True
+        cursor = chat = None
+        first_ts, last_ts = sys.maxsize, 0
+        cycles, messages_processed, chat_messages_processed = 0, 0, 0
+        while run:
+            cycles += 1
+            if not cycles % 100 and not self.progress(): break # while run
+            if cursor is None and not chats_queue: break # while run
+            if cursor is None:
+                chat = chatmap[chats_queue.pop()]
+                if not self.progress(action="populate", table="shared_files",
+                                     chat=chat["identity"], start=True):
+                    break # while run
+                sql = "SELECT * FROM Messages WHERE convo_id = %s AND " % chat["id"]
+                sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
+                sql += "ORDER BY id DESC "
+                cursor = self.db.execute(sql)
+                first_ts, last_ts = sys.maxsize, 0
+                chat_messages_processed = 0
+
+            m = next(cursor, None)
+            if not m:
+                cidentity, saved = chat["identity"], counts[chat["id"]]
+                util.try_ignore(cursor.close)
+                cursor = chat = None
+                if not saved: continue # while run
+
+                if not self.progress(action="populate", table="shared_files", chat=cidentity,
+                                     count=chat_messages_processed, saved=saved,
+                                     first=self.db.stamp_to_date(first_ts),
+                                     last=self.db.stamp_to_date(last_ts), end=True):
+                    break # while run
+                continue # while run
+
+            messages_processed += 1
+            chat_messages_processed += 1
+            localpath = self.db.get_shared_file_path(m["id"])
+            if localpath and os.path.exists(localpath): continue # while run
+            metadata, content = self.msg_parser.get_message_share_data(body=m["body_xml"]), None
+            if metadata:
+                content = self.download_content(metadata["url"], metadata["category"] or "file")
+            if content is not None:
+                if self.db.store_shared_file(m, content, metadata):
+                    counts[chat["id"]] += 1
+
+            if not self.progress(action="populate", table="shared_files",
+                                 chat=chat["identity"], count=chat_messages_processed,
+                                 **(dict(saved=counts[chat["id"]]) if counts[chat["id"]] else {})):
+                break # while run
+            first_ts, last_ts = min(first_ts, m["timestamp"]), max(last_ts, m["timestamp"])
+
+        if chat and counts[chat["id"]]: # Leftover report from breaking while
+            self.progress(action="populate", table="shared_files", chat=chat["identity"],
+                          count=counts[chat["id"]], first=self.db.stamp_to_date(first_ts),
+                          last=self.db.stamp_to_date(last_ts), end=True)
+
+        logger.info("Finished downloading %s for %s from Skype online service as '%s'.",
+                    util.plural("shared file", sum(counts.values())),
+                    util.plural("message", messages_processed), self.username)
+        self.progress(action="populate", table="shared_files", saved=sum(counts.values()), end=True)
+
+
     def populate_chats(self, chats=(), messages=True):
         """
         Retrieves all conversations and saves to database.
@@ -850,7 +935,7 @@ class SkypeLogin(object):
         @param   messages  whether to retrieve messages, or only chat metainfo and participants
         """
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
-        logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
+        logger.info("Starting to sync %s in '%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
         if not self.progress(action="populate", table="chats", start=True):
             return
@@ -1478,10 +1563,12 @@ class SkypeExport(skypedata.SkypeDatabase):
                        type=skypedata.MESSAGE_TYPE_FILE)
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                fileurl = bs.find("uriobject").get("url")
                 name = bs.find("originalname").get("v")
                 size = bs.find("filesize").get("v")
-                msg["body_xml"] = '<files><file index="0" size="%s">%s</file></files>' % (
+                msg["body_xml"] = '<files><file index="0" size="%s" url="%s">%s</file></files>' % (
                                   urllib.parse.quote(util.to_unicode(size or 0)),
+                                  urllib.parse.quote(util.to_unicode(fileurl or ""), safe=":/"),
                                   util.to_unicode(name or "file").replace("<", "&lt;").replace(">", "&gt;"))
             except Exception:
                 if BeautifulSoup: logger.warning("Error parsing file from %s.", msg, exc_info=True)
