@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    14.04.2025
+@modified    15.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2742,9 +2742,12 @@ class MessageParser(object):
         if not dom and body:
             try: dom = self.make_xml(body)
             except Exception: return None
-        if not dom or not any(dom.iter("URIObject")): return None
+        if not dom or (not any(dom.iter("URIObject")) and not any(dom.iter("files"))): return None
 
-        url = next(dom.iter("URIObject")).get("uri")
+        try: url = next(dom.iter("URIObject")).get("uri")
+        except Exception:
+            try: url = next(dom.iter("file")).get("url") # <files><file url="..">..</file></files>
+            except Exception: url = None
         if not url:
             linktag = next(dom.iter("a"), None)
             if linktag is not None: url = linktag.get("href")
@@ -2762,14 +2765,20 @@ class MessageParser(object):
         if not filename:
             metatag = next(dom.iter("meta"), None) # <meta type="photo" originalName="..">
             if metatag is not None: filename = metatag.get("originalName")
+        if not filename:
+            filetag = next(dom.iter("file"), None) # <files><file ..>..</file></files>
+            if filetag is not None: filename = filetag.text
 
         data = dict()
         if filename: data.update(filename=filename)
         if docid: data.update(docid=docid)
         try: data["filesize"] = int(next(dom.iter("FileSize")).get("v"))
-        except Exception: pass
+        except Exception:
+            try: data["filesize"] = int(next(dom.iter("file")).get("size")) # <files><file size="..">..
+            except Exception: pass
 
-        objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
+        try: objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
+        except Exception: objtype = ""
         if   "picture" in objtype: data["category"] = "image"
         elif "audio"   in objtype: data["category"] = "audio"
         elif "video"   in objtype: data["category"] = "video"
@@ -2783,6 +2792,7 @@ class MessageParser(object):
                     # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
                     url = pkg["attachments"][0]["content"]["images"][0]["url"]
             except Exception: pass
+        elif any(dom.iter("files")): data["category"] = "file"
 
         data["url"] = live.make_content_url(url, data.get("category"))
         return data
