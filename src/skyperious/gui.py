@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    16.04.2025
+@modified    17.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3272,10 +3272,11 @@ class DatabasePage(wx.Panel):
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
         button_sync.Label = "S&ynchronize history in local database"
         button_sync.Note  = "Query Skype online services for new messages and save them in local database."
+        button_sync_sel.MinSize = button_sync_file.MinSize = (100, -1)
         button_sync_sel.Label = "Synchronize selec&ted chats"
         button_sync_sel.Note  = "Select specific chats to update in local database."
         button_sync_file.Label = "Synchronize shared files only"
-        button_sync_file.Note  = "Download shared files and media of existing messages to local share folder."
+        button_sync_file.Note  = "Download shared files and media of existing messages."
         button_sync_stop.Label = "Stop synchronizing"
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
@@ -3329,6 +3330,7 @@ class DatabasePage(wx.Panel):
         sizer_user  = wx.BoxSizer(wx.HORIZONTAL)
         sizer_sync1 = panel_sync1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_sync2 = panel_sync2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_sync2_hor = wx.BoxSizer(wx.HORIZONTAL)
 
         sizer_user.Add(edit_user,    flag=wx.GROW, proportion=1)
         sizer_user.Add(button_user,  border=10, flag=wx.LEFT)
@@ -3360,8 +3362,9 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(check_contacts, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(check_older,    border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
-        sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
-        sizer_sync2.Add(button_sync_file, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2_hor.Add(button_sync_sel,  proportion=1, flag=wx.GROW)
+        sizer_sync2_hor.Add(button_sync_file, proportion=1, border=5, flag=wx.LEFT | wx.GROW)
+        sizer_sync2.Add(sizer_sync2_hor, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
 
         sizer2.Add(splitter_sync, proportion=1, flag=wx.GROW)
