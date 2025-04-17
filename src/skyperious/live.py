@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    16.04.2025
+@modified    17.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -419,7 +419,7 @@ class SkypeLogin(object):
             if not localpath or not os.path.exists(localpath):
                 metadata = self.msg_parser.get_message_share_data(body=item.content)
             if metadata:
-                content = self.download_content(metadata["url"], metadata["category"] or "file")
+                content = self.download_content(metadata["url"], metadata.get("category") or "file")
             if content is not None:
                 if self.db.store_shared_file(dbitem, content, metadata):
                     self.sync_counts["shared_files"] += 1
@@ -865,6 +865,15 @@ class SkypeLogin(object):
         chats_queue = [x["convo_id"] for x in self.db.execute(sql)]
         chats_queue.sort(key=lambda k: chatmap[k]["title_long_lc"], reverse=True)
 
+        if chats_queue:
+            sql = "SELECT COUNT(*) AS count FROM Messages WHERE "
+            if chats: sql += " convo_id IN (%s) AND " % \
+                             ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+            sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%')"
+            potentials = self.db.execute(sql).fetchone()["count"]
+            logger.info("Checking %s in %s for potential shared files to download.",
+                        util.plural("message", potentials), util.plural("chat", chats_queue))
+
         run = True
         cursor = chat = None
         first_ts, last_ts = sys.maxsize, 0
@@ -905,7 +914,7 @@ class SkypeLogin(object):
             if localpath and os.path.exists(localpath): continue # while run
             metadata, content = self.msg_parser.get_message_share_data(body=m["body_xml"]), None
             if metadata:
-                content = self.download_content(metadata["url"], metadata["category"] or "file")
+                content = self.download_content(metadata["url"], metadata.get("category") or "file")
             if content is not None:
                 if self.db.store_shared_file(m, content, metadata):
                     counts[chat["id"]] += 1
