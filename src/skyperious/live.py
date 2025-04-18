@@ -1279,12 +1279,15 @@ class SkypeExport(skypedata.SkypeDatabase):
         self.export_last_modified = datetime.datetime.fromtimestamp(ts)
         self.export_parsed = False
         self.is_temporary = not dbfilename
+        self.msg_parser = None # skypedata.MessageParser instance
+        self.tarfp = None # Open TAR file pointer, if any
 
         if self.is_temporary:
             fh, dbfilename = tempfile.mkstemp(".db")
             os.close(fh)
         super(SkypeExport, self).__init__(dbfilename, truncate=not self.is_temporary)
         self.ensure_schema()
+        self.msg_parser = skypedata.MessageParser(self)
 
 
     def __str__(self):
@@ -1311,12 +1314,15 @@ class SkypeExport(skypedata.SkypeDatabase):
         try:
             f, tf = self.export_open(self.export_path)
         except Exception: raise
-        else: self.export_parse(f, progress)
+        else:
+            self.tarfp = tf
+            self.export_parse(f, progress)
         finally:
             util.try_ignore(f and f.close)
             util.try_ignore(tf and tf.close)
             util.try_ignore(self.clear_cache)
             self.export_parsed = True
+            self.tarfp = None
 
 
     def export_parse(self, f, progress=None):
@@ -1380,6 +1386,13 @@ class SkypeExport(skypedata.SkypeDatabase):
                                 counts["messages"] += 1
                         except Exception:
                             logger.warning("Error finalizing and inserting message %s.", msg, exc_info=True)
+                        else:
+                            try:
+                                if msg and conf.ShareDirectoryEnabled and self.export_store_shared_file(msg):
+                                    counts["shared_files"] = counts.get("shared_files", 0) + 1
+                            except Exception:
+                                logger.warning("Error processing shared file for message #%s.",
+                                               msg["id"], exc_info=True)
                     skip_msg = False
 
             # List start: ("nested path", "start_array", None)
@@ -1695,6 +1708,78 @@ class SkypeExport(skypedata.SkypeDatabase):
             self.update_row(ptable, pitem, pitem, log=False)
 
         return msg
+
+
+    def export_store_shared_file(self, message):
+        """
+        @return  whether a file was stored
+        """
+        metadata, content, extradata = None, None, None
+        localpath = self.get_shared_file_path(message["id"])
+        if not localpath or not os.path.exists(localpath):
+            metadata = self.msg_parser.get_message_share_data(body=message["body_xml"])
+        if metadata and metadata.get("docid"):
+            content, extradata = self.export_load_shared_file_content(metadata["docid"])
+        if content is not None:
+            return self.store_shared_file(message, content, dict(metadata, **extradata))
+        return False
+
+
+    def export_load_shared_file_content(self, docid):
+        """
+        Returns (file content bytes, extra metadata dictionary) for shared file, if available.
+
+        @param   docid  share ID in Skype, like "0-neu-d6-81ec4221c1f1186e093c4aebea145fea"
+        """
+        content, extradata = None, {}
+        ROOTPATH, SUBFOLDER = "" if self.tarfp else os.path.dirname(self.export_path), "media"
+        if self.tarfp:
+            allnames = [n for n in self.tarfp.getnames() if os.path.split(n)[0] == SUBFOLDER]
+        else:
+            allnames = glob.glob(os.path.join(ROOTPATH, SUBFOLDER, "%s.*" % docid))
+            allnames = [os.path.join(SUBFOLDER, n) for n in allnames]
+        allnames = sorted(allnames) # ["media/docid.1.jpg", "media/docid.json", ]
+        if not allnames: return None, None
+
+        # Data files files are named like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.1.json
+        # {"expiry_date":"3017-10-24T20:06:57.5687593Z","filename":"image.png","contents":{"1":{"type":"image/png"}}}
+        jsondata = {}
+        jsonname = "%s.json" % docid
+        jsonpath = next((n for n in allnames if os.path.split(n)[1] == jsonname), None)
+        if not jsonpath: return None, None
+
+        if self.tarfp:
+            with self.tarfp.extractfile(jsonpath) as metaf:
+                jsondata = json.load(metaf)
+        else:
+            jsonpath = os.path.join(ROOTPATH, jsonpath)
+            if os.path.isfile(jsonpath):
+                with open(jsonpath, "rb") as metaf:
+                    jsondata = json.load(metaf)
+        if not jsondata: return None, None
+
+        # Content files are named like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.1.png
+        # Video files may have preview like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.2.jpg
+        contentpath = None
+        for filename in allnames:
+            if os.path.split(filename)[1].startswith("%s.1" % docid):
+                contentpath = filename
+                break # for filename
+        if not contentpath: return None, None
+
+        if self.tarfp:
+            with self.tarfp.extractfile(contentpath) as contentf:
+                content = contentf.read()
+        else:
+            with open(os.path.join(ROOTPATH, contentpath), "rb") as contentf:
+                content = contentf.read()
+
+        try: extradata["filename"] = jsondata["filename"]
+        except Exception: pass
+        try: extradata["mimetype"] = jsondata["contents"]["1"]["type"]
+        except Exception: pass
+
+        return content, extradata
 
 
     @staticmethod
