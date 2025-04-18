@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2025
+@modified    17.04.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -759,7 +759,7 @@ def run_create(filenames, args):
         result = result or kwargs
         if "counts" in result:
             counts.update(result["counts"])
-            t = ", ".join(util.plural(x[:-1], counts[x], sep=",")
+            t = ", ".join(util.plural(x[:-1].replace("_", " "), counts[x], sep=",")
                           for x in sorted(counts))
             bar.afterword = " Imported %s." % t
         return True

@@ -1818,7 +1818,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                     self.update_database_list(filename)
                     self.load_database_page(filename)
                 else:
-                    t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
+                    t = ", ".join(util.plural(x[:-1].replace("_", " "), result["counts"][x], sep=",")
                                   for x in sorted(result["counts"]))
                     dlg.Message = "Parsed %s." % t
 
@@ -7510,7 +7510,7 @@ class MergerPage(wx.Panel):
 
             if "counts" in result:
 
-                t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
+                t = ", ".join(util.plural(x[:-1].replace("_", " "), result["counts"][x], sep=",")
                               for x in sorted(result["counts"]))
                 self.label_gauge.Label = "Parsed %s." % t
                 self.panel_gauge.Layout()
