@@ -1526,7 +1526,7 @@ class SkypeExport(skypedata.SkypeDatabase):
                     msg["__type"] = value # For post-processing
 
             if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
-            or counts["messages"] and not counts["messages"] % 100) \
+            or counts["messages"] and not counts["messages"] % 10) \
             and not progress(counts=counts):
                 break # while True
 
