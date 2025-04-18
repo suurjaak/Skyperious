@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.04.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -1160,7 +1160,7 @@ def run(nogui=False):
         try: os.makedirs(os.path.dirname(conf.LogFile))
         except Exception: pass
         try:
-            handler = logging.FileHandler(conf.LogFile)
+            handler = logging.FileHandler(conf.LogFile, encoding="utf-8")
             handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
             logger.addHandler(handler)
             logger.info("Logging to file %r.", conf.LogFile)
