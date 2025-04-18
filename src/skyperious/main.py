@@ -108,7 +108,7 @@ ARGUMENTS = {
               "help": "date to export messages from, as YYYY-MM-DD", "type": date},
              {"args": ["-e", "--end"], "dest": "end_date", "required": False,
               "help": "date to export messages until, as YYYY-MM-DD", "type": date},
-             {"args": ["--media-folder"], "dest": "media_folder",
+             {"args": ["--files-folder"], "dest": "files_folder",
               "action": "store_true", "required": False,
               "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
@@ -808,7 +808,7 @@ def run_export(filenames, args):
                authors          names of specific authors whose chats to export
                start_date       date to export messages from, as YYYY-MM-DD
                end_date         date to export messages until, as YYYY-MM-DD
-               media_folder     save shared media into a subfolder in HTML export
+               files_folder     save shared files and media into a subfolder in HTML export
                media_cache      cache downloaded media in user directory
                password         Skype password
                ask_password     whether to ask password on the command line interactively
@@ -824,7 +824,7 @@ def run_export(filenames, args):
 
         if (args.password or args.ask_password) and db.username \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-             or conf.SharedFileAutoDownload and args.media_folder) \
+             or conf.SharedFileAutoDownload and args.files_folder) \
         and "html" == format:
             password = None
             while not db.live.is_logged_in():
@@ -871,7 +871,7 @@ def run_export(filenames, args):
             opts = dict(progress=not conf.IsCLINonTerminal and bar.update,
                         timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
-            if args.media_folder: opts["media_folder"] = True
+            if args.files_folder: opts["files_folder"] = True
             if args.media_cache:  opts["media_cache"]  = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result

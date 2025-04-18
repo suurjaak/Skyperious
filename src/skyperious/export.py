@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.06.2024
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -96,7 +96,7 @@ def export_chats(chats, path, format, db, opts=None):
     @param   db                SkypeDatabase instance
     @param   opts              export options dictionary
                ?multi          whether exporting multiple files under path
-               ?media_folder   whether to save images to subfolder in HTML export
+               ?files_folder   whether to save shared files and media to subfolder in HTML export
                ?timerange      additional arguments for filtering messages, as
                                (from_timestamp or None, to_timestamp or None)
                ?messages       list messages to export if not querying all
@@ -132,7 +132,7 @@ def export_chats(chats, path, format, db, opts=None):
 
         if "html" == format \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-             or conf.SharedFileAutoDownload and opts.get("media_folder")) \
+             or conf.SharedFileAutoDownload and opts.get("files_folder")) \
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared media
@@ -248,7 +248,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
     @param   messages  list of message data dicts
     @param   opts      export options dictionary, as {
                          ?"media_cache": use local download cache,
-                         ?"media_folder": save images to subfolder in HTML export}
+                         ?"files_folder": save shared files to subfolder in HTML export}
     @return            (number of chats exported, number of messages exported)
     """
     count, message_count, opts = 0, 0, opts or {}
@@ -257,11 +257,11 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         is_html  = filename.lower().endswith(".html")
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
         namespace = {"db": db, "chat": chat, "messages": messages, "parser": parser}
-        if opts.get("media_folder"):
+        if opts.get("files_folder"):
             filedir, basename = os.path.split(filename)
             basename = os.path.splitext(basename)[0]
             mediadir = os.path.join(filedir, "%s_files" % basename)
-            namespace["media_folder"] = mediadir
+            namespace["files_folder"] = mediadir
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
         # statistics will be available for the main file after parsing.

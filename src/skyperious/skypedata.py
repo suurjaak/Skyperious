@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    15.04.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2541,7 +2541,7 @@ class MessageParser(object):
         """Returns an HTML representation of the message body."""
         if message.get("__files") and output.get("export"):
             do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
-                          and output.get("media_folder") \
+                          and output.get("files_folder") \
                           and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
                 if self.db.get_shared_file(message["id"]):
@@ -2804,7 +2804,7 @@ class MessageParser(object):
 
         Populates local share directory if enabled and content given.
 
-        @param   options   output options like {"media_folder": directory/to/write/under}
+        @param   options   output options like {"files_folder": directory/to/write/under}
         @param   metadata  metadata dictionary to update, containing at least "filename"
         @param   content   raw binary content if not using local share directory
         @return            binary content if media and no error else None
@@ -2818,7 +2818,7 @@ class MessageParser(object):
         filedata = self.db.get_shared_file(message["id"]) or {}
 
         outpath = None
-        if output.get("media_folder"):
+        if output.get("files_folder"):
             basename = metadata.get("filename")
             if not basename:
                 peek = content
@@ -2831,9 +2831,9 @@ class MessageParser(object):
                 filetype = util.get_file_type(peek, filedata.get("category"))
                 basename = "%s.%s" % (message["id"], filetype)
             basename = util.safe_filename(basename)
-            outpath = util.unique_path(os.path.join(output["media_folder"], basename))
+            outpath = util.unique_path(os.path.join(output["files_folder"], basename))
         if outpath:
-            try: os.makedirs(output["media_folder"])
+            try: os.makedirs(output["files_folder"])
             except Exception: pass
             try:
                 if content is None: shutil.copyfile(localpath, outpath)

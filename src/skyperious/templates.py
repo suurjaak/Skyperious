@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    14.04.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1371,14 +1371,14 @@ HTML chat history export template for the messages part.
 @param   chat            chat data dictionary
 @param   messages        message iterator
 @param   parser          MessageParser instance
-@param   ?media_folder   path to save images under, if not embedding
+@param   ?files_folder   path to save images under, if not embedding
 """
 CHAT_MESSAGES_HTML = """<%
 from skyperious import skypedata
 from skyperious.lib import util
 
 output = {"format": "html", "export": True}
-if isdef("media_folder") and media_folder: output["media_folder"] = media_folder
+if isdef("files_folder") and files_folder: output["files_folder"] = files_folder
 previous_day, previous_author = None, None
 %>
 %for m in messages:
