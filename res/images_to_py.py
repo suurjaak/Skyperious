@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author    Erki Suurjaak
 @created   07.02.2012
-@modified  07.03.2025
+@modified  18.04.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -49,6 +49,8 @@ IMAGES = {
         "Button for databases in database list.",
     "ButtonLogin.png":
         "Small icon for login button on online page.",
+    "ButtonMergeFile.png":
+        "Small icon for syncing files on online page.",
     "ButtonMergeLeft.png":
         "Small icon for left merge button on merger page.",
     "ButtonMergeLeftMulti.png":

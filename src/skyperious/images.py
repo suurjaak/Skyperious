@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     07.02.2012
-@modified    07.03.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 try:
@@ -765,6 +765,26 @@ ButtonLogin = PyEmbeddedImage(
     "YXybmBhTks/KC6caypdrRCwGZzA6/AEL/klsKBLQZM9Fx8EKOJ13e3t6HrjI6iehUEhSyNMA"
     "NGq1Oluv19ut1opNbW1nd1VWbildOsyhoXferq4rT6amxgfJ4n5RFIOUFpgARzAQcgh6ss5A"
     "9y6lR5O79DlTl3M0dW8ikQjT/yKB2RX+LcAAp/aU9ivfuRgAAAAASUVORK5CYII="
+)
+
+
+"""Small icon for syncing files on online page."""
+ButtonMergeFile = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9i"
+    "ZSBJbWFnZVJlYWR5ccllPAAAArhJREFUeNqMU0tME1EUPVOm0GmL5dcQKqhNUT4LNRkrjYrR"
+    "RgwxMTFGNi5MDEFcuHGjOyAkLo0bFzYxunChiYC/DSRgImgEQiVijOXjAixQLYW2zkCnnWm9"
+    "b7BVFhomOTmd13fu59w73IWODrCH47izRBXY3rOcyWResR+8bHPDHB0HHTh6urvv/X0rncls"
+    "MoH+R2YzEy52dl7N3uHlIjdUoRLW4FMue5i9zJgFyTKDIS8PaU3jpMoWyFwpuMb7yz4qX2TC"
+    "faW8uJ36ZyKqn7GaTLbzG5IktrVUiyqlVKnWJHGSsQYoxAnidcJPFYinCMSxEojJeEKyzgV9"
+    "/Hos5r/jG9cjVzss/62A9WhjnhSYMVXutO5cXQWfLwjtgsUiWhZ7z7+4cl3U0uktPedA54x5"
+    "oxHXhpfwJRSRYpEIeBOJ84xGX8rkmGJu334Xx2xExbk6E04687eINTYVwtjQ657kfIETlNxA"
+    "Rvi8h0tqvPtrLrPMnxYlNDTY8WQyioEZeYtYUVXyRoM59PlrSlHaKZ+fmQhLkck6nS5Dy4MZ"
+    "vVf/bBjuY1V4NBCAkixCU41VFyspcpFaMHNrP0TbWz+bNS/H43gTiErVdVVWc4YtDyCT6+8j"
+    "gLOxFg/7/Tjuculilt1IFWmplCG3SKyUiWcjvgl6ce2y6VOI19bBtceOsd5hXDrqyIlZO/r8"
+    "VfVPACX40Z9fWHjILg/dHLz7WDzSNQiU2THf14/WE7vRVG/TxYFAIDfOeDSaL1PreoCVvhuo"
+    "8niwUVzMMxPrK8z48PI5Wk+5cOZAWS5zIpFAc3MzDnq9XUsLCyPptTWk2R5QEOHb6GhhucdT"
+    "wNGe32vzQKVATKiS0Pj7g2IB9rrdt6LB4JQWCk3T0Q6CxJarhOAQnM7TBkGw/2sLqTpOWVmZ"
+    "1MLhOXolmxEmfP8lwAB2qn9GULsBBgAAAABJRU5ErkJggg=="
 )
 
 

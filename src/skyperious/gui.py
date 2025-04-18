@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    17.04.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3219,7 +3219,7 @@ class DatabasePage(wx.Panel):
         check_older      = wx.CheckBox(panel_sync2, label="Check &older database chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
-        button_sync_file = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync_file = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeFile.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
 
         ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
