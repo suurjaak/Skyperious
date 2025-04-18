@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    17.04.2025
+@modified    18.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1439,8 +1439,10 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
                     try:
-                        if value is not None or skypedata.CHATS_TYPE_GROUP == chat["type"]:
-                            identities = map(id_to_identity, json.loads(value))
+                        identities = []
+                        if skypedata.CHATS_TYPE_GROUP == chat["type"]:
+                            if value is not None:
+                                identities = map(id_to_identity, json.loads(value))
                         else: identities = [self.id, chat["identity"]]
                         for identity in identities:
                             if not identity: continue # for identity
