@@ -1386,6 +1386,23 @@ class SkypeDatabase(object):
         return True
 
 
+    def delete_shared_files(self):
+        """Deletes all shared files from disk and database, drops shared folder if empty."""
+        directory = self.get_share_path()
+        if os.path.isdir(directory) and os.listdir(directory):
+            self.ensure_internal_schema()
+            for row in self.execute("SELECT filepath FROM _shared_files_"):
+                filepath = row["filepath"]
+                if not os.path.isabs(filepath):
+                    filepath = os.path.join(directory, filepath)
+                try: os.path.exists(filepath) and os.unlink(filepath)
+                except Exception as e: logger.warning("Error deleting %s: %s", filepath, e)
+        self.execute("DELETE FROM _shared_files_")
+        if os.path.isdir(directory) and not os.listdir(directory):
+            try: os.rmdir(directory)
+            except Exception as e: logger.warning("Error deleting %s: %s", directory, e)
+
+
     def blobs_to_binary(self, values, list_columns, col_data):
         """
         Converts blob columns in the list to sqlite3.Binary, suitable

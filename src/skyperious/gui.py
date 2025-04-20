@@ -1786,37 +1786,46 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                  (filename, conf.Title), conf.Title, wx.OK)
 
         def on_cancel():
-            result = wx.OK == wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL)
-            if result:
-                worker.stop(drop_results=False)
-                self.workers_import.pop(filename, None)
-            return result
+            if wx.OK != wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL):
+                return False
+            worker.stop(drop_results=False)
+            self.workers_import.pop(filename, None)
+            return True
 
         def on_progress(result):
-            if result.get("error") or result.get("stop"):
-                util.try_ignore(lambda: db.close())
-                util.try_ignore(os.unlink, filename)
-            if result.get("done"):
-                worker.stop()
-                self.workers_import.pop(filename, None)
 
             def after():
                 if not self: return
 
+                do_drop = False
                 if result.get("error"):
                     dlg.Destroy()
                     guibase.status("Error parsing Skype export")
-                    wx.MessageBox("Error parsing Skype export:\n%s" % result["error_short"],
-                                  conf.Title, wx.OK | wx.ICON_ERROR)
+                    choice = wx.MessageBox("Error parsing Skype export:\n%s\n\n"
+                                           "Keep created database file?" % result["error_short"],
+                                           conf.Title, wx.YES | wx.NO | wx.ICON_ERROR)
+                    do_drop = (wx.NO == choice)
                 elif result.get("stop"):
                     dlg.Destroy()
                     guibase.status()
-                elif result.get("done"):
-                    dlg.Destroy()
+                    choice = wx.MessageBox("Keep created database file?\n\n"
+                                           'Choosing "No" will delete\n%s.' % filename,
+                                           conf.Title, wx.YES | wx.NO | wx.ICON_INFORMATION)
+                    do_drop = (wx.NO == choice)
+                if do_drop:
+                    db.delete_shared_files()
+                    util.try_ignore(lambda: db.close())
+                    util.try_ignore(os.unlink, filename)
+
+                if result.get("done"):
+                    worker.stop()
+                    self.workers_import.pop(filename, None)
+                    if dlg: dlg.Destroy()
                     guibase.status()
-                    db.close()
-                    self.update_database_list(filename)
-                    self.load_database_page(filename)
+                    if not do_drop:
+                        db.close()
+                        self.update_database_list(filename)
+                        self.load_database_page(filename)
                 else:
                     t = ", ".join(util.plural(x[:-1].replace("_", " "), result["counts"][x], sep=",")
                                   for x in sorted(result["counts"]))

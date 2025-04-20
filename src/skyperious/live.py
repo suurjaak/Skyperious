@@ -1358,24 +1358,10 @@ class SkypeExport(skypedata.SkypeDatabase):
             # Dictionary end: ("nested path", "end_map", None)
             elif "end_map" == evt:
                 if "conversations.item" == prefix:
-                    if skip_chat:
-                        skip_chat = False
-                        try:
-                            self.delete_row("conversations", chat, log=False)
-                            counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
-                                                               [chat["id"]], log=False).rowcount
-                            self.execute("DELETE FROM participants WHERE convo_id = ?",
-                                         [chat["id"]], log=False)
-                        except Exception:
-                            logger.warning("Error dropping from database chat %s.", chat, exc_info=True)
-                        counts["chats"] -= 1
-                    else:
-                        try:
-                            chat = self.export_finalize_chat(chat)
-                            self.update_row("conversations", chat, {"id": chat["id"]}, log=False)
-                        except Exception:
-                            logger.warning("Error updating chat %s.", chat, exc_info=True)
+                    self.export_finalize_chat(chat, skip_chat, counts)
                     edited_msgs.clear()
+                    chat = None
+                    skip_chat = False
                     skip_msg = False
                 elif "conversations.item.MessageList.item" == prefix:
                     if not skip_chat and not skip_msg:
@@ -1528,26 +1514,38 @@ class SkypeExport(skypedata.SkypeDatabase):
             if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
             or counts["messages"] and not counts["messages"] % 10) \
             and not progress(counts=counts):
+                if chat: self.export_finalize_chat(chat, skip_chat, counts)
                 break # while True
 
             lastcounts = dict(counts)
 
 
-    def export_finalize_chat(self, chat):
-        """
-        Populates last fields, inserts account participant if lacking.
-        """
-        if "meta_topic" in chat and "displayname" not in chat:
-            chat["displayname"] = chat["meta_topic"]
+    def export_finalize_chat(self, chat, skip_chat, counts):
+        """Updates chat and participants, or drops chat and related if skipping."""
+        if skip_chat:
+            try:
+                self.delete_row("conversations", chat, log=False)
+                counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
+                                                   [chat["id"]], log=False).rowcount
+                self.execute("DELETE FROM participants WHERE convo_id = ?",
+                             [chat["id"]], log=False)
+            except Exception:
+                logger.warning("Error dropping from database chat %s.", chat, exc_info=True)
+            counts["chats"] -= 1
+        else:
+            try:
+                if "meta_topic" in chat and "displayname" not in chat:
+                    chat["displayname"] = chat["meta_topic"]
 
-        # Insert account participant if not inserted
-        if not any(self.id == x["identity"] and chat["id"] == x["convo_id"]
-                   for x in self.table_rows["participants"]):
-            p = dict(is_permanent=1, convo_id=chat["id"], identity=self.id)
-            p["id"] = self.insert_row("participants", p, log=False)
-            self.table_rows["participants"].append(p)
-
-        return chat
+                # Insert account participant if not inserted
+                if not any(self.id == x["identity"] and chat["id"] == x["convo_id"]
+                           for x in self.table_rows["participants"]):
+                    p = dict(is_permanent=1, convo_id=chat["id"], identity=self.id)
+                    p["id"] = self.insert_row("participants", p, log=False)
+                    self.table_rows["participants"].append(p)
+                self.update_row("conversations", chat, {"id": chat["id"]}, log=False)
+            except Exception:
+                logger.warning("Error updating chat %s.", chat, exc_info=True)
 
 
     def export_finalize_message(self, msg, chat, edited_msgs):

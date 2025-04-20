@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+5.9, 2025-04-20
+---------------
+- offer to retain partial database on canceling import of Skype export archive
+
+
 5.8, 2025-03-27
 ---------------
 - adapt to recent changes in Skype online API regarding 1:1 chats
