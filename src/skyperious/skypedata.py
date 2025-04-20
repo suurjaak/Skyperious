@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.04.2025
+@modified    20.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -3259,6 +3259,14 @@ def find_databases(folder):
     for root, dirs, files in os.walk(folder):
         for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)
+
+
+def make_db_path(username):
+    """Returns the default database path for username."""
+    base = util.safe_filename(username)
+    if base != username: base += "_%x" % util.hash_string(username)
+    return os.path.join(conf.VarDirectory, "%s.main.db" % base)
+
 
 def get_avatar_data(datadict):
     """Returns contact/account avatar raw data or ""."""

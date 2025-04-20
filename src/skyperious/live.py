@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    18.04.2025
+@modified    20.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -143,7 +143,7 @@ class SkypeLogin(object):
     def init_db(self, filename=None, truncate=False):
         """Creates SQLite database if not already created."""
         if not self.db:
-            path = filename or make_db_path(self.username)
+            path = filename or skypedata.make_db_path(self.username)
             truncate = truncate or not os.path.exists(path)
             self.db = skypedata.SkypeDatabase(path, truncate=truncate)
             self.db.live = self
@@ -1890,13 +1890,6 @@ def is_bot(user):
         and isinstance(user.raw.get("person_id"), six.string_types)
         and user.raw["person_id"].startswith(skypedata.ID_PREFIX_BOT)
     ) # Workaround for skpy bug of presenting bots in some contexts as plain contacts
-
-
-def make_db_path(username):
-    """Returns the default database path for username."""
-    base = util.safe_filename(username)
-    if base != username: base += "_%x" % util.hash_string(username)
-    return os.path.join(conf.VarDirectory, "%s.main.db" % base)
 
 
 def make_message_ids(msg_id):
