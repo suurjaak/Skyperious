@@ -3261,11 +3261,11 @@ def find_databases(folder):
             yield os.path.join(root, f)
 
 
-def make_db_path(username):
-    """Returns the default database path for username."""
+def make_db_path(username, directory=None):
+    """Returns the default database path for username, by default in variable content directory."""
     base = util.safe_filename(username)
     if base != username: base += "_%x" % util.hash_string(username)
-    return os.path.join(conf.VarDirectory, "%s.main.db" % base)
+    return os.path.join(directory or conf.VarDirectory, "%s.main.db" % base)
 
 
 def get_avatar_data(datadict):

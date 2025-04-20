@@ -1768,7 +1768,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not user: return wx.MessageBox("No Skype username found in %s." % efilename,
                                           conf.Title, wx.OK | wx.ICON_WARNING)
 
-        filename0 = skypedata.make_db_path(user)
+        filename0 = skypedata.make_db_path(user, os.path.dirname(efilename))
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
