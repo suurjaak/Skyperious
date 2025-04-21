@@ -1289,12 +1289,11 @@ class SkypeDatabase(object):
 
         Setting None clears option from table.
         """
-        if value == self.get_internal_option(name, reload=True): return
-        if value is None: self.execute("DELETE FROM _options_ WHERE name = ?", [name])
-        else:
-            self.execute("INSERT INTO _options_ (name, value) VALUES (:name, :value) "
-                         "ON CONFLICT (name) DO UPDATE SET value = :value WHERE name = :name",
-                         {"name": name, "value": value})
+        value0 = self.get_internal_option(name, reload=True)
+        if value == value0: return
+        if value is None: self.delete_row("_options_", {"name": name})
+        elif value0 is None: self.insert_row("_options_", {"name": name, "value": value})
+        else: self.update_row("_options_", {"value": value}, {"name": name})
         self.get_internal_option(name, reload=True) # Update cache
 
 
@@ -1412,6 +1411,8 @@ class SkypeDatabase(object):
                 try: os.path.exists(filepath) and os.unlink(filepath)
                 except Exception as e: logger.warning("Error deleting %s: %s", filepath, e)
         self.execute("DELETE FROM _shared_files_")
+        self.connection.commit()
+        self.last_modified = datetime.datetime.now()
         if os.path.isdir(directory) and not os.listdir(directory):
             try: os.rmdir(directory)
             except Exception as e: logger.warning("Error deleting %s: %s", directory, e)
@@ -1427,12 +1428,14 @@ class SkypeDatabase(object):
         if path1 == path2: return
 
         if os.path.isdir(path1) and not os.path.isdir(path2):
+            logger.info("Renaming shared files folder %s to %s.", path1, path2)
             try: os.makedirs(os.path.dirname(path2))
             except Exception: pass
             try: shutil.move(path1, path2)
             except Exception:
                 logger.exception("Error renaming shared files path %s to %s.", path1, path2)
         elif os.path.isdir(path1) and os.path.isdir(path2):
+            logger.info("Moving shared files folder from %s to %s.", path1, path2)
             for row in self.execute("SELECT * FROM _shared_files_"):
                 filepath1 = row["filepath"]
                 if not os.path.isabs(filepath1):
@@ -1446,8 +1449,7 @@ class SkypeDatabase(object):
                 else:
                     filepath = os.path.basename(filepath2)
                     if filepath != row["filepath"]:
-                        self.execute("UPDATE _shared_files_ SET filepath = ? WHERE id = ?",
-                                     (filepath, row["id"]))
+                        self.update_row("_shared_files_", {"filepath": filepath}, row)
             if os.path.isdir(path1) and not os.listdir(path1):
                 try: os.rmdir(path1)
                 except Exception as e: logger.warning("Error deleting %s: %s", path1, e)
