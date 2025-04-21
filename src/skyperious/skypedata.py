@@ -1340,6 +1340,20 @@ class SkypeDatabase(object):
         return path
 
 
+    def get_shared_files_count(self):
+        """Returns the number of shared files on disk."""
+        result = 0
+        directory = self.get_share_path()
+        if os.path.isdir(directory) and os.listdir(directory):
+            self.ensure_internal_schema()
+            for row in self.execute("SELECT filepath FROM _shared_files_"):
+                filepath = row["filepath"]
+                if not os.path.isabs(filepath):
+                    filepath = os.path.join(directory, filepath)
+                result += os.path.exists(filepath)
+        return result
+
+
     def store_shared_file(self, message, content, data):
         """
         Saves file or media shared in message; replaces existing data if present.

@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2025
+@modified    21.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -1202,12 +1202,31 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return wx.MessageBox("%s is currently being imported to, cannot delete." %
                                  filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
+        db, files_count = None, 0
+        try:
+            if os.path.isfile(filename):
+                db = skypedata.SkypeDatabase(filename)
+                files_count = db.get_shared_files_count()
+        except Exception: logger.exception("Error retrieving shared files count for %s.", filename)
+
+        if files_count:
+            choice = wx.MessageBox("Delete shared files stored on disk?\n\n"
+                                   "%s has %s." % 
+                                   (db.get_share_path(), util.plural("shared file", files_count)),
+                                   conf.Title, wx.YES | wx.NO | wx.CANCEL | wx.ICON_QUESTION)
+            if wx.CANCEL == choice:
+                db.close()
+                return
+            if wx.YES == choice:
+                db.delete_shared_files()
+        if db: db.close()
+
         try: os.unlink(filename)
         except Exception as e:
             logger.exception("Error deleting %s.", filename)
-            return wx.MessageBox("Failed to delete %s:\n\n%s" %
-                                 (filename, util.format_exc(e)),
-                                 conf.Title, wx.OK | wx.ICON_ERROR)
+            wx.MessageBox("Failed to delete %s:\n\n%s" % (filename, util.format_exc(e)),
+                          conf.Title, wx.OK | wx.ICON_ERROR)
+            return
         self.remove_databases([filename])
         self.db_filename = None
         self.list_db.Select(0)
