@@ -1379,6 +1379,7 @@ class SkypeDatabase(object):
             except Exception: pass
         directory = self.get_share_path()
         outpath = util.unique_path(os.path.join(directory, basename))
+        basename = os.path.basename(outpath)
         logger.info("Storing local shared file %s for message #%s.", outpath, message["id"])
         try: os.makedirs(directory)
         except Exception: pass
