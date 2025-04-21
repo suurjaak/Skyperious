@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    18.04.2025
+@modified    21.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1472,7 +1472,7 @@ title = "Click to %s." % ("enlarge" if "image" == category else "play")
 if filename:
     caption, title = ("%s: %s." % (x[:-1], filename) for x in (caption, title))
 if isdef("filepath") and filepath:
-    folder, basename = os.path.basename(os.path.split(filepath)[0]), os.path.basename(filepath)
+    folder, basename = os.path.basename(os.path.dirname(filepath)), os.path.basename(filepath)
     src = "%s/%s" % tuple(urllib.parse.quote(os.path.basename(x)) for x in (folder, basename))
 else:
     src = "data:%s;base64,%s" % (mimetype, util.b64encode(content))

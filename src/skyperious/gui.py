@@ -690,7 +690,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             subtitle = p.title
             if isinstance(p, DatabasePage): # Use parent/file.db or C:/file.db
                 path, file = os.path.split(p.db.filename)
-                subtitle = os.path.join(os.path.split(path)[-1] or path, file)
+                subtitle = os.path.join(os.path.basename(path) or path, file)
             self.Title += " - " + subtitle
         self.update_notebook_header()
         if event: event.Skip() # Pass event along to next handler

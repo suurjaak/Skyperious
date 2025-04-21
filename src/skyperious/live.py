@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    20.04.2025
+@modified    21.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1734,7 +1734,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         content, extradata = None, {}
         ROOTPATH, SUBFOLDER = "" if self.tarfp else os.path.dirname(self.export_path), "media"
         if self.tarfp:
-            allnames = [n for n in self.tarfp.getnames() if os.path.split(n)[0] == SUBFOLDER]
+            allnames = [n for n in self.tarfp.getnames() if os.path.dirname(n) == SUBFOLDER]
         else:
             allnames = glob.glob(os.path.join(ROOTPATH, SUBFOLDER, "%s.*" % docid))
             allnames = [os.path.join(SUBFOLDER, n) for n in allnames]
@@ -1745,7 +1745,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         # {"expiry_date":"3017-10-24T20:06:57.5687593Z","filename":"image.png","contents":{"1":{"type":"image/png"}}}
         jsondata = {}
         jsonname = "%s.json" % docid
-        jsonpath = next((n for n in allnames if os.path.split(n)[1] == jsonname), None)
+        jsonpath = next((n for n in allnames if os.path.basename(n) == jsonname), None)
         if not jsonpath: return None, None
 
         if self.tarfp:
@@ -1762,7 +1762,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         # Video files may have preview like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.2.jpg
         contentpath = None
         for filename in allnames:
-            if os.path.split(filename)[1].startswith("%s.1" % docid):
+            if os.path.basename(filename).startswith("%s.1" % docid):
                 contentpath = filename
                 break # for filename
         if not contentpath: return None, None
