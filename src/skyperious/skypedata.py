@@ -1345,7 +1345,6 @@ class SkypeDatabase(object):
         result = 0
         directory = self.get_share_path()
         if os.path.isdir(directory) and os.listdir(directory):
-            self.ensure_internal_schema()
             for row in self.execute("SELECT filepath FROM _shared_files_"):
                 filepath = row["filepath"]
                 if not os.path.isabs(filepath):
@@ -1362,7 +1361,6 @@ class SkypeDatabase(object):
         @param   data     file metadata dictionary, as {?filename, ?docid, ?category, ?mimetype}
         @return           True if file was stored
         """
-        self.ensure_internal_schema()
         filedata0 = self.get_shared_file(message["id"])
 
         basename = data.get("filename")
@@ -1407,7 +1405,6 @@ class SkypeDatabase(object):
         """Deletes all shared files from disk and database, drops shared folder if empty."""
         directory = self.get_share_path()
         if os.path.isdir(directory) and os.listdir(directory):
-            self.ensure_internal_schema()
             for row in self.execute("SELECT filepath FROM _shared_files_"):
                 filepath = row["filepath"]
                 if not os.path.isabs(filepath):
@@ -1418,6 +1415,44 @@ class SkypeDatabase(object):
         if os.path.isdir(directory) and not os.listdir(directory):
             try: os.rmdir(directory)
             except Exception as e: logger.warning("Error deleting %s: %s", directory, e)
+
+
+    def rename_share_path(self, path):
+        """Renames local shared files path, moving/renaming all existing files on disk."""
+        path1, path2 = self.get_share_path(), path
+        if not path2:
+            try:              path2 = conf.ShareDirectoryTemplate % {"filename": self.filename}
+            except Exception: path2 = conf.ShareDirectoryTemplate
+        if not os.path.isabs(path2): path2 = os.path.join(os.path.dirname(self.filename), path2)
+        if path1 == path2: return
+
+        if os.path.isdir(path1) and not os.path.isdir(path2):
+            try: os.makedirs(os.path.dirname(path2))
+            except Exception: pass
+            try: shutil.move(path1, path2)
+            except Exception:
+                logger.exception("Error renaming shared files path %s to %s.", path1, path2)
+        elif os.path.isdir(path1) and os.path.isdir(path2):
+            for row in self.execute("SELECT * FROM _shared_files_"):
+                filepath1 = row["filepath"]
+                if not os.path.isabs(filepath1):
+                    filepath1 = os.path.join(path1, filepath1)
+                if not os.path.isfile(filepath1): continue # for row
+
+                filepath2 = util.unique_path(os.path.join(path2, os.path.basename(row["filepath"])))
+                try: shutil.move(filepath1, filepath2)
+                except Exception as e: logger.warning("Error renaming %s to %s: %s",
+                                                      filepath1, filepath2, e)
+                else:
+                    filepath = os.path.basename(filepath2)
+                    if filepath != row["filepath"]:
+                        self.execute("UPDATE _shared_files_ SET filepath = ? WHERE id = ?",
+                                     (filepath, row["id"]))
+            if os.path.isdir(path1) and not os.listdir(path1):
+                try: os.rmdir(path1)
+                except Exception as e: logger.warning("Error deleting %s: %s", path1, e)
+        
+        self.set_internal_option("ShareDirectory", path or None)
 
 
     def blobs_to_binary(self, values, list_columns, col_data):

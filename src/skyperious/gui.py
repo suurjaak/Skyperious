@@ -4502,17 +4502,17 @@ class DatabasePage(wx.Panel):
 
     def on_set_sharepath(self, event):
         """Handler for selecting to set or clear local shared files path for database."""
-        value = self.db.get_internal_option("ShareDirectory") or ""
+        value1 = self.db.get_internal_option("ShareDirectory") or ""
 
         message = "Set relative or absolute path for local shared files folder\n" \
                   "or leave blank for default:"
-        with wx.TextEntryDialog(self, message, conf.Title, value=value) as dlg:
+        with wx.TextEntryDialog(self, message, conf.Title, value=value1) as dlg:
             dlg.CenterOnParent()
             if wx.ID_OK != dlg.ShowModal(): return
             value2 = dlg.GetValue().strip()
-        if value2 == value: return
-        self.db.set_internal_option("ShareDirectory", value2 or None)
-        self.edit_info_sharepath.Value = self.db.get_share_path()
+        if value1 != value2:
+            self.db.rename_share_path(value2 or None)
+            self.edit_info_sharepath.Value = self.db.get_share_path()
 
 
     def on_change_range_date(self, event):
