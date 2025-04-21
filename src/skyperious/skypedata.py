@@ -1420,6 +1420,7 @@ class SkypeDatabase(object):
 
     def rename_share_path(self, path):
         """Renames local shared files path, moving/renaming all existing files on disk."""
+        if path: path = os.path.normpath(path)
         path1, path2 = self.get_share_path(), path
         if not path2:
             try:              path2 = conf.ShareDirectoryTemplate % {"filename": self.filename}
@@ -1453,7 +1454,11 @@ class SkypeDatabase(object):
             if os.path.isdir(path1) and not os.listdir(path1):
                 try: os.rmdir(path1)
                 except Exception as e: logger.warning("Error deleting %s: %s", path1, e)
-        
+
+        if path and os.path.isabs(path):
+            dbdir = os.path.dirname(self.filename) + os.sep
+            if path.startswith(dbdir):
+                path = path[len(dbdir):]
         self.set_internal_option("ShareDirectory", path or None)
 
 
