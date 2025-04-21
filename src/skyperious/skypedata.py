@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    20.04.2025
+@modified    21.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -182,6 +182,7 @@ class SkypeDatabase(object):
                                 convo_id INTEGER NOT NULL, -- Conversations.id
                                 msg_id   INTEGER NOT NULL, -- Messages.id
                                 docid    TEXT, -- Skype online ID like "0-wus-d7-4f8248..."
+                                author   TEXT NOT NULL, -- skypename of sender
                                 category TEXT, -- "audio" "video" "image"
                                 mimetype TEXT, -- "image/png" "video/mp4" etc
                                 filesize INTEGER NOT NULL DEFAULT 0,
@@ -1375,7 +1376,8 @@ class SkypeDatabase(object):
             return False
 
         filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
-                        filename=data.get("filename") or "", filepath=basename)
+                        filename=data.get("filename") or "", filepath=basename,
+                        author=message["author"])
         filedata.update({k: data[k] for k in ("docid", "category", "mimetype") if data.get(k)})
         if not filedata.get("docid") and data.get("url"):
             filedata.update(docid=live.get_content_id(data["url"]))
