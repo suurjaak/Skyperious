@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    15.04.2025
+@modified    21.04.2025
 ------------------------------------------------------------------------------
 """
 import datetime
@@ -707,9 +707,9 @@ class MergeThread(WorkerThread):
         c = chat
         participants1 = c["c1"]["participants"] if c["c1"] else []
         participants2 = c["c2"]["participants"] if c["c2"] else []
-        c2p_map = dict((p["identity"], p) for p in participants2
-                       if p["contact"].get("id"))
-        c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map]
+        c2p_map = {p["identity"]: p for p in participants2}
+        c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map
+                    or (p["contact"].get("id") and not c2p_map[p["identity"]]["contact"].get("id"))]
         c1m_diff = [] # [(id, datetime), ] messages different in chat 1
         db_account_ids = set(filter(bool, [db1.id, db1.username, db2.id, db2.username]))
 

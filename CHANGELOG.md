@@ -1,9 +1,10 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-20
+5.9, 2025-04-21
 ---------------
 - offer to retain partial database on canceling import of Skype export archive
+- fix database diff mistakenly marking participants as new
 
 
 5.8, 2025-03-27
