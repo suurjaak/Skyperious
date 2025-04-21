@@ -7590,6 +7590,8 @@ class MergerPage(wx.Panel):
         for a, b in [(self.label_all1, self.label_all2)]:
             a.Label, b.Label = b.Label, a.Label
 
+        for i in range(self.list_chats.ItemCount):
+            self.list_chats.SetItemFont(i, self.list_chats.Font)
         self.label_merge_chat.Label = ""
         self.stc_diff1.ClearAll()
         self.button_merge_chat.Enabled = False
