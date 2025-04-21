@@ -2335,7 +2335,7 @@ class MessageParser(object):
             for i, f in enumerate(files[i] for i in sorted(files)):
                 if len(dom) > 0:
                     a.tail = ", "
-                h = f["url"] or util.path_to_url(f["filepath"] or f["filename"])
+                h = f.get("url") or util.path_to_url(f["filepath"] or f["filename"])
                 a = ElementTree.SubElement(dom, "a", {"href": h})
                 a.text = f["filename"]
                 a.tail = "" if i < len(files) - 1 else "."
