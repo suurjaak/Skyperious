@@ -6486,7 +6486,7 @@ class DatabasePage(wx.Panel):
         sortkey = lambda x: util.coalesce(x[self.contact_sort_field], MINS.get(self.contact_sort_field, ""))
         contact.get("conversations", []).sort(key=sortkey, reverse=True)
 
-        avatar_path, avatar_size, avatar_raw = None, None, skypedata.get_avatar_raw(contact)
+        avatar_path, avatar_size = None, None
         if skypedata.get_avatar_data(contact):
             imgkey = ("avatar", contact["id"])
             img = self.imagecache.get(imgkey) or skypedata.get_avatar(contact)
