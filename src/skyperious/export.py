@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    18.04.2025
+@modified    22.04.2025
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -99,7 +99,7 @@ def export_chats(chats, path, format, db, opts=None):
                ?files_folder   whether to save shared files and media to subfolder in HTML export
                ?timerange      additional arguments for filtering messages, as
                                (from_timestamp or None, to_timestamp or None)
-               ?messages       list messages to export if not querying all
+               ?messages       iterable of messages to export if not querying all
                ?noskip         whether to not skip chats with no messages
                ?progress       function called before exporting each chat,
                                with the number of messages exported so far
@@ -121,7 +121,8 @@ def export_chats(chats, path, format, db, opts=None):
 
     if "xlsx" == format and not opts.get("multi"):
         filename = make_filename(chats[0])
-        count, message_count = export_chats_xlsx(chats, filename, db, opts=opts)
+        messages = opts.get("messages")
+        count, message_count = export_chats_xlsx(chats, filename, db, messages, opts=opts)
         files.append(filename)
     else:
         filedir = path if opts.get("multi") else os.path.dirname(path)
