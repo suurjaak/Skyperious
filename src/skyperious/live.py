@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    21.04.2025
+@modified    22.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -417,7 +417,7 @@ class SkypeLogin(object):
             metadata, content = None, None
             localpath = self.db.get_shared_file_path(dbitem["id"])
             if not localpath or not os.path.exists(localpath):
-                metadata = self.msg_parser.get_message_share_data(body=item.content)
+                metadata = self.msg_parser.make_message_share_data(body=item.content)
             if metadata:
                 content = self.download_content(metadata["url"], metadata.get("category") or "file")
             if content is not None:
@@ -912,7 +912,7 @@ class SkypeLogin(object):
             chat_messages_processed += 1
             localpath = self.db.get_shared_file_path(m["id"])
             if localpath and os.path.exists(localpath): continue # while run
-            metadata, content = self.msg_parser.get_message_share_data(body=m["body_xml"]), None
+            metadata, content = self.msg_parser.make_message_share_data(body=m["body_xml"]), None
             if metadata:
                 content = self.download_content(metadata["url"], metadata.get("category") or "file")
             if content is not None:
@@ -1717,7 +1717,7 @@ class SkypeExport(skypedata.SkypeDatabase):
         metadata, content, extradata = None, None, None
         localpath = self.get_shared_file_path(message["id"])
         if not localpath or not os.path.exists(localpath):
-            metadata = self.msg_parser.get_message_share_data(body=message["body_xml"])
+            metadata = self.msg_parser.make_message_share_data(body=message["body_xml"])
         if metadata and metadata.get("docid"):
             content, extradata = self.export_load_shared_file_content(metadata["docid"])
         if content is not None:

@@ -2537,7 +2537,7 @@ class MessageParser(object):
                     if not options.get("export"): data.update(filepath=path)
                     self.stats["shared_media"][message["id"]] = data
             elif options.get("merge"):
-                if not filedata: filedata = self.get_message_share_data(dom=dom)
+                if not filedata: filedata = self.make_message_share_data(dom=dom)
                 if filedata and filedata.get("filename"):
                     filedata = dict(filedata, url=filedata.get("url") or "",
                                     category=filedata.get("category") or "file")
@@ -2548,7 +2548,7 @@ class MessageParser(object):
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
             dom0 = dom
-            data = self.get_message_share_data(dom=dom)
+            data = self.make_message_share_data(dom=dom)
             if data:
                 data.update(author_name=get_author_name(message),
                             author=message["author"], success=False,
@@ -2859,7 +2859,7 @@ class MessageParser(object):
         return dom
 
 
-    def get_message_share_data(self, body=None, dom=None):
+    def make_message_share_data(self, body=None, dom=None):
         """
         Returns metadata dictionary for Skype file/media message body or DOM.
 
