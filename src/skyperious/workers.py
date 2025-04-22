@@ -9,11 +9,13 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    21.04.2025
+@modified    22.04.2025
 ------------------------------------------------------------------------------
 """
+import collections
 import datetime
 import logging
+import os
 import re
 import threading
 import traceback
@@ -495,7 +497,8 @@ class MergeThread(WorkerThread):
             diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
             if not self._is_working:
                 break # for index, chat
-            if diff["messages"] \
+            if not conf.ShareDirectoryEnabled: diff["shared_files"] = []
+            if diff["messages"] or diff["shared_files"] \
             or (chat["message_count"] and diff["participants"]):
                 new_chat = not chat["c2"]
                 newstr = "" if new_chat else "new "
@@ -503,21 +506,20 @@ class MergeThread(WorkerThread):
                 if new_chat:
                     info += " - new chat"
                 if diff["messages"]:
-                    info += ", %s" % util.plural("%smessage" % newstr,
-                                                 diff["messages"])
-                else:
+                    info += ", %s" % util.plural("%smessage" % newstr, diff["messages"])
+                elif not diff["shared_files"]:
                     info += ", no messages"
+                if diff["shared_files"]:
+                    info += ", %s" % util.plural("%sshared file" % newstr, diff["shared_files"])
                 if diff["participants"] and not new_chat:
-                    info += ", %s" % (util.plural("%sparticipant" % newstr,
-                                                  diff["participants"]))
+                    info += ", %s" % (util.plural("%sparticipant" % newstr, diff["participants"]))
                 info += ".<br />"
                 result["output"] += info
                 result["chats"].append({"chat": chat, "diff": diff})
             result["index"] = postback["index"]
             if not self._drop_results:
                 if index < len(compared) - 1:
-                    result["status"] = ("Scanning %s." %
-                                        compared[index + 1]["title_long_lc"])
+                    result["status"] = ("Scanning %s." % compared[index + 1]["title_long_lc"])
                 self.postback(result)
                 result = dict(result, output="", chats=[])
         if not self._drop_results:
@@ -555,8 +557,7 @@ class MergeThread(WorkerThread):
                 result["count"] += c["messages1"] + c["messages2"]
             result["chatcount"] = len(chats1)
             compared.sort(key=lambda x: x["title"].lower())
-            count_messages = 0
-            count_participants = 0
+            counts = collections.defaultdict(int)
 
             for index, chat in enumerate(compared):
                 result["chatindex"] = index
@@ -565,7 +566,8 @@ class MergeThread(WorkerThread):
                 diff = self.get_chat_diff_left(chat, db1, db2, postback, runcheck=True)
                 if not self._is_working:
                     break # for index, chat
-                if diff["messages"] \
+                if not conf.ShareDirectoryEnabled: diff["shared_files"] = []
+                if diff["messages"] or diff["shared_files"] \
                 or (chat["message_count"] and diff["participants"]):
                     chat1 = chat["c1"]
                     chat2 = chat["c2"]
@@ -576,21 +578,30 @@ class MergeThread(WorkerThread):
                         chat2["id"] = db2.insert_conversation(chat2, db1)
                     if diff["participants"]:
                         db2.insert_participants(chat2, diff["participants"], db1)
-                        count_participants += len(diff["participants"])
+                        counts["participants"] += len(diff["participants"])
                     if diff["messages"]:
-                        db2.insert_messages(chat2, diff["messages"], db1, chat1,
+                        db2.insert_messages(chat2, diff["messages"], db1, chat1, diff["shared_files"],
                                             self.yield_ui, self.REFRESH_COUNT)
-                        count_messages += len(diff["messages"])
+                        counts["messages"] += len(diff["messages"])
+                    if diff["shared_files"]:
+                        files_missing = [f for f in diff["shared_files"] if f.get("msg_id2")]
+                        if files_missing:
+                            db2.insert_shared_files(chat2, files_missing, db1,
+                                                    self.yield_ui, self.REFRESH_COUNT)
+                        counts["shared_files"] += len(diff["shared_files"])
 
                     newstr = "" if new_chat else "new "
                     info = "Merged %s" % chat["title_long_lc"]
                     if new_chat:
                         info += " - new chat"
                     if diff["messages"]:
-                        info += ", %s" % util.plural("%smessage" % newstr,
-                                                     diff["messages"])
-                    else:
+                        info += ", %s" % util.plural("%smessage" % newstr, diff["messages"])
+                    elif not diff["shared_files"]:
                         info += ", no messages"
+                    if diff["shared_files"]:
+                        info += ", %s" % util.plural("%sshared file" % newstr, diff["shared_files"])
+                    if diff["participants"]:
+                        info += ", %s" % util.plural("%sparticipant" % newstr, diff["participants"])
                     result["output"] = info + "."
                     result["diff"] = diff
                 result["index"] = postback["index"]
@@ -607,12 +618,13 @@ class MergeThread(WorkerThread):
         finally:
             if not self._drop_results:
                 if compared:
-                    info = "Merged %s" % util.plural("new message",
-                                                     count_messages)
-                    if count_participants:
-                        info += " and %s" % util.plural("new participant",
-                                                        count_participants)
-                    info += " \n\nto %s." % db2
+                    count_texts = []
+                    for category in ("messages", "shared_files", "participants"):
+                        if counts.get(category):
+                            word = category[:-1].replace("_", " ")
+                            count_texts.append(util.plural("new %s" % word, counts[category],
+                                                           sep=","))
+                    info = "Merged %s\n\nto %s." % (" and ".join(count_texts), db2)
                 else:
                     info = "Nothing new to merge from %s to %s." % (db1, db2)
                 result = {"type": "diff_merge_left", "done": True,
@@ -631,12 +643,12 @@ class MergeThread(WorkerThread):
         error, e = None, None
         db1, db2 = params["db1"], params["db2"]
         chats = params["chats"]
-        count_messages = 0
-        count_participants = 0
+        counts = collections.defaultdict(int)
         result = {"count": sum(len(x["diff"]["messages"]) for x in chats),
                   "index": 0, "chatindex": 0, "chatcount": len(chats),
                   "type": "merge_left", "output": "", "chats": [],
                   "params": params}
+        exc = None
         try:
             for index, chat_data in enumerate(chats):
                 if not self._is_working:
@@ -645,14 +657,18 @@ class MergeThread(WorkerThread):
                 chat2 = chat_data["chat"]["c2"]
                 messages = chat_data["diff"]["messages"]
                 participants = chat_data["diff"]["participants"]
+                shared_files = chat_data["diff"]["shared_files"]
+                if not conf.ShareDirectoryEnabled: conf.ShareDirectoryEnabled = []
+                newstr = "" if not chat2 else "new "
                 html = "Merged %s" % chat1["title_long_lc"]
                 if not chat2:
                     html += " - new chat"
                 if messages:
-                    newstr = "" if not chat2 else "new "
                     html += ", %s" % util.plural("%smessage" % newstr, messages)
-                else:
+                elif not shared_files:
                     html += ", no messages"
+                if shared_files:
+                    html += ", %s" % util.plural("%sshared file" % newstr, shared_files)
                 html += "."
                 if not chat2:
                     chat2 = chat1.copy()
@@ -660,37 +676,43 @@ class MergeThread(WorkerThread):
                     chat2["id"] = db2.insert_conversation(chat2, db1)
                 if participants:
                     db2.insert_participants(chat2, participants, db1)
-                    count_participants += len(participants)
+                    counts["participants"] += len(participants)
                 if messages:
-                    db2.insert_messages(chat2, messages, db1, chat1,
+                    db2.insert_messages(chat2, messages, db1, chat1, shared_files,
                                         self.yield_ui, self.REFRESH_COUNT)
-                    count_messages += len(messages)
+                    counts["messages"] += len(messages)
+                if shared_files:
+                    files_missing = [f for f in shared_files if f.get("msg_id2")]
+                    if files_missing:
+                        db2.insert_shared_files(chat2, files_missing, db1,
+                                                self.yield_ui, self.REFRESH_COUNT)
+                    counts["shared_files"] += len(shared_files)
+
                 if not self._drop_results:
-                    result.update(output=html, chatindex=index,
-                                  chats=[chat_data["chat"]])
+                    result.update(output=html, chatindex=index, chats=[chat_data["chat"]])
                     result["index"] += len(messages)
                     if index < len(chats) - 1:
-                        result["status"] = ("Merging %s."
-                            % chats[index + 1]["chat"]["title_long_lc"])
+                        result["status"] = ("Merging %s." %
+                                            chats[index + 1]["chat"]["title_long_lc"])
                     self.postback(result)
                     result = dict(result, output="", chats=[])
         except Exception as e:
             error = traceback.format_exc()
+            exc = e
         finally:
             html = "Nothing to merge."
             if chats:
-                html = "Merged %s" % util.plural("new message",
-                                                 count_messages)
-                if count_participants:
-                    html += " and %s" % util.plural("new participant",
-                                                    count_participants)
-                html += " \n\nto %s." % db2
+                count_texts = []
+                for category in ("messages", "shared_files", "participants"):
+                    if counts.get(category):
+                        word = category[:-1].replace("_", " ")
+                        count_texts.append(util.plural("new %s" % word, counts[category], sep=","))
+                html = "Merged %s\n\n to %s." % (" and ".join(count_texts), db2)
             if not self._drop_results:
-                result = {"type": "merge_left", "done": True, "output": html,
-                          "params": params}
+                result = {"type": "merge_left", "done": True, "output": html, "params": params}
                 if error:
                     result["error"] = error
-                    if e: result["error_short"] = repr(e)
+                    if exc: result["error_short"] = repr(exc)
                 self.postback(result)
 
 
@@ -698,7 +720,8 @@ class MergeThread(WorkerThread):
         """
         Compares the chat in the two databases and returns the differences from
         the left as {"messages": [message IDs different in db1],
-                     "participants": [participants different in db1] }.
+                     "participants": [participants different in db1],
+                     "shared_Files": [shared files missing in db2, with optional msg_id2]}.
 
         @param   postback  if {"count": .., "index": ..}, updates index
                            and posts the result at POSTBACK_COUNT intervals
@@ -710,7 +733,17 @@ class MergeThread(WorkerThread):
         c2p_map = {p["identity"]: p for p in participants2}
         c1p_diff = [p for p in participants1 if p["identity"] not in c2p_map
                     or (p["contact"].get("id") and not c2p_map[p["identity"]]["contact"].get("id"))]
+
+        c1f_map, c2f_map = {}, {} # {message ID: {.._shared_files_ row..}} for both sides
+        if conf.ShareDirectoryEnabled:
+            for db, convo, fmap in [(db1, c["c1"], c1f_map), (db2, c["c2"], c2f_map)]:
+                if convo and "_shared_files_" in db.tables:
+                    for f in db.execute("SELECT * FROM _shared_files_ WHERE convo_id = :id", convo):
+                        path = db.get_shared_file_path(f["msg_id"])
+                        if path and os.path.isfile(path): fmap[f["msg_id"]] = f
+
         c1m_diff = [] # [(id, datetime), ] messages different in chat 1
+        c1f_diff = [] # [{..shared file dict, ?msg_id2..}, ] files from chat 1 missing in chat 2
         db_account_ids = set(filter(bool, [db1.id, db1.username, db2.id, db2.username]))
 
         if not c["messages1"]:   # Left side empty, skip all messages
@@ -760,8 +793,14 @@ class MergeThread(WorkerThread):
                 for delta in DELTAS:
                     # Look for matching messages within -1/+1 day interval
                     potentials += m2buckets.get(mdate+delta, {}).get(ckey, [])
-                if not any(self.match_time(m["datetime"], x[1], 180) for x in potentials):
+                m2key = next((x for x in potentials
+                              if self.match_time(m["datetime"], x[1], 180)), None)
+                if not m2key:
                     c1m_diff.append((m["id"], m["datetime"]))
+                if m["id"] in c1f_map and (not m2key or m2key[0] not in c2f_map):
+                    filedata = c1f_map[m["id"]]
+                    if m2key: filedata = dict(filedata, msg_id2=m2key[0])
+                    c1f_diff.append(filedata)
                 if runcheck and not self._is_working:
                     break # for i, m
                 if i and not i % self.REFRESH_COUNT:
@@ -771,7 +810,7 @@ class MergeThread(WorkerThread):
                     self.postback(postback)
 
         message_ids1 = [x[0] for x in sorted(c1m_diff, key=lambda x: x[1])]
-        result = {"messages": message_ids1, "participants": c1p_diff}
+        result = {"messages": message_ids1, "participants": c1p_diff, "shared_files": c1f_diff}
 
         return result
 

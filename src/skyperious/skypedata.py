@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.04.2025
+@modified    22.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1358,7 +1358,7 @@ class SkypeDatabase(object):
 
         @param   content  raw binary content bytes
         @param   data     file metadata dictionary, as {?filename, ?docid, ?category, ?mimetype}
-        @return           True if file was stored
+        @return           shared file ID, or None on failure
         """
         filedata0 = self.get_shared_file(message["id"])
 
@@ -1385,7 +1385,7 @@ class SkypeDatabase(object):
                 f.write(content)
         except Exception:
             logger.exception("Failed to store local shared file %s.", outpath)
-            return False
+            return None
 
         filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
                         filename=data.get("filename") or "", filepath=basename,
@@ -1395,9 +1395,10 @@ class SkypeDatabase(object):
             filedata.update(docid=live.get_content_id(data["url"]))
         if not filedata.get("mimetype"):
             filedata.update(mimetype=util.get_mime_type(content, data.get("category"), basename))
-        if filedata0: self.update_row("_shared_files_", filedata, filedata0)
-        else: self.insert_row("_shared_files_", filedata)
-        return True
+        if filedata0:
+            self.update_row("_shared_files_", filedata, filedata0)
+            return filedata0["id"]
+        else: return self.insert_row("_shared_files_", filedata)
 
 
     def delete_shared_files(self):
@@ -1528,17 +1529,18 @@ class SkypeDatabase(object):
             return cursor.lastrowid
 
 
-    def insert_messages(self, chat, messages, source_db, source_chat,
+    def insert_messages(self, chat, messages, source_db, source_chat, shared_files=(),
                         heartbeat=None, beatcount=None):
         """
         Inserts the specified messages under the specified chat in this
         database, includes related rows in Calls, Videos, Transfers and
         SMSes.
 
-        @param    messages   list of messages, or message IDs from source_db
-        @param    heartbeat  function called after every @beatcount message
-        @param    beatcount  number of messages after which to call heartbeat
-        @return              a list of inserted message IDs
+        @param    messages      list of messages, or message IDs from source_db
+        @param    shared_files  list of shared file data dictionaries
+        @param    heartbeat     function called after every @beatcount message
+        @param    beatcount     number of messages after which to call heartbeat
+        @return                 a list of inserted message IDs
         """
         result = []
         if self.is_open() and not self.account and source_db.account:
@@ -1551,6 +1553,8 @@ class SkypeDatabase(object):
             self.create_table("smses")
         if self.is_open() and "chats" not in self.tables:
             self.create_table("chats")
+        if self.is_open() and shared_files:
+            self.ensure_internal_schema()
         if self.is_open() and "messages" in self.tables:
             logger.info("Merging %s (%s) into %s.",
                         util.plural("chat message", messages),
@@ -1564,6 +1568,7 @@ class SkypeDatabase(object):
                     % ", ".join("?" * len(cc)), [x["id"] for x in cc]))
             chatrows_present = dict([(i["name"], 1)
                 for i in self.execute("SELECT name FROM chats")])
+            filemap = {f["msg_id"]: f for f in shared_files or ()}
             col_data = self.get_table_columns("messages")
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
@@ -1588,8 +1593,7 @@ class SkypeDatabase(object):
 
             for i, m in enumerate(source_db.message_iterator(messages)):
                 # Insert corresponding Chats entry, if not present
-                if (m["chatname"] not in chatrows_present
-                and m["chatname"] in chatrows_source):
+                if m["chatname"] not in chatrows_present and m["chatname"] in chatrows_source:
                     chatrowdata = chatrows_source[m["chatname"]]
                     chatrow = [chatrowdata.get(col, "") for col in chat_fields]
                     chatrow = self.blobs_to_binary(
@@ -1602,15 +1606,13 @@ class SkypeDatabase(object):
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
                 # Ensure correct author if merge from other account
-                if m["author"] \
-                and m["author"] in (self.username, source_db.id, source_db.username):
+                if m["author"] and m["author"] in (self.username, source_db.id, source_db.username):
                     m_filled["author"] = self.id
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
                 m_id = cursor.lastrowid
-                if (MESSAGE_TYPE_FILE == m["type"]
-                and "transfers" in source_db.tables):
+                if MESSAGE_TYPE_FILE == m["type"] and "transfers" in source_db.tables:
                     transfers = [t for t in source_db.get_transfers()
                                  if t.get("chatmsg_guid") == m["guid"]]
                     if transfers:
@@ -1625,21 +1627,21 @@ class SkypeDatabase(object):
                                 t["partner_handle"] = self.id
                             row = [t.get(col, "") if col != "convo_id" else chat["id"]
                                    for col in transfer_fields]
-                            row = self.blobs_to_binary(row, transfer_fields,
-                                                       transfer_col_data)
+                            row = self.blobs_to_binary(row, transfer_fields, transfer_col_data)
                             self.execute(sql, row)
-                if (MESSAGE_TYPE_SMS == m["type"]
-                and "smses" in source_db.tables):
+                if MESSAGE_TYPE_SMS == m["type"] and "smses" in source_db.tables:
                     smses = [s for s in source_db.get_smses()
                              if s.get("chatmsg_id") == m["id"]]
                     if smses:
-                        sql = "INSERT INTO smses (%s) VALUES (%s)" % \
-                              (sms_cols, sms_vals)
+                        sql = "INSERT INTO smses (%s) VALUES (%s)" % (sms_cols, sms_vals)
                         for sms in smses:
                             t = [sms.get(col, "") if col != "chatmsg_id" else m_id
                                  for col in sms_fields]
                             t = self.blobs_to_binary(t, sms_fields, sms_col_data)
                             self.execute(sql, t)
+                if m["id"] in filemap:
+                    self.insert_shared_files(chat, [dict(filemap[m["id"]], msg_id2=m_id)],
+                                             source_db, heartbeat, beatcount)
                 timestamp_earliest = min(timestamp_earliest, m["timestamp"])
                 result.append(m_id)
                 if heartbeat and beatcount and i and not i % beatcount:
@@ -1654,6 +1656,34 @@ class SkypeDatabase(object):
                              ":creation_timestamp WHERE id = :id", chat)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
+        return result
+
+
+    def insert_shared_files(self, chat, shared_files, source_db, heartbeat=None, beatcount=None):
+        """
+        Inserts the specified shared files under the specified chat in this
+        database, copying over file content on disk.
+
+        @param    shared_files  list of shared file data dictionaries, with msg_id2
+        @param    heartbeat     function called after every @beatcount message
+        @param    beatcount     number of messages after which to call heartbeat
+        @return                 a list of inserted shared file IDs
+        """
+        result = []
+        if not self.is_open(): return result
+        self.ensure_internal_schema()
+
+        for i, filedata in enumerate(shared_files):
+            content = source_db.get_shared_file_content(filedata["msg_id"])
+            if content is None:
+                logger.warning("Failed to get content for file %s.", filedata)
+            else:
+                sql = "SELECT * FROM Messages WHERE id = ?"
+                message = self.execute(sql, [filedata["msg_id2"]]).fetchone()
+                fileid = self.store_shared_file(message, content, filedata) if message else None
+                if fileid is not None: result.append(fileid)
+            if heartbeat and beatcount and i and not i % beatcount:
+                heartbeat()
         return result
 
 
@@ -1816,6 +1846,16 @@ class SkypeDatabase(object):
                 res = self.get_messages(additional_sql=s, additional_params=p)
                 for m in res:
                     yield m
+
+
+    def sort_message_ids(self, chat, *id_sequences):
+        """Returns a single list of all message IDs in ascending timestamp order."""
+        result = []
+        ids = set(sum(map(list, id_sequences), []))
+        sql = "SELECT id FROM Messages WHERE convo_id = :id ORDER BY timestamp ASC"
+        for row in self.execute(sql, chat):
+            if row["id"] in ids: result.append(row["id"])
+        return result
 
 
     def delete_data(self, conversations, contacts=()):
@@ -2189,8 +2229,8 @@ class MessageParser(object):
                                 "wrap": False    whether to wrap long lines
                                 "export": False  whether output is for export,
                                                  using another content template
-                                "merge": False   for merge comparison, inserts
-                                                 skypename instead of fullname
+                                "merge": False   for merge comparison, provides
+                                                 simplified result
         @return                 a string if html or text specified,
                                 or ElementTree.Element containing message body,
                                 with "xml" as the root tag
@@ -2302,7 +2342,9 @@ class MessageParser(object):
                          if f["chatmsg_guid"] == message["guid"])
 
             domfiles = {}
-            localdata = None if options.get("export") else self.db.get_shared_file(message["id"])
+            localdata = None
+            if not options.get("export") and not options.get("merge"):
+                localdata = self.db.get_shared_file(message["id"])
             for f in dom.findall("*/file"):
                 domfiles[int(f.get("index"))] = domfile = {
                     "filename": f.text,
@@ -2477,9 +2519,9 @@ class MessageParser(object):
 
         # Photo/video/file sharing: make file link for local share folder, if any
         if any(dom.iter("URIObject")):
+            filedata = self.db.get_shared_file(message["id"])
             path = self.db.get_shared_file_path(message["id"])
             if path and os.path.isfile(path):
-                filedata = self.db.get_shared_file(message["id"])
                 url = util.path_to_url(path)
                 text = step.Template('Shared {{category}} <a href="{{url}}">{{name}}</a>').expand(
                     category=filedata["category"] or "file", url=url, name=filedata["filename"])
@@ -2494,6 +2536,14 @@ class MessageParser(object):
                                 category=filedata["category"])
                     if not options.get("export"): data.update(filepath=path)
                     self.stats["shared_media"][message["id"]] = data
+            elif options.get("merge"):
+                if not filedata: filedata = self.get_message_share_data(dom=dom)
+                if filedata and filedata.get("filename"):
+                    filedata = dict(filedata, url=filedata.get("url") or "",
+                                    category=filedata.get("category") or "file")
+                    text = step.Template('Shared {{category}} <a href="{{url}}">{{filename}}</a>') \
+                           .expand(filedata)
+                    dom = self.make_xml(text, message)
 
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):

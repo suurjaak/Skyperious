@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    21.04.2025
+@modified    22.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -7475,12 +7475,16 @@ class MergerPage(wx.Panel):
         format = export.CHAT_EXTS[dialog.FilterIndex]
         files_folder = "html" == format and \
                        dialog.FilterIndex != export.CHAT_EXTS.index("html")
-        if files_folder and not check_shared_files_export_login(self.db): return
+        if files_folder and not check_shared_files_export_login(self.db1): return
 
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
         guibase.status("Exporting to %s.", filepath, log=True)
         try:
-            messages = self.db1.message_iterator(self.chat_diff["messages"])
+            message_ids = list(self.chat_diff["messages"])
+            if self.chat_diff["shared_files"]:
+                message_ids += [f["msg_id"] for f in self.chat_diff["shared_files"]]
+                message_ids = self.db1.sort_message_ids(self.chat, message_ids)
+            messages = self.db1.message_iterator(message_ids)
             opts = dict(messages=messages, progress=lambda *args: wx.SafeYield())
             if files_folder: opts["files_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db1, opts)
@@ -7743,7 +7747,7 @@ class MergerPage(wx.Panel):
                 self, "Diffing messages for %s." % c["title_long_lc"])
 
             try:
-                diff = {"messages": [], "participants": []}
+                diff = {"messages": [], "shared_files": [], "participants": []}
                 data = self.chats_diffdata.get(c["identity"])
                 if data:
                     diff = data["diff"] # Use cached diff if available
@@ -7759,16 +7763,25 @@ class MergerPage(wx.Panel):
                 elif c["identity"] not in self.chats_nodiff:
                     data = {"chat": c, "diff": diff}
                     self.chats_nodiff[c["identity"]] = data
-                messages = list(self.db1.message_iterator(diff["messages"]))
+                message_ids = list(diff["messages"])
+                if diff["shared_files"]:
+                    message_ids += [f["msg_id"] for f in diff["shared_files"]]
+                    message_ids = self.db1.sort_message_ids(c, message_ids)
+                messages = list(self.db1.message_iterator(message_ids))
                 self.chat = c
                 self.chat_diff = diff
                 self.button_merge_chat.Enabled = len(messages)
                 self.button_merge_chat.Note = self.MERGE_CHAT_BUTTON_NOTE
                 self.button_export_chat.Enabled = len(messages)
-                if messages:
-                    self.button_merge_chat.Note = (
-                        "Copy %s to the database on the right." %
-                        util.plural("chat message", messages, sep=","))
+
+                count_texts = []
+                for category in ("messages", "shared_files"):
+                    if diff[category]:
+                        word = "chat message" if "messages" == category else "shared file"
+                        count_texts.append(util.plural(word, diff[category], sep=","))
+                if count_texts:
+                    self.button_merge_chat.Note = ("Copy %s to the database on the right." %
+                                                   " and ".join(count_texts))
                     self.button_merge_chat.ContainingSizer.Layout()
                 idx = -conf.MaxHistoryInitialMessages
                 self.stc_diff1.Populate(c, self.db1, messages, from_index=idx)
@@ -7902,18 +7915,24 @@ class MergerPage(wx.Panel):
             self.button_swap.Enabled = True
             self.button_merge_chats.Enabled = True
             if self.chats_diffdata:
-                count_msgs = util.plural(
-                    "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()), sep=",")
-                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-                noteinfo = "%s from %s" % (count_msgs, count_chats)
+                count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+                count_files = sum(len(d["diff"]["shared_files"])
+                                  for d in self.chats_diffdata.values())
+                text_msgs = ""
+                if count_msgs or not count_files:
+                    text_msgs += util.plural("message", count_msgs, sep=",")
+                if count_files:
+                    if count_msgs: text_msgs += " and "
+                    text_msgs += util.plural("shared file", count_files, sep=",")
+                text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+                noteinfo = "%s from %s" % (text_msgs, text_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
                 self.html_report.Freeze()
                 self.html_report.AppendToPage(
                     "<br /><br />New in %s: %s in %s." %
-                    (self.db1, count_msgs, count_chats))
+                    (self.db1, text_msgs, text_chats))
                 scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
                 self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
@@ -7932,11 +7951,16 @@ class MergerPage(wx.Panel):
         """
         db1, db2 = self.db1, self.db2
         if self.is_scanned:
-            count_msgs = util.plural(
-                "message", sum(len(d["diff"]["messages"])
-                               for d in self.chats_diffdata.values()), sep=",")
-            count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-            info = "%s in %s" % (count_msgs, count_chats)
+            count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+            count_files = sum(len(d["diff"]["shared_files"]) for d in self.chats_diffdata.values())
+            text_msgs = ""
+            if count_msgs or not count_files:
+                text_msgs += util.plural("message", count_msgs, sep=",")
+            if count_files:
+                if count_msgs: text_msgs += " and "
+                text_msgs += util.plural("shared file", count_files, sep=",")
+            text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+            info = "%s in %s" % (text_msgs, text_chats)
             message = "Copy %s\n\nfrom %s\n\ninto %s?" % (info, db1, db2)
             type = "merge_left"
             chats = list(self.chats_diffdata.values())
@@ -8028,11 +8052,17 @@ class MergerPage(wx.Panel):
             self.button_merge_chats.Enabled = True
             wx.CallLater(20, self.load_later_data)
             if self.is_scanned and self.chats_diffdata:
-                count_msgs = util.plural(
-                    "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()), sep=",")
-                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-                noteinfo = "%s from %s" % (count_msgs, count_chats)
+                count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+                count_files = sum(len(d["diff"]["shared_files"])
+                                  for d in self.chats_diffdata.values())
+                text_msgs = ""
+                if count_msgs or not count_files:
+                    text_msgs += util.plural("message", count_msgs, sep=",")
+                if count_files:
+                    if count_msgs: text_msgs += " and "
+                    text_msgs += util.plural("shared file", count_files, sep=",")
+                text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+                noteinfo = "%s from %s" % (text_msgs, text_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
@@ -8074,11 +8104,12 @@ class MergerPage(wx.Panel):
         db1, db2 = self.db1, self.db2
         chat, chat2 = self.chat["c1"], self.chat["c2"]
         messages = self.chat_diff["messages"]
+        shared_files = self.chat_diff["shared_files"]
         participants = self.chat_diff["participants"]
         condiff = self.con1diff
         contacts2 = []
 
-        if messages or participants:
+        if messages or shared_files or participants:
             info = ""
             parts = []
             new_chat = not chat2
@@ -8087,19 +8118,18 @@ class MergerPage(wx.Panel):
                 info += "new chat with "
             if messages:
                 parts.append(util.plural("%smessage" % newstr, messages, sep=","))
+            if shared_files:
+                parts.append(util.plural("%sshared file" % newstr, shared_files, sep=","))
             if participants:
                 # Add to contacts those that are new
-                cc2 = [db1.id, db2.id] + \
-                    [i["identity"] for i in db2.get_contacts()]
+                cc2 = [db1.id, db2.id] +  [i["identity"] for i in db2.get_contacts()]
                 contacts2 = [i["contact"] for i in participants
-                    if "id" in i["contact"] and i["identity"] not in cc2]
+                             if "id" in i["contact"] and i["identity"] not in cc2]
                 if contacts2:
                     parts.append(util.plural("new contact", contacts2, sep=","))
-                parts.append(util.plural("%sparticipant" % newstr,
-                                         participants, sep=","))
+                parts.append(util.plural("%sparticipant" % newstr, participants, sep=","))
             for i in parts:
-                info += ("" if i == parts[0] else (
-                         " and " if i == parts[-1] else ", ")) + i
+                info += ("" if i == parts[0] else (" and " if i == parts[-1] else ", ")) + i
 
             proceed = wx.OK == wx.MessageBox(
                 "Copy %s\n\nfrom %s\n\ninto %s?" % (info, db1, db2),
@@ -8120,8 +8150,12 @@ class MergerPage(wx.Panel):
                         db2.insert_participants(chat2, participants, db1)
                         del participants[:]
                     if messages:
-                        db2.insert_messages(chat2, messages, db1, chat)
+                        db2.insert_messages(chat2, messages, db1, chat, shared_files)
                         del messages[:]
+                    if shared_files:
+                        files_missing = [f for f in shared_files if f.get("msg_id2")]
+                        if files_missing:
+                            db2.insert_shared_files(chat2, files_missing, db1)
                 finally:
                     self.is_merging = False
                 if chat["identity"] in self.chats_diffdata:
