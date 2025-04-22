@@ -6738,7 +6738,7 @@ class DatabasePage(wx.Panel):
             elif   wx.NO == resp: del purgables[:]
 
         TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
-                  "Participants", "Transfers", "Videos", "Voicemails"]
+                  "Participants", "Transfers", "Videos", "Voicemails", "_shared_files_"]
         if purgables: TABLES.extend(["Contacts", "ContactGroups"])
         openeds, changeds = [], []
         for t in TABLES:
@@ -6834,7 +6834,7 @@ class DatabasePage(wx.Panel):
         TABLES = ["Alerts", "CallMembers", "Calls", "ChatMembers", "Chats", "Contacts",
                   "ContactGroups", "Conversations", "MediaDocuments", "MessageAnnotations",
                   "Messages", "Participants", "Transfers", "VideoMessages", "Videos",
-                  "Voicemails"]
+                  "Voicemails", "_shared_files_"]
         openeds, changeds = [], []
         for t in TABLES:
             if t.lower() in self.db_grids:

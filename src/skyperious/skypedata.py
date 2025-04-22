@@ -1401,22 +1401,51 @@ class SkypeDatabase(object):
         else: return self.insert_row("_shared_files_", filedata)
 
 
-    def delete_shared_files(self):
-        """Deletes all shared files from disk and database, drops shared folder if empty."""
+    def delete_shared_files(self, chats=None, contacts=None):
+        """
+        Deletes shared files from disk and database, drops shared folder if empty.
+
+        @param   chats     list of specific chats to delete files from if not all
+        @param   contacts  list of specific contacts to delete files from if not all;
+                           may include database account
+        @return            number of database rows deleted
+        """
+        table_expr = "_shared_files_"
+        account = next((c for c in contacts or () if c["identity"] == self.id), None) 
+        if account:
+            table_expr += " LEFT JOIN Accounts ON _shared_files_.author = Accounts.skypename"
+            contacts = [c for c in contacts if c != account]
+        if contacts:
+            table_expr += " LEFT JOIN Contacts ON _shared_files_.author =" \
+                          " COALESCE(Contacts.skypename, Contacts.pstnnumber, '')"
+            table_expr += " WHERE Contacts.id IN (%s)" % ", ".join(str(x["id"]) for x in contacts)
+        if chats:
+            inter = " OR " if contacts else " WHERE "
+            table_expr += "%sconvo_id IN (%s)" % (inter, ", ".join(str(x["id"]) for x in chats))
+
+        count_files_deleted = 0
         directory = self.get_share_path()
         if os.path.isdir(directory) and os.listdir(directory):
-            for row in self.execute("SELECT filepath FROM _shared_files_"):
+            for row in self.execute("SELECT filepath FROM %s" % table_expr):
                 filepath = row["filepath"]
                 if not os.path.isabs(filepath):
                     filepath = os.path.join(directory, filepath)
-                try: os.path.exists(filepath) and os.unlink(filepath)
-                except Exception as e: logger.warning("Error deleting %s: %s", filepath, e)
-        self.execute("DELETE FROM _shared_files_")
+                if os.path.exists(filepath):
+                    try: os.unlink(filepath)
+                    except Exception as e: logger.warning("Error deleting %s: %s", filepath, e)
+                    else: count_files_deleted += 1
+        count_rows = self.execute("DELETE FROM _shared_files_ WHERE id IN "
+                                  "(SELECT _shared_files_.id FROM %s)" % table_expr,
+                                  log=True).rowcount
         self.connection.commit()
         self.last_modified = datetime.datetime.now()
+        if count_files_deleted:
+            logger.info("Deleted %s from disk.", util.plural("shared file", count_files_deleted))
         if os.path.isdir(directory) and not os.listdir(directory):
             try: os.rmdir(directory)
             except Exception as e: logger.warning("Error deleting %s: %s", directory, e)
+            else: logger.info("Deleted empty shared files folder %s.", directory)
+        return count_rows
 
 
     def rename_share_path(self, path):
@@ -1990,6 +2019,7 @@ class SkypeDatabase(object):
                 sql = "DELETE FROM %s WHERE %s IN (%s)" % (table, col, valstr)
                 sqls.append((table, sql))
 
+        result["_shared_files_"] = self.delete_shared_files(chats=conversations, contacts=contacts)
         for table, sql in sqls:
             delcount = self.execute(sql, log=True).rowcount
             if delcount:
