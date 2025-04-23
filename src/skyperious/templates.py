@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    21.04.2025
+@modified    23.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1322,7 +1322,7 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
 <%
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
-partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
+partner = db.get_contact_name(f["partner_handle"])
 dt = db.stamp_to_date(f["starttime"]) if f.get("starttime") else None
 f_datetime = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
@@ -2136,7 +2136,7 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
 <%
 from_remote = (f["partner_handle"] == db.id and skypedata.TRANSFER_TYPE_INBOUND == f["type"]) or \
               (f["partner_handle"] != db.id and skypedata.TRANSFER_TYPE_OUTBOUND == f["type"])
-partner = f["partner_dispname"] or db.get_contact_name(f["partner_handle"])
+partner = db.get_contact_name(f["partner_handle"])
 f_datetime = db.stamp_to_date(f["starttime"]).strftime("%Y-%m-%d %H:%M") if f.get("starttime") else ""
 %>
   <tr>
