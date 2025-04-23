@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.04.2025
+@modified    23.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2325,7 +2325,7 @@ class MessageParser(object):
             # Replace emoticons with <ss> tags if message appears to
             # have no XML (probably in older format).
             body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
-        dom = self.make_xml(body, message)
+        dom = self.make_xml(body)
 
         if MESSAGE_TYPE_SMS == message["type"] \
         or (MESSAGE_TYPE_INFO == message["type"]
@@ -2362,8 +2362,7 @@ class MessageParser(object):
             status = dom.find("*/failurereason")
             if status is not None and status.text in self.FAILURE_REASONS:
                 status_text += ": %s" % self.FAILURE_REASONS[status.text]
-            dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
-                                (status_text, body), message)
+            dom = self.make_xml("<msgstatus>%s</msgstatus>%s" % (status_text, body))
         elif MESSAGE_TYPE_FILE == message["type"] \
         or (MESSAGE_TYPE_INFO == message["type"]
         and "<files" in message["body_xml"]):
@@ -2555,7 +2554,7 @@ class MessageParser(object):
                 url = util.path_to_url(path)
                 text = step.Template('Shared {{category}} <a href="{{url}}">{{name}}</a>').expand(
                     category=filedata["category"] or "file", url=url, name=filedata["filename"])
-                dom = self.make_xml(text, message)
+                dom = self.make_xml(text)
 
                 if self.stats:
                     data = dict(url=url, author_name=get_author_name(message),
@@ -2573,7 +2572,7 @@ class MessageParser(object):
                                     category=filedata.get("category") or "file")
                     text = step.Template('Shared {{category}} <a href="{{url}}">{{filename}}</a>') \
                            .expand(filedata)
-                    dom = self.make_xml(text, message)
+                    dom = self.make_xml(text)
 
         # Photo/video/file sharing: take file link, if any
         if any(dom.iter("URIObject")):
@@ -2597,7 +2596,7 @@ class MessageParser(object):
                             data.update(category="card")
                             dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
                                                 (urllib.parse.quote(data["url"], safe=":/=?&#"),
-                                                 data["url"]), message)
+                                                 data["url"]))
                     except Exception: pass
 
                 a = next(dom.iter("a"), None)
@@ -2630,7 +2629,7 @@ class MessageParser(object):
         return dom
 
 
-    def make_xml(self, text, message=None):
+    def make_xml(self, text):
         """Returns a new xml.etree.cElementTree node from the text."""
         result = None
         TAG = "<xml>%s</xml>"
@@ -2645,8 +2644,6 @@ class MessageParser(object):
                     text = text.replace("&", "&amp;")
                     result = ElementTree.fromstring(TAG % text)
                 except Exception:
-                    logger.exception('Error parsing message %s, body "%s".',
-                                     message.get("id", message) if message else "", text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
         return result

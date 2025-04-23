@@ -7,6 +7,7 @@ CHANGELOG
 - fix database diff mistakenly marking participants as new
 - fix chat diff Excel export ignoring diff and exporting all messages
 - fix error on contacts list popup menu after deleting all contacts
+- use contact name in file transfer statistics instead of display name registered in transfer
 
 
 5.8, 2025-03-27
