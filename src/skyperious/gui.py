@@ -2821,7 +2821,7 @@ class DatabasePage(wx.Panel):
         html_contact.Bind(wx.EVT_CONTEXT_MENU,           self.on_rightclick_html)
         html_contact.Bind(wx.EVT_RIGHT_UP,               self.on_rightclick_html)
 
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,   self.on_change_list_contacts, list_contacts)
         list_contacts.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_contacts)
         list_contacts.Bind(wx.EVT_CHAR_HOOK,    self.on_list_contacts_key)
 
@@ -3148,7 +3148,7 @@ class DatabasePage(wx.Panel):
                  "edit_info_lastmessage", "edit_info_firstmessage", "",
                  "edit_info_path", "edit_info_sharepath", "edit_info_size",
                  "edit_info_modified", "edit_info_sha1", "edit_info_md5", ]
-        labels = ["Conversations", "Contacts", "File transfers", "Messages",
+        labels = ["Conversations", "Contacts", "File sharing", "Messages",
                   "Last message", "First message", "",
                   "Full path", "Shared files path", "File size", "Last modified",
                   "SHA-1 checksum", "MD5 checksum",  ]
@@ -4397,10 +4397,15 @@ class DatabasePage(wx.Panel):
             stats = self.db.get_general_statistics()
         except Exception: pass
         if stats:
-            self.edit_info_chats.Value     = '{:,}'.format(stats["chats"])
-            self.edit_info_contacts.Value  = '{:,}'.format(stats["contacts"])
-            self.edit_info_messages.Value  = '{:,}'.format(stats["messages"])
-            self.edit_info_transfers.Value = '{:,}'.format(stats["transfers"])
+            self.edit_info_chats.Value     = "{:,}".format(stats["chats"])
+            self.edit_info_contacts.Value  = "{:,}".format(stats["contacts"])
+            self.edit_info_messages.Value  = "{:,}".format(stats["messages"])
+            text_sharing = util.plural("file transfer", stats["transfers"], sep=",")
+            if stats["shares"]:
+                text_sharing += ", %s" % util.plural("other share", stats["shares"], sep=",")
+            if stats.get("shared_files"):
+                text_sharing += ", {:,} locally on disk".format(stats["shared_files"])
+            self.edit_info_transfers.Value = text_sharing
         if "messages_from" in stats:
             self.edit_info_messages.Value += " ({:,} sent and {:,} received)".format(
                 stats.get("messages_from") or 0, stats.get("messages_to") or 0)

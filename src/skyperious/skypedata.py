@@ -527,6 +527,13 @@ class SkypeDatabase(object):
                 % ("!="[i], typestr), result).fetchone()
             result["messages_" + ("to", "from")[i]] = row["count"]
 
+        if full:
+            row = self.execute("SELECT COUNT(*) AS count FROM Messages "
+                               "WHERE body_xml LIKE '<URIObject%</URIObject>%'").fetchone()
+            result["shares"] = row["count"]
+            if conf.ShareDirectoryEnabled:
+                result["shared_files"] = self.get_shared_files_count()
+
         return result
 
 
