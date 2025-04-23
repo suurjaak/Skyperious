@@ -1,11 +1,12 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-22
+5.9, 2025-04-23
 ---------------
 - offer to retain partial database on canceling import of Skype export archive
 - fix database diff mistakenly marking participants as new
 - fix chat diff Excel export ignoring diff and exporting all messages
+- fix error on contacts list popup menu after deleting all contacts
 
 
 5.8, 2025-03-27

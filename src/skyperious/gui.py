@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    22.04.2025
+@modified    23.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -3712,7 +3712,7 @@ class DatabasePage(wx.Panel):
         chats, visited, chatmap = [], set(), {x["id"]: x for x in self.chats}
         for c in contacts:
             chats.extend(sorted((chatmap[x["id"]] for x in c.get("conversations", [])
-                                if x["id"] not in visited),
+                                if x["id"] not in visited and x["id"] in chatmap),
                                 key=lambda x: (x["type"], x["title_long"].lower())))
             visited.update(x["id"] for x in chats)
         contact_cols = self.db.get_table_columns("contacts")
