@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.04.2025
+@modified    24.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2590,24 +2590,10 @@ class MessageParser(object):
                             author=message["author"], success=False,
                             datetime=message.get("datetime")
                                      or self.db.stamp_to_date(message["timestamp"]))
-
-                objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
-                if   "sticker" in objtype: data["category"] = "sticker"
-                elif "swift"   in objtype:
-                    # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
-                    try:
-                        val = next(dom0.iter("Swift")).get("b64")
-                        pkg = json.loads(util.b64decode(val))
-                        if "message/card" == pkg["type"]:
-                            # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
-                            data.update(category="card")
-                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
-                                                (urllib.parse.quote(data["url"], safe=":/=?&#"),
-                                                 data["url"]))
-                    except Exception: pass
-
                 a = next(dom.iter("a"), None)
-                if a is not None: a.set("href", data["url"]); a.text = data["url"]
+                if a is not None:
+                    a.set("href", data["url"])
+                    a.text = data["url"]
 
                 # If not root element, then this message quotes a media message
                 if self.stats and dom0.find("URIObject"):
@@ -2897,7 +2883,7 @@ class MessageParser(object):
         """
         Returns metadata dictionary for Skype file/media message body or DOM.
 
-        @return  {url, ?docid, ?category, ?filename, ?filesize} or None
+        @return  {url, ?docid, ?category, ?filename, ?filesize, ?mimetype} or None
         """
         if not dom and body:
             try: dom = self.make_xml(body)
@@ -2943,15 +2929,23 @@ class MessageParser(object):
         elif "audio"   in objtype: data["category"] = "audio"
         elif "video"   in objtype: data["category"] = "video"
         elif "file"    in objtype: data["category"] = "file"
+        elif "sticker" in objtype: data["category"] = "sticker"
         elif "swift"   in objtype:
             # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
             try:
-                val = next(dom0.iter("Swift")).get("b64")
+                val = next(dom.iter("Swift")).get("b64")
                 pkg = json.loads(util.b64decode(val))
                 if "message/card" == pkg["type"]:
-                    # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
+                    # {"attachments":[{"content":{"images":[{"url":"https://..."}]}}]}
                     url = pkg["attachments"][0]["content"]["images"][0]["url"]
-            except Exception: pass
+                    data["filename"]  = pkg["attachments"][0]["content"]["images"][0].get("alt")
+                    mimetype = pkg["attachments"][0]["content"]["images"][0].get("type")
+                    if mimetype and "/" in mimetype:
+                        data["mimetype"] = mimetype
+                        data["filename"] += ".%s" % mimetype.split("/", 1)[-1]
+                    data["category"] = "card"
+            except Exception: logger.exception("Error parsing SWIFT message %r.",
+                                               body or ElementTree.tostring(dom))
         elif any(dom.iter("files")): data["category"] = "file"
 
         data["url"] = live.make_content_url(url, data.get("category"))

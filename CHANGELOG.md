@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-23
+5.9, 2025-04-24
 ---------------
+- present card and sticker messages as media sharing
 - offer to retain partial database on canceling import of Skype export archive
 - fix database diff mistakenly marking participants as new
 - fix chat diff Excel export ignoring diff and exporting all messages
