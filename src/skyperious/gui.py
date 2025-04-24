@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    23.04.2025
+@modified    24.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -10318,8 +10318,9 @@ def check_shared_files_export_login(db):
     Returns whether db can login to download shared files and media to subfolder for export
     or whether user confirms to proceed without login information.
     """
-    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-        or conf.SharedFileAutoDownload) \
+    if conf.SharedContentPromptAutoLogin \
+    and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
+         or conf.SharedFileAutoDownload) \
     and not db.live.is_logged_in() \
     and not conf.Login.get(db.filename, {}).get("password") and wx.OK != wx.MessageBox(
         "You have selected to export HTML with shared files in subfolder, "

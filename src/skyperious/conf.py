@@ -26,7 +26,7 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.9.dev49"
+Version = "5.9.dev50"
 VersionDate = "24.04.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
@@ -66,10 +66,10 @@ OptionalFileDirectives = [
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
     "MaxSearchTableRows", "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour",
     "PlotHoursUnitSize", "PopupUnexpectedErrors", "SearchResultsChunk",
-    "SharedAudioVideoAutoDownload", "SharedContentUseCache", "SharedFileAutoDownload",
-    "SharedImageAutoDownload", "ShareDirectoryEnabled", "ShareDirectoryTemplate",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval", "WordCloudCountMin",
-    "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
+    "SharedAudioVideoAutoDownload", "SharedContentPromptAutoLogin", "SharedContentUseCache",
+    "SharedFileAutoDownload", "SharedImageAutoDownload", "ShareDirectoryEnabled",
+    "ShareDirectoryTemplate", "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
+    "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
 ]
 Defaults = {}
 
@@ -237,6 +237,9 @@ SearchResultsChunk = 50
 
 """Download shared audio & video from Skype online service for HTML export."""
 SharedAudioVideoAutoDownload = True
+
+"""Prompt to log in to Skype online automatically to download shared content during export."""
+SharedContentPromptAutoLogin = False
 
 """Cache downloaded shared files and media in user directory, for faster repeated exports."""
 SharedContentUseCache = False

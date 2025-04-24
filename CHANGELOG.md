@@ -6,6 +6,7 @@ CHANGELOG
 - show file and media sharing messages without link to Skype online
 - present card and sticker messages as media sharing
 - offer to retain partial database on canceling import of Skype export archive
+- make configurable whether to confirm automatic login to Skype online for shared content during export
 - fix database diff mistakenly marking participants as new
 - fix chat diff Excel export ignoring diff and exporting all messages
 - fix error on contacts list popup menu after deleting all contacts
