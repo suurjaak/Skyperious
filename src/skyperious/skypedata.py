@@ -182,6 +182,7 @@ class SkypeDatabase(object):
                                 convo_id INTEGER NOT NULL, -- Conversations.id
                                 msg_id   INTEGER NOT NULL, -- Messages.id
                                 docid    TEXT, -- Skype online ID like "0-wus-d7-4f8248..."
+                                url      TEXT, -- Skype online content original URL
                                 author   TEXT NOT NULL, -- skypename of sender
                                 category TEXT, -- "audio" "video" "image"
                                 mimetype TEXT, -- "image/png" "video/mp4" etc
@@ -1396,7 +1397,7 @@ class SkypeDatabase(object):
 
         filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
                         filename=data.get("filename") or "", filepath=basename,
-                        author=message["author"])
+                        author=message["author"], url=data.get("url"))
         filedata.update({k: data[k] for k in ("docid", "category", "mimetype") if data.get(k)})
         if not filedata.get("docid") and data.get("url"):
             filedata.update(docid=live.get_content_id(data["url"]))
