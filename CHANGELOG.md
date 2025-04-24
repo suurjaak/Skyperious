@@ -3,6 +3,7 @@ CHANGELOG
 
 5.9, 2025-04-24
 ---------------
+- show file and media sharing messages without link to Skype online
 - present card and sticker messages as media sharing
 - offer to retain partial database on canceling import of Skype export archive
 - fix database diff mistakenly marking participants as new

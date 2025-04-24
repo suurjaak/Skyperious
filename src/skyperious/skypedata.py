@@ -2381,6 +2381,7 @@ class MessageParser(object):
             localdata = None
             if not options.get("export") and not options.get("merge"):
                 localdata = self.db.get_shared_file(message["id"])
+
             for f in dom.findall("*/file"):
                 domfiles[int(f.get("index"))] = domfile = {
                     "filename": f.text,
@@ -2407,16 +2408,14 @@ class MessageParser(object):
                 files = domfiles
             message["__files"] = [f for i, f in sorted(files.items())]
             dom.clear()
-            dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
-                       else "Sent "
+            dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] else "Sent "
             dom.text += util.plural("file", files, False) + " "
             for i, f in enumerate(files[i] for i in sorted(files)):
-                if len(dom) > 0:
-                    a.tail = ", "
-                h = f.get("url") or util.path_to_url(f["filepath"] or f["filename"])
-                a = ElementTree.SubElement(dom, "a", {"href": h})
-                a.text = f["filename"]
-                a.tail = "" if i < len(files) - 1 else "."
+                tagname, attr = "span", {}
+                if f.get("filepath"): tagname, attr = "a", {"href": util.path_to_url(f["filepath"])}
+                elem = ElementTree.SubElement(dom, tagname, attr)
+                elem.text = f["filename"]
+                elem.tail = ", " if i < len(files) - 1 else "."
         elif MESSAGE_TYPE_INFO == message["type"] \
         and "<location" in message["body_xml"]:
             href, text = None, None
@@ -2553,53 +2552,32 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        # Photo/video/file sharing: make file link for local share folder, if any
+        # Photo/video/file sharing: transform content, link to local file if available
         if any(dom.iter("URIObject")):
-            filedata = self.db.get_shared_file(message["id"])
-            path = self.db.get_shared_file_path(message["id"])
-            if path and os.path.isfile(path):
-                url = util.path_to_url(path)
-                text = step.Template('Shared {{category}} <a href="{{url}}">{{name}}</a>').expand(
-                    category=filedata["category"] or "file", url=url, name=filedata["filename"])
-                dom = self.make_xml(text)
+            data = self.db.get_shared_file(message["id"]) or self.make_message_share_data(dom=dom)
+            if data:
+                data = dict(data)
+                path = self.db.get_shared_file_path(message["id"]) if data.get("filepath") else None
+                is_local_file = path and os.path.isfile(path)
+                if not data.get("category"): data["category"] = "file"
+                if not data.get("filename"): data["filename"] = data.get("docid") or data["category"]
+                if is_local_file:
+                    data["url"] = util.path_to_url(path)
+                    tpl = step.Template('Shared {{category}} <a href="{{url}}">{{filename}}</a>')
+                else:
+                    tpl = step.Template('Shared {{category}} {{filename}}')
+                dom = self.make_xml(tpl.expand(data))
 
                 if self.stats:
-                    data = dict(url=url, author_name=get_author_name(message),
-                                author=message["author"], success=True,
+                    data.update(author_name=get_author_name(message),
+                                author=message["author"], success=is_local_file,
                                 datetime=message.get("datetime")
-                                         or self.db.stamp_to_date(message["timestamp"]),
-                                filename=filedata["filename"], filesize=filedata["filesize"],
-                                category=filedata["category"])
+                                         or self.db.stamp_to_date(message["timestamp"]))
                     if not options.get("export"): data.update(filepath=path)
                     self.stats["shared_media"][message["id"]] = data
-            elif options.get("merge"):
-                if not filedata: filedata = self.make_message_share_data(dom=dom)
-                if filedata and filedata.get("filename"):
-                    filedata = dict(filedata, url=filedata.get("url") or "",
-                                    category=filedata.get("category") or "file")
-                    text = step.Template('Shared {{category}} <a href="{{url}}">{{filename}}</a>') \
-                           .expand(filedata)
-                    dom = self.make_xml(text)
-
-        # Photo/video/file sharing: take file link, if any
-        if any(dom.iter("URIObject")):
-            dom0 = dom
-            data = self.make_message_share_data(dom=dom)
-            if data:
-                data.update(author_name=get_author_name(message),
-                            author=message["author"], success=False,
-                            datetime=message.get("datetime")
-                                     or self.db.stamp_to_date(message["timestamp"]))
-                a = next(dom.iter("a"), None)
-                if a is not None:
-                    a.set("href", data["url"])
-                    a.text = data["url"]
-
-                # If not root element, then this message quotes a media message
-                if self.stats and dom0.find("URIObject"):
-                    self.stats["shared_media"][message["id"]] = data
-            # Sanitize XML tags like Title|Text|Description|..
-            dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
+            else:
+                # Sanitize XML tags like Title|Text|Description|..
+                dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
         # Process Skype message quotation tags, assembling a simple
         # <quote>text<special>footer</special></quote> element.
