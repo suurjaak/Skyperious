@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    22.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -248,7 +248,6 @@ def export_chat_template(chat, filename, db, messages, opts=None):
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
     @param   opts      export options dictionary, as {
-                         ?"media_cache": use local download cache,
                          ?"files_folder": save shared files to subfolder in HTML export}
     @return            (number of chats exported, number of messages exported)
     """
@@ -272,10 +271,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         tmpfile = open(tmpname, "wb+")
         template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
                    templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
-        media_cache0 = conf.SharedContentUseCache
-        conf.SharedContentUseCache = bool(opts.get("media_cache", conf.SharedContentUseCache))
-        try: template.stream(tmpfile, namespace)
-        finally: conf.SharedContentUseCache = media_cache0
+        template.stream(tmpfile, namespace)
 
         namespace["stats"] = stats = parser.get_collected_stats()
         namespace.update({

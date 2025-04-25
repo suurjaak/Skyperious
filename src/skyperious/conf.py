@@ -26,7 +26,7 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.9.dev51"
+Version = "5.9.dev52"
 VersionDate = "25.04.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
@@ -40,8 +40,6 @@ else:
 
 """Directory for variable content like login tokens and created databases."""
 VarDirectory = os.path.join(ApplicationDirectory, "var")
-"""Directory for cached files like downloaded shared content for export."""
-CacheDirectory = os.path.join(ApplicationDirectory, "var", "cache")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -66,10 +64,10 @@ OptionalFileDirectives = [
     "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
     "MaxSearchTableRows", "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour",
     "PlotHoursUnitSize", "PopupUnexpectedErrors", "SearchResultsChunk",
-    "SharedAudioVideoAutoDownload", "SharedContentPromptAutoLogin", "SharedContentUseCache",
-    "SharedFileAutoDownload", "SharedImageAutoDownload", "ShareDirectoryEnabled",
-    "ShareDirectoryTemplate", "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
+    "SharedAudioVideoAutoDownload", "SharedContentPromptAutoLogin", "SharedFileAutoDownload",
+    "SharedImageAutoDownload", "ShareDirectoryEnabled", "ShareDirectoryTemplate",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval", "WordCloudCountMin",
+    "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
 ]
 Defaults = {}
 
@@ -240,9 +238,6 @@ SharedAudioVideoAutoDownload = True
 
 """Prompt to log in to Skype online automatically to download shared content during export."""
 SharedContentPromptAutoLogin = False
-
-"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
-SharedContentUseCache = False
 
 """Download shared files from Skype online service for HTML export."""
 SharedFileAutoDownload = True
@@ -447,7 +442,7 @@ def load(configfile=None):
 
     @param   configfile  name of configuration file to use from now if not module defaults
     """
-    global Defaults, VarDirectory, CacheDirectory, LogFile, ConfigFile, ConfigFileStatic
+    global Defaults, VarDirectory, LogFile, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, float, int, long, list, tuple, dict, type(None))        # Py2
     except Exception: VARTYPES = (bytes, str, bool, float, int, list, tuple, dict, type(None)) # Py3
@@ -473,8 +468,6 @@ def load(configfile=None):
         try:
             VarDirectory = appdirs.user_data_dir(title, appauthor=False)
             LogFile = os.path.join(VarDirectory, "%s.log" % Title.lower())
-        except Exception: pass
-        try: CacheDirectory = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
         except Exception: pass
 
     section = "*"

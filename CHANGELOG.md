@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-24
+5.9, 2025-04-25
 ---------------
 - show file and media sharing messages without link to Skype online
 - present card and sticker messages as media sharing
@@ -11,6 +11,7 @@ CHANGELOG
 - fix chat diff Excel export ignoring diff and exporting all messages
 - fix error on contacts list popup menu after deleting all contacts
 - use contact name in file transfer statistics instead of display name registered in transfer
+- drop shared media cache introduced in issue #112 as obsolete
 
 
 5.8, 2025-03-27

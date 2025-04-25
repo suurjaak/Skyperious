@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    22.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -78,7 +78,6 @@ class SkypeLogin(object):
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
-        self.dl_cache_dir = os.path.join(conf.CacheDirectory, "shared")
         self.populated    = False
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
@@ -630,7 +629,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_content(item.picture, category="avatar", cache=False)
+                    raw = self.get_api_content(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw.decode("latin1"))
             else: result = None
@@ -1110,45 +1109,22 @@ class SkypeLogin(object):
         return result
 
 
-    def get_api_content(self, url, category=None, cache=True):
+    def get_api_content(self, url, category=None):
         """
         Returns content raw binary from Skype API URL via login, or None.
 
-        @param   category  type of content, e.g. "avatar" for avatar image,
-                           "file" for shared file
-        @param   cache     whether to use disk cache if media caching is enabled;
-                           loads content from disk if available, and saves download to disk
+        @param   category  type of content, e.g. "avatar" for avatar image, "file" for shared file
         """
-        result, cached, url = None, None, make_content_url(url, category)
+        result, url = None, make_content_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
 
-        for url in urls if conf.SharedContentUseCache and cache else ():
-            try:
-                filebase = os.path.join(self.dl_cache_dir, urllib.parse.quote(url, safe=""))
-                for p in glob.glob(filebase + ".*")[:1]:
-                    with open(p, "rb") as f:
-                        result = cached = f.read()
-            except Exception: pass
-
         for url in urls if not result else ():
             result = self.download_content(url, category)
             if result: break # for url
-
-        if result and conf.SharedContentUseCache and cache and not cached:
-            try:
-                filetype = util.get_file_type(result, category, url)
-                filename = "%s.%s" % (urllib.parse.quote(url, safe=""), filetype)
-                filepath = os.path.join(self.dl_cache_dir, filename)
-                self.ensure_cache_dir()
-                with open(filepath, "wb") as f:
-                    f.write(result)
-            except Exception:
-                logger.warning("Error caching %s.", filepath, exc_info=True)
-
         return result
 
 
@@ -1202,18 +1178,6 @@ class SkypeLogin(object):
         """Adds bot prefix to contact identity if contact exists as bot."""
         botidentity = (skypedata.ID_PREFIX_BOT + identity) if identity else identity
         return botidentity if botidentity in self.cache["contacts"] else identity
-
-
-    def ensure_cache_dir(self):
-        """Creates content cache directory and tagfile if not already created."""
-        TAGCONTENT = """Signature: 8a477f597d28d172789f06886806bc55
-# This file is a cache directory tag created by %s.
-# For information about cache directory tags, see:
-#   http://www.brynosaurus.com/cachedir/""" % conf.Title
-        tagpath = os.path.join(self.dl_cache_dir, "CACHEDIR.TAG")
-        if not os.path.isfile(tagpath):
-            with util.create_file(tagpath, handle=True) as f:
-                f.write(TAGCONTENT)
 
 
 class SkypeExport(skypedata.SkypeDatabase):

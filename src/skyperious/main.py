@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    18.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -112,10 +112,6 @@ ARGUMENTS = {
               "action": "store_true", "required": False,
               "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
-             {"args": ["--media-cache"], "dest": "media_cache",
-              "action": "store_true", "required": False,
-              "help": "cache downloaded media in user directory, "
-                      "for faster repeated exports"},
              {"args": ["-p", "--password"], "dest": "password",
               "help": "password for Skype account to download shared media in HTML export,\n"
                       "if not using stored or prompted"},
@@ -809,7 +805,6 @@ def run_export(filenames, args):
                start_date       date to export messages from, as YYYY-MM-DD
                end_date         date to export messages until, as YYYY-MM-DD
                files_folder     save shared files and media into a subfolder in HTML export
-               media_cache      cache downloaded media in user directory
                password         Skype password
                ask_password     whether to ask password on the command line interactively
                store_password   whether to store password in configuration file
@@ -872,7 +867,6 @@ def run_export(filenames, args):
                         timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
             if args.files_folder: opts["files_folder"] = True
-            if args.media_cache:  opts["media_cache"]  = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
