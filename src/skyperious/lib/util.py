@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    14.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -685,6 +685,21 @@ def add_unique(lst, item, direction=1, maxlen=sys.maxsize):
     if len(lst) > maxlen:
         lst[:] = lst[:maxlen] if direction < 0 else lst[-maxlen:]
     return lst
+
+
+def make_unique(value, existing, suffix="_%s", counter=2, case=True):
+    """
+    Returns a unique string, appending suffix % counter as necessary.
+
+    @param   existing  collection of existing strings to check
+    @oaram   case      whether uniqueness should be case-sensitive
+    """
+    result, is_present = value, (lambda: result in existing)
+    if not case:
+        existing = [x.lower() for x in existing]
+        is_present = lambda: result.lower() in existing
+    while is_present(): result, counter = value + suffix % counter, counter + 1
+    return result
 
 
 def get_locale_day_date(dt):

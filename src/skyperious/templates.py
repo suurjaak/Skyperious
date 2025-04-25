@@ -2184,6 +2184,7 @@ CHAT_COLS = [("title_long",             "Chat",                  "chat name"),
 datefmt = lambda x: x.strftime("%Y-%m-%d %H:%M") if x else ""
 get_fields = lambda c: skypedata.CONTACT_FIELD_TITLES if db.id != c["identity"] \
                        else skypedata.ACCOUNT_FIELD_TITLES
+get_page_id = lambda c: pageidentity[id(c)]
 TITLEMAP = {x["id"]: x["title_long"] for x in db.get_conversations()}
 HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
 
@@ -2191,6 +2192,9 @@ bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
 phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
 account_contact = next((c for c in contacts if c["identity"] == db.id), None)
 contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
+pageidentity = {} # {id(contact dict): unique identity on page}
+for c in contacts:
+    pageidentity[id(c)] = util.make_unique(c["identity"], list(pageidentity.values()))
 %>
 <!DOCTYPE HTML><html lang="">
 <head>
@@ -2382,7 +2386,7 @@ dct = {
     "last_message_datetime":  c["last_message_datetime"].isoformat() if c["last_message_datetime"] else None,
 }
 %>
-      "{{ c["identity"] }}": {{! json.dumps(dct) }},
+      "{{ get_page_id(c) }}": {{! json.dumps(dct) }},
 %endfor
     };
     var filter = "";        // Current filter value
@@ -2574,7 +2578,7 @@ if avatar:
 category = "account" if db.id == c["identity"] else "contact"
 %>
 
-  <div class="contact{{ " self" if db.id == c["identity"] else "" }}" id="contact/{{ c["identity"] }}">
+  <div class="contact{{ " self" if db.id == c["identity"] else "" }}" id="contact/{{ get_page_id(c) }}">
     <table>
       <tr><td class="avatar">
         <img title="{{ alt }}" alt="{{ alt }}"
@@ -2617,7 +2621,7 @@ category = "account" if db.id == c["identity"] else "contact"
           <th>Chats:</th>
           <td>
             {{ len(c["conversations"]) }}
-            <a class="toggle{{ "" if db.id == c["identity"] else " open" }}" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
+            <a class="toggle{{ "" if db.id == c["identity"] else " open" }}" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ get_page_id(c) }}/sep', 'contact/{{ get_page_id(c) }}/chats')"> </a>
           </td>
         </tr>
 %if c.get("shared_files_count"):
@@ -2631,8 +2635,8 @@ category = "account" if db.id == c["identity"] else "contact"
 
       </td></tr>
 %if c.get("conversations"):
-      <tr id="contact/{{ c["identity"] }}/sep"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td colspan="2"><hr /></td></tr>
-      <tr id="contact/{{ c["identity"] }}/chats"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td></td><td>
+      <tr id="contact/{{ get_page_id(c) }}/sep"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td colspan="2"><hr /></td></tr>
+      <tr id="contact/{{ get_page_id(c) }}/chats"{{! ' class="hidden"' if db.id == c["identity"] else "" }}><td></td><td>
 
         <table class="chats"><tr>
 %for i, (name, label, sortlabel) in enumerate(CHAT_COLS):

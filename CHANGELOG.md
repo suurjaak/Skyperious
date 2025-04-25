@@ -10,6 +10,7 @@ CHANGELOG
 - fix database diff mistakenly marking participants as new
 - fix chat diff Excel export ignoring diff and exporting all messages
 - fix error on contacts list popup menu after deleting all contacts
+- fix contacts HTML export not accounting for duplicate identities when sorting or toggling
 - use contact name in file transfer statistics instead of display name registered in transfer
 - drop shared media cache introduced in issue #112 as obsolete
 
