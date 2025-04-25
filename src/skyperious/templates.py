@@ -2191,7 +2191,7 @@ HAS_AVATARS = any(skypedata.get_avatar_raw(c) for c in contacts)
 bots = [c for c in contacts if skypedata.CONTACT_TYPE_BOT == c["type"]]
 phones = [c for c in contacts if skypedata.CONTACT_TYPE_PHONE == c["type"]]
 account_contact = next((c for c in contacts if c["identity"] == db.id), None)
-contacts = sorted(contacts, reverse=True, key=lambda x: x["last_message_datetime"] or datetime.datetime.min)
+contacts = sorted(contacts, reverse=True, key=lambda x: (x["last_message_datetime"] or datetime.datetime.min).isoformat())
 pageidentity = {} # {id(contact dict): unique identity on page}
 for c in contacts:
     pageidentity[id(c)] = util.make_unique(c["identity"], list(pageidentity.values()))
