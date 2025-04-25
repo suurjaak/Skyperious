@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    23.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -2620,6 +2620,12 @@ category = "account" if db.id == c["identity"] else "contact"
             <a class="toggle{{ "" if db.id == c["identity"] else " open" }}" title="Toggle chats" onclick="on_toggle(this, 'contact/{{ c["identity"] }}/sep', 'contact/{{ c["identity"] }}/chats')"> </a>
           </td>
         </tr>
+%if c.get("shared_files_count"):
+        <tr>
+          <th><b>Shared files:</b></th>
+          <td>{{ c["shared_files_count"] }}</td>
+        </tr>
+%endif
 %endif
         </table>
 
@@ -2732,6 +2738,7 @@ vals = [str(x) for x in (
     c["message_count_single"] + c["message_count_group"],
     c["message_count_single"], c["message_count_group"], len(c["conversations"])
 )]
+if c.get("shared_files_count"): vals.append(str(c["shared_files_count"]))
 maxw = max(map(len, vals))
 %>
 
@@ -2739,6 +2746,9 @@ Messages in total:       {{ vals[0].rjust(maxw) }}
 Messages in 1:1 chat:    {{ vals[1].rjust(maxw) }}
 Messages in group chats: {{ vals[2].rjust(maxw) }}
 Chats:                   {{ vals[3].rjust(maxw) }}
+%if c.get("shared_files_count"):
+Shared files:            {{ vals[4].rjust(maxw) }}
+%endif
 
 <%
 category = "account" if db.id == c["identity"] else "contact"
@@ -2842,6 +2852,12 @@ if avatar_size[0] > 300:
         <td nowrap valign="top"><b>Chats:</b></td>
         <td>{{ len(contact["conversations"]) }}</td>
       </tr>
+%if contact.get("shared_files_count"):
+      <tr>
+        <td nowrap valign="top"><b>Shared files:</b></td>
+        <td>{{ contact["shared_files_count"] }}</td>
+      </tr>
+%endif
 %endif
     </table>
   </td>

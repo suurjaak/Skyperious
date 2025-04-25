@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.04.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -828,6 +828,7 @@ class SkypeDatabase(object):
         {"first_message_datetime": datetime, "last_message_datetime": datetime,
          "message_count_single": message count in 1:1 chat,
          "message_count_group": message count in group chats,
+         "shared_files_count": shared files and media available locally if local storage enabled,
          "conversations": [{"id", "first_message_id", "last_message_id", ..}]}.
 
         @param   contacts  list of contacts, as returned from get_contacts()
@@ -879,6 +880,8 @@ class SkypeDatabase(object):
             chatids = set(c["id"] for c in chats if any(
                 contact["identity"] == p["identity"] for p in c["participants"]
             ))
+            if conf.ShareDirectoryEnabled:
+                contact["shared_files_count"] = self.get_shared_files_count(contacts=[contact])
             datas, datas2 = stats.get(contact["identity"], []), []
             if not chatids and not datas: continue # for contact
 
@@ -1347,17 +1350,32 @@ class SkypeDatabase(object):
         return path
 
 
-    def get_shared_files_count(self):
-        """Returns the number of shared files on disk."""
-        result = 0
+    def get_shared_files_count(self, contacts=None):
+        """
+        Returns the number of shared files on disk.
+
+        @param   contacts  list of specific contacts to count files for if not all;
+                           may include database account
+        """
+        table_expr = "_shared_files_"
+        account = next((c for c in contacts or () if c["identity"] == self.id), None) 
+        if account:
+            table_expr += " LEFT JOIN Accounts ON _shared_files_.author = Accounts.skypename"
+            contacts = [c for c in contacts if c != account]
+        if contacts:
+            table_expr += " LEFT JOIN Contacts ON _shared_files_.author =" \
+                          " COALESCE(Contacts.skypename, Contacts.pstnnumber, '')"
+            table_expr += " WHERE Contacts.id IN (%s)" % ", ".join(str(x["id"]) for x in contacts)
+
+        total = 0
         directory = self.get_share_path()
         if os.path.isdir(directory) and os.listdir(directory):
-            for row in self.execute("SELECT filepath FROM _shared_files_"):
+            for row in self.execute("SELECT filepath FROM %s" % table_expr):
                 filepath = row["filepath"]
                 if not os.path.isabs(filepath):
                     filepath = os.path.join(directory, filepath)
-                result += os.path.exists(filepath)
-        return result
+                total += os.path.exists(filepath)
+        return total
 
 
     def store_shared_file(self, message, content, data):
