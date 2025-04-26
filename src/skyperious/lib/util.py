@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    25.04.2025
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -716,26 +716,9 @@ def get_locale_day_date(dt):
 
 
 def path_to_url(path, encoding="utf-8"):
-    """
-    Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
-    """
-    if isinstance(path, six.text_type): path = path.encode(encoding)
-    if not isinstance(path, six.string_types): path = path.decode("latin1")
-    if ":" not in path:
-        # No drive specifier, just convert slashes and quote the name
-        if path[:2] == "\\\\":
-            path = "\\\\" + path
-        url = urllib.parse.quote("/".join(path.split("\\")))
-    else:
-        url, parts = "", path.split(":")
-        if len(parts[0]) == 1: # Looks like a proper drive, e.g. C:\
-            url = "///" + urllib.parse.quote(parts[0].upper()) + ":"
-            parts = parts[1:]
-        components = ":".join(parts).split("\\")
-        for part in filter(bool, components):
-            url += "/" + urllib.parse.quote(part)
-    url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
-    return url
+    """Returns the local file path as a URL, e.g. "file:///C:/path/file.ext"."""
+    if not isinstance(path, six.text_type): path = path.decode(encoding)
+    return urllib.parse.urljoin('file:', urllib.request.pathname2url(path))
 
 
 def url_to_path(url, double_decode=False):

@@ -12,6 +12,7 @@ CHANGELOG
 - fix chat diff Excel export ignoring diff and exporting all messages
 - fix error on contacts list popup menu after deleting all contacts
 - fix contacts HTML export not accounting for duplicate identities when sorting or toggling
+- fix filesystem links over-encoding paths with exotic characters
 - use contact name in file transfer statistics instead of display name registered in transfer
 - drop shared media cache introduced in issue #112 as obsolete
 
