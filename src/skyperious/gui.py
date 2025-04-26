@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    24.04.2025
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -957,7 +957,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 (conf.Title, conf.Version), "Update information",
                 wx.OK | wx.ICON_INFORMATION)
         elif full_response:
-            wx.MessageBox("Could not contact download server.",
+            wx.MessageBox("Could not obtain information from download server.",
                           "Update information", wx.OK | wx.ICON_WARNING)
         if check_result is not None:
             conf.LastUpdateCheck = datetime.date.today().strftime("%Y%m%d")
