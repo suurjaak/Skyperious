@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    25.04.2025
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -19,7 +19,6 @@ import itertools
 import logging
 import os
 import re
-import sys
 
 import six
 import step
