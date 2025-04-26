@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    28.11.2024
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -113,6 +113,7 @@ import operator
 import os
 import re
 import sys
+import warnings
 
 import wx
 import wx.adv
@@ -1250,16 +1251,49 @@ class Patch(object):
         wx.stc.StyledTextCtrl.StartStyling = StartStyling__Patched
         Patch._PATCHED = True
 
+        if wx.VERSION >= (4, 2):
+            # Previously, ToolBitmapSize was set to largest, and smaller bitmaps were padded
+            ToolBar__Realize = wx.ToolBar.Realize
+            def Realize__Patched(self):
+                sz = tuple(self.GetToolBitmapSize())
+                for i in range(self.GetToolsCount()):
+                    t = self.GetToolByPos(i)
+                    for b in filter(bool, (t.NormalBitmap, t.DisabledBitmap)):
+                        sz = max(sz[0], b.Width), max(sz[1], b.Height)
+                self.SetToolBitmapSize(sz)
+                for i in range(self.GetToolsCount()):
+                    t = self.GetToolByPos(i)
+                    if t.NormalBitmap:   t.NormalBitmap   = resize_img(t.NormalBitmap,   sz)
+                    if t.DisabledBitmap: t.DisabledBitmap = resize_img(t.DisabledBitmap, sz)
+                return ToolBar__Realize(self)
+            wx.ToolBar.Realize = Realize__Patched
+
+            def resize_bitmaps(func):
+                """Returns function pass-through wrapper, resizing any Bitmap arguments."""
+                def inner(self, *args, **kwargs):
+                    sz = self.GetToolBitmapSize()
+                    args = [resize_img(v, sz) if v and isinstance(v, wx.Bitmap) else v for v in args]
+                    kwargs = {k: resize_img(v, sz) if v and isinstance(v, wx.Bitmap) else v
+                              for k, v in kwargs.items()}
+                    return func(self, *args, **kwargs)
+                return functools.update_wrapper(inner, func)
+            wx.ToolBar.SetToolNormalBitmap   = resize_bitmaps(wx.ToolBar.SetToolNormalBitmap)
+            wx.ToolBar.SetToolDisabledBitmap = resize_bitmaps(wx.ToolBar.SetToolDisabledBitmap)
+
         # In some setups, float->int autoconversion is not done for Python/C sip objects
-        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
-        except Exception: pass
-        else: return
+        with warnings.catch_warnings():
+            warnings.simplefilter("error") # Possible DeprecationWarning on wx.Rect with floats
+            try: wx.Rect(1.1, 2.2, 3.3, 4.4)
+            except Exception: pass
+            else: return
 
         def defloatify(func):
             """Returns function pass-through wrapper, converting any float arguments to int."""
+            cast = lambda v: int(v) if isinstance(v, float) else v
+            make = lambda v: type(v)(cast(x) for x in v) if isinstance(v, (list, tuple)) else cast(v)
             def inner(*args, **kwargs):
-                args = [int(v) if isinstance(v, float) else v for v in args]
-                kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
+                args = [make(v) for v in args]
+                kwargs = {k: make(v) for k, v in kwargs.items()}
                 return func(*args, **kwargs)
             return functools.update_wrapper(inner, func)
 
@@ -4882,6 +4916,29 @@ def get_tool_rect(toolbar, id_tool):
                                else tool.Control.Size[0])
 
     return result
+
+
+def resize_img(img, size, aspect_ratio=True, bg=(-1, -1, -1)):
+    """Returns a resized wx.Image or wx.Bitmap, centered in free space if any."""
+    if not img or not size or list(size) == list(img.GetSize()): return img
+
+    result = img if isinstance(img, wx.Image) else img.ConvertToImage()
+    size1, size2 = list(result.GetSize()), list(size)
+    align_pos = None
+    if size1[0] < size[0] and size1[1] < size[1]:
+        size2 = tuple(size1)
+        align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
+    elif aspect_ratio:
+        ratio = size1[0] / float(size1[1]) if size1[1] else 0.0
+        size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
+        align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
+    if size1[0] > size[0] or size1[1] > size[1]:
+        if result is img: result = result.Copy()
+        result.Rescale(*size2)
+    if align_pos:
+        if result is img: result = result.Copy()
+        result.Resize(size, align_pos, *bg)
+    return result.ConvertToBitmap() if isinstance(img, wx.Bitmap) else result
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):
