@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    26.04.2025
+@modified    27.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -883,8 +883,25 @@ class NoteButton(wx.Panel, wx.Button):
     def __init__(self, parent, label=wx.EmptyString, note=wx.EmptyString,
                  bmp=wx.NullBitmap, id=-1, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=0, name=wx.PanelNameStr):
+        """
+        Constructor.
+
+        @param   parent  parent window
+        @param   label   button label
+        @param   note    button note text
+        @param   bmp     button icon
+        @param   id      button wx identifier
+        @param   pos     button position
+        @param   size    button default size
+        @param   style   alignment flags for button content
+                         (left-right for horizontal, center for vertical),
+                         plus optional wx.BORDER_RAISED
+                         for permanent 3D-border and default cursor,
+                         plus any flags for wx.Panel
+        @param   name    control name
+        """
         wx.Panel.__init__(self, parent, id, pos, size,
-                          style | wx.FULL_REPAINT_ON_RESIZE, name)
+                          style & ~wx.BORDER_RAISED | wx.FULL_REPAINT_ON_RESIZE, name)
         self._label = label
         self._note = note
         self._bmp = bmp
@@ -894,7 +911,7 @@ class NoteButton(wx.Panel, wx.Button):
             self._bmp_disabled = wx.Bitmap(img) if img.IsOk() else bmp
         self._hover = False # Whether button is being mouse hovered
         self._press = False # Whether button is being mouse pressed
-        self._align = style & (wx.ALIGN_RIGHT | wx.ALIGN_CENTER)
+        self._style = style
         self._enabled = True
         self._size = self.Size
 
@@ -905,8 +922,7 @@ class NoteButton(wx.Panel, wx.Button):
         self._extent_label = None
         self._extent_note = None
 
-        self._cursor_hover   = wx.Cursor(wx.CURSOR_HAND)
-        self._cursor_default = wx.Cursor(wx.CURSOR_DEFAULT)
+        self._cursor_hover = None if wx.BORDER_RAISED & self._style else wx.Cursor(wx.CURSOR_HAND)
 
         self.Bind(wx.EVT_MOUSE_EVENTS,       self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
@@ -918,7 +934,7 @@ class NoteButton(wx.Panel, wx.Button):
         self.Bind(wx.EVT_KEY_DOWN,           self.OnKeyDown)
         self.Bind(wx.EVT_CHAR_HOOK,          self.OnChar)
 
-        self.SetCursor(self._cursor_hover)
+        if not wx.BORDER_RAISED & self._style: self.SetCursor(self._cursor_hover)
         ColourManager.Manage(self, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
         ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
         self.WrapTexts()
@@ -926,6 +942,17 @@ class NoteButton(wx.Panel, wx.Button):
 
     def GetMinSize(self):
         return self.DoGetBestSize()
+    MinSize = property(GetMinSize, wx.Panel.SetMinSize)
+
+
+    def GetMinWidth(self):
+        return self.DoGetBestSize().Width
+    MinWidth = property(GetMinWidth)
+
+
+    def GetMinHeight(self):
+        return self.DoGetBestSize().Height
+    MinHeight = property(GetMinHeight)
 
 
     def DoGetBestSize(self):
@@ -951,10 +978,14 @@ class NoteButton(wx.Panel, wx.Button):
             self.WrapTexts()
 
         x, y = 10, 10
-        if (self._align & wx.ALIGN_RIGHT):
+        if (self._style & wx.ALIGN_RIGHT):
             x = width - 10 - self._bmp.Size.width
-        elif (self._align & wx.ALIGN_CENTER):
+        elif (self._style & wx.ALIGN_CENTER_HORIZONTAL):
             x = 10 + (width - self.DoGetBestSize().width) // 2
+        if (self._style & wx.ALIGN_BOTTOM):
+            y = height - self.DoGetBestSize().height + 10
+        elif (self._style & wx.ALIGN_CENTER_VERTICAL):
+            y = (height - self.DoGetBestSize().height + 10) // 2
 
         dc.Font = self.Font
         dc.Brush = BRUSH(self.BackgroundColour)
@@ -1005,6 +1036,18 @@ class NoteButton(wx.Panel, wx.Button):
             lines   = [(1, 1, width - 2, 1), (1, 1, 1, height - 2)]
             dc.DrawLineList(lines, [PEN(wx.Colour(*c)) for c in colours])
             x += 1; y += 1
+        elif wx.BORDER_RAISED & self._style:
+            # Draw 3D border
+            colours = [ColourManager.ColourHex(x) for x in (
+                wx.SYS_COLOUR_3DHILIGHT, wx.SYS_COLOUR_3DLIGHT,
+                wx.SYS_COLOUR_3DSHADOW,  wx.SYS_COLOUR_3DDKSHADOW
+            )]
+            lines, pencolours = [], []
+            lines  = [(0, 0, 0, height - 1), (0, 0, width - 1, 0)]
+            lines += [(1, 1, 1, height - 2), (1, 1, width - 2, 1)]
+            lines += [(1, height - 2, width - 2, height - 2), (width - 2, 1, width - 2, height - 2)]
+            lines += [(0, height - 1, width - 1, height - 1), (width - 1, 0, width - 1, height - 1)]
+            dc.DrawLineList(lines, sum(([PEN(wx.Colour(c))]*2 for c in colours), []))
         elif self._hover and self.IsThisEnabled():
             # Button is being hovered with mouse: create raised effect
             colours  = [(255, 255, 255)] * 2
@@ -1021,9 +1064,9 @@ class NoteButton(wx.Panel, wx.Button):
 
         if self._bmp:
             bmp = self._bmp if self.IsThisEnabled() else self._bmp_disabled
-            dc.DrawBitmap(bmp, x, y)
+            dc.DrawBitmap(bmp, x, y, useMask=True)
 
-        if self._align & wx.ALIGN_RIGHT:
+        if self._style & wx.ALIGN_RIGHT:
             x -= 10 + max(self._extent_label[0], self._extent_note[0])
         else:
             x += self._bmp.Size.width + 10
