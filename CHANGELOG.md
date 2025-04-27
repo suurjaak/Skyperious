@@ -1,10 +1,11 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-26
+5.9, 2025-04-27
 ---------------
 - show file and media sharing messages without link to Skype online
 - present card and sticker messages as media sharing
+- add compare&merge button to database information page
 - offer to retain partial database on canceling import of Skype export archive
 - make configurable whether to confirm automatic login to Skype online for shared content during export
 - fix toolbar icons getting rescaled poorly on newer wx versions

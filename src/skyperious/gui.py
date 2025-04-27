@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.04.2025
+@modified    27.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -72,6 +72,7 @@ from . import workers
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
 DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
+DatabasePageEvent, EVT_DATABASE_PAGE = wx.lib.newevent.NewCommandEvent()
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(EVT_OPEN_DATABASE, self.on_open_database_event)
 
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
+        self.Bind(EVT_DATABASE_PAGE, self.on_database_page_event)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_MOVE, self.on_move)
@@ -372,15 +374,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             sizer_labels.Add(valtext, proportion=1, flag=wx.GROW)
             setattr(self, "label_" + field, valtext)
 
+        compare_what = "another database or an archive" if live.ijson else "another database"
         BUTTONS_DETAIL = [
             ("button_open", "&Open", images.ButtonOpen,
              "Open the database for reading."),
             ("button_compare", "Compare and &merge", images.ButtonCompare,
-             "Choose another Skype database to compare with, in order to merge "
-             "their differences."),
+             "Choose %s to compare with, in order to merge their differences." % compare_what),
             ("button_export", "&Export messages", images.ButtonExport,
-             "Export all conversations from the database as "
-             "HTML, text or spreadsheet."),
+             "Export all conversations from the database as HTML, text or spreadsheet."),
             ("button_saveas", "Save &as..", images.ButtonSaveAs,
              "Save a copy of the database under another name."),
             ("button_remove", "&Remove", images.ButtonRemoveType,
@@ -1531,18 +1532,21 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for clicking to compare a selected database with another, shows
         a popup menu for choosing the second database file.
         """
+        self.open_compare_databases_menu(self.db_filename, self.button_compare)
+
+
+    def open_compare_databases_menu(self, filename, target):
+        """Opens a popup menu on target control for choosing a second file to compare given to."""
         fm = wx.lib.agw.flatmenu
         menu = fm.FlatMenu()
-        item = fm.FlatMenuItem(menu, wx.ID_ANY,
-                               "&Select a file from your computer..")
+        item = fm.FlatMenuItem(menu, wx.ID_ANY, "&Select a database file from your computer..")
         menu.AppendItem(item)
         if live.ijson:
             item = fm.FlatMenuItem(menu, wx.ID_ANY,
                                    "Select a Skype chat history &export archive from your computer..")
             menu.AppendItem(item)
-        recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
-        others = [f for f in conf.DBFiles
-                  if f not in recents and f != self.db_filename]
+        recents = [f for f in conf.RecentFiles if f != filename][:5]
+        others = [f for f in conf.DBFiles if f not in recents and f != filename]
         if recents or others:
             menu.AppendSeparator()
         if recents:
@@ -1563,13 +1567,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_compare_menu, item)
 
-        btn = self.button_compare
-        sz_btn, pt_btn = btn.Size, btn.Position
-        pt_btn = btn.Parent.ClientToScreen(pt_btn)
-        menu.SetOwnerHeight(sz_btn.y)
-        if menu.Size.width < sz_btn.width:
-            menu.Size = sz_btn.width, menu.Size.height
-        menu.Popup(pt_btn, self)
+        sz_target, pt_target = target.Size, target.Position
+        pt_target = target.Parent.ClientToScreen(pt_target)
+        menu.SetOwnerHeight(sz_target.y)
+        if menu.Size.width < sz_target.width:
+            menu.Size = sz_target.width, menu.Size.height
+        menu.Popup(pt_target, self)
+
+
+    def on_database_page_event(self, event):
+        """Handler for notification from DatabasePage, opens popup menu if doing compare."""
+        if getattr(event, "compare", False):
+            self.open_compare_databases_menu(event.source.db.filename, event.target)
 
 
     def on_open_options(self, event):
@@ -3135,6 +3144,13 @@ class DatabasePage(wx.Panel):
         sizer1.Add(sizer_account, border=20, proportion=1,
                    flag=wx.TOP | wx.GROW)
 
+        what = "another database or an archive" if live.ijson else "another database"
+        button_compare = self.button_compare = controls.NoteButton(panel1, "Compare and &merge",
+            "Choose %s to compare with, in order to merge their differences." % what,
+            images.ButtonCompare.Bitmap, style=wx.BORDER_RAISED
+        )
+        sizer1.Add(button_compare, border=10, flag=wx.ALL | wx.GROW)
+
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_file = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
         sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
@@ -3186,16 +3202,18 @@ class DatabasePage(wx.Panel):
         sizer_buttons.AddStretchSpacer()
         sizer_buttons.Add(button_setshare)
         sizer_buttons.AddStretchSpacer()
-        sizer_buttons.Add(button_refresh)
+        sizer_buttons.Add(button_refresh, border=5, flag=wx.RIGHT)
         
-        self.Bind(wx.EVT_BUTTON, self.on_check_integrity, button_check)
-        self.Bind(wx.EVT_BUTTON, self.on_set_sharepath,   button_setshare)
+        self.Bind(wx.EVT_BUTTON, self.on_compare_database, button_compare)
+        self.Bind(wx.EVT_BUTTON, self.on_check_integrity,  button_check)
+        self.Bind(wx.EVT_BUTTON, self.on_set_sharepath,    button_setshare)
         self.Bind(wx.EVT_BUTTON, lambda e: self.update_info_page(),
                   button_refresh)
 
         sizer_file.AddGrowableCol(1, 1)
         sizer2.Add(sizer_file, border=20, flag=wx.TOP | wx.GROW)
-        sizer2.Add(sizer_buttons, border=15, flag=wx.RIGHT | wx.GROW)
+        sizer2.AddStretchSpacer()
+        sizer2.Add(sizer_buttons, border=10, flag=wx.ALL | wx.GROW)
 
         sizer.Add(panel1, proportion=1, border=5,
                   flag=wx.LEFT  | wx.TOP | wx.BOTTOM | wx.GROW)
@@ -4264,6 +4282,12 @@ class DatabasePage(wx.Panel):
         if not self.get_unsaved_grids(): self.on_refresh_tables()
         wx.Bell()
         self.update_info_page()
+
+
+    def on_compare_database(self, event):
+        """Handler for choosing file to merge into this database, opens menu."""
+        evt = DatabasePageEvent(self.Id, source=self, compare=True, target=self.button_compare)
+        wx.PostEvent(self.Parent, evt)
 
 
     def on_check_integrity(self, event):
