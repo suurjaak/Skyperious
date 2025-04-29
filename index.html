@@ -32,6 +32,7 @@
         <p class="view">
           <a href="index.html">Index</a><br />
           <span class="subview">
+            <a href="#history">History</a><br />
             <a href="#using">Using the program</a><br />
             <a href="#attribution">Attribution</a><br />
             <a href="#license">License</a><br />
@@ -45,60 +46,88 @@
           <a href="https://github.com/suurjaak/Skyperious">View the Project on GitHub <small>suurjaak/Skyperious</small></a>
         </p>
         <ul>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8_setup.exe">Download <strong>Setup</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8.exe">Download <strong>Executable</strong></a></li>
-          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.8-src.zip">Download <strong>Source</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.9_setup.exe">Download <strong>Setup</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.9.exe">Download <strong>Executable</strong></a></li>
+          <li><a href="https://erki.lap.ee/downloads/Skyperious/skyperious_5.9-src.zip">Download <strong>Source</strong></a></li>
         </ul>
       </header>
 
 <section>
 
-<h2>Regarding Skype 2025 Shutdown</h2>
-
-<p>As of 2025 May, there is no more Skype service, and after that,
-Skyperious can obviously no longer download message history from online service.</p>
-
-<p>It can still import Skype export archives into a local database.</p>
-
-<p>Note that in 2025 March, the online service became strongly rate limited,
-making live sync in Skyperious rather slow.</p>
-
-
-<h2>Important notice from 2020</h2>
-
-<p>Around 2017, starting from Skype version 8, Skype moved away from its famous
-peer-to-peer architecture to a client-server system, and started to store 
-conversation history on its own servers only.</p>
-
-<p>Formerly, it used a local SQLite <code>main.db</code> database to store chats and messages,
-which is what Skyperious was originally created to work with - merging chat 
-histories from different computers into one.</p>
-
-<p>Skyperious still works with existing <code>main.db</code> files, and can also download
-newer messages from Skype online service. But any changes done to the database
-no longer affect what is visible in the official Skype program.</p>
-
-<hr />
-
-
 <p>Skyperious is a Skype chat history tool.</p>
 
-You can open Skype SQLite databases and work with their contents:
-<ul>
-<li>import messages from Skype online service and Skype export archives</li>
-<li>search across all messages and contacts</li>
-<li>read chat history in full, see chat statistics and word clouds</li>
-<li>export chats as HTML, text or spreadsheet</li>
-<li>view any database table and and export their data</li>
-<li>change, add or delete data in any table</li>
-<li>execute direct SQL queries</li>
-</ul>
+<p>
+You can open and browse Skype's <code>main.db</code> databases from before Skype version 8,
+or create such databases from Skype online service and Skype export archives.
+</p>
 
 <p>
-Additionally, it doubles as a useful database tool for any SQLite file.<br />
-Also, a <a href="help.html#commandline">command line interface</a> is available
-with key functions like exporting, searching, syncing, and merging.<br />
+With an opened database, you can:
+
+<ul>
+<li>search across all messages and contacts</li>
+<li>read chat history in full, see chat statistics and word clouds</li>
+<li>export chats and contacts as HTML, text or spreadsheet</li>
+<li>compare and synchronize messages with another Skype database, merging their differences</li>
+</ul>
+</p>
+
+<p>
+Additionally, it doubles as a useful database tool for any SQLite file:
+
+<ul>
+<li>view and filter database tables, fix database corruption</li>
+<li>change, add or delete data in tables</li>
+<li>execute direct SQL queries</li>
+<li>export tables and query results as HTML, SQL or spreadsheet</li>
+</ul>
+</p>
+
+<p>
+Also, a <a href="help.html#commandline">command line interface</a>
+is available with key functions like exporting, searching, syncing, and merging.
 The graphical version includes a Python console window.
+</p>
+
+
+<a name="history"><h2>History</h2></a>
+
+<p>
+Skyperious was initially written in 2012 to work with local Skype databases
+(<code>main.db</code> files in user folders),
+mostly in order to merge chat histories from different computers
+with different slices of chat history.
+</p>
+
+<p>
+Over time it grew into a more general tool to search and export Skype chat history,
+and manage the local Skype database e.g. pruning unneeded contacts.
+It could also communicate with a local running Skype instance, to add contacts
+from a file exported from MSN / GMail and the like.
+</p>
+
+<p>
+Around 2017, starting from Skype version 8, Skype moved away from its famous
+peer-to-peer architecture to a client-server system, closed API access to local
+running Skype instances, and started to store conversation history on its own servers only.
+</p>
+
+<p>
+Skyperious was updated to be able to create new local Skype databases,
+by downloading messages from Skype online service via login inside Skyperious,
+or by importing a Skype export archive (a <code>.tar</code> archive manually downloaded
+from Skype website, containing a <code>messages.json</code> file).
+</p>
+
+<p>
+In 2025 May, Skype is shut down altogether, and its accounts migrated to Microsoft Teams.
+</p>
+
+<p>
+Skyperious is still able to import Skype export archives, 
+and work locally with the database as before,
+but synchronizing messages from Skype online will no longer be possible
+once the online service is terminated.
 </p>
 
 
@@ -110,7 +139,7 @@ automatically, or you can select specific files or folders.
 Once added to the database list, a file can be opened for browsing, searching 
 and exporting, or compared with another database for merging.
 </p><p>
-Searching an opened database supports a simple query syntax. 
+Searching an opened database supports a simple <a hreF="help.html">query syntax</a>. 
 You can use keywords to search among specific authors or chats only
 (<code>from:john</code>, <code>chat:links</code>), or from certain dates only 
 (<code>date:2012</code>, <code>date:2010..2013-06</code>). Search supports 
@@ -120,13 +149,11 @@ Skyperious can log into Skype online service and download and save new messages
 int the local database file. It can also create a new <code>main.db</code> database from 
 scratch, by downloading all available history.
 </p><p>
-HTML export can download shared photos and embed them in the resulting HTML,
-if password for the Skype account has been entered in online-page.
-This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
-Image download is also supported in the command-line interface.
+Skyperious stores shared files and media in a subfolder next to the database,
+browsable by themselves, available as in-program links, and embedded in HTML exports.
 </p><p>
-In database comparison, you can scan one database for messages not found in
-the other, and copy all detected messages to the other database. Or you can 
+In database comparison, you can scan one database for messages and shares not found in
+the other, and copy all detected differences to the other database. Or you can 
 browse and copy specific chats and contacts.
 </p><p>
 Skyperious can also merge chat history exported from Skype into an existing 
@@ -160,17 +187,10 @@ elsewhere, same goes for the source code. The command line interface only needs
 Python to run.
 </p>
 <p>
-Skyperious has been tested under Windows 10, Windows 7, Windows Vista, Windows XP
+Skyperious has been tested under Windows 11, Windows 10, Windows 7, Windows Vista, Windows XP
 and Ubuntu Linux, and reported to work under OS X and Windows 8. In source code
 form, it should run wherever Python and the required Python packages are
 installed.
-</p>
-<p>
-If running from pip installation, run <code>skyperious</code> from the command-line. <br />
-If running from straight source code, go to Skyperious directory, and launch 
-<code>skyperious.sh</code> where shell scripts are supported, or launch 
-<code>skyperious.bat</code> under Windows, or open a terminal and run 
-<code>python -m skyperious</code>.
 </p>
 
 
