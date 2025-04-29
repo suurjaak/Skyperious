@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    25.04.2025
+@modified    29.04.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1302,8 +1302,6 @@ subtitle = "%s%% of %s in personal total" % (util.round_float(100. * count / sma
         <td class="link">
 %if data.get("filepath"):
         <a href="{{ util.path_to_url(data["filepath"]) }}" target="_blank">Open</a>
-%elif not data.get("success") and data.get("url"):
-        <a href="{{ data["url"] }}" target="_blank">Online</a>
 %endif
         </td>
         <td class="timestamp" title="{{ data["datetime"].strftime("%Y-%m-%d %H:%M:%S") }}"><a href="#message:{{ message_id }}">{{ data["datetime"].strftime("%Y-%m-%d %H:%M") }}</a></td>
@@ -1332,7 +1330,7 @@ f_datetime_title = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
         </td><td title="{{ util.plural("byte", int(f["filesize"]), sep=",") }}">
           {{ util.format_bytes(int(f["filesize"])) }}
         </td><td class="link">
-%if f["filepath"]:
+%if f.get("filepath"):
           <a href="{{ util.path_to_url(f["filepath"]) }}" target="_blank">Open</a>
 %endif
         </td>
@@ -2117,8 +2115,6 @@ text_cell2 = "" if text_cell1 else "&nbsp;%d%%&nbsp;" % percent
     <td valign="top">
 %if data.get("filepath"):
       <font size="2" face="{{ conf.HistoryFontName }}"><a href="{{ util.path_to_url(data["filepath"]) }}"><font color="{{ conf.LinkColour }}">Open</font></a></font>
-%elif data.get("url"):
-      <font size="2" face="{{ conf.HistoryFontName }}"><a href="{{ data["url"] }}"><font color="{{ conf.LinkColour }}">Online</font></a></font>
 %endif
     </td>
     <td align="right" valign="top" nowrap=""><a href="message:{{ message_id }}"><font size="2" color="{{ conf.HistoryTimestampColour }}" face="{{ conf.HistoryFontName }}">{{ data["datetime"].strftime("%Y-%m-%d %H:%M") }}</font></a></td>

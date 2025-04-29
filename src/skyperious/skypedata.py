@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    25.04.2025
+@modified    29.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -2593,6 +2593,7 @@ class MessageParser(object):
                                 datetime=message.get("datetime")
                                          or self.db.stamp_to_date(message["timestamp"]))
                     if not options.get("export"): data.update(filepath=path)
+                    elif not options.get("files_folder"): data.pop("filepath", None)
                     self.stats["shared_media"][message["id"]] = data
             else:
                 # Sanitize XML tags like Title|Text|Description|..
@@ -2960,6 +2961,7 @@ class MessageParser(object):
         @param   content   raw binary content if not using local share directory
         @return            binary content if media and no error else None
         """
+        if metadata is None: metadata = {}
         if content is not None:
             if conf.ShareDirectoryEnabled:
                 self.db.store_shared_file(message, content, metadata)
