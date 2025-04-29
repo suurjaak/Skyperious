@@ -1,8 +1,9 @@
 CHANGELOG
 =========
 
-5.9, 2025-04-27
+5.9, 2025-04-29
 ---------------
+- store shared files and media locally (issue #135)
 - show file and media sharing messages without link to Skype online
 - present card and sticker messages as media sharing
 - add compare&merge button to database information page
