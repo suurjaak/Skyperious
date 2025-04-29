@@ -1,6 +1,24 @@
 CHANGELOG
 =========
 
+5.9, 2025-04-29
+---------------
+- store shared files and media locally (issue #135)
+- show file and media sharing messages without link to Skype online
+- present card and sticker messages as media sharing
+- add compare&merge button to database information page
+- offer to retain partial database on canceling import of Skype export archive
+- make configurable whether to confirm automatic login to Skype online for shared content during export
+- fix toolbar icons getting rescaled poorly on newer wx versions
+- fix database diff mistakenly marking participants as new
+- fix chat diff Excel export ignoring diff and exporting all messages
+- fix error on contacts list popup menu after deleting all contacts
+- fix contacts HTML export not accounting for duplicate identities when sorting or toggling
+- fix filesystem links over-encoding paths with exotic characters
+- use contact name in file transfer statistics instead of display name registered in transfer
+- drop shared media cache introduced in issue #112 as obsolete
+
+
 5.8, 2025-03-27
 ---------------
 - adapt to recent changes in Skype online API regarding 1:1 chats

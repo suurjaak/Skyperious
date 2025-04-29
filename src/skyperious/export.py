@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    02.06.2024
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import codecs
@@ -19,7 +19,6 @@ import itertools
 import logging
 import os
 import re
-import sys
 
 import six
 import step
@@ -96,10 +95,10 @@ def export_chats(chats, path, format, db, opts=None):
     @param   db                SkypeDatabase instance
     @param   opts              export options dictionary
                ?multi          whether exporting multiple files under path
-               ?media_folder   whether to save images to subfolder in HTML export
+               ?files_folder   whether to save shared files and media to subfolder in HTML export
                ?timerange      additional arguments for filtering messages, as
                                (from_timestamp or None, to_timestamp or None)
-               ?messages       list messages to export if not querying all
+               ?messages       iterable of messages to export if not querying all
                ?noskip         whether to not skip chats with no messages
                ?progress       function called before exporting each chat,
                                with the number of messages exported so far
@@ -121,7 +120,8 @@ def export_chats(chats, path, format, db, opts=None):
 
     if "xlsx" == format and not opts.get("multi"):
         filename = make_filename(chats[0])
-        count, message_count = export_chats_xlsx(chats, filename, db, opts=opts)
+        messages = opts.get("messages")
+        count, message_count = export_chats_xlsx(chats, filename, db, messages, opts=opts)
         files.append(filename)
     else:
         filedir = path if opts.get("multi") else os.path.dirname(path)
@@ -132,7 +132,7 @@ def export_chats(chats, path, format, db, opts=None):
 
         if "html" == format \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-             or conf.SharedFileAutoDownload and opts.get("media_folder")) \
+             or conf.SharedFileAutoDownload and opts.get("files_folder")) \
         and not db.live.is_logged_in() \
         and conf.Login.get(db.filename, {}).get("password"):
             # Log in to Skype online service to download shared media
@@ -247,8 +247,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
     @param   db        SkypeDatabase instance
     @param   messages  list of message data dicts
     @param   opts      export options dictionary, as {
-                         ?"media_cache": use local download cache,
-                         ?"media_folder": save images to subfolder in HTML export}
+                         ?"files_folder": save shared files to subfolder in HTML export}
     @return            (number of chats exported, number of messages exported)
     """
     count, message_count, opts = 0, 0, opts or {}
@@ -257,11 +256,11 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         is_html  = filename.lower().endswith(".html")
         parser = skypedata.MessageParser(db, chat=chat, stats=True)
         namespace = {"db": db, "chat": chat, "messages": messages, "parser": parser}
-        if opts.get("media_folder"):
+        if opts.get("files_folder"):
             filedir, basename = os.path.split(filename)
             basename = os.path.splitext(basename)[0]
             mediadir = os.path.join(filedir, "%s_files" % basename)
-            namespace["media_folder"] = mediadir
+            namespace["files_folder"] = mediadir
         # As HTML and TXT contain statistics in their headers before
         # messages, write out all messages to a temporary file first,
         # statistics will be available for the main file after parsing.
@@ -271,10 +270,7 @@ def export_chat_template(chat, filename, db, messages, opts=None):
         tmpfile = open(tmpname, "wb+")
         template = step.Template(templates.CHAT_MESSAGES_HTML if is_html else
                    templates.CHAT_MESSAGES_TXT, strip=False, escape=is_html)
-        media_cache0 = conf.SharedContentUseCache
-        conf.SharedContentUseCache = bool(opts.get("media_cache", conf.SharedContentUseCache))
-        try: template.stream(tmpfile, namespace)
-        finally: conf.SharedContentUseCache = media_cache0
+        template.stream(tmpfile, namespace)
 
         namespace["stats"] = stats = parser.get_collected_stats()
         namespace.update({

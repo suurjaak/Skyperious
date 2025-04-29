@@ -13,7 +13,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     03.04.2012
-@modified    26.03.2025
+@modified    18.04.2025
 """
 import datetime
 import logging
@@ -24,6 +24,7 @@ import traceback
 try:
     import wx
     import wx.lib.inspection
+    import wx.lib.newevent
     import wx.py
     import wx.stc
 except ImportError: wx = None
@@ -33,6 +34,8 @@ from . lib import util
 from . lib import wx_accel
 
 from . import conf
+
+ConfigurationEvent, EVT_CONFIGURATION = wx.lib.newevent.NewEvent() if wx else (None, None)
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,7 @@ class GUILogHandler(logging.Handler):
 
     def __init__(self):
         self.deferred = [] # Messages logged before main window available
-        super(self.__class__, self).__init__()
+        super(GUILogHandler, self).__init__()
 
 
     def emit(self, record):
@@ -166,6 +169,7 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
         button_open .Bind(wx.EVT_BUTTON,     on_open)
         button_clear.Bind(wx.EVT_BUTTON,     on_clear)
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, on_colour)
+        self.Bind(EVT_CONFIGURATION,         self.on_change_configuration)
         on_colour()
 
         sizer_top.Add(button_open, border=10, flag=wx.RIGHT)
@@ -269,6 +273,34 @@ class TemplateFrameMixIn(wx_accel.AutoAcceleratorMixIn if wx else object):
             except Exception as e: print("Exception %s: %s in log_message" %
                                          (e.__class__.__name__, e))
         self.log.SetReadOnly(True)
+
+
+    def on_change_configuration(self, event):
+        """Starts or stops or changes file logging if relevent configuration changed."""
+        opts1, opts2 = event.opts1, event.opts2
+        if all(opts1.get(k) == opts2.get(k) for k in ("LogFile", "LogToFile")): return
+
+        is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
+        should_log = all(opts2.get(k) for k in ("LogFile", "LogToFile"))
+        path_changed = (opts1.get("LogFile") != opts2.get("LogFile"))
+        if is_logging and (path_changed or not should_log):
+            logger.info("Closing log file %r.", opts1.get("LogFile"))
+            handler = next(x for x in logger.parent.handlers
+                           if isinstance(x, logging.FileHandler))
+            logger.parent.removeHandler(handler)
+            handler.close()
+        if should_log and (path_changed or not is_logging):
+            try: os.makedirs(os.path.dirname(conf.LogFile))
+            except Exception: pass
+            try:
+                handler = logging.FileHandler(conf.LogFile, encoding="utf-8")
+                handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
+                logger.parent.addHandler(handler)
+                logger.info("Logging to file %r.", conf.LogFile)
+            except Exception:
+                logger.exception("Error starting logging to %r.", conf.LogFile)
+        is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
+        self.button_open_log.Enable(is_logging)
 
 
     def on_showhide_console(self, event=None):

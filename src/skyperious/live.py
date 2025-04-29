@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    23.03.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -78,7 +78,6 @@ class SkypeLogin(object):
         self.skype        = None # skpy.Skype instance
         self.tokenpath    = None # Path to login tokenfile
         self.cache        = collections.defaultdict(dict) # {table: {identity: {item}}}
-        self.dl_cache_dir = os.path.join(conf.CacheDirectory, "shared")
         self.populated    = False
         self.sync_counts  = collections.defaultdict(int) # {"contacts_new": x, ..}
         self.query_stamps = [] # [datetime.datetime, ] for rate limiting
@@ -143,7 +142,7 @@ class SkypeLogin(object):
     def init_db(self, filename=None, truncate=False):
         """Creates SQLite database if not already created."""
         if not self.db:
-            path = filename or make_db_path(self.username)
+            path = filename or skypedata.make_db_path(self.username)
             truncate = truncate or not os.path.exists(path)
             self.db = skypedata.SkypeDatabase(path, truncate=truncate)
             self.db.live = self
@@ -413,6 +412,17 @@ class SkypeLogin(object):
         if "messages" == table and isinstance(item, skpy.SkypeCallMsg):
             self.insert_calls(item, dbitem, dbitem0)
 
+        if "messages" == table and "<URIObject" in item.content and conf.LiveSyncAutoDownload:
+            metadata, content = None, None
+            localpath = self.db.get_shared_file_path(dbitem["id"])
+            if not localpath or not os.path.exists(localpath):
+                metadata = self.msg_parser.make_message_share_data(body=item.content)
+            if metadata:
+                content = self.download_content(metadata["url"], metadata.get("category") or "file")
+            if content is not None:
+                if self.db.store_shared_file(dbitem, content, metadata):
+                    self.sync_counts["shared_files"] += 1
+
         if result is None and dbitem0 and dbitem0.get("__inserted__"):
             result = self.SAVE.SKIP # Primary was inserted during this run, no need to count
         if result is None and dbitem0:
@@ -619,7 +629,7 @@ class SkypeLogin(object):
                     if creator: result.update(creator=creator)
                 if item.picture:
                     # https://api.asm.skype.com/v1/objects/0-weu-d14-abcdef..
-                    raw = self.get_api_content(item.picture, category="avatar", cache=False)
+                    raw = self.get_api_content(item.picture, category="avatar")
                     # main.db has NULL-byte in front of image binary
                     if raw: result.update(meta_picture="\0" + raw.decode("latin1"))
             else: result = None
@@ -831,6 +841,100 @@ class SkypeLogin(object):
                           new=self.sync_counts["contacts_new"], identities=list(updateds))
 
 
+    def populate_files(self, chats=()):
+        """
+        Downloads all shared files and media of existing messages and stores to local share folder.
+
+        @param   chats     list of chat identities to populate if not all
+        """
+
+        cstr = util.plural("chat", chats) if chats else "all chats"
+        logger.info("Starting to download shared files for %s in '%s' from Skype online service "
+                    "as '%s'.", cstr, self.db, self.username)
+        if not self.progress(action="populate", table="shared_files", start=True):
+            return
+        chatmap = {c["id"]: c for c in self.db.get_conversations()}
+        counts = collections.defaultdict(int) # {convo_id: stored file count}
+
+        sql = "SELECT convo_id FROM Messages WHERE "
+        if chats: sql += " convo_id IN (%s) AND " % \
+                         ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+        sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
+        sql += "GROUP BY convo_id"
+        chats_queue = [x["convo_id"] for x in self.db.execute(sql)]
+        chats_queue.sort(key=lambda k: chatmap[k]["title_long_lc"], reverse=True)
+
+        if chats_queue:
+            sql = "SELECT COUNT(*) AS count FROM Messages WHERE "
+            if chats: sql += " convo_id IN (%s) AND " % \
+                             ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+            sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%')"
+            potentials = self.db.execute(sql).fetchone()["count"]
+            logger.info("Checking %s in %s for potential shared files to download.",
+                        util.plural("message", potentials), util.plural("chat", chats_queue))
+
+        run = True
+        cursor = chat = None
+        first_ts, last_ts = sys.maxsize, 0
+        cycles, messages_processed, chat_messages_processed = 0, 0, 0
+        while run:
+            cycles += 1
+            if not cycles % 100 and not self.progress(): break # while run
+            if cursor is None and not chats_queue: break # while run
+            if cursor is None:
+                chat = chatmap[chats_queue.pop()]
+                if not self.progress(action="populate", table="shared_files",
+                                     chat=chat["identity"], start=True):
+                    break # while run
+                sql = "SELECT * FROM Messages WHERE convo_id = %s AND " % chat["id"]
+                sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
+                sql += "ORDER BY id DESC "
+                cursor = self.db.execute(sql)
+                first_ts, last_ts = sys.maxsize, 0
+                chat_messages_processed = 0
+
+            m = next(cursor, None)
+            if not m:
+                cidentity, saved = chat["identity"], counts[chat["id"]]
+                util.try_ignore(cursor.close)
+                cursor = chat = None
+                if not saved: continue # while run
+
+                if not self.progress(action="populate", table="shared_files", chat=cidentity,
+                                     count=chat_messages_processed, saved=saved,
+                                     first=self.db.stamp_to_date(first_ts),
+                                     last=self.db.stamp_to_date(last_ts), end=True):
+                    break # while run
+                continue # while run
+
+            messages_processed += 1
+            chat_messages_processed += 1
+            localpath = self.db.get_shared_file_path(m["id"])
+            if localpath and os.path.exists(localpath): continue # while run
+            metadata, content = self.msg_parser.make_message_share_data(body=m["body_xml"]), None
+            if metadata:
+                content = self.download_content(metadata["url"], metadata.get("category") or "file")
+            if content is not None:
+                if self.db.store_shared_file(m, content, metadata):
+                    counts[chat["id"]] += 1
+
+            if not self.progress(action="populate", table="shared_files",
+                                 chat=chat["identity"], count=chat_messages_processed,
+                                 **(dict(saved=counts[chat["id"]]) if counts[chat["id"]] else {})):
+                break # while run
+            first_ts, last_ts = min(first_ts, m["timestamp"]), max(last_ts, m["timestamp"])
+
+        if chat and counts[chat["id"]]: # Leftover report from breaking while
+            self.progress(action="populate", table="shared_files", chat=chat["identity"],
+                          count=counts[chat["id"]], first=self.db.stamp_to_date(first_ts),
+                          last=self.db.stamp_to_date(last_ts), end=True)
+
+        logger.info("Finished downloading %s for %s from Skype online service as '%s'.",
+                    util.plural("shared file", sum(counts.values())),
+                    util.plural("message", messages_processed), self.username)
+        self.progress(action="populate", table="shared_files", saved=sum(counts.values()), end=True)
+
+
     def populate_chats(self, chats=(), messages=True):
         """
         Retrieves all conversations and saves to database.
@@ -839,7 +943,7 @@ class SkypeLogin(object):
         @param   messages  whether to retrieve messages, or only chat metainfo and participants
         """
         cstr = "%s " % util.plural("chat", chats, numbers=False) if chats else ""
-        logger.info("Starting to sync %s'%s' from Skype online service as '%s'.",
+        logger.info("Starting to sync %s in '%s' from Skype online service as '%s'.",
                     cstr, self.db, self.username)
         if not self.progress(action="populate", table="chats", start=True):
             return
@@ -891,6 +995,8 @@ class SkypeLogin(object):
             message_count_new=self.sync_counts["messages_new"],
             message_count_updated=self.sync_counts["messages_updated"],
         ) if messages else {}
+        if self.sync_counts.get("shared_files"):
+            pargs["shared_files"] = self.sync_counts["shared_files"]
         self.progress(
             action="populate", table="chats", end=True, count=len(updateds),
             new=self.sync_counts["chats_new"], identities=list(updateds),
@@ -1003,45 +1109,22 @@ class SkypeLogin(object):
         return result
 
 
-    def get_api_content(self, url, category=None, cache=True):
+    def get_api_content(self, url, category=None):
         """
         Returns content raw binary from Skype API URL via login, or None.
 
-        @param   category  type of content, e.g. "avatar" for avatar image,
-                           "file" for shared file
-        @param   cache     whether to use disk cache if media caching is enabled;
-                           loads content from disk if available, and saves download to disk
+        @param   category  type of content, e.g. "avatar" for avatar image, "file" for shared file
         """
-        result, cached, url = None, None, make_content_url(url, category)
+        result, url = None, make_content_url(url, category)
         urls = [url]
         # Some images appear to be available on one domain, some on another
         if not url.startswith("https://experimental-api.asm"):
             url0 = re.sub(r"https\:\/\/.+\.asm", "https://experimental-api.asm", url)
             urls.insert(0, url0)
 
-        for url in urls if conf.SharedContentUseCache and cache else ():
-            try:
-                filebase = os.path.join(self.dl_cache_dir, urllib.parse.quote(url, safe=""))
-                for p in glob.glob(filebase + ".*")[:1]:
-                    with open(p, "rb") as f:
-                        result = cached = f.read()
-            except Exception: pass
-
         for url in urls if not result else ():
             result = self.download_content(url, category)
             if result: break # for url
-
-        if result and conf.SharedContentUseCache and cache and not cached:
-            try:
-                filetype = util.get_file_type(result, category, url)
-                filename = "%s.%s" % (urllib.parse.quote(url, safe=""), filetype)
-                filepath = os.path.join(self.dl_cache_dir, filename)
-                self.ensure_cache_dir()
-                with open(filepath, "wb") as f:
-                    f.write(result)
-            except Exception:
-                logger.warning("Error caching %s.", filepath, exc_info=True)
-
         return result
 
 
@@ -1095,18 +1178,6 @@ class SkypeLogin(object):
         """Adds bot prefix to contact identity if contact exists as bot."""
         botidentity = (skypedata.ID_PREFIX_BOT + identity) if identity else identity
         return botidentity if botidentity in self.cache["contacts"] else identity
-
-
-    def ensure_cache_dir(self):
-        """Creates content cache directory and tagfile if not already created."""
-        TAGCONTENT = """Signature: 8a477f597d28d172789f06886806bc55
-# This file is a cache directory tag created by %s.
-# For information about cache directory tags, see:
-#   http://www.brynosaurus.com/cachedir/""" % conf.Title
-        tagpath = os.path.join(self.dl_cache_dir, "CACHEDIR.TAG")
-        if not os.path.isfile(tagpath):
-            with util.create_file(tagpath, handle=True) as f:
-                f.write(TAGCONTENT)
 
 
 class SkypeExport(skypedata.SkypeDatabase):
@@ -1172,12 +1243,15 @@ class SkypeExport(skypedata.SkypeDatabase):
         self.export_last_modified = datetime.datetime.fromtimestamp(ts)
         self.export_parsed = False
         self.is_temporary = not dbfilename
+        self.msg_parser = None # skypedata.MessageParser instance
+        self.tarfp = None # Open TAR file pointer, if any
 
         if self.is_temporary:
             fh, dbfilename = tempfile.mkstemp(".db")
             os.close(fh)
         super(SkypeExport, self).__init__(dbfilename, truncate=not self.is_temporary)
         self.ensure_schema()
+        self.msg_parser = skypedata.MessageParser(self)
 
 
     def __str__(self):
@@ -1204,12 +1278,15 @@ class SkypeExport(skypedata.SkypeDatabase):
         try:
             f, tf = self.export_open(self.export_path)
         except Exception: raise
-        else: self.export_parse(f, progress)
+        else:
+            self.tarfp = tf
+            self.export_parse(f, progress)
         finally:
             util.try_ignore(f and f.close)
             util.try_ignore(tf and tf.close)
             util.try_ignore(self.clear_cache)
             self.export_parsed = True
+            self.tarfp = None
 
 
     def export_parse(self, f, progress=None):
@@ -1245,24 +1322,10 @@ class SkypeExport(skypedata.SkypeDatabase):
             # Dictionary end: ("nested path", "end_map", None)
             elif "end_map" == evt:
                 if "conversations.item" == prefix:
-                    if skip_chat:
-                        skip_chat = False
-                        try:
-                            self.delete_row("conversations", chat, log=False)
-                            counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
-                                                               [chat["id"]], log=False).rowcount
-                            self.execute("DELETE FROM participants WHERE convo_id = ?",
-                                         [chat["id"]], log=False)
-                        except Exception:
-                            logger.warning("Error dropping from database chat %s.", chat, exc_info=True)
-                        counts["chats"] -= 1
-                    else:
-                        try:
-                            chat = self.export_finalize_chat(chat)
-                            self.update_row("conversations", chat, {"id": chat["id"]}, log=False)
-                        except Exception:
-                            logger.warning("Error updating chat %s.", chat, exc_info=True)
+                    self.export_finalize_chat(chat, skip_chat, counts)
                     edited_msgs.clear()
+                    chat = None
+                    skip_chat = False
                     skip_msg = False
                 elif "conversations.item.MessageList.item" == prefix:
                     if not skip_chat and not skip_msg:
@@ -1273,6 +1336,13 @@ class SkypeExport(skypedata.SkypeDatabase):
                                 counts["messages"] += 1
                         except Exception:
                             logger.warning("Error finalizing and inserting message %s.", msg, exc_info=True)
+                        else:
+                            try:
+                                if msg and conf.ShareDirectoryEnabled and self.export_store_shared_file(msg):
+                                    counts["shared_files"] = counts.get("shared_files", 0) + 1
+                            except Exception:
+                                logger.warning("Error processing shared file for message #%s.",
+                                               msg["id"], exc_info=True)
                     skip_msg = False
 
             # List start: ("nested path", "start_array", None)
@@ -1319,8 +1389,10 @@ class SkypeExport(skypedata.SkypeDatabase):
                 elif "conversations.item.threadProperties.members" == prefix:
                     if skip_chat: continue # while True
                     try:
-                        if value is not None or skypedata.CHATS_TYPE_GROUP == chat["type"]:
-                            identities = map(id_to_identity, json.loads(value))
+                        identities = []
+                        if skypedata.CHATS_TYPE_GROUP == chat["type"]:
+                            if value is not None:
+                                identities = map(id_to_identity, json.loads(value))
                         else: identities = [self.id, chat["identity"]]
                         for identity in identities:
                             if not identity: continue # for identity
@@ -1404,28 +1476,40 @@ class SkypeExport(skypedata.SkypeDatabase):
                     msg["__type"] = value # For post-processing
 
             if progress and lastcounts != counts and (counts["chats"] != lastcounts["chats"]
-            or counts["messages"] and not counts["messages"] % 100) \
+            or counts["messages"] and not counts["messages"] % 10) \
             and not progress(counts=counts):
+                if chat: self.export_finalize_chat(chat, skip_chat, counts)
                 break # while True
 
             lastcounts = dict(counts)
 
 
-    def export_finalize_chat(self, chat):
-        """
-        Populates last fields, inserts account participant if lacking.
-        """
-        if "meta_topic" in chat and "displayname" not in chat:
-            chat["displayname"] = chat["meta_topic"]
+    def export_finalize_chat(self, chat, skip_chat, counts):
+        """Updates chat and participants, or drops chat and related if skipping."""
+        if skip_chat:
+            try:
+                self.delete_row("conversations", chat, log=False)
+                counts["messages"] -= self.execute("DELETE FROM messages WHERE convo_id = ?",
+                                                   [chat["id"]], log=False).rowcount
+                self.execute("DELETE FROM participants WHERE convo_id = ?",
+                             [chat["id"]], log=False)
+            except Exception:
+                logger.warning("Error dropping from database chat %s.", chat, exc_info=True)
+            counts["chats"] -= 1
+        else:
+            try:
+                if "meta_topic" in chat and "displayname" not in chat:
+                    chat["displayname"] = chat["meta_topic"]
 
-        # Insert account participant if not inserted
-        if not any(self.id == x["identity"] and chat["id"] == x["convo_id"]
-                   for x in self.table_rows["participants"]):
-            p = dict(is_permanent=1, convo_id=chat["id"], identity=self.id)
-            p["id"] = self.insert_row("participants", p, log=False)
-            self.table_rows["participants"].append(p)
-
-        return chat
+                # Insert account participant if not inserted
+                if not any(self.id == x["identity"] and chat["id"] == x["convo_id"]
+                           for x in self.table_rows["participants"]):
+                    p = dict(is_permanent=1, convo_id=chat["id"], identity=self.id)
+                    p["id"] = self.insert_row("participants", p, log=False)
+                    self.table_rows["participants"].append(p)
+                self.update_row("conversations", chat, {"id": chat["id"]}, log=False)
+            except Exception:
+                logger.warning("Error updating chat %s.", chat, exc_info=True)
 
 
     def export_finalize_message(self, msg, chat, edited_msgs):
@@ -1465,10 +1549,12 @@ class SkypeExport(skypedata.SkypeDatabase):
                        type=skypedata.MESSAGE_TYPE_FILE)
             try:
                 bs = BeautifulSoup(msg["body_xml"], "html.parser")
+                fileurl = bs.find("uriobject").get("url")
                 name = bs.find("originalname").get("v")
                 size = bs.find("filesize").get("v")
-                msg["body_xml"] = '<files><file index="0" size="%s">%s</file></files>' % (
+                msg["body_xml"] = '<files><file index="0" size="%s" url="%s">%s</file></files>' % (
                                   urllib.parse.quote(util.to_unicode(size or 0)),
+                                  urllib.parse.quote(util.to_unicode(fileurl or ""), safe=":/"),
                                   util.to_unicode(name or "file").replace("<", "&lt;").replace(">", "&gt;"))
             except Exception:
                 if BeautifulSoup: logger.warning("Error parsing file from %s.", msg, exc_info=True)
@@ -1588,6 +1674,78 @@ class SkypeExport(skypedata.SkypeDatabase):
         return msg
 
 
+    def export_store_shared_file(self, message):
+        """
+        @return  whether a file was stored
+        """
+        metadata, content, extradata = None, None, None
+        localpath = self.get_shared_file_path(message["id"])
+        if not localpath or not os.path.exists(localpath):
+            metadata = self.msg_parser.make_message_share_data(body=message["body_xml"])
+        if metadata and metadata.get("docid"):
+            content, extradata = self.export_load_shared_file_content(metadata["docid"])
+        if content is not None:
+            return self.store_shared_file(message, content, dict(metadata, **extradata))
+        return False
+
+
+    def export_load_shared_file_content(self, docid):
+        """
+        Returns (file content bytes, extra metadata dictionary) for shared file, if available.
+
+        @param   docid  share ID in Skype, like "0-neu-d6-81ec4221c1f1186e093c4aebea145fea"
+        """
+        content, extradata = None, {}
+        ROOTPATH, SUBFOLDER = "" if self.tarfp else os.path.dirname(self.export_path), "media"
+        if self.tarfp:
+            allnames = [n for n in self.tarfp.getnames() if os.path.dirname(n) == SUBFOLDER]
+        else:
+            allnames = glob.glob(os.path.join(ROOTPATH, SUBFOLDER, "%s.*" % docid))
+            allnames = [os.path.join(SUBFOLDER, n) for n in allnames]
+        allnames = sorted(allnames) # ["media/docid.1.jpg", "media/docid.json", ]
+        if not allnames: return None, None
+
+        # Data files files are named like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.1.json
+        # {"expiry_date":"3017-10-24T20:06:57.5687593Z","filename":"image.png","contents":{"1":{"type":"image/png"}}}
+        jsondata = {}
+        jsonname = "%s.json" % docid
+        jsonpath = next((n for n in allnames if os.path.basename(n) == jsonname), None)
+        if not jsonpath: return None, None
+
+        if self.tarfp:
+            with self.tarfp.extractfile(jsonpath) as metaf:
+                jsondata = json.load(metaf)
+        else:
+            jsonpath = os.path.join(ROOTPATH, jsonpath)
+            if os.path.isfile(jsonpath):
+                with open(jsonpath, "rb") as metaf:
+                    jsondata = json.load(metaf)
+        if not jsondata: return None, None
+
+        # Content files are named like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.1.png
+        # Video files may have preview like 0-neu-d6-81ec4221c1f1186e093c4aebea145fea.2.jpg
+        contentpath = None
+        for filename in allnames:
+            if os.path.basename(filename).startswith("%s.1" % docid):
+                contentpath = filename
+                break # for filename
+        if not contentpath: return None, None
+
+        if self.tarfp:
+            with self.tarfp.extractfile(contentpath) as contentf:
+                content = contentf.read()
+        else:
+            with open(os.path.join(ROOTPATH, contentpath), "rb") as contentf:
+                content = contentf.read()
+
+        try: extradata["filename"] = jsondata["filename"]
+        except Exception: pass
+        try: extradata["mimetype"] = jsondata["contents"]["1"]["type"]
+        except Exception: pass
+
+        return content, extradata
+
+
     @staticmethod
     def export_parse_timestamp(value):
         """
@@ -1696,13 +1854,6 @@ def is_bot(user):
     ) # Workaround for skpy bug of presenting bots in some contexts as plain contacts
 
 
-def make_db_path(username):
-    """Returns the default database path for username."""
-    base = util.safe_filename(username)
-    if base != username: base += "_%x" % util.hash_string(username)
-    return os.path.join(conf.VarDirectory, "%s.main.db" % base)
-
-
 def make_message_ids(msg_id):
     """Returns (pk_id, guid) for message ID."""
     try: pk_id = int(msg_id) if int(msg_id).bit_length() < 64 else util.hash_string(msg_id)
@@ -1762,3 +1913,15 @@ def make_content_url(url, category=None):
         url += "/views/imgpsh_fullsize"
 
     return url
+
+
+def get_content_id(url):
+    """
+    Returns Skype live content ID from Skype online URL, or None if not detected.
+
+    @param   url  like "https://api.asm.skype.com/../0-weu-d4-73d../views/audio"
+                  or "https://login.skype.com/login/sso?go=webclient.xmm&amp;docid=0-weu-d3-ab2.."
+    """
+    if "docid=" not in url: match = re.search("/([a-z0-9-]{20,})(/|$)", url, re.I)
+    else: match = re.search("[^a-z0-9]docid=([a-z0-9-]{20,})([^a-z0-9]|$)", url, re.I)
+    return match[1] if match else None

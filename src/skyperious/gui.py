@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2025
+@modified    27.04.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -68,10 +68,11 @@ from . import templates
 from . import workers
 
 
-"""Custom application events for worker results."""
+"""Custom application events for in-program signaling."""
 WorkerEvent, EVT_WORKER = wx.lib.newevent.NewEvent()
 DetectionWorkerEvent, EVT_DETECTION_WORKER = wx.lib.newevent.NewEvent()
 OpenDatabaseEvent, EVT_OPEN_DATABASE = wx.lib.newevent.NewEvent()
+DatabasePageEvent, EVT_DATABASE_PAGE = wx.lib.newevent.NewCommandEvent()
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         self.Bind(EVT_OPEN_DATABASE, self.on_open_database_event)
 
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
+        self.Bind(EVT_DATABASE_PAGE, self.on_database_page_event)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_MOVE, self.on_move)
@@ -372,15 +374,14 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             sizer_labels.Add(valtext, proportion=1, flag=wx.GROW)
             setattr(self, "label_" + field, valtext)
 
+        compare_what = "another database or an archive" if live.ijson else "another database"
         BUTTONS_DETAIL = [
             ("button_open", "&Open", images.ButtonOpen,
              "Open the database for reading."),
             ("button_compare", "Compare and &merge", images.ButtonCompare,
-             "Choose another Skype database to compare with, in order to merge "
-             "their differences."),
+             "Choose %s to compare with, in order to merge their differences." % compare_what),
             ("button_export", "&Export messages", images.ButtonExport,
-             "Export all conversations from the database as "
-             "HTML, text or spreadsheet."),
+             "Export all conversations from the database as HTML, text or spreadsheet."),
             ("button_saveas", "Save &as..", images.ButtonSaveAs,
              "Save a copy of the database under another name."),
             ("button_remove", "&Remove", images.ButtonRemoveType,
@@ -690,7 +691,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             subtitle = p.title
             if isinstance(p, DatabasePage): # Use parent/file.db or C:/file.db
                 path, file = os.path.split(p.db.filename)
-                subtitle = os.path.join(os.path.split(path)[-1] or path, file)
+                subtitle = os.path.join(os.path.basename(path) or path, file)
             self.Title += " - " + subtitle
         self.update_notebook_header()
         if event: event.Skip() # Pass event along to next handler
@@ -957,7 +958,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 (conf.Title, conf.Version), "Update information",
                 wx.OK | wx.ICON_INFORMATION)
         elif full_response:
-            wx.MessageBox("Could not contact download server.",
+            wx.MessageBox("Could not obtain information from download server.",
                           "Update information", wx.OK | wx.ICON_WARNING)
         if check_result is not None:
             conf.LastUpdateCheck = datetime.date.today().strftime("%Y%m%d")
@@ -1202,12 +1203,31 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             return wx.MessageBox("%s is currently being imported to, cannot delete." %
                                  filename, conf.Title, wx.OK | wx.ICON_WARNING)
 
+        db, files_count = None, 0
+        try:
+            if os.path.isfile(filename):
+                db = skypedata.SkypeDatabase(filename)
+                files_count = db.get_shared_files_count()
+        except Exception: logger.exception("Error retrieving shared files count for %s.", filename)
+
+        if files_count:
+            choice = wx.MessageBox("Delete shared files stored on disk?\n\n"
+                                   "%s has %s." % 
+                                   (db.get_share_path(), util.plural("shared file", files_count)),
+                                   conf.Title, wx.YES | wx.NO | wx.CANCEL | wx.ICON_QUESTION)
+            if wx.CANCEL == choice:
+                db.close()
+                return
+            if wx.YES == choice:
+                db.delete_shared_files()
+        if db: db.close()
+
         try: os.unlink(filename)
         except Exception as e:
             logger.exception("Error deleting %s.", filename)
-            return wx.MessageBox("Failed to delete %s:\n\n%s" %
-                                 (filename, util.format_exc(e)),
-                                 conf.Title, wx.OK | wx.ICON_ERROR)
+            wx.MessageBox("Failed to delete %s:\n\n%s" % (filename, util.format_exc(e)),
+                          conf.Title, wx.OK | wx.ICON_ERROR)
+            return
         self.remove_databases([filename])
         self.db_filename = None
         self.list_db.Select(0)
@@ -1359,7 +1379,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             if focused_control: focused_control.SetFocus()
             return
 
-        db, files, count, message_count, media_folder = None, [], 0, 0, False
+        db, files, count, message_count, files_folder = None, [], 0, 0, False
         error, errormsg, errormsg_short = False, None, None
 
         db = self.load_database(self.db_filename)
@@ -1371,9 +1391,9 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             errormsg = "Cannot export %s. Not a valid Skype database?" % db
         if not error and not do_singlefile:
             format = export.CHAT_EXTS[dialog.FilterIndex]
-            media_folder = "html" == format and \
+            files_folder = "html" == format and \
                            dialog.FilterIndex != export.CHAT_EXTS.index("html")
-            if media_folder and not check_media_export_login(db):
+            if files_folder and not check_shared_files_export_login(db):
                 self.button_export.Enabled = True
                 if focused_control: focused_control.SetFocus()
                 return
@@ -1405,7 +1425,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                 db.get_conversations_stats(chats)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(multi=not do_singlefile, progress=progressfunc)
-                if media_folder: opts["media_folder"] = True
+                if files_folder: opts["files_folder"] = True
                 result = export.export_chats(chats, path, format, db, opts)
                 files, count, message_count = result
                 page = next((k for k, v in self.db_pages.items() if v is db), None)
@@ -1512,18 +1532,21 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         Handler for clicking to compare a selected database with another, shows
         a popup menu for choosing the second database file.
         """
+        self.open_compare_databases_menu(self.db_filename, self.button_compare)
+
+
+    def open_compare_databases_menu(self, filename, target):
+        """Opens a popup menu on target control for choosing a second file to compare given to."""
         fm = wx.lib.agw.flatmenu
         menu = fm.FlatMenu()
-        item = fm.FlatMenuItem(menu, wx.ID_ANY,
-                               "&Select a file from your computer..")
+        item = fm.FlatMenuItem(menu, wx.ID_ANY, "&Select a database file from your computer..")
         menu.AppendItem(item)
         if live.ijson:
             item = fm.FlatMenuItem(menu, wx.ID_ANY,
                                    "Select a Skype chat history &export archive from your computer..")
             menu.AppendItem(item)
-        recents = [f for f in conf.RecentFiles if f != self.db_filename][:5]
-        others = [f for f in conf.DBFiles
-                  if f not in recents and f != self.db_filename]
+        recents = [f for f in conf.RecentFiles if f != filename][:5]
+        others = [f for f in conf.DBFiles if f not in recents and f != filename]
         if recents or others:
             menu.AppendSeparator()
         if recents:
@@ -1544,13 +1567,18 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         for item in menu.GetMenuItems():
             self.Bind(wx.EVT_MENU, self.on_compare_menu, item)
 
-        btn = self.button_compare
-        sz_btn, pt_btn = btn.Size, btn.Position
-        pt_btn = btn.Parent.ClientToScreen(pt_btn)
-        menu.SetOwnerHeight(sz_btn.y)
-        if menu.Size.width < sz_btn.width:
-            menu.Size = sz_btn.width, menu.Size.height
-        menu.Popup(pt_btn, self)
+        sz_target, pt_target = target.Size, target.Position
+        pt_target = target.Parent.ClientToScreen(pt_target)
+        menu.SetOwnerHeight(sz_target.y)
+        if menu.Size.width < sz_target.width:
+            menu.Size = sz_target.width, menu.Size.height
+        menu.Popup(pt_target, self)
+
+
+    def on_database_page_event(self, event):
+        """Handler for notification from DatabasePage, opens popup menu if doing compare."""
+        if getattr(event, "compare", False):
+            self.open_compare_databases_menu(event.source.db.filename, event.target)
 
 
     def on_open_options(self, event):
@@ -1601,39 +1629,20 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
             dialog.AddProperty(name, value, help, default, kind)
             opts1[name] = value
         dialog.Realize()
+        with dialog:
+            if wx.ID_OK != dialog.ShowModal(): return
 
-        if wx.ID_OK == dialog.ShowModal():
             for k, v in dialog.GetProperties():
                 # Keep numbers in sane regions (no isinstance as bool is an int)
                 if type(v) in six.integer_types: v = max(1, min(sys.maxsize, v))
-                setattr(conf, k, v)
                 opts2[k] = v
-            util.run_once(conf.save)
+        if opts1 == opts2: return
+
+        for k, v in opts2.items(): setattr(conf, k, v)
+        util.run_once(conf.save)
+        if opts1.get("MinWindowSize") != opts2.get("MinWindowSize"):
             self.MinSize = conf.MinWindowSize
-            if any(opts1.get(k) != opts2.get(k) for k in ("LogFile", "LogToFile")):
-                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
-                should_log = all(opts2.get(k) for k in ("LogFile", "LogToFile"))
-                path_changed = (opts1.get("LogFile") != opts2.get("LogFile"))
-                should_remove = is_logging and (not should_log or path_changed)
-                if is_logging and (path_changed or not should_log):
-                    logger.info("Closing log file %r.", opts1.get("LogFile"))
-                    handler = next(x for x in logger.parent.handlers
-                                   if isinstance(x, logging.FileHandler))
-                    logger.parent.removeHandler(handler)
-                    handler.close()
-                if should_log and (path_changed or not is_logging):
-                    try: os.makedirs(os.path.dirname(conf.LogFile))
-                    except Exception: pass
-                    try:
-                        handler = logging.FileHandler(conf.LogFile)
-                        handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
-                        logger.parent.addHandler(handler)
-                        logger.info("Logging to file %r.", conf.LogFile)
-                    except Exception as e:
-                        logger.exception("Error starting logging to %r.", conf.LogFile)
-                is_logging = any(isinstance(x, logging.FileHandler) for x in logger.parent.handlers)
-                self.button_open_log.Enable(is_logging)
-        dialog.Destroy()
+        wx.PostEvent(self, guibase.ConfigurationEvent(opts1=opts1, opts2=opts2))
 
 
     def on_new_database(self, event):
@@ -1670,7 +1679,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         user = dialog1.GetValue().strip()
         if not user: return
 
-        filename0 = live.make_db_path(user)
+        filename0 = skypedata.make_db_path(user)
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
@@ -1716,7 +1725,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         user, pw = dialog1.Username, dialog1.Password
         if not user or not pw: return
 
-        filename0 = live.make_db_path(user)
+        filename0 = skypedata.make_db_path(user)
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
@@ -1787,7 +1796,7 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
         if not user: return wx.MessageBox("No Skype username found in %s." % efilename,
                                           conf.Title, wx.OK | wx.ICON_WARNING)
 
-        filename0 = live.make_db_path(user)
+        filename0 = skypedata.make_db_path(user, os.path.dirname(efilename))
         util.try_ignore(os.makedirs, os.path.dirname(filename0))
         dialog2 = wx.FileDialog(parent=self, message="Save new database",
             defaultDir=os.path.dirname(filename0),
@@ -1805,39 +1814,48 @@ class MainWindow(guibase.TemplateFrameMixIn, wx.Frame):
                                  (filename, conf.Title), conf.Title, wx.OK)
 
         def on_cancel():
-            result = wx.OK == wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL)
-            if result:
-                worker.stop(drop_results=False)
-                self.workers_import.pop(filename, None)
-            return result
+            if wx.OK != wx.MessageBox("Cancel import?", conf.Title, wx.OK | wx.CANCEL):
+                return False
+            worker.stop(drop_results=False)
+            self.workers_import.pop(filename, None)
+            return True
 
         def on_progress(result):
-            if result.get("error") or result.get("stop"):
-                util.try_ignore(lambda: db.close())
-                util.try_ignore(os.unlink, filename)
-            if result.get("done"):
-                worker.stop()
-                self.workers_import.pop(filename, None)
 
             def after():
                 if not self: return
 
+                do_drop = False
                 if result.get("error"):
                     dlg.Destroy()
                     guibase.status("Error parsing Skype export")
-                    wx.MessageBox("Error parsing Skype export:\n%s" % result["error_short"],
-                                  conf.Title, wx.OK | wx.ICON_ERROR)
+                    choice = wx.MessageBox("Error parsing Skype export:\n%s\n\n"
+                                           "Keep created database file?" % result["error_short"],
+                                           conf.Title, wx.YES | wx.NO | wx.ICON_ERROR)
+                    do_drop = (wx.NO == choice)
                 elif result.get("stop"):
                     dlg.Destroy()
                     guibase.status()
-                elif result.get("done"):
-                    dlg.Destroy()
+                    choice = wx.MessageBox("Keep created database file?\n\n"
+                                           'Choosing "No" will delete\n%s.' % filename,
+                                           conf.Title, wx.YES | wx.NO | wx.ICON_INFORMATION)
+                    do_drop = (wx.NO == choice)
+                if do_drop:
+                    db.delete_shared_files()
+                    util.try_ignore(lambda: db.close())
+                    util.try_ignore(os.unlink, filename)
+
+                if result.get("done"):
+                    worker.stop()
+                    self.workers_import.pop(filename, None)
+                    if dlg: dlg.Destroy()
                     guibase.status()
-                    db.close()
-                    self.update_database_list(filename)
-                    self.load_database_page(filename)
+                    if not do_drop:
+                        db.close()
+                        self.update_database_list(filename)
+                        self.load_database_page(filename)
                 else:
-                    t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
+                    t = ", ".join(util.plural(x[:-1].replace("_", " "), result["counts"][x], sep=",")
                                   for x in sorted(result["counts"]))
                     dlg.Message = "Parsed %s." % t
 
@@ -2371,6 +2389,7 @@ class DatabasePage(wx.Panel):
         self.counter = lambda x={"c": 0}: x.update(c=1+x["c"]) or x["c"]
         ColourManager.Manage(self, "BackgroundColour", "WidgetColour")
         self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_sys_colour_change)
+        self.TopLevelParent.Bind(guibase.EVT_CONFIGURATION, self.on_change_configuration)
 
         self.chat = None # Currently viewed chat
         self.chats = []  # All chats in database
@@ -2811,7 +2830,7 @@ class DatabasePage(wx.Panel):
         html_contact.Bind(wx.EVT_CONTEXT_MENU,           self.on_rightclick_html)
         html_contact.Bind(wx.EVT_RIGHT_UP,               self.on_rightclick_html)
 
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_contacts, list_contacts)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,   self.on_change_list_contacts, list_contacts)
         list_contacts.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_list_contacts)
         list_contacts.Bind(wx.EVT_CHAR_HOOK,    self.on_list_contacts_key)
 
@@ -3125,8 +3144,16 @@ class DatabasePage(wx.Panel):
         sizer1.Add(sizer_account, border=20, proportion=1,
                    flag=wx.TOP | wx.GROW)
 
+        what = "another database or an archive" if live.ijson else "another database"
+        button_compare = self.button_compare = controls.NoteButton(panel1, "Compare and &merge",
+            "Choose %s to compare with, in order to merge their differences." % what,
+            images.ButtonCompare.Bitmap, style=wx.BORDER_RAISED
+        )
+        sizer1.Add(button_compare, border=10, flag=wx.ALL | wx.GROW)
+
         sizer2 = panel2.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_file = wx.FlexGridSizer(cols=2, vgap=3, hgap=10)
+        sizer_buttons = wx.BoxSizer(wx.HORIZONTAL)
         label_file = wx.StaticText(parent=panel2, label="Database information")
         label_file.Font = wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL,
                                   wx.FONTWEIGHT_BOLD, faceName=self.Font.FaceName)
@@ -3135,11 +3162,11 @@ class DatabasePage(wx.Panel):
         names = ["edit_info_chats", "edit_info_contacts",
                  "edit_info_transfers", "edit_info_messages",
                  "edit_info_lastmessage", "edit_info_firstmessage", "",
-                 "edit_info_path", "edit_info_size", "edit_info_modified",
-                 "edit_info_sha1", "edit_info_md5", ]
-        labels = ["Conversations", "Contacts", "File transfers", "Messages",
+                 "edit_info_path", "edit_info_sharepath", "edit_info_size",
+                 "edit_info_modified", "edit_info_sha1", "edit_info_md5", ]
+        labels = ["Conversations", "Contacts", "File sharing", "Messages",
                   "Last message", "First message", "",
-                  "Full path", "File size", "Last modified",
+                  "Full path", "Shared files path", "File size", "Last modified",
                   "SHA-1 checksum", "MD5 checksum",  ]
         for name, label in zip(names, labels):
             if not name and not label:
@@ -3155,23 +3182,38 @@ class DatabasePage(wx.Panel):
             sizer_file.Add(labeltext, border=5, flag=wx.LEFT)
             sizer_file.Add(valuetext, proportion=1, flag=wx.GROW)
             setattr(self, name, valuetext)
+            setattr(self, "label_%s" % name, labeltext)
         self.edit_info_path.Value = self.db.filename
+        self.edit_info_sharepath.Value = self.db.get_share_path()
+        self.edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.label_edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
 
         button_check = self.button_check_integrity = \
             wx.Button(parent=panel2, label="Check for corruption")
+        button_setshare = self.button_set_sharepath = \
+            wx.Button(parent=panel2, label="Set shared files path")
         button_refresh = self.button_refresh_fileinfo = \
             wx.Button(parent=panel2, label="Refresh")
-        button_check.Enabled = button_refresh.Enabled = False
+        button_check.Enabled = button_setshare.Enabled = button_refresh.Enabled = False
+        button_setshare.Shown = conf.ShareDirectoryEnabled
+        button_setshare.ToolTip = "Set or clear database-specific path for local shared files cache"
         button_check.SetToolTip("Check database integrity for corruption and recovery.")
-        sizer_file.Add(button_check)
-        sizer_file.Add(button_refresh, border=15,
-                       flag=wx.ALIGN_RIGHT | wx.RIGHT)
-        self.Bind(wx.EVT_BUTTON, self.on_check_integrity, button_check)
+        sizer_buttons.Add(button_check)
+        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.Add(button_setshare)
+        sizer_buttons.AddStretchSpacer()
+        sizer_buttons.Add(button_refresh, border=5, flag=wx.RIGHT)
+        
+        self.Bind(wx.EVT_BUTTON, self.on_compare_database, button_compare)
+        self.Bind(wx.EVT_BUTTON, self.on_check_integrity,  button_check)
+        self.Bind(wx.EVT_BUTTON, self.on_set_sharepath,    button_setshare)
         self.Bind(wx.EVT_BUTTON, lambda e: self.update_info_page(),
                   button_refresh)
 
         sizer_file.AddGrowableCol(1, 1)
-        sizer2.Add(sizer_file, border=20, proportion=1, flag=wx.TOP | wx.GROW)
+        sizer2.Add(sizer_file, border=20, flag=wx.TOP | wx.GROW)
+        sizer2.AddStretchSpacer()
+        sizer2.Add(sizer_buttons, border=10, flag=wx.ALL | wx.GROW)
 
         sizer.Add(panel1, proportion=1, border=5,
                   flag=wx.LEFT  | wx.TOP | wx.BOTTOM | wx.GROW)
@@ -3223,6 +3265,7 @@ class DatabasePage(wx.Panel):
         check_older      = wx.CheckBox(panel_sync2, label="Check &older database chats for messages to sync")
         button_sync      = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeftMulti.Bitmap)
         button_sync_sel  = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeLeft.Bitmap)
+        button_sync_file = controls.NoteButton(panel_sync2, bmp=images.ButtonMergeFile.Bitmap)
         button_sync_stop = controls.NoteButton(panel_sync2, bmp=images.ButtonStop.Bitmap)
 
         ColourManager.Manage(panel1, "BackgroundColour", "BgColour")
@@ -3271,11 +3314,15 @@ class DatabasePage(wx.Panel):
         check_contacts.Enabled = check_older.Enabled = False
         ColourManager.Manage(button_sync,      "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_sel,  "BackgroundColour", "BgColour")
+        ColourManager.Manage(button_sync_file, "BackgroundColour", "BgColour")
         ColourManager.Manage(button_sync_stop, "BackgroundColour", "BgColour")
         button_sync.Label = "S&ynchronize history in local database"
         button_sync.Note  = "Query Skype online services for new messages and save them in local database."
+        button_sync_sel.MinSize = button_sync_file.MinSize = (100, -1)
         button_sync_sel.Label = "Synchronize selec&ted chats"
         button_sync_sel.Note  = "Select specific chats to update in local database."
+        button_sync_file.Label = "Synchronize shared files only"
+        button_sync_file.Note  = "Download shared files and media of existing messages."
         button_sync_stop.Label = "Stop synchronizing"
         button_sync_stop.Note = "Cease querying the online service."
         for c in controls.get_controls(panel2): c.Disable()
@@ -3295,6 +3342,7 @@ class DatabasePage(wx.Panel):
         self.Bind(wx.EVT_BUTTON,     self.on_live_login,        button_login)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync,         button_sync)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_sel,     button_sync_sel)
+        self.Bind(wx.EVT_BUTTON,     self.on_live_sync_files,   button_sync_file)
         self.Bind(wx.EVT_BUTTON,     self.on_live_sync_stop,    button_sync_stop)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_change_list_chats_sync, list_chats)
         label_info.Bind(wx.html.EVT_HTML_LINK_CLICKED,          self.on_click_html_link)
@@ -3317,6 +3365,7 @@ class DatabasePage(wx.Panel):
         self.check_sync_older    = check_older
         self.button_sync         = button_sync
         self.button_sync_sel     = button_sync_sel
+        self.button_sync_file    = button_sync_file
         self.button_sync_stop    = button_sync_stop
 
         sizer = page.Sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -3327,6 +3376,7 @@ class DatabasePage(wx.Panel):
         sizer_user  = wx.BoxSizer(wx.HORIZONTAL)
         sizer_sync1 = panel_sync1.Sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_sync2 = panel_sync2.Sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_sync2_hor = wx.BoxSizer(wx.HORIZONTAL)
 
         sizer_user.Add(edit_user,    flag=wx.GROW, proportion=1)
         sizer_user.Add(button_user,  border=10, flag=wx.LEFT)
@@ -3358,14 +3408,16 @@ class DatabasePage(wx.Panel):
         sizer_sync2.Add(check_contacts, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(check_older,    border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync, border=5, flag=wx.ALL | wx.GROW)
-        sizer_sync2.Add(button_sync_sel, border=5, flag=wx.ALL | wx.GROW)
+        sizer_sync2_hor.Add(button_sync_sel,  proportion=1, flag=wx.GROW)
+        sizer_sync2_hor.Add(button_sync_file, proportion=1, border=5, flag=wx.LEFT | wx.GROW)
+        sizer_sync2.Add(sizer_sync2_hor, border=5, flag=wx.ALL | wx.GROW)
         sizer_sync2.Add(button_sync_stop, border=5, flag=wx.ALL | wx.GROW)
 
         sizer2.Add(splitter_sync, proportion=1, flag=wx.GROW)
 
         sizer.Add(splitter, border=5, proportion=1, flag=wx.ALL | wx.GROW)
         splitter.SplitVertically(panel1, panel2)
-        pos = self.Size[1] // 4
+        pos = self.Size[1] // 5
         splitter_sync.SplitHorizontally(panel_sync1, panel_sync2, sashPosition=pos)
 
 
@@ -3395,6 +3447,22 @@ class DatabasePage(wx.Panel):
             self.load_contact(self.contact)
 
         wx.CallAfter(dorefresh) # Postpone to allow conf update
+
+
+    def on_change_configuration(self, event):
+        """Handler for changing advanced options, updates local share directory related UI."""
+        opts1, opts2 = event.opts1, event.opts2
+        if all(opts1.get(k) == opts2.get(k)
+               for k in ("ShareDirectoryEnabled", "ShareDirectoryTemplate")): return
+
+        self.edit_info_sharepath.Value = self.db.get_share_path()
+        self.edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.label_edit_info_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.button_set_sharepath.Enabled = conf.ShareDirectoryEnabled
+        self.button_set_sharepath.Shown = conf.ShareDirectoryEnabled
+        self.page_info.Layout()
+        self.button_sync_file.Shown = conf.ShareDirectoryEnabled
+        self.button_sync_file.ContainingSizer.Layout()
 
 
     def update_liveinfo(self):
@@ -3662,7 +3730,7 @@ class DatabasePage(wx.Panel):
         chats, visited, chatmap = [], set(), {x["id"]: x for x in self.chats}
         for c in contacts:
             chats.extend(sorted((chatmap[x["id"]] for x in c.get("conversations", [])
-                                if x["id"] not in visited),
+                                if x["id"] not in visited and x["id"] in chatmap),
                                 key=lambda x: (x["type"], x["title_long"].lower())))
             visited.update(x["id"] for x in chats)
         contact_cols = self.db.get_table_columns("contacts")
@@ -3819,7 +3887,7 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate"})
@@ -3857,10 +3925,54 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.Clear()
         self.gauge_sync.Pulse()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.work({"action": "populate", "chats": [x["identity"] for x in selchats]})
+
+
+    def on_live_sync_files(self, event=None):
+        """
+        Opens dialogs for choosing all or selected chats and starts downloading
+        shared files and media of existing messages to local share folder.
+        """
+        response = wx.MessageBox(
+            "Download shared files and media for all existing chat messages in local database?\n\n"
+            'Choosing "No" will allow to select specific chats only.', conf.Title,
+            wx.YES | wx.NO | wx.CANCEL | wx.ICON_INFORMATION)
+        if wx.CANCEL == response: return
+
+        selchats = None
+        if wx.NO == response:
+            FIELDS = ["identity", "title", "title_long", "type"]
+            chats = sorted(self.chats, key=lambda x: (x["type"], x["title"].lower()))
+            chats = [{k: x.get(k) for k in FIELDS} for x in chats]
+            for x in chats:
+                t = x["title"] if skypedata.CHATS_TYPE_SINGLE == x["type"] else x["title_long"]
+                if len(t) > 60:
+                    t = "%s.." % t[:60]
+                    if skypedata.CHATS_TYPE_SINGLE != x["type"]: t += '"'
+                if skypedata.CHATS_TYPE_SINGLE == x["type"] and x["identity"] != x["title"]:
+                    t += " (%s)" % x["identity"]
+                x["title"] = t
+
+            dlg = wx.MultiChoiceDialog(self, "Select chats to update:",
+                                       conf.Title, [x["title"] for x in chats])
+            with dlg:
+                if wx.ID_OK != dlg.ShowModal() or not dlg.GetSelections(): return
+                selchats = [chats[i] for i in dlg.GetSelections()]
+
+        self.label_sync_progress.Label = "Updating local database from Skype online service.."
+        self.list_chats_sync.DeleteAllItems()
+        self.edit_sync_status.Clear()
+        self.gauge_sync.Pulse()
+        self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
+        self.button_sync_stop.Enable()
+        self.gauge_sync.ContainingSizer.Layout()
+        workdata = {"action": "shared_files"}
+        if selchats: workdata["chats"] = [x["identity"] for x in selchats]
+        self.worker_live.work(workdata)
 
 
     def on_live_sync_stop(self, event=None):
@@ -3870,7 +3982,7 @@ class DatabasePage(wx.Panel):
         ) or not self.worker_live.is_working(): return
         self.gauge_sync.Value = self.gauge_sync.Value # Stop pulse, if any
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = True
         self.button_sync_stop.Disable()
         self.gauge_sync.ContainingSizer.Layout()
         self.worker_live.stop_work()
@@ -3895,7 +4007,7 @@ class DatabasePage(wx.Panel):
             return
 
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = False
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = False
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = False
         self.button_sync_stop.Enable()
         if not self.worker_live.is_working():
             self.list_chats_sync.DeleteAllItems()
@@ -3938,7 +4050,7 @@ class DatabasePage(wx.Panel):
                 self.on_live_work_done(result)
             elif "populate" == result["action"]:
                 reloads = {} # {category: whether to reload in full or refresh UI only}
-                tlabel = ("account" if "accounts" == result["table"] else result["table"])
+                tlabel = ("account" if "accounts" == result["table"] else result["table"].replace("_", " "))
                 plabel, slabel, chat = u"Synchronizing %s" % tlabel, None, None
                 if result.get("chat"):
                     chat  = next((c for c in self.chats if c["identity"] == result["chat"]), None)
@@ -3947,16 +4059,22 @@ class DatabasePage(wx.Panel):
                         self.chats.extend(cc)
                         if cc: chat = cc[0]
 
-                if "messages" == result["table"] and result.get("chat"):
+                if "messages" == result["table"] and result.get("chat") \
+                or "shared_files" == result["table"] and result.get("chat"):
                     title = chat["title_long_lc"] if chat else result["chat"]
                     if len(title) > 35:
                         title = title[:35] + ".."
                         if chat and skypedata.CHATS_TYPE_GROUP == chat["type"]: title += '"'
                     plabel += " in %s" % title
 
-                if result.get("count"):
+                if result.get("count") and "shared_files" == result["table"]:
+                    clabel = ", %s processed" % util.plural("message", result["count"])
+                    if result.get("saved"):
+                        clabel += ", %s saved" % util.plural("file", result["saved"])
+                    plabel += clabel + "."
+                elif result.get("count"):
                     clabel = ", %s processed" % result["count"]
-                    for k in "new", "updated":
+                    for k in ("new", "updated"):
                         if result.get(k): clabel += ", %s %s" % (result[k], k)
                     plabel += clabel + "."
                 elif result.get("start") and "chats" == result["table"] and "cidentity" in result:
@@ -3982,7 +4100,7 @@ class DatabasePage(wx.Panel):
                             util.plural("new message", result["message_count_new"], sep=","),
                             ", %s updated" % result["message_count_updated"] if result["message_count_updated"] else ""
                         )
-                        if result["contact_count_new"] or result["contact_count_updated"]:
+                        if result.get("contact_count_new") or result.get("contact_count_updated"):
                             slabel += "\n%s." % ", ".join(filter(bool, [
                                 util.plural("new contact", result["contact_count_new"], sep=",")
                                 if result["contact_count_new"] else "",
@@ -4027,7 +4145,25 @@ class DatabasePage(wx.Panel):
                             if result["updated"]: slabel += ", %s updated" % result["updated"]
                             slabel += "."
 
+                    if "shared_files" == result["table"] and result.get("chat"):
+                        slabel += " in %s" % (chat["title_long_lc"] if chat else result["chat"])
+
+                        if chat and result.get("saved"):
+                            row = dict(title=chat["title"], identity=chat["identity"],
+                                       first_message_datetime=result["first"],
+                                       last_message_datetime=result["last"],
+                                       message_count=result["saved"])
+                            self.list_chats_sync.AppendRow(row)
+                            self.list_chats_sync.ResetColumnWidths()
+
+                            slabel += ": %s stored." % result["saved"]
+                    elif "shared_files" == result["table"] and "saved" in result:
+                        slabel += ", stored %s" % result["saved"]
+
                     if slabel and not slabel.endswith("."): slabel += "."
+
+                    if "shared_files" in result and "chat" not in result:
+                        slabel += "\n\nStored %s locally." % util.plural("shared file", result["shared_files"])
 
                 elif not result.get("start"):
                     if "chats" == result["table"] and result.get("chat"):
@@ -4141,11 +4277,17 @@ class DatabasePage(wx.Panel):
         self.edit_sync_status.ShowPosition(self.edit_sync_status.LastPosition)
         self.gauge_sync.ContainingSizer.Layout()
         self.check_sync_contacts.Enabled = self.check_sync_older.Enabled = True
-        self.button_sync.Enabled = self.button_sync_sel.Enabled = True
+        self.button_sync.Enabled = self.button_sync_sel.Enabled = self.button_sync_file.Enabled = True
         self.button_sync_stop.Disable()
         if not self.get_unsaved_grids(): self.on_refresh_tables()
         wx.Bell()
         self.update_info_page()
+
+
+    def on_compare_database(self, event):
+        """Handler for choosing file to merge into this database, opens menu."""
+        evt = DatabasePageEvent(self.Id, source=self, compare=True, target=self.button_compare)
+        wx.PostEvent(self.Parent, evt)
 
 
     def on_check_integrity(self, event):
@@ -4279,10 +4421,15 @@ class DatabasePage(wx.Panel):
             stats = self.db.get_general_statistics()
         except Exception: pass
         if stats:
-            self.edit_info_chats.Value     = '{:,}'.format(stats["chats"])
-            self.edit_info_contacts.Value  = '{:,}'.format(stats["contacts"])
-            self.edit_info_messages.Value  = '{:,}'.format(stats["messages"])
-            self.edit_info_transfers.Value = '{:,}'.format(stats["transfers"])
+            self.edit_info_chats.Value     = "{:,}".format(stats["chats"])
+            self.edit_info_contacts.Value  = "{:,}".format(stats["contacts"])
+            self.edit_info_messages.Value  = "{:,}".format(stats["messages"])
+            text_sharing = util.plural("file transfer", stats["transfers"], sep=",")
+            if stats["shares"]:
+                text_sharing += ", %s" % util.plural("other share", stats["shares"], sep=",")
+            if stats.get("shared_files"):
+                text_sharing += ", {:,} locally on disk".format(stats["shared_files"])
+            self.edit_info_transfers.Value = text_sharing
         if "messages_from" in stats:
             self.edit_info_messages.Value += " ({:,} sent and {:,} received)".format(
                 stats.get("messages_from") or 0, stats.get("messages_to") or 0)
@@ -4320,6 +4467,7 @@ class DatabasePage(wx.Panel):
         except Exception as e:
             self.edit_info_sha1.Value = self.edit_info_md5.Value = util.format_exc(e)
         self.button_check_integrity.Enabled = True
+        self.button_set_sharepath.Enabled = conf.ShareDirectoryEnabled
         self.button_refresh_fileinfo.Enabled = True
 
 
@@ -4379,6 +4527,21 @@ class DatabasePage(wx.Panel):
                 self.button_export_table.Enabled = False
             grid.Thaw()
             self.page_tables.Refresh()
+
+
+    def on_set_sharepath(self, event):
+        """Handler for selecting to set or clear local shared files path for database."""
+        value1 = self.db.get_internal_option("ShareDirectory") or ""
+
+        message = "Set relative or absolute path for local shared files folder\n" \
+                  "or leave blank for default:"
+        with wx.TextEntryDialog(self, message, conf.Title, value=value1) as dlg:
+            dlg.CenterOnParent()
+            if wx.ID_OK != dlg.ShowModal(): return
+            value2 = dlg.GetValue().strip()
+        if value1 != value2:
+            self.db.rename_share_path(value2 or None)
+            self.edit_info_sharepath.Value = self.db.get_share_path()
 
 
     def on_change_range_date(self, event):
@@ -4557,9 +4720,9 @@ class DatabasePage(wx.Panel):
 
         filepath = controls.get_dialog_path(self.dialog_savechat)
         format = export.CHAT_EXTS[self.dialog_savechat.FilterIndex]
-        media_folder = "html" == format and \
+        files_folder = "html" == format and \
                        self.dialog_savechat.FilterIndex != export.CHAT_EXTS.index("html")
-        if media_folder and not check_media_export_login(self.db): return
+        if files_folder and not check_shared_files_export_login(self.db): return
 
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
         guibase.status("Exporting to %s.", filepath)
@@ -4567,7 +4730,7 @@ class DatabasePage(wx.Panel):
             messages = self.stc_history.GetMessages()
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(progress=progressfunc, noskip=True, messages=messages)
-            if media_folder: opts["media_folder"] = True
+            if files_folder: opts["files_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
@@ -4850,16 +5013,16 @@ class DatabasePage(wx.Panel):
             dialog.Filename = default
         if wx.ID_OK != dialog.ShowModal(): return
 
-        path, media_folder = controls.get_dialog_path(dialog), False
+        path, files_folder = controls.get_dialog_path(dialog), False
         if do_singlefile:
             format = export.CHAT_EXTS_SINGLEFILE[dialog.FilterIndex]
         else:
             if len(chats) > 1: path = os.path.dirname(path)
             format = export.CHAT_EXTS[dialog.FilterIndex]
-            media_folder = "html" == format and \
+            files_folder = "html" == format and \
                            dialog.FilterIndex != export.CHAT_EXTS.index("html")
 
-        if media_folder and not check_media_export_login(self.db): return
+        if files_folder and not check_shared_files_export_login(self.db): return
 
         msg = 'Exporting to %s.' % path if len(chats) == 1 and not do_singlefile \
         else  'Exporting %schats from "%s"\nas %s under %s.' % \
@@ -4871,7 +5034,7 @@ class DatabasePage(wx.Panel):
             progressfunc = lambda *args: wx.SafeYield()
             opts = dict(multi=not do_singlefile and len(chats) > 1, noskip=not do_all,
                         progress=progressfunc, timerange=timerange)
-            if media_folder: opts["media_folder"] = True
+            if files_folder: opts["files_folder"] = True
             result = export.export_chats(chats, path, format, self.db, opts)
             files, count, message_count = result
         except Exception as e:
@@ -4908,9 +5071,9 @@ class DatabasePage(wx.Panel):
 
         filepath = controls.get_dialog_path(self.dialog_savechat)
         format = export.CHAT_EXTS[self.dialog_savechat.FilterIndex]
-        media_folder = "html" == format and \
+        files_folder = "html" == format and \
                        self.dialog_savechat.FilterIndex != export.CHAT_EXTS.index("html")
-        if media_folder and not check_media_export_login(self.db): return
+        if files_folder and not check_shared_files_export_login(self.db): return
 
         busy = controls.BusyPanel(self, 'Filtering and exporting "%s".' %
                                   self.chat["title"])
@@ -4927,7 +5090,7 @@ class DatabasePage(wx.Panel):
                 guibase.status("Filtering and exporting to %s.", filepath, log=True)
                 progressfunc = lambda *args: wx.SafeYield()
                 opts = dict(messages=messages, progress=progressfunc)
-                if media_folder: opts["media_folder"] = True
+                if files_folder: opts["files_folder"] = True
                 result = export.export_chats([self.chat], filepath, format, self.db, opts)
                 files, count, message_count = result
                 guibase.status("Exported %s to %s.",
@@ -6352,7 +6515,7 @@ class DatabasePage(wx.Panel):
         sortkey = lambda x: util.coalesce(x[self.contact_sort_field], MINS.get(self.contact_sort_field, ""))
         contact.get("conversations", []).sort(key=sortkey, reverse=True)
 
-        avatar_path, avatar_size, avatar_raw = None, None, skypedata.get_avatar_raw(contact)
+        avatar_path, avatar_size = None, None
         if skypedata.get_avatar_data(contact):
             imgkey = ("avatar", contact["id"])
             img = self.imagecache.get(imgkey) or skypedata.get_avatar(contact)
@@ -6604,7 +6767,7 @@ class DatabasePage(wx.Panel):
             elif   wx.NO == resp: del purgables[:]
 
         TABLES = ["Calls", "Chats", "Conversations", "MediaDocuments", "Messages",
-                  "Participants", "Transfers", "Videos", "Voicemails"]
+                  "Participants", "Transfers", "Videos", "Voicemails", "_shared_files_"]
         if purgables: TABLES.extend(["Contacts", "ContactGroups"])
         openeds, changeds = [], []
         for t in TABLES:
@@ -6700,7 +6863,7 @@ class DatabasePage(wx.Panel):
         TABLES = ["Alerts", "CallMembers", "Calls", "ChatMembers", "Chats", "Contacts",
                   "ContactGroups", "Conversations", "MediaDocuments", "MessageAnnotations",
                   "Messages", "Participants", "Transfers", "VideoMessages", "Videos",
-                  "Voicemails"]
+                  "Voicemails", "_shared_files_"]
         openeds, changeds = [], []
         for t in TABLES:
             if t.lower() in self.db_grids:
@@ -7339,16 +7502,20 @@ class MergerPage(wx.Panel):
 
         filepath = controls.get_dialog_path(dialog)
         format = export.CHAT_EXTS[dialog.FilterIndex]
-        media_folder = "html" == format and \
+        files_folder = "html" == format and \
                        dialog.FilterIndex != export.CHAT_EXTS.index("html")
-        if media_folder and not check_media_export_login(self.db): return
+        if files_folder and not check_shared_files_export_login(self.db1): return
 
         busy = controls.BusyPanel(self, 'Exporting "%s".' % self.chat["title"])
         guibase.status("Exporting to %s.", filepath, log=True)
         try:
-            messages = self.db1.message_iterator(self.chat_diff["messages"])
+            message_ids = list(self.chat_diff["messages"])
+            if self.chat_diff["shared_files"]:
+                message_ids += [f["msg_id"] for f in self.chat_diff["shared_files"]]
+                message_ids = self.db1.sort_message_ids(self.chat, message_ids)
+            messages = self.db1.message_iterator(message_ids)
             opts = dict(messages=messages, progress=lambda *args: wx.SafeYield())
-            if media_folder: opts["media_folder"] = True
+            if files_folder: opts["files_folder"] = True
             result = export.export_chats([self.chat], filepath, format, self.db1, opts)
             files, count, message_count = result
             guibase.status("Exported %s to %s.",
@@ -7404,7 +7571,7 @@ class MergerPage(wx.Panel):
 
             if "counts" in result:
 
-                t = ", ".join(util.plural(x[:-1], result["counts"][x], sep=",")
+                t = ", ".join(util.plural(x[:-1].replace("_", " "), result["counts"][x], sep=",")
                               for x in sorted(result["counts"]))
                 self.label_gauge.Label = "Parsed %s." % t
                 self.panel_gauge.Layout()
@@ -7456,6 +7623,8 @@ class MergerPage(wx.Panel):
         for a, b in [(self.label_all1, self.label_all2)]:
             a.Label, b.Label = b.Label, a.Label
 
+        for i in range(self.list_chats.ItemCount):
+            self.list_chats.SetItemFont(i, self.list_chats.Font)
         self.label_merge_chat.Label = ""
         self.stc_diff1.ClearAll()
         self.button_merge_chat.Enabled = False
@@ -7607,7 +7776,7 @@ class MergerPage(wx.Panel):
                 self, "Diffing messages for %s." % c["title_long_lc"])
 
             try:
-                diff = {"messages": [], "participants": []}
+                diff = {"messages": [], "shared_files": [], "participants": []}
                 data = self.chats_diffdata.get(c["identity"])
                 if data:
                     diff = data["diff"] # Use cached diff if available
@@ -7623,16 +7792,25 @@ class MergerPage(wx.Panel):
                 elif c["identity"] not in self.chats_nodiff:
                     data = {"chat": c, "diff": diff}
                     self.chats_nodiff[c["identity"]] = data
-                messages = list(self.db1.message_iterator(diff["messages"]))
+                message_ids = list(diff["messages"])
+                if diff["shared_files"]:
+                    message_ids += [f["msg_id"] for f in diff["shared_files"]]
+                    message_ids = self.db1.sort_message_ids(c, message_ids)
+                messages = list(self.db1.message_iterator(message_ids))
                 self.chat = c
                 self.chat_diff = diff
                 self.button_merge_chat.Enabled = len(messages)
                 self.button_merge_chat.Note = self.MERGE_CHAT_BUTTON_NOTE
                 self.button_export_chat.Enabled = len(messages)
-                if messages:
-                    self.button_merge_chat.Note = (
-                        "Copy %s to the database on the right." %
-                        util.plural("chat message", messages, sep=","))
+
+                count_texts = []
+                for category in ("messages", "shared_files"):
+                    if diff[category]:
+                        word = "chat message" if "messages" == category else "shared file"
+                        count_texts.append(util.plural(word, diff[category], sep=","))
+                if count_texts:
+                    self.button_merge_chat.Note = ("Copy %s to the database on the right." %
+                                                   " and ".join(count_texts))
                     self.button_merge_chat.ContainingSizer.Layout()
                 idx = -conf.MaxHistoryInitialMessages
                 self.stc_diff1.Populate(c, self.db1, messages, from_index=idx)
@@ -7766,18 +7944,24 @@ class MergerPage(wx.Panel):
             self.button_swap.Enabled = True
             self.button_merge_chats.Enabled = True
             if self.chats_diffdata:
-                count_msgs = util.plural(
-                    "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()), sep=",")
-                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-                noteinfo = "%s from %s" % (count_msgs, count_chats)
+                count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+                count_files = sum(len(d["diff"]["shared_files"])
+                                  for d in self.chats_diffdata.values())
+                text_msgs = ""
+                if count_msgs or not count_files:
+                    text_msgs += util.plural("message", count_msgs, sep=",")
+                if count_files:
+                    if count_msgs: text_msgs += " and "
+                    text_msgs += util.plural("shared file", count_files, sep=",")
+                text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+                noteinfo = "%s from %s" % (text_msgs, text_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
                 self.html_report.Freeze()
                 self.html_report.AppendToPage(
                     "<br /><br />New in %s: %s in %s." %
-                    (self.db1, count_msgs, count_chats))
+                    (self.db1, text_msgs, text_chats))
                 scrollpos = self.html_report.GetScrollRange(wx.VERTICAL)
                 self.html_report.Scroll(0, scrollpos)
                 self.html_report.Thaw()
@@ -7796,11 +7980,16 @@ class MergerPage(wx.Panel):
         """
         db1, db2 = self.db1, self.db2
         if self.is_scanned:
-            count_msgs = util.plural(
-                "message", sum(len(d["diff"]["messages"])
-                               for d in self.chats_diffdata.values()), sep=",")
-            count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-            info = "%s in %s" % (count_msgs, count_chats)
+            count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+            count_files = sum(len(d["diff"]["shared_files"]) for d in self.chats_diffdata.values())
+            text_msgs = ""
+            if count_msgs or not count_files:
+                text_msgs += util.plural("message", count_msgs, sep=",")
+            if count_files:
+                if count_msgs: text_msgs += " and "
+                text_msgs += util.plural("shared file", count_files, sep=",")
+            text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+            info = "%s in %s" % (text_msgs, text_chats)
             message = "Copy %s\n\nfrom %s\n\ninto %s?" % (info, db1, db2)
             type = "merge_left"
             chats = list(self.chats_diffdata.values())
@@ -7892,11 +8081,17 @@ class MergerPage(wx.Panel):
             self.button_merge_chats.Enabled = True
             wx.CallLater(20, self.load_later_data)
             if self.is_scanned and self.chats_diffdata:
-                count_msgs = util.plural(
-                    "message", sum(len(d["diff"]["messages"])
-                                   for d in self.chats_diffdata.values()), sep=",")
-                count_chats = util.plural("chat", self.chats_diffdata, sep=",")
-                noteinfo = "%s from %s" % (count_msgs, count_chats)
+                count_msgs = sum(len(d["diff"]["messages"]) for d in self.chats_diffdata.values())
+                count_files = sum(len(d["diff"]["shared_files"])
+                                  for d in self.chats_diffdata.values())
+                text_msgs = ""
+                if count_msgs or not count_files:
+                    text_msgs += util.plural("message", count_msgs, sep=",")
+                if count_files:
+                    if count_msgs: text_msgs += " and "
+                    text_msgs += util.plural("shared file", count_files, sep=",")
+                text_chats = util.plural("chat", self.chats_diffdata, sep=",")
+                noteinfo = "%s from %s" % (text_msgs, text_chats)
                 self.button_merge_all.Note = (
                     "Copy %s to the database on the right." % noteinfo)
                 self.button_merge_all.Enabled = True
@@ -7938,11 +8133,12 @@ class MergerPage(wx.Panel):
         db1, db2 = self.db1, self.db2
         chat, chat2 = self.chat["c1"], self.chat["c2"]
         messages = self.chat_diff["messages"]
+        shared_files = self.chat_diff["shared_files"]
         participants = self.chat_diff["participants"]
         condiff = self.con1diff
         contacts2 = []
 
-        if messages or participants:
+        if messages or shared_files or participants:
             info = ""
             parts = []
             new_chat = not chat2
@@ -7951,19 +8147,18 @@ class MergerPage(wx.Panel):
                 info += "new chat with "
             if messages:
                 parts.append(util.plural("%smessage" % newstr, messages, sep=","))
+            if shared_files:
+                parts.append(util.plural("%sshared file" % newstr, shared_files, sep=","))
             if participants:
                 # Add to contacts those that are new
-                cc2 = [db1.id, db2.id] + \
-                    [i["identity"] for i in db2.get_contacts()]
+                cc2 = [db1.id, db2.id] +  [i["identity"] for i in db2.get_contacts()]
                 contacts2 = [i["contact"] for i in participants
-                    if "id" in i["contact"] and i["identity"] not in cc2]
+                             if "id" in i["contact"] and i["identity"] not in cc2]
                 if contacts2:
                     parts.append(util.plural("new contact", contacts2, sep=","))
-                parts.append(util.plural("%sparticipant" % newstr,
-                                         participants, sep=","))
+                parts.append(util.plural("%sparticipant" % newstr, participants, sep=","))
             for i in parts:
-                info += ("" if i == parts[0] else (
-                         " and " if i == parts[-1] else ", ")) + i
+                info += ("" if i == parts[0] else (" and " if i == parts[-1] else ", ")) + i
 
             proceed = wx.OK == wx.MessageBox(
                 "Copy %s\n\nfrom %s\n\ninto %s?" % (info, db1, db2),
@@ -7984,8 +8179,12 @@ class MergerPage(wx.Panel):
                         db2.insert_participants(chat2, participants, db1)
                         del participants[:]
                     if messages:
-                        db2.insert_messages(chat2, messages, db1, chat)
+                        db2.insert_messages(chat2, messages, db1, chat, shared_files)
                         del messages[:]
+                    if shared_files:
+                        files_missing = [f for f in shared_files if f.get("msg_id2")]
+                        if files_missing:
+                            db2.insert_shared_files(chat2, files_missing, db1)
                 finally:
                     self.is_merging = False
                 if chat["identity"] in self.chats_diffdata:
@@ -10138,18 +10337,19 @@ class LoginDialog(wx.Dialog, wx_accel.AutoAcceleratorMixIn):
     Password = property(GetPassword)
 
 
-def check_media_export_login(db):
+def check_shared_files_export_login(db):
     """
-    Returns whether db can login to download shared files to subfolder for export
+    Returns whether db can login to download shared files and media to subfolder for export
     or whether user confirms to proceed without login information.
     """
-    if (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-        or conf.SharedFileAutoDownload) \
+    if conf.SharedContentPromptAutoLogin \
+    and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
+         or conf.SharedFileAutoDownload) \
     and not db.live.is_logged_in() \
     and not conf.Login.get(db.filename, {}).get("password") and wx.OK != wx.MessageBox(
         "You have selected to export HTML with shared files in subfolder, "
         "but the database does not have login information "
-        "for downloading media.\n\nAre you sure you want to continue?",
+        "for downloading shared files and media.\n\nAre you sure you want to continue?",
         conf.Title, wx.OK | wx.CANCEL | wx.ICON_INFORMATION
     ): return False
     return True

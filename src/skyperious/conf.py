@@ -10,7 +10,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.03.2025
+@modified    29.04.2025
 ------------------------------------------------------------------------------
 """
 try: from ConfigParser import RawConfigParser                 # Py2
@@ -26,8 +26,8 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.8"
-VersionDate = "27.03.2025"
+Version = "5.9.dev60"
+VersionDate = "29.04.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")
 if Frozen:
@@ -40,8 +40,6 @@ else:
 
 """Directory for variable content like login tokens and created databases."""
 VarDirectory = os.path.join(ApplicationDirectory, "var")
-"""Directory for cached files like downloaded shared content for export."""
-CacheDirectory = os.path.join(ApplicationDirectory, "var", "cache")
 
 """Name of file where FileDirectives are kept."""
 ConfigFile = "%s.ini" % os.path.join(ApplicationDirectory, Title.lower())
@@ -60,15 +58,16 @@ FileDirectives = ["ConsoleHistoryCommands", "DBDoBackup",  "DBFiles", "DBSort",
 """List of attributes saved if changed from default."""
 OptionalFileDirectives = [
     "EmoticonsPlotWidth", "ExportChatTemplate", "ExportContactsTemplate", "ExportDbTemplate",
-    "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAuthRateLimitDelay",
-    "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay", "LiveSyncRetryLimit",
-    "LogFile", "LogSQL", "LogToFile", "MaxConsoleHistory", "MaxHistoryInitialMessages",
-    "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages", "MaxSearchTableRows",
-    "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour", "PlotHoursUnitSize",
-    "PopupUnexpectedErrors", "SearchResultsChunk", "SharedAudioVideoAutoDownload",
-    "SharedContentUseCache", "SharedFileAutoDownload", "SharedImageAutoDownload",
-    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval",
-    "WordCloudCountMin", "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
+    "ExportFileAutoOpen", "HistoryFontSize", "HistoryZoom", "LiveSyncAutoDownload",
+    "LiveSyncAuthRateLimitDelay", "LiveSyncRateLimit", "LiveSyncRateWindow", "LiveSyncRetryDelay",
+    "LiveSyncRetryLimit", "LogFile", "LogSQL", "LogToFile", "MaxConsoleHistory",
+    "MaxHistoryInitialMessages", "MaxRecentFiles", "MaxSearchHistory", "MaxSearchMessages",
+    "MaxSearchTableRows", "MinWindowSize", "PlotDaysColour", "PlotDaysUnitSize", "PlotHoursColour",
+    "PlotHoursUnitSize", "PopupUnexpectedErrors", "SearchResultsChunk",
+    "SharedAudioVideoAutoDownload", "SharedContentPromptAutoLogin", "SharedFileAutoDownload",
+    "SharedImageAutoDownload", "ShareDirectoryEnabled", "ShareDirectoryTemplate",
+    "StatisticsPlotWidth", "StatusFlashLength", "UpdateCheckInterval", "WordCloudCountMin",
+    "WordCloudLengthMin", "WordCloudWordsAuthorMax", "WordCloudWordsMax",
 ]
 Defaults = {}
 
@@ -171,6 +170,9 @@ HistoryZoom = 1.0
 """Sleep interval upon hitting server rate limit, in seconds."""
 LiveSyncAuthRateLimitDelay = 20
 
+"""Download shared files and media to local share folder automatically during live sync."""
+LiveSyncAutoDownload = True
+
 """Max number of requests in rate window."""
 LiveSyncRateLimit = 10
 
@@ -234,14 +236,20 @@ SearchResultsChunk = 50
 """Download shared audio & video from Skype online service for HTML export."""
 SharedAudioVideoAutoDownload = True
 
-"""Cache downloaded shared files and media in user directory, for faster repeated exports."""
-SharedContentUseCache = False
+"""Prompt to log in to Skype online automatically to download shared content during export."""
+SharedContentPromptAutoLogin = False
 
 """Download shared files from Skype online service for HTML export."""
 SharedFileAutoDownload = True
 
 """Download shared images from Skype online service for HTML export."""
 SharedImageAutoDownload = True
+
+"""Use local folder for storing files shared in chats."""
+ShareDirectoryEnabled = True
+
+"""Template for local shared files folder name, format can use "filename" parameter."""
+ShareDirectoryTemplate = "%(filename)s files"
 
 """Width of the chat statistics plots, in pixels."""
 StatisticsPlotWidth = 150
@@ -434,7 +442,7 @@ def load(configfile=None):
 
     @param   configfile  name of configuration file to use from now if not module defaults
     """
-    global Defaults, VarDirectory, CacheDirectory, LogFile, ConfigFile, ConfigFileStatic
+    global Defaults, VarDirectory, LogFile, ConfigFile, ConfigFileStatic
 
     try: VARTYPES = (basestring, bool, float, int, long, list, tuple, dict, type(None))        # Py2
     except Exception: VARTYPES = (bytes, str, bool, float, int, list, tuple, dict, type(None)) # Py3
@@ -460,8 +468,6 @@ def load(configfile=None):
         try:
             VarDirectory = appdirs.user_data_dir(title, appauthor=False)
             LogFile = os.path.join(VarDirectory, "%s.log" % Title.lower())
-        except Exception: pass
-        try: CacheDirectory = appdirs.user_cache_dir(title, appauthor=False, opinion=False)
         except Exception: pass
 
     section = "*"

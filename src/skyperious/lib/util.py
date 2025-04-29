@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     16.02.2012
-@modified    27.03.2025
+@modified    26.04.2025
 ------------------------------------------------------------------------------
 """
 import base64
@@ -21,6 +21,7 @@ except ImportError: imghdr = None  # Py3.13+
 import io
 import locale
 import math
+import mimetypes
 import os
 import platform
 import re
@@ -32,7 +33,7 @@ import time
 import warnings
 
 Image = ImageFile = wx = None # For image resize, most functions work without
-try: import filetype_lib  # For image detection in Py3.13+
+try: import filetype as filetype_lib  # For image detection in Py3.13+
 except Exception: filetype_lib = None
 try: from PIL import Image, ImageFile
 except ImportError: pass
@@ -497,16 +498,36 @@ def get_file_type(content, category=None, filename=None):
     @param   category  type of content, e.g. "image" or "audio" or "video"
     @param   filename  original name of file
     """
-    category = category if category in ("audio", "video") else "image"
     filetype = None
-    if filename:
-        filetype = os.path.splitext(filename)[-1][1:] or filetype
-    if "image" == category:
-        if imghdr: filetype = imghdr.what("", content)
-        elif filetype_lib: filetype = filetype_lib.guess_extension(content)
-    elif not filetype:
-        filetype = "mp4" # Pretty safe bet for Skype audio/video
-    return filetype or category
+    fileext = os.path.splitext(filename)[1].lstrip(".") if filename else None
+    if category not in ("audio", "video") and imghdr:
+        filetype = imghdr.what("", content)
+    if not filetype and filetype_lib:
+        filetype = filetype_lib.guess_extension(content)
+    if not filetype and fileext:
+        mimetype, _ = mimetypes.guess_type("name.%s" % fileext)
+        if mimetype: filetype = mimetype.split("/")[-1]
+    if not filetype and not fileext:
+        if   "video" == category: filetype = "mp4" # Rather safe bets for Skype audio/video
+        elif "audio" == category: filetype = "mp3"
+    return filetype or fileext or category
+
+
+def get_mime_type(content, category=None, filename=None):
+    """
+    Returns file MIME type like "image/png", or None if not detected.
+
+    @param   content   file as raw bytes
+    @param   category  type of content, e.g. "image" or "audio" or "video"
+    @param   filename  original name of file
+    """
+    filetype = get_file_type(content, category, filename)
+    if filetype or filename:
+        mimetype, _ = mimetypes.guess_type(filename or "name.%s" % filetype)
+        if mimetype: return mimetype
+    if filetype and category in ("image", "audio", "video"):
+        return "%s/%s" % (category, filetype)
+    return None
 
 
 def is_os_64bit():
@@ -666,6 +687,21 @@ def add_unique(lst, item, direction=1, maxlen=sys.maxsize):
     return lst
 
 
+def make_unique(value, existing, suffix="_%s", counter=2, case=True):
+    """
+    Returns a unique string, appending suffix % counter as necessary.
+
+    @param   existing  collection of existing strings to check
+    @oaram   case      whether uniqueness should be case-sensitive
+    """
+    result, is_present = value, (lambda: result in existing)
+    if not case:
+        existing = [x.lower() for x in existing]
+        is_present = lambda: result.lower() in existing
+    while is_present(): result, counter = value + suffix % counter, counter + 1
+    return result
+
+
 def get_locale_day_date(dt):
     """Returns a formatted (weekday, weekdate) in current locale language."""
     weekday, weekdate = dt.strftime("%A"), dt.strftime("%d. %B %Y")
@@ -680,26 +716,9 @@ def get_locale_day_date(dt):
 
 
 def path_to_url(path, encoding="utf-8"):
-    """
-    Returns the local file path as a URL, e.g. "file:///C:/path/file.ext".
-    """
-    if isinstance(path, six.text_type): path = path.encode(encoding)
-    if not isinstance(path, six.string_types): path = path.decode("latin1")
-    if ":" not in path:
-        # No drive specifier, just convert slashes and quote the name
-        if path[:2] == "\\\\":
-            path = "\\\\" + path
-        url = urllib.parse.quote("/".join(path.split("\\")))
-    else:
-        url, parts = "", path.split(":")
-        if len(parts[0]) == 1: # Looks like a proper drive, e.g. C:\
-            url = "///" + urllib.parse.quote(parts[0].upper()) + ":"
-            parts = parts[1:]
-        components = ":".join(parts).split("\\")
-        for part in filter(bool, components):
-            url += "/" + urllib.parse.quote(part)
-    url = "file:%s%s" % ("" if url.startswith("///") else "///" , url)
-    return url
+    """Returns the local file path as a URL, e.g. "file:///C:/path/file.ext"."""
+    if not isinstance(path, six.text_type): path = path.decode(encoding)
+    return urllib.parse.urljoin('file:', urllib.request.pathname2url(path))
 
 
 def url_to_path(url, double_decode=False):

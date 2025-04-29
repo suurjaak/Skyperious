@@ -101,7 +101,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     13.01.2012
-@modified    28.11.2024
+@modified    27.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -113,6 +113,7 @@ import operator
 import os
 import re
 import sys
+import warnings
 
 import wx
 import wx.adv
@@ -882,8 +883,25 @@ class NoteButton(wx.Panel, wx.Button):
     def __init__(self, parent, label=wx.EmptyString, note=wx.EmptyString,
                  bmp=wx.NullBitmap, id=-1, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=0, name=wx.PanelNameStr):
+        """
+        Constructor.
+
+        @param   parent  parent window
+        @param   label   button label
+        @param   note    button note text
+        @param   bmp     button icon
+        @param   id      button wx identifier
+        @param   pos     button position
+        @param   size    button default size
+        @param   style   alignment flags for button content
+                         (left-right for horizontal, center for vertical),
+                         plus optional wx.BORDER_RAISED
+                         for permanent 3D-border and default cursor,
+                         plus any flags for wx.Panel
+        @param   name    control name
+        """
         wx.Panel.__init__(self, parent, id, pos, size,
-                          style | wx.FULL_REPAINT_ON_RESIZE, name)
+                          style & ~wx.BORDER_RAISED | wx.FULL_REPAINT_ON_RESIZE, name)
         self._label = label
         self._note = note
         self._bmp = bmp
@@ -893,7 +911,7 @@ class NoteButton(wx.Panel, wx.Button):
             self._bmp_disabled = wx.Bitmap(img) if img.IsOk() else bmp
         self._hover = False # Whether button is being mouse hovered
         self._press = False # Whether button is being mouse pressed
-        self._align = style & (wx.ALIGN_RIGHT | wx.ALIGN_CENTER)
+        self._style = style
         self._enabled = True
         self._size = self.Size
 
@@ -904,8 +922,7 @@ class NoteButton(wx.Panel, wx.Button):
         self._extent_label = None
         self._extent_note = None
 
-        self._cursor_hover   = wx.Cursor(wx.CURSOR_HAND)
-        self._cursor_default = wx.Cursor(wx.CURSOR_DEFAULT)
+        self._cursor_hover = None if wx.BORDER_RAISED & self._style else wx.Cursor(wx.CURSOR_HAND)
 
         self.Bind(wx.EVT_MOUSE_EVENTS,       self.OnMouseEvent)
         self.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.OnMouseCaptureLostEvent)
@@ -917,7 +934,7 @@ class NoteButton(wx.Panel, wx.Button):
         self.Bind(wx.EVT_KEY_DOWN,           self.OnKeyDown)
         self.Bind(wx.EVT_CHAR_HOOK,          self.OnChar)
 
-        self.SetCursor(self._cursor_hover)
+        if not wx.BORDER_RAISED & self._style: self.SetCursor(self._cursor_hover)
         ColourManager.Manage(self, "ForegroundColour", wx.SYS_COLOUR_BTNTEXT)
         ColourManager.Manage(self, "BackgroundColour", wx.SYS_COLOUR_BTNFACE)
         self.WrapTexts()
@@ -925,6 +942,17 @@ class NoteButton(wx.Panel, wx.Button):
 
     def GetMinSize(self):
         return self.DoGetBestSize()
+    MinSize = property(GetMinSize, wx.Panel.SetMinSize)
+
+
+    def GetMinWidth(self):
+        return self.DoGetBestSize().Width
+    MinWidth = property(GetMinWidth)
+
+
+    def GetMinHeight(self):
+        return self.DoGetBestSize().Height
+    MinHeight = property(GetMinHeight)
 
 
     def DoGetBestSize(self):
@@ -950,10 +978,14 @@ class NoteButton(wx.Panel, wx.Button):
             self.WrapTexts()
 
         x, y = 10, 10
-        if (self._align & wx.ALIGN_RIGHT):
+        if (self._style & wx.ALIGN_RIGHT):
             x = width - 10 - self._bmp.Size.width
-        elif (self._align & wx.ALIGN_CENTER):
+        elif (self._style & wx.ALIGN_CENTER_HORIZONTAL):
             x = 10 + (width - self.DoGetBestSize().width) // 2
+        if (self._style & wx.ALIGN_BOTTOM):
+            y = height - self.DoGetBestSize().height + 10
+        elif (self._style & wx.ALIGN_CENTER_VERTICAL):
+            y = (height - self.DoGetBestSize().height + 10) // 2
 
         dc.Font = self.Font
         dc.Brush = BRUSH(self.BackgroundColour)
@@ -1004,6 +1036,18 @@ class NoteButton(wx.Panel, wx.Button):
             lines   = [(1, 1, width - 2, 1), (1, 1, 1, height - 2)]
             dc.DrawLineList(lines, [PEN(wx.Colour(*c)) for c in colours])
             x += 1; y += 1
+        elif wx.BORDER_RAISED & self._style:
+            # Draw 3D border
+            colours = [ColourManager.ColourHex(x) for x in (
+                wx.SYS_COLOUR_3DHILIGHT, wx.SYS_COLOUR_3DLIGHT,
+                wx.SYS_COLOUR_3DSHADOW,  wx.SYS_COLOUR_3DDKSHADOW
+            )]
+            lines, pencolours = [], []
+            lines  = [(0, 0, 0, height - 1), (0, 0, width - 1, 0)]
+            lines += [(1, 1, 1, height - 2), (1, 1, width - 2, 1)]
+            lines += [(1, height - 2, width - 2, height - 2), (width - 2, 1, width - 2, height - 2)]
+            lines += [(0, height - 1, width - 1, height - 1), (width - 1, 0, width - 1, height - 1)]
+            dc.DrawLineList(lines, sum(([PEN(wx.Colour(c))]*2 for c in colours), []))
         elif self._hover and self.IsThisEnabled():
             # Button is being hovered with mouse: create raised effect
             colours  = [(255, 255, 255)] * 2
@@ -1020,9 +1064,9 @@ class NoteButton(wx.Panel, wx.Button):
 
         if self._bmp:
             bmp = self._bmp if self.IsThisEnabled() else self._bmp_disabled
-            dc.DrawBitmap(bmp, x, y)
+            dc.DrawBitmap(bmp, x, y, useMask=True)
 
-        if self._align & wx.ALIGN_RIGHT:
+        if self._style & wx.ALIGN_RIGHT:
             x -= 10 + max(self._extent_label[0], self._extent_note[0])
         else:
             x += self._bmp.Size.width + 10
@@ -1250,16 +1294,49 @@ class Patch(object):
         wx.stc.StyledTextCtrl.StartStyling = StartStyling__Patched
         Patch._PATCHED = True
 
+        if wx.VERSION >= (4, 2):
+            # Previously, ToolBitmapSize was set to largest, and smaller bitmaps were padded
+            ToolBar__Realize = wx.ToolBar.Realize
+            def Realize__Patched(self):
+                sz = tuple(self.GetToolBitmapSize())
+                for i in range(self.GetToolsCount()):
+                    t = self.GetToolByPos(i)
+                    for b in filter(bool, (t.NormalBitmap, t.DisabledBitmap)):
+                        sz = max(sz[0], b.Width), max(sz[1], b.Height)
+                self.SetToolBitmapSize(sz)
+                for i in range(self.GetToolsCount()):
+                    t = self.GetToolByPos(i)
+                    if t.NormalBitmap:   t.NormalBitmap   = resize_img(t.NormalBitmap,   sz)
+                    if t.DisabledBitmap: t.DisabledBitmap = resize_img(t.DisabledBitmap, sz)
+                return ToolBar__Realize(self)
+            wx.ToolBar.Realize = Realize__Patched
+
+            def resize_bitmaps(func):
+                """Returns function pass-through wrapper, resizing any Bitmap arguments."""
+                def inner(self, *args, **kwargs):
+                    sz = self.GetToolBitmapSize()
+                    args = [resize_img(v, sz) if v and isinstance(v, wx.Bitmap) else v for v in args]
+                    kwargs = {k: resize_img(v, sz) if v and isinstance(v, wx.Bitmap) else v
+                              for k, v in kwargs.items()}
+                    return func(self, *args, **kwargs)
+                return functools.update_wrapper(inner, func)
+            wx.ToolBar.SetToolNormalBitmap   = resize_bitmaps(wx.ToolBar.SetToolNormalBitmap)
+            wx.ToolBar.SetToolDisabledBitmap = resize_bitmaps(wx.ToolBar.SetToolDisabledBitmap)
+
         # In some setups, float->int autoconversion is not done for Python/C sip objects
-        try: wx.Rect(1.1, 2.2, 3.3, 4.4)
-        except Exception: pass
-        else: return
+        with warnings.catch_warnings():
+            warnings.simplefilter("error") # Possible DeprecationWarning on wx.Rect with floats
+            try: wx.Rect(1.1, 2.2, 3.3, 4.4)
+            except Exception: pass
+            else: return
 
         def defloatify(func):
             """Returns function pass-through wrapper, converting any float arguments to int."""
+            cast = lambda v: int(v) if isinstance(v, float) else v
+            make = lambda v: type(v)(cast(x) for x in v) if isinstance(v, (list, tuple)) else cast(v)
             def inner(*args, **kwargs):
-                args = [int(v) if isinstance(v, float) else v for v in args]
-                kwargs = {k: int(v) if isinstance(v, float) else v for k, v in kwargs.items()}
+                args = [make(v) for v in args]
+                kwargs = {k: make(v) for k, v in kwargs.items()}
                 return func(*args, **kwargs)
             return functools.update_wrapper(inner, func)
 
@@ -4882,6 +4959,29 @@ def get_tool_rect(toolbar, id_tool):
                                else tool.Control.Size[0])
 
     return result
+
+
+def resize_img(img, size, aspect_ratio=True, bg=(-1, -1, -1)):
+    """Returns a resized wx.Image or wx.Bitmap, centered in free space if any."""
+    if not img or not size or list(size) == list(img.GetSize()): return img
+
+    result = img if isinstance(img, wx.Image) else img.ConvertToImage()
+    size1, size2 = list(result.GetSize()), list(size)
+    align_pos = None
+    if size1[0] < size[0] and size1[1] < size[1]:
+        size2 = tuple(size1)
+        align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
+    elif aspect_ratio:
+        ratio = size1[0] / float(size1[1]) if size1[1] else 0.0
+        size2[ratio > 1] = int(size2[ratio > 1] * (ratio if ratio < 1 else 1 / ratio))
+        align_pos = [(a - b) // 2 for a, b in zip(size, size2)]
+    if size1[0] > size[0] or size1[1] > size[1]:
+        if result is img: result = result.Copy()
+        result.Rescale(*size2)
+    if align_pos:
+        if result is img: result = result.Copy()
+        result.Resize(size, align_pos, *bg)
+    return result.ConvertToBitmap() if isinstance(img, wx.Bitmap) else result
 
 
 def wordwrap(text, width, dc, breakLongWords=True, margin=0):

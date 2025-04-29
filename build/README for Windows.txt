@@ -1,50 +1,63 @@
 Skyperious
 ==========
 
-
-Important notice
-----------------
-
-Around 2017, starting from Skype version 8, Skype moved away from its famous
-peer-to-peer architecture to a client-server system, and started to store 
-conversation history on its own servers only.
-
-Formerly, it used a local SQLite main.db database to store chats and messages,
-which is what Skyperious was originally created to work with - merging chat 
-histories from different computers into one.
-
-Skyperious still works with existing main.db files, and can also download
-newer messages from Skype online service. But any changes done to the database
-no longer affect what is visible in the official Skype program.
-
-
----
-
-
 Skyperious is a Skype chat history tool.
 
-You can open Skype SQLite databases and work with their contents:
+You can open and browse Skype's main.db databases from before Skype version 8,
+or create such databases from Skype online service and Skype export archives.
 
-- import messages from Skype online service and Skype export archives
+With an opened database, you can:
+
 - search across all messages and contacts
 - read chat history in full, see chat statistics and word clouds
-- export chats as HTML, text or spreadsheet
-- view any database table and export their data, fix database corruption
-- change, add or delete data in any table
+- export chats and contacts as HTML, text or spreadsheet
+- compare and synchronize messages with another Skype database, merging their differences
+
+
+Additionally, it doubles as a useful database tool for any SQLite file:
+
+- view and filter database tables, fix database corruption
+- change, add or delete data in tables
 - execute direct SQL queries
-
-and
-
-- synchronize messages in two Skype databases, merging their differences
+- export tables and query results as HTML, SQL or spreadsheet
 
 
-Additionally, it doubles as a useful database browser for any SQLite file.
 Also, a command line interface is available with key functions like
 exporting, searching, syncing, and merging. 
 The graphical version includes a Python console window.
 
 Downloads, help texts, and more screenshots at
 https://suurjaak.github.io/Skyperious.
+
+
+History
+-------
+
+Skyperious was initially written in 2012 to work with local Skype databases
+(main.db files in user folders),
+mostly in order to merge chat histories from different computers
+with different slices of chat history.
+
+Over time it grew into a more general tool to search and export Skype chat history,
+and manage the local Skype database e.g. pruning unneeded contacts.
+It could also communicate with a local running Skype instance, to add contacts
+from a file exported from MSN / GMail and the like.
+
+Around 2017, starting from Skype version 8, Skype moved away from its famous
+peer-to-peer architecture to a client-server system, closed API access to local
+running Skype instances, and started to store conversation history on its own servers only.
+
+Skyperious was updated to be able to create new local Skype databases,
+by downloading messages from Skype online service via login inside Skyperious,
+or by importing a Skype export archive (a .tar archive manually downloaded
+from Skype website, containing a messages.json file).
+
+In 2025 May, Skype is shut down altogether, and its accounts migrated to Microsoft Teams.
+
+Skyperious is still able to import Skype export archives, 
+and work locally with the database as before,
+but synchronizing messages from Skype online will no longer be possible
+once the online service is terminated.
 
 
 Using The Program
@@ -72,10 +85,8 @@ contents into an existing database, or create a new database from their contents
  My account -> Export files and chat history.
  The result is a .tar archive containing a messages.json file.)
 
-HTML export can download shared photos and embed them in the resulting HTML,
-if password for the Skype account has been entered in online-page.
-This can be disabled in File -> Advanced Options -> SharedImageAutoDownload.
-Image download is also supported in the command-line interface.
+Skyperious stores shared files and media in a subfolder next to the database,
+browsable by themselves, available as in-program links, and embedded in HTML exports.
 
 In database comparison, you can scan one database for messages not found in
 the other, and merge all detected messages to the other database. Or you can
@@ -96,15 +107,14 @@ Skyperious offers a number of options from the command line:
 More at https://suurjaak.github.io/Skyperious/help.html#commandline
 
 
-Skyperious can be minimized to tray, clicking the tray icon opens 
-a search popup.
+Skyperious can be minimized to tray, clicking the tray icon opens a search popup.
 
 The program itself is stand-alone, can work from any directory, and does not 
 need additional installation, Windows installers have been provided for 
 convenience. The installed program can be copied to a USB stick and used
 elsewhere.
 
-Skyperious has been tested under Windows 10, Windows 7, Windows Vista,
+Skyperious has been tested under Windows 11, Windows 10, Windows 7, Windows Vista,
 Windows XP, and reported to work under Windows 8.
 
 

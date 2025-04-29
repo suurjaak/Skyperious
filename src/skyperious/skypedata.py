@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    02.06.2024
+@modified    29.04.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -171,6 +171,25 @@ class SkypeDatabase(object):
         "videomessages":       "CREATE TABLE VideoMessages (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, qik_id BLOB, attached_msg_ids TEXT, sharing_id TEXT, status INTEGER, vod_status INTEGER, vod_path TEXT, local_path TEXT, public_link TEXT, progress INTEGER, title TEXT, description TEXT, author TEXT, creation_timestamp INTEGER, type TEXT)",
         "videos":              "CREATE TABLE Videos (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, status INTEGER, dimensions TEXT, error TEXT, debuginfo TEXT, duration_1080 INTEGER, duration_720 INTEGER, duration_hqv INTEGER, duration_vgad2 INTEGER, duration_ltvgad2 INTEGER, timestamp INTEGER, hq_present INTEGER, duration_ss INTEGER, ss_timestamp INTEGER, media_type INTEGER, convo_id INTEGER, device_path TEXT, device_name TEXT, participant_id INTEGER, rank INTEGER)",
         "voicemails":          "CREATE TABLE Voicemails (id INTEGER NOT NULL PRIMARY KEY, is_permanent INTEGER, type INTEGER, partner_handle TEXT, partner_dispname TEXT, status INTEGER, failurereason INTEGER, subject TEXT, timestamp INTEGER, duration INTEGER, allowed_duration INTEGER, playback_progress INTEGER, convo_id INTEGER, chatmsg_guid BLOB, notification_id INTEGER, flags INTEGER, size INTEGER, path TEXT, failures INTEGER, vflags INTEGER, xmsg TEXT, extprop_hide_from_history INTEGER)",
+    }
+
+    """SQL CREATE statements for Skyperious tables."""
+    INTERNAL_CREATE_STATEMENTS = {
+        "_options_":          "CREATE TABLE _options_ (name TEXT PRIMARY KEY, value NOT NULL)",
+        "_shared_files_":     """
+                              CREATE TABLE _shared_files_ (
+                                id       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                convo_id INTEGER NOT NULL, -- Conversations.id
+                                msg_id   INTEGER NOT NULL, -- Messages.id
+                                docid    TEXT, -- Skype online ID like "0-wus-d7-4f8248..."
+                                url      TEXT, -- Skype online content original URL
+                                author   TEXT NOT NULL, -- skypename of sender
+                                category TEXT, -- "audio" "video" "image"
+                                mimetype TEXT, -- "image/png" "video/mp4" etc
+                                filesize INTEGER NOT NULL DEFAULT 0,
+                                filename TEXT NOT NULL, -- Original filename
+                                filepath TEXT NOT NULL  -- Unique filename under share cache directory
+                              )""",
     }
 
 
@@ -509,6 +528,13 @@ class SkypeDatabase(object):
                 % ("!="[i], typestr), result).fetchone()
             result["messages_" + ("to", "from")[i]] = row["count"]
 
+        if full:
+            row = self.execute("SELECT COUNT(*) AS count FROM Messages "
+                               "WHERE body_xml LIKE '<URIObject%</URIObject>%'").fetchone()
+            result["shares"] = row["count"]
+            if conf.ShareDirectoryEnabled:
+                result["shared_files"] = self.get_shared_files_count()
+
         return result
 
 
@@ -802,6 +828,7 @@ class SkypeDatabase(object):
         {"first_message_datetime": datetime, "last_message_datetime": datetime,
          "message_count_single": message count in 1:1 chat,
          "message_count_group": message count in group chats,
+         "shared_files_count": shared files and media available locally if local storage enabled,
          "conversations": [{"id", "first_message_id", "last_message_id", ..}]}.
 
         @param   contacts  list of contacts, as returned from get_contacts()
@@ -853,6 +880,8 @@ class SkypeDatabase(object):
             chatids = set(c["id"] for c in chats if any(
                 contact["identity"] == p["identity"] for p in c["participants"]
             ))
+            if conf.ShareDirectoryEnabled:
+                contact["shared_files_count"] = self.get_shared_files_count(contacts=[contact])
             datas, datas2 = stats.get(contact["identity"], []), []
             if not chatids and not datas: continue # for contact
 
@@ -1240,6 +1269,255 @@ class SkypeDatabase(object):
         if refresh: self.get_tables(refresh=True)
 
 
+    def ensure_internal_schema(self):
+        """Adds Skyperious schema tables and columns not present."""
+        if not self.is_open(): return
+        if all(t in self.tables for t in self.INTERNAL_CREATE_STATEMENTS): return
+        self.get_tables()
+        refresh = []
+        for table, sql in self.INTERNAL_CREATE_STATEMENTS.items():
+            if table not in self.tables:
+                self.create_table(table, sql)
+                refresh.append(table)
+        for table in refresh: self.get_tables(refresh=True, this_table=table)
+
+
+    def get_internal_option(self, name, reload=False):
+        """
+        Returns value of specified program option like "ShareDirectory", or None if not set.
+
+        @param   reload  whether to requery from database
+        """
+        self.ensure_internal_schema()
+        if reload or "_options_" not in self.table_objects:
+            self.get_table_rows("_options_", reload=True)
+        return self.table_objects["_options_"].get(name, {}).get("value")
+
+
+    def set_internal_option(self, name, value):
+        """
+        Sets value of specified program option like "ShareDirectory" in options table.
+
+        Setting None clears option from table.
+        """
+        value0 = self.get_internal_option(name, reload=True)
+        if value == value0: return
+        if value is None: self.delete_row("_options_", {"name": name})
+        elif value0 is None: self.insert_row("_options_", {"name": name, "value": value})
+        else: self.update_row("_options_", {"value": value}, {"name": name})
+        self.get_internal_option(name, reload=True) # Update cache
+
+
+    def get_share_path(self):
+        """Gets absolute path of local shared files path for this database as configured."""
+        path = self.get_internal_option("ShareDirectory")
+        if not path:
+            try:              path = conf.ShareDirectoryTemplate % {"filename": self.filename}
+            except Exception: path = conf.ShareDirectoryTemplate
+        if not os.path.isabs(path): path = os.path.join(os.path.dirname(self.filename), path)
+        return path
+
+
+    def get_shared_file(self, msg_id):
+        """Returns data dictionary of shared file in conversation, or None if no such."""
+        self.ensure_internal_schema()
+        if msg_id not in self.table_objects.get("_shared_files_", {}):
+            row = self.execute("SELECT * FROM _shared_files_ WHERE msg_id = ?", [msg_id]).fetchone()
+            if row:
+                self.table_objects.setdefault("_shared_files_", {})[msg_id] = row
+        return self.table_objects.get("_shared_files_", {}).get(msg_id)
+
+
+    def get_shared_file_content(self, msg_id):
+        """Returns shared file raw binary from share folder, or None if no such."""
+        path = self.get_shared_file_path(msg_id)
+        if path and os.path.isfile(path):
+            try:
+                with open(path, "rb") as f:
+                    return f.read()
+            except Exception:
+                logger.exception("Error reading %s.", path)
+        return None
+
+
+    def get_shared_file_path(self, msg_id):
+        """Returns absolute calculated path of shared file, whether on disk or not."""
+        data = self.get_shared_file(msg_id)
+        if not data: return None
+        path = data["filepath"]
+        if not os.path.isabs(path):
+            path = os.path.join(self.get_share_path(), path)
+        return path
+
+
+    def get_shared_files_count(self, contacts=None):
+        """
+        Returns the number of shared files on disk.
+
+        @param   contacts  list of specific contacts to count files for if not all;
+                           may include database account
+        """
+        table_expr = "_shared_files_"
+        account = next((c for c in contacts or () if c["identity"] == self.id), None) 
+        if account:
+            table_expr += " LEFT JOIN Accounts ON _shared_files_.author = Accounts.skypename"
+            contacts = [c for c in contacts if c != account]
+        if contacts:
+            table_expr += " LEFT JOIN Contacts ON _shared_files_.author =" \
+                          " COALESCE(Contacts.skypename, Contacts.pstnnumber, '')"
+            table_expr += " WHERE Contacts.id IN (%s)" % ", ".join(str(x["id"]) for x in contacts)
+
+        total = 0
+        directory = self.get_share_path()
+        if os.path.isdir(directory) and os.listdir(directory):
+            for row in self.execute("SELECT filepath FROM %s" % table_expr):
+                filepath = row["filepath"]
+                if not os.path.isabs(filepath):
+                    filepath = os.path.join(directory, filepath)
+                total += os.path.exists(filepath)
+        return total
+
+
+    def store_shared_file(self, message, content, data):
+        """
+        Saves file or media shared in message; replaces existing data if present.
+
+        @param   content  raw binary content bytes
+        @param   data     file metadata dictionary, as {?filename, ?docid, ?category, ?mimetype}
+        @return           shared file ID, or None on failure
+        """
+        filedata0 = self.get_shared_file(message["id"])
+
+        basename = data.get("filename")
+        if not basename:
+            filetype = util.get_file_type(content, data.get("category"))
+            basename = "%s.%s" % (message["id"], filetype)
+        dt = message.get("datetime") or self.stamp_to_date(message["timestamp"])
+        basename = "_".join((dt.strftime("%Y%m%d_%H%I%S"), message["author"], basename))
+        basename = util.safe_filename(basename)
+
+        if filedata0:
+            outpath0 = self.get_shared_file_path(message["id"])
+            try: os.unlink(outpath0)
+            except Exception: pass
+        directory = self.get_share_path()
+        outpath = util.unique_path(os.path.join(directory, basename))
+        basename = os.path.basename(outpath)
+        logger.info("Storing local shared file %s for message #%s.", outpath, message["id"])
+        try: os.makedirs(directory)
+        except Exception: pass
+        try:
+            with open(outpath, "wb") as f:
+                f.write(content)
+        except Exception:
+            logger.exception("Failed to store local shared file %s.", outpath)
+            return None
+
+        filedata = dict(msg_id=message["id"], convo_id=message["convo_id"], filesize=len(content),
+                        filename=data.get("filename") or "", filepath=basename,
+                        author=message["author"], url=data.get("url"))
+        filedata.update({k: data[k] for k in ("docid", "category", "mimetype") if data.get(k)})
+        if not filedata.get("docid") and data.get("url"):
+            filedata.update(docid=live.get_content_id(data["url"]))
+        if not filedata.get("mimetype"):
+            filedata.update(mimetype=util.get_mime_type(content, data.get("category"), basename))
+        if filedata0:
+            self.update_row("_shared_files_", filedata, filedata0)
+            return filedata0["id"]
+        else: return self.insert_row("_shared_files_", filedata)
+
+
+    def delete_shared_files(self, chats=None, contacts=None):
+        """
+        Deletes shared files from disk and database, drops shared folder if empty.
+
+        @param   chats     list of specific chats to delete files from if not all
+        @param   contacts  list of specific contacts to delete files from if not all;
+                           may include database account
+        @return            number of database rows deleted
+        """
+        table_expr = "_shared_files_"
+        account = next((c for c in contacts or () if c["identity"] == self.id), None) 
+        if account:
+            table_expr += " LEFT JOIN Accounts ON _shared_files_.author = Accounts.skypename"
+            contacts = [c for c in contacts if c != account]
+        if contacts:
+            table_expr += " LEFT JOIN Contacts ON _shared_files_.author =" \
+                          " COALESCE(Contacts.skypename, Contacts.pstnnumber, '')"
+            table_expr += " WHERE Contacts.id IN (%s)" % ", ".join(str(x["id"]) for x in contacts)
+        if chats:
+            inter = " OR " if contacts else " WHERE "
+            table_expr += "%sconvo_id IN (%s)" % (inter, ", ".join(str(x["id"]) for x in chats))
+
+        count_files_deleted = 0
+        directory = self.get_share_path()
+        if os.path.isdir(directory) and os.listdir(directory):
+            for row in self.execute("SELECT filepath FROM %s" % table_expr):
+                filepath = row["filepath"]
+                if not os.path.isabs(filepath):
+                    filepath = os.path.join(directory, filepath)
+                if os.path.exists(filepath):
+                    try: os.unlink(filepath)
+                    except Exception as e: logger.warning("Error deleting %s: %s", filepath, e)
+                    else: count_files_deleted += 1
+        count_rows = self.execute("DELETE FROM _shared_files_ WHERE id IN "
+                                  "(SELECT _shared_files_.id FROM %s)" % table_expr,
+                                  log=True).rowcount
+        self.connection.commit()
+        self.last_modified = datetime.datetime.now()
+        if count_files_deleted:
+            logger.info("Deleted %s from disk.", util.plural("shared file", count_files_deleted))
+        if os.path.isdir(directory) and not os.listdir(directory):
+            try: os.rmdir(directory)
+            except Exception as e: logger.warning("Error deleting %s: %s", directory, e)
+            else: logger.info("Deleted empty shared files folder %s.", directory)
+        return count_rows
+
+
+    def rename_share_path(self, path):
+        """Renames local shared files path, moving/renaming all existing files on disk."""
+        if path: path = os.path.normpath(path)
+        path1, path2 = self.get_share_path(), path
+        if not path2:
+            try:              path2 = conf.ShareDirectoryTemplate % {"filename": self.filename}
+            except Exception: path2 = conf.ShareDirectoryTemplate
+        if not os.path.isabs(path2): path2 = os.path.join(os.path.dirname(self.filename), path2)
+        if path1 == path2: return
+
+        if os.path.isdir(path1) and not os.path.isdir(path2):
+            logger.info("Renaming shared files folder %s to %s.", path1, path2)
+            try: os.makedirs(os.path.dirname(path2))
+            except Exception: pass
+            try: shutil.move(path1, path2)
+            except Exception:
+                logger.exception("Error renaming shared files path %s to %s.", path1, path2)
+        elif os.path.isdir(path1) and os.path.isdir(path2):
+            logger.info("Moving shared files folder from %s to %s.", path1, path2)
+            for row in self.execute("SELECT * FROM _shared_files_"):
+                filepath1 = row["filepath"]
+                if not os.path.isabs(filepath1):
+                    filepath1 = os.path.join(path1, filepath1)
+                if not os.path.isfile(filepath1): continue # for row
+
+                filepath2 = util.unique_path(os.path.join(path2, os.path.basename(row["filepath"])))
+                try: shutil.move(filepath1, filepath2)
+                except Exception as e: logger.warning("Error renaming %s to %s: %s",
+                                                      filepath1, filepath2, e)
+                else:
+                    filepath = os.path.basename(filepath2)
+                    if filepath != row["filepath"]:
+                        self.update_row("_shared_files_", {"filepath": filepath}, row)
+            if os.path.isdir(path1) and not os.listdir(path1):
+                try: os.rmdir(path1)
+                except Exception as e: logger.warning("Error deleting %s: %s", path1, e)
+
+        if path and os.path.isabs(path):
+            dbdir = os.path.dirname(self.filename) + os.sep
+            if path.startswith(dbdir):
+                path = path[len(dbdir):]
+        self.set_internal_option("ShareDirectory", path or None)
+
+
     def blobs_to_binary(self, values, list_columns, col_data):
         """
         Converts blob columns in the list to sqlite3.Binary, suitable
@@ -1306,17 +1584,18 @@ class SkypeDatabase(object):
             return cursor.lastrowid
 
 
-    def insert_messages(self, chat, messages, source_db, source_chat,
+    def insert_messages(self, chat, messages, source_db, source_chat, shared_files=(),
                         heartbeat=None, beatcount=None):
         """
         Inserts the specified messages under the specified chat in this
         database, includes related rows in Calls, Videos, Transfers and
         SMSes.
 
-        @param    messages   list of messages, or message IDs from source_db
-        @param    heartbeat  function called after every @beatcount message
-        @param    beatcount  number of messages after which to call heartbeat
-        @return              a list of inserted message IDs
+        @param    messages      list of messages, or message IDs from source_db
+        @param    shared_files  list of shared file data dictionaries
+        @param    heartbeat     function called after every @beatcount message
+        @param    beatcount     number of messages after which to call heartbeat
+        @return                 a list of inserted message IDs
         """
         result = []
         if self.is_open() and not self.account and source_db.account:
@@ -1329,6 +1608,8 @@ class SkypeDatabase(object):
             self.create_table("smses")
         if self.is_open() and "chats" not in self.tables:
             self.create_table("chats")
+        if self.is_open() and shared_files:
+            self.ensure_internal_schema()
         if self.is_open() and "messages" in self.tables:
             logger.info("Merging %s (%s) into %s.",
                         util.plural("chat message", messages),
@@ -1342,6 +1623,7 @@ class SkypeDatabase(object):
                     % ", ".join("?" * len(cc)), [x["id"] for x in cc]))
             chatrows_present = dict([(i["name"], 1)
                 for i in self.execute("SELECT name FROM chats")])
+            filemap = {f["msg_id"]: f for f in shared_files or ()}
             col_data = self.get_table_columns("messages")
             fields = [col["name"] for col in col_data if col["name"] != "id"]
             str_cols = ", ".join(fields)
@@ -1366,8 +1648,7 @@ class SkypeDatabase(object):
 
             for i, m in enumerate(source_db.message_iterator(messages)):
                 # Insert corresponding Chats entry, if not present
-                if (m["chatname"] not in chatrows_present
-                and m["chatname"] in chatrows_source):
+                if m["chatname"] not in chatrows_present and m["chatname"] in chatrows_source:
                     chatrowdata = chatrows_source[m["chatname"]]
                     chatrow = [chatrowdata.get(col, "") for col in chat_fields]
                     chatrow = self.blobs_to_binary(
@@ -1380,15 +1661,13 @@ class SkypeDatabase(object):
                 m_filled = self.fill_missing_fields(m, fields)
                 m_filled["convo_id"] = chat["id"]
                 # Ensure correct author if merge from other account
-                if m["author"] \
-                and m["author"] in (self.username, source_db.id, source_db.username):
+                if m["author"] and m["author"] in (self.username, source_db.id, source_db.username):
                     m_filled["author"] = self.id
                 m_filled = self.blobs_to_binary(m_filled, fields, col_data)
                 cursor = self.execute("INSERT INTO messages (%s) VALUES (%s)"
                                       % (str_cols, str_vals), m_filled)
                 m_id = cursor.lastrowid
-                if (MESSAGE_TYPE_FILE == m["type"]
-                and "transfers" in source_db.tables):
+                if MESSAGE_TYPE_FILE == m["type"] and "transfers" in source_db.tables:
                     transfers = [t for t in source_db.get_transfers()
                                  if t.get("chatmsg_guid") == m["guid"]]
                     if transfers:
@@ -1403,21 +1682,21 @@ class SkypeDatabase(object):
                                 t["partner_handle"] = self.id
                             row = [t.get(col, "") if col != "convo_id" else chat["id"]
                                    for col in transfer_fields]
-                            row = self.blobs_to_binary(row, transfer_fields,
-                                                       transfer_col_data)
+                            row = self.blobs_to_binary(row, transfer_fields, transfer_col_data)
                             self.execute(sql, row)
-                if (MESSAGE_TYPE_SMS == m["type"]
-                and "smses" in source_db.tables):
+                if MESSAGE_TYPE_SMS == m["type"] and "smses" in source_db.tables:
                     smses = [s for s in source_db.get_smses()
                              if s.get("chatmsg_id") == m["id"]]
                     if smses:
-                        sql = "INSERT INTO smses (%s) VALUES (%s)" % \
-                              (sms_cols, sms_vals)
+                        sql = "INSERT INTO smses (%s) VALUES (%s)" % (sms_cols, sms_vals)
                         for sms in smses:
                             t = [sms.get(col, "") if col != "chatmsg_id" else m_id
                                  for col in sms_fields]
                             t = self.blobs_to_binary(t, sms_fields, sms_col_data)
                             self.execute(sql, t)
+                if m["id"] in filemap:
+                    self.insert_shared_files(chat, [dict(filemap[m["id"]], msg_id2=m_id)],
+                                             source_db, heartbeat, beatcount)
                 timestamp_earliest = min(timestamp_earliest, m["timestamp"])
                 result.append(m_id)
                 if heartbeat and beatcount and i and not i % beatcount:
@@ -1432,6 +1711,34 @@ class SkypeDatabase(object):
                              ":creation_timestamp WHERE id = :id", chat)
             self.connection.commit()
             self.last_modified = datetime.datetime.now()
+        return result
+
+
+    def insert_shared_files(self, chat, shared_files, source_db, heartbeat=None, beatcount=None):
+        """
+        Inserts the specified shared files under the specified chat in this
+        database, copying over file content on disk.
+
+        @param    shared_files  list of shared file data dictionaries, with msg_id2
+        @param    heartbeat     function called after every @beatcount message
+        @param    beatcount     number of messages after which to call heartbeat
+        @return                 a list of inserted shared file IDs
+        """
+        result = []
+        if not self.is_open(): return result
+        self.ensure_internal_schema()
+
+        for i, filedata in enumerate(shared_files):
+            content = source_db.get_shared_file_content(filedata["msg_id"])
+            if content is None:
+                logger.warning("Failed to get content for file %s.", filedata)
+            else:
+                sql = "SELECT * FROM Messages WHERE id = ?"
+                message = self.execute(sql, [filedata["msg_id2"]]).fetchone()
+                fileid = self.store_shared_file(message, content, filedata) if message else None
+                if fileid is not None: result.append(fileid)
+            if heartbeat and beatcount and i and not i % beatcount:
+                heartbeat()
         return result
 
 
@@ -1596,6 +1903,16 @@ class SkypeDatabase(object):
                     yield m
 
 
+    def sort_message_ids(self, chat, *id_sequences):
+        """Returns a single list of all message IDs in ascending timestamp order."""
+        result = []
+        ids = set(sum(map(list, id_sequences), []))
+        sql = "SELECT id FROM Messages WHERE convo_id = :id ORDER BY timestamp ASC"
+        for row in self.execute(sql, chat):
+            if row["id"] in ids: result.append(row["id"])
+        return result
+
+
     def delete_data(self, conversations, contacts=()):
         """
         Deletes the specified conversations and contacts, and all their related data.
@@ -1728,6 +2045,7 @@ class SkypeDatabase(object):
                 sql = "DELETE FROM %s WHERE %s IN (%s)" % (table, col, valstr)
                 sqls.append((table, sql))
 
+        result["_shared_files_"] = self.delete_shared_files(chats=conversations, contacts=contacts)
         for table, sql in sqls:
             delcount = self.execute(sql, log=True).rowcount
             if delcount:
@@ -1967,8 +2285,8 @@ class MessageParser(object):
                                 "wrap": False    whether to wrap long lines
                                 "export": False  whether output is for export,
                                                  using another content template
-                                "merge": False   for merge comparison, inserts
-                                                 skypename instead of fullname
+                                "merge": False   for merge comparison, provides
+                                                 simplified result
         @return                 a string if html or text specified,
                                 or ElementTree.Element containing message body,
                                 with "xml" as the root tag
@@ -1978,13 +2296,14 @@ class MessageParser(object):
         result = dom = None
         output = output or {}
         is_html = "html" == output.get("format")
+        use_cache = not self.stats and not output.get("merge") \
+                    and not (output.get("export") and "html" == output.get("format"))
 
-        if not output.get("merge") and "dom" in message:
-            dom = message["dom"] # Cached DOM already exists
+        if "dom" in message and use_cache:
+                dom = message["dom"] # Cached DOM already exists
         if dom is None:
             dom = self.parse_message_dom(message, output)
-            if not (output.get("merge")
-            or message["id"] in self.stats.get("shared_media", {})):
+            if use_cache:
                 message["dom"] = dom # Cache DOM if it was not mutated
 
         if dom is not None:
@@ -2013,7 +2332,7 @@ class MessageParser(object):
         Parses the body of the Skype message according to message type.
 
         @param   message  message data dict
-        @param   options  output options, {merge: True} has different content
+        @param   options  output options, e.g. {merge: True} has different content
         @return           ElementTree instance
         """
         body = message["body_xml"] or ""
@@ -2032,7 +2351,7 @@ class MessageParser(object):
             # Replace emoticons with <ss> tags if message appears to
             # have no XML (probably in older format).
             body = self.EMOTICON_RGX.sub(self.EMOTICON_REPL, body)
-        dom = self.make_xml(body, message)
+        dom = self.make_xml(body)
 
         if MESSAGE_TYPE_SMS == message["type"] \
         or (MESSAGE_TYPE_INFO == message["type"]
@@ -2069,8 +2388,7 @@ class MessageParser(object):
             status = dom.find("*/failurereason")
             if status is not None and status.text in self.FAILURE_REASONS:
                 status_text += ": %s" % self.FAILURE_REASONS[status.text]
-            dom = self.make_xml("<msgstatus>%s</msgstatus>%s" %
-                                (status_text, body), message)
+            dom = self.make_xml("<msgstatus>%s</msgstatus>%s" % (status_text, body))
         elif MESSAGE_TYPE_FILE == message["type"] \
         or (MESSAGE_TYPE_INFO == message["type"]
         and "<files" in message["body_xml"]):
@@ -2079,35 +2397,44 @@ class MessageParser(object):
                          if f["chatmsg_guid"] == message["guid"])
 
             domfiles = {}
+            localdata = None
+            if not options.get("export") and not options.get("merge"):
+                localdata = self.db.get_shared_file(message["id"])
+
             for f in dom.findall("*/file"):
-                domfiles[int(f.get("index"))] = {
-                    "filename": f.text, "filepath": "",
+                domfiles[int(f.get("index"))] = domfile = {
+                    "filename": f.text,
+                    "filepath": "",
                     "filesize": f.get("size", 0),
-                    "fileurl": live.make_content_url(f.get("url", None), "file"),
+                    "url": live.make_content_url(f.get("url", None), category="file"),
                     "partner_handle": message["author"],
                     "partner_dispname": get_author_name(message),
                     "starttime": message["timestamp"],
                     "type": TRANSFER_TYPE_OUTBOUND}
+                if localdata: # Ok to be within loop: only early messages had multiple files
+                    path = self.db.get_shared_file_path(message["id"])
+                    if os.path.isfile(path): domfile.update({
+                        "filepath": path, "filesize": localdata["filesize"], "url": None
+                    })
             if files and domfiles:
-                # Attach file URLs if available
+                # Attach local data or URLs if available
                 for i, f in files.items():
-                    f.update(fileurl=domfiles.get(i, {}).get("fileurl"))
+                    if i in domfiles:
+                        f.update({k: domfiles[i][k] for k in ("filepath", "filesize", "url")})
             elif not files:
                 # No rows in Transfers, try to find data from message body
                 # and create replacements for Transfers fields
                 files = domfiles
             message["__files"] = [f for i, f in sorted(files.items())]
             dom.clear()
-            dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] \
-                       else "Sent "
+            dom.text = "sent " if MESSAGE_TYPE_INFO == message["type"] else "Sent "
             dom.text += util.plural("file", files, False) + " "
             for i, f in enumerate(files[i] for i in sorted(files)):
-                if len(dom) > 0:
-                    a.tail = ", "
-                h = f["fileurl"] or util.path_to_url(f["filepath"] or f["filename"])
-                a = ElementTree.SubElement(dom, "a", {"href": h})
-                a.text = f["filename"]
-                a.tail = "" if i < len(files) - 1 else "."
+                tagname, attr = "span", {}
+                if f.get("filepath"): tagname, attr = "a", {"href": util.path_to_url(f["filepath"])}
+                elem = ElementTree.SubElement(dom, tagname, attr)
+                elem.text = f["filename"]
+                elem.tail = ", " if i < len(files) - 1 else "."
         elif MESSAGE_TYPE_INFO == message["type"] \
         and "<location" in message["body_xml"]:
             href, text = None, None
@@ -2244,61 +2571,33 @@ class MessageParser(object):
                 if MESSAGE_TYPE_UPDATE_DONE == message["type"]:
                     b.tail = " can now participate in this chat."
 
-        # Photo/video/file sharing: take file link, if any
+        # Photo/video/file sharing: transform content, link to local file if available
         if any(dom.iter("URIObject")):
-            url, filename, dom0 = next(dom.iter("URIObject")).get("uri"), None, dom
-            nametag = next(dom.iter("OriginalName"), None)
-            if nametag is not None: filename = nametag.get("v")
-            if not filename:
-                metatag = next(dom.iter("meta"), None)
-                if metatag is not None: filename = metatag.get("originalName")
-            link = next(dom.iter("a"), None)
-            if not url and link:
-                url = link.get("href")
-            elif not url: # Parse link from message contents
-                text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
-                match = re.search(r"(https?://[^\s<]+)", text)
-                if match: # Make link clickable
-                    url = match.group(0)
-                    a = step.Template('<a href="{{u}}">{{u}}</a>').expand(u=url)
-                    text2 = text.replace(url, a.encode("utf-8").decode("latin1"))
-                    dom = self.make_xml(text2, message) or dom
-            if url:
-                data = dict(url=url, author_name=get_author_name(message),
-                            author=message["author"], success=False,
-                            datetime=message.get("datetime")
-                                     or self.db.stamp_to_date(message["timestamp"]))
-                if filename: data.update(filename=filename)
+            data = self.db.get_shared_file(message["id"]) or self.make_message_share_data(dom=dom)
+            if data:
+                data = dict(data)
+                path = self.db.get_shared_file_path(message["id"]) if data.get("filepath") else None
+                is_local_file = path and os.path.isfile(path)
+                if not data.get("category"): data["category"] = "file"
+                if not data.get("filename"): data["filename"] = data.get("docid") or data["category"]
+                if is_local_file:
+                    data["url"] = util.path_to_url(path)
+                    tpl = step.Template('Shared {{category}} <a href="{{url}}">{{filename}}</a>')
+                else:
+                    tpl = step.Template('Shared {{category}} {{filename}}')
+                dom = self.make_xml(tpl.expand(data))
 
-                try: data["filesize"] = int(next(dom0.iter("FileSize")).get("v"))
-                except Exception: pass
-
-                objtype = (next(dom0.iter("URIObject")).get("type") or "").lower()
-                if   "audio"   in objtype: data["category"] = "audio"
-                elif "video"   in objtype: data["category"] = "video"
-                elif "sticker" in objtype: data["category"] = "sticker"
-                elif "swift"   in objtype:
-                    # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
-                    try:
-                        val = next(dom0.iter("Swift")).get("b64")
-                        pkg = json.loads(util.b64decode(val))
-                        if "message/card" == pkg["type"]:
-                            # {"attachments":[{"content":{"images":[{"url":"https://media..."}]}}]}
-                            url = pkg["attachments"][0]["content"]["images"][0]["url"]
-                            data.update(category="card", url=live.make_content_url(url, "card"))
-                            dom = self.make_xml('To view this card, go to: <a href="%s">%s</a>' %
-                                                (urllib.parse.quote(url, safe=":/=?&#"), url), message)
-                    except Exception: pass
-
-                url = data["url"] = live.make_content_url(data["url"], data.get("category"))
-                a = next(dom.iter("a"), None)
-                if a is not None: a.set("href", url); a.text = url
-
-                # If not root element, then this message quotes a media message
-                if self.stats and dom0.find("URIObject"):
+                if self.stats:
+                    data.update(author_name=get_author_name(message),
+                                author=message["author"], success=is_local_file,
+                                datetime=message.get("datetime")
+                                         or self.db.stamp_to_date(message["timestamp"]))
+                    if not options.get("export"): data.update(filepath=path)
+                    elif not options.get("files_folder"): data.pop("filepath", None)
                     self.stats["shared_media"][message["id"]] = data
-            # Sanitize XML tags like Title|Text|Description|..
-            dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
+            else:
+                # Sanitize XML tags like Title|Text|Description|..
+                dom = self.sanitize(dom, ["a", "b", "i", "s", "ss", "quote", "span"])
 
         # Process Skype message quotation tags, assembling a simple
         # <quote>text<special>footer</special></quote> element.
@@ -2321,7 +2620,7 @@ class MessageParser(object):
         return dom
 
 
-    def make_xml(self, text, message):
+    def make_xml(self, text):
         """Returns a new xml.etree.cElementTree node from the text."""
         result = None
         TAG = "<xml>%s</xml>"
@@ -2336,8 +2635,6 @@ class MessageParser(object):
                     text = text.replace("&", "&amp;")
                     result = ElementTree.fromstring(TAG % text)
                 except Exception:
-                    logger.exception('Error parsing message %s, body "%s".',
-                                     message.get("id", message), text)
                     result = ElementTree.fromstring(TAG % "")
                     result.text = text
         return result
@@ -2387,19 +2684,25 @@ class MessageParser(object):
     def dom_to_html(self, dom, output, message):
         """Returns an HTML representation of the message body."""
         if message.get("__files") and output.get("export"):
-            files = []
             do_download = conf.SharedFileAutoDownload and self.db.live.is_logged_in() \
-                          and output.get("media_folder") \
+                          and output.get("files_folder") \
                           and message["datetime"] >= conf.SharedContentDownloadMinDate
             for f in message["__files"]:
-                content = None
-                if do_download and f.get("fileurl"):
-                    content = self.db.live.get_api_content(f.get("fileurl"), "file")
-                files.append(dict(f, content=content))
-            ns = dict(files=files)
-            return step.Template(templates.CHAT_MESSAGE_FILE).expand(ns, **output)
+                if self.db.get_shared_file(message["id"]):
+                    self.handle_shared_content(message, output, f)
+                elif do_download and f.get("url"):
+                    content = self.db.live.get_api_content(f["url"], "file")
+                    if content is not None: self.handle_shared_content(message, output, f, content)
+            return step.Template(templates.CHAT_MESSAGE_FILE).expand(files=message["__files"])
 
         media = self.stats.get("shared_media", {}).get(message["id"])
+        if media and output.get("export") and media.get("success"):
+            content = self.handle_shared_content(message, output, media)
+            if content is not None:
+                filedata = self.db.get_shared_file(message["id"])
+                ns = dict(media, content=content, message=message, mimetype=filedata.get("mimetype"))
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
+
         if media and output.get("export") \
         and (conf.SharedAudioVideoAutoDownload if media.get("category") in ("audio", "video")
              else conf.SharedImageAutoDownload) \
@@ -2407,11 +2710,13 @@ class MessageParser(object):
         and message["datetime"] >= conf.SharedContentDownloadMinDate:
             category = media.get("category")
             if CHATMSG_TYPE_PICTURE == message["chatmsg_type"]: category = "avatar"
-            raw = self.db.live.get_api_content(media["url"], category)
-            if raw is not None:
-                media.update(success=True, filesize=len(raw))
-                ns = dict(media, content=raw, message=message)
-                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns, **output)
+            content = self.db.live.get_api_content(media["url"], category)
+            if content is not None:
+                self.handle_shared_content(message, output, media, content)
+                media.update(success=True)
+                filedata = self.db.get_shared_file(message["id"])
+                ns = dict(media, content=content, message=message, mimetype=filedata.get("mimetype"))
+                return step.Template(templates.CHAT_MESSAGE_MEDIA).expand(ns)
 
         other_tags = ["blink", "font", "span", "table", "tr", "td", "br"]
         greytag, greyattr, greyval = "font", "color", conf.HistoryGreyColour
@@ -2570,6 +2875,136 @@ class MessageParser(object):
         while len(dom) == 1 and "span" == dom[0].tag and not dom[0].tail:
             dom, dom.tag = dom[0], dom.tag # Collapse single spans to root
         return dom
+
+
+    def make_message_share_data(self, body=None, dom=None):
+        """
+        Returns metadata dictionary for Skype file/media message body or DOM.
+
+        @return  {url, ?docid, ?category, ?filename, ?filesize, ?mimetype} or None
+        """
+        if not dom and body:
+            try: dom = self.make_xml(body)
+            except Exception: return None
+        if not dom or (not any(dom.iter("URIObject")) and not any(dom.iter("files"))): return None
+
+        try: url = next(dom.iter("URIObject")).get("uri")
+        except Exception:
+            try: url = next(dom.iter("file")).get("url") # <files><file url="..">..</file></files>
+            except Exception: url = None
+        if not url:
+            linktag = next(dom.iter("a"), None)
+            if linktag is not None: url = linktag.get("href")
+        elif not url: # Parse link from message contents
+            text = ElementTree.tostring(dom, "utf-8", "text").decode("utf-8")
+            match = re.search(r"(https?://[^\s<]+)", text)
+            if match: url = match.group(0)
+        if not url: return None
+
+        docid = live.get_content_id(url) 
+
+        filename = None
+        nametag = next(dom.iter("OriginalName"), None) # <OriginalName v="..">
+        if nametag is not None: filename = nametag.get("v")
+        if not filename:
+            metatag = next(dom.iter("meta"), None) # <meta type="photo" originalName="..">
+            if metatag is not None: filename = metatag.get("originalName")
+        if not filename:
+            filetag = next(dom.iter("file"), None) # <files><file ..>..</file></files>
+            if filetag is not None: filename = filetag.text
+
+        data = dict()
+        if filename: data.update(filename=filename)
+        if docid: data.update(docid=docid)
+        try: data["filesize"] = int(next(dom.iter("FileSize")).get("v"))
+        except Exception:
+            try: data["filesize"] = int(next(dom.iter("file")).get("size")) # <files><file size="..">..
+            except Exception: pass
+
+        try: objtype = (next(dom.iter("URIObject")).get("type") or "").lower()
+        except Exception: objtype = ""
+        if   "picture" in objtype: data["category"] = "image"
+        elif "audio"   in objtype: data["category"] = "audio"
+        elif "video"   in objtype: data["category"] = "video"
+        elif "file"    in objtype: data["category"] = "file"
+        elif "sticker" in objtype: data["category"] = "sticker"
+        elif "swift"   in objtype:
+            # <URIObject type="SWIFT.1" ..><Swift b64=".."/>
+            try:
+                val = next(dom.iter("Swift")).get("b64")
+                pkg = json.loads(util.b64decode(val))
+                if "message/card" == pkg["type"]:
+                    # {"attachments":[{"content":{"images":[{"url":"https://..."}]}}]}
+                    url = pkg["attachments"][0]["content"]["images"][0]["url"]
+                    data["filename"]  = pkg["attachments"][0]["content"]["images"][0].get("alt")
+                    mimetype = pkg["attachments"][0]["content"]["images"][0].get("type")
+                    if mimetype and "/" in mimetype:
+                        data["mimetype"] = mimetype
+                        data["filename"] += ".%s" % mimetype.split("/", 1)[-1]
+                    data["category"] = "card"
+            except Exception: logger.exception("Error parsing SWIFT message %r.",
+                                               body or ElementTree.tostring(dom))
+        elif any(dom.iter("files")): data["category"] = "file"
+
+        data["url"] = live.make_content_url(url, data.get("category"))
+        return data
+
+
+    def handle_shared_content(self, message, output, metadata=None, content=None):
+        """
+        Handles shared file/media content for HTML export, ensuring valid stats.
+
+        Populates local share directory if enabled and content given.
+
+        @param   options   output options like {"files_folder": directory/to/write/under}
+        @param   metadata  metadata dictionary to update, containing at least "filename"
+        @param   content   raw binary content if not using local share directory
+        @return            binary content if media and no error else None
+        """
+        if metadata is None: metadata = {}
+        if content is not None:
+            if conf.ShareDirectoryEnabled:
+                self.db.store_shared_file(message, content, metadata)
+        else:
+            localpath = self.db.get_shared_file_path(message["id"])
+            if not localpath or not os.path.isfile(localpath): return None
+        filedata = self.db.get_shared_file(message["id"]) or {}
+
+        outpath = None
+        if output.get("files_folder"):
+            basename = metadata.get("filename")
+            if not basename:
+                peek = content
+                if peek is None:
+                    try:
+                        with open(localpath, "rb") as f: peek = f.read(100)
+                    except Exception:
+                        logger.exception("Error reading local shared %s.", localpath)
+                        return None
+                filetype = util.get_file_type(peek, filedata.get("category"))
+                basename = "%s.%s" % (message["id"], filetype)
+            basename = util.safe_filename(basename)
+            outpath = util.unique_path(os.path.join(output["files_folder"], basename))
+        if outpath:
+            try: os.makedirs(output["files_folder"])
+            except Exception: pass
+            try:
+                if content is None: shutil.copyfile(localpath, outpath)
+                else:
+                    with open(outpath, "wb") as f: f.write(content)
+            except Exception:
+                logger.exception("Error producing %s.", outpath)
+                return content
+
+        if content is None and MESSAGE_TYPE_FILE != message["type"]:
+            try:
+                with open(localpath, "rb") as f: content = f.read()
+            except Exception:
+                logger.exception("Error reading file %s.", localpath)
+                return None
+
+        if outpath: metadata.update(filepath=outpath)
+        return content
 
 
     def add_dict_text(self, dictionary, key, text, inter=" "):
@@ -2977,6 +3412,14 @@ def find_databases(folder):
     for root, dirs, files in os.walk(folder):
         for f in (x for x in files if is_sqlite_file(x, root)):
             yield os.path.join(root, f)
+
+
+def make_db_path(username, directory=None):
+    """Returns the default database path for username, by default in variable content directory."""
+    base = util.safe_filename(username)
+    if base != username: base += "_%x" % util.hash_string(username)
+    return os.path.join(directory or conf.VarDirectory, "%s.main.db" % base)
+
 
 def get_avatar_data(datadict):
     """Returns contact/account avatar raw data or ""."""

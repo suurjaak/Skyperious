@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    26.03.2025
+@modified    25.04.2025
 ------------------------------------------------------------------------------
 """
 from __future__ import print_function
@@ -108,14 +108,10 @@ ARGUMENTS = {
               "help": "date to export messages from, as YYYY-MM-DD", "type": date},
              {"args": ["-e", "--end"], "dest": "end_date", "required": False,
               "help": "date to export messages until, as YYYY-MM-DD", "type": date},
-             {"args": ["--media-folder"], "dest": "media_folder",
+             {"args": ["--files-folder"], "dest": "files_folder",
               "action": "store_true", "required": False,
               "help": "save shared media into a subfolder in HTML export "
                       "instead of embedding into HTML"},
-             {"args": ["--media-cache"], "dest": "media_cache",
-              "action": "store_true", "required": False,
-              "help": "cache downloaded media in user directory, "
-                      "for faster repeated exports"},
              {"args": ["-p", "--password"], "dest": "password",
               "help": "password for Skype account to download shared media in HTML export,\n"
                       "if not using stored or prompted"},
@@ -759,7 +755,7 @@ def run_create(filenames, args):
         result = result or kwargs
         if "counts" in result:
             counts.update(result["counts"])
-            t = ", ".join(util.plural(x[:-1], counts[x], sep=",")
+            t = ", ".join(util.plural(x[:-1].replace("_", " "), counts[x], sep=",")
                           for x in sorted(counts))
             bar.afterword = " Imported %s." % t
         return True
@@ -808,8 +804,7 @@ def run_export(filenames, args):
                authors          names of specific authors whose chats to export
                start_date       date to export messages from, as YYYY-MM-DD
                end_date         date to export messages until, as YYYY-MM-DD
-               media_folder     save shared media into a subfolder in HTML export
-               media_cache      cache downloaded media in user directory
+               files_folder     save shared files and media into a subfolder in HTML export
                password         Skype password
                ask_password     whether to ask password on the command line interactively
                store_password   whether to store password in configuration file
@@ -824,7 +819,7 @@ def run_export(filenames, args):
 
         if (args.password or args.ask_password) and db.username \
         and (conf.SharedImageAutoDownload or conf.SharedAudioVideoAutoDownload
-             or conf.SharedFileAutoDownload and args.media_folder) \
+             or conf.SharedFileAutoDownload and args.files_folder) \
         and "html" == format:
             password = None
             while not db.live.is_logged_in():
@@ -871,8 +866,7 @@ def run_export(filenames, args):
             opts = dict(progress=not conf.IsCLINonTerminal and bar.update,
                         timerange=timerange)
             if not is_xlsx_single: opts["multi"] = True
-            if args.media_folder: opts["media_folder"] = True
-            if args.media_cache:  opts["media_cache"]  = True
+            if args.files_folder: opts["files_folder"] = True
             result = export.export_chats(chats, path, format, db, opts)
             files, count, message_count = result
             bar.stop()
@@ -1160,7 +1154,7 @@ def run(nogui=False):
         try: os.makedirs(os.path.dirname(conf.LogFile))
         except Exception: pass
         try:
-            handler = logging.FileHandler(conf.LogFile)
+            handler = logging.FileHandler(conf.LogFile, encoding="utf-8")
             handler.setFormatter(logging.Formatter("%(asctime)s\t%(message)s"))
             logger.addHandler(handler)
             logger.info("Logging to file %r.", conf.LogFile)
