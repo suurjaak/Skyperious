@@ -9,7 +9,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     10.01.2012
-@modified    22.04.2025
+@modified    10.05.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -904,6 +904,7 @@ class LiveThread(WorkerThread):
                 elif "shared_files" == action["action"]:
                     self._skype.populate_files(action.get("chats"))
             except Exception as e:
+                logger.exception("Error working with Skype online service.")
                 result["error"] = traceback.format_exc()
                 result["error_short"] = util.format_exc(e)
             if self._queue.empty():   result["done"] = True
