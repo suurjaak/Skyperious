@@ -5,6 +5,7 @@ CHANGELOG
 -----------------
 - fix error syncing shared files in conversations migrated from older Skype (issue #150)
 - fix error in checking shared file existence
+- fix highlighting opened item in contacts list where account is in own contacts
 - fix missing statement terminator in query export to SQL
 
 
