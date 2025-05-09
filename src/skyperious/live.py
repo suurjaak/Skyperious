@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     08.07.2020
-@modified    25.04.2025
+@modified    10.05.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -854,24 +854,25 @@ class SkypeLogin(object):
         if not self.progress(action="populate", table="shared_files", start=True):
             return
         chatmap = {c["id"]: c for c in self.db.get_conversations()}
+        chatmap.update((c["__link"]["id"], c) for c in list(chatmap.values()) if c.get("__link"))
+        selected_ids = [cid for cid, c in chatmap.items() if chats and c["identity"] in chats]
         counts = collections.defaultdict(int) # {convo_id: stored file count}
 
         sql = "SELECT convo_id FROM Messages WHERE "
-        if chats: sql += " convo_id IN (%s) AND " % \
-                         ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+        if chats: sql += "convo_id IN (%s) AND " % ", ".join(map(str, selected_ids))
         sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
         sql += "GROUP BY convo_id"
-        chats_queue = [x["convo_id"] for x in self.db.execute(sql)]
-        chats_queue.sort(key=lambda k: chatmap[k]["title_long_lc"], reverse=True)
+        chats_idqueue = [x["convo_id"] for x in self.db.execute(sql)]
+        chats_idqueue = list(set(chatmap[cid]["id"] for cid in chats_idqueue if cid in chatmap))
+        chats_idqueue.sort(key=lambda k: chatmap[k]["title_long_lc"], reverse=True)
 
-        if chats_queue:
+        if chats_idqueue:
             sql = "SELECT COUNT(*) AS count FROM Messages WHERE "
-            if chats: sql += " convo_id IN (%s) AND " % \
-                             ", ".join(str(k) for k, c in chatmap.items() if c["identity"] in chats)
+            if chats: sql += "convo_id IN (%s) AND " % ", ".join(map(str, selected_ids))
             sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%')"
             potentials = self.db.execute(sql).fetchone()["count"]
             logger.info("Checking %s in %s for potential shared files to download.",
-                        util.plural("message", potentials), util.plural("chat", chats_queue))
+                        util.plural("message", potentials), util.plural("chat", chats_idqueue))
 
         run = True
         cursor = chat = None
@@ -880,13 +881,15 @@ class SkypeLogin(object):
         while run:
             cycles += 1
             if not cycles % 100 and not self.progress(): break # while run
-            if cursor is None and not chats_queue: break # while run
+            if cursor is None and not chats_idqueue: break # while run
             if cursor is None:
-                chat = chatmap[chats_queue.pop()]
+                chat = chatmap[chats_idqueue.pop()]
                 if not self.progress(action="populate", table="shared_files",
                                      chat=chat["identity"], start=True):
                     break # while run
-                sql = "SELECT * FROM Messages WHERE convo_id = %s AND " % chat["id"]
+                chat_ids = (chat["id"], chat["__link"]["id"]) if chat.get("__link") else [chat["id"]]
+                sql = "SELECT * FROM Messages WHERE "
+                sql += "convo_id IN (%s) AND " % ", ".join(map(str, chat_ids))
                 sql += "(body_xml LIKE '<URIObject%' OR body_xml LIKE '<files>%') "
                 sql += "ORDER BY id DESC "
                 cursor = self.db.execute(sql)

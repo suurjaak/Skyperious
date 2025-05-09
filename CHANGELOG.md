@@ -3,6 +3,7 @@ CHANGELOG
 
 5.9.1, 2025-05-10
 -----------------
+- fix error syncing shared files in conversations migrated from older Skype (issue #150)
 - fix error in checking shared file existence
 
 
