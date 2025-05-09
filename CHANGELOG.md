@@ -5,6 +5,7 @@ CHANGELOG
 -----------------
 - fix error syncing shared files in conversations migrated from older Skype (issue #150)
 - fix error in checking shared file existence
+- fix missing statement terminator in query export to SQL
 
 
 5.9, 2025-04-29
