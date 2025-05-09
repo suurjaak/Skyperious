@@ -26,7 +26,7 @@ except ImportError: appdirs = None
 
 """Program title, version number and version date."""
 Title = "Skyperious"
-Version = "5.10.dev0"
+Version = "5.9.1.dev1"
 VersionDate = "10.05.2025"
 
 Frozen, Snapped = getattr(sys, "frozen", False), (sys.executable or "").startswith("/snap/")

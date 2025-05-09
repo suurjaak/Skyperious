@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    29.04.2025
+@modified    10.05.2025
 ------------------------------------------------------------------------------
 """
 import collections
@@ -1322,7 +1322,7 @@ class SkypeDatabase(object):
         """Returns data dictionary of shared file in conversation, or None if no such."""
         self.ensure_internal_schema()
         if msg_id not in self.table_objects.get("_shared_files_", {}):
-            row = self.execute("SELECT * FROM _shared_files_ WHERE msg_id = ?", [msg_id]).fetchone()
+            row = next(self.execute("SELECT * FROM _shared_files_ WHERE msg_id = ?", [msg_id]), None)
             if row:
                 self.table_objects.setdefault("_shared_files_", {})[msg_id] = row
         return self.table_objects.get("_shared_files_", {}).get(msg_id)

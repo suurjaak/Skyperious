@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+5.9.1, 2025-05-10
+-----------------
+- fix error in checking shared file existence
+
+
 5.9, 2025-04-29
 ---------------
 - store shared files and media locally (issue #135)
