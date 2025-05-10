@@ -1,6 +1,15 @@
 CHANGELOG
 =========
 
+5.9.1, 2025-05-10
+-----------------
+- fix error syncing shared files in conversations migrated from older Skype (issue #150)
+- fix error in checking shared file existence
+- fix showing default avatar on contact page when no avatar loaded yet
+- fix highlighting opened item in contacts list where account is in own contacts
+- fix missing statement terminator in query export to SQL
+
+
 5.9, 2025-04-29
 ---------------
 - store shared files and media locally (issue #135)

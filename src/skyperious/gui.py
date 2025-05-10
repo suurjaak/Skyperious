@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     26.11.2011
-@modified    27.04.2025
+@modified    10.05.2025
 ------------------------------------------------------------------------------
 """
 import ast
@@ -6479,19 +6479,22 @@ class DatabasePage(wx.Panel):
             return
 
         # Update contact list colours and scroll to the opened contact
-        category = "database account" if contact["identity"] == self.db.id else "contact"
+        category = "database account" if contact is self.db.account else "contact"
         if contact != self.contact:
             logger.info("Opening %s %s.", category, contact["name"])
         clist.Freeze()
         scrollpos = clist.GetScrollPos(wx.VERTICAL)
         index_selected = -1
         for i in range(clist.ItemCount):
+            item = clist.GetItemMappedData(i)
+            if contact is self.db.account: matches = (item is self.db.account)
+            else: matches = item is not self.db.account and item["id"] == contact["id"]
             myid = clist.GetItemMappedData(i)["id"]
-            if myid == contact["id"]:
+            if matches:
                 index_selected = i
                 f = clist.Font; f.SetWeight(wx.FONTWEIGHT_BOLD)
                 clist.SetItemFont(i, f)
-            elif self.contact and myid == self.contact["id"]:
+            else:
                 clist.SetItemFont(i, clist.Font)
         if index_selected >= 0:
             delta = index_selected - scrollpos
@@ -6500,7 +6503,7 @@ class DatabasePage(wx.Panel):
                 clist.ScrollLines(delta + nudge)
         clist.Thaw()
         wx.YieldIfNeeded() # Allow display to refresh
-        prefix = "Database a&ccount" if contact["identity"] == self.db.id else "&Contact"
+        prefix = "Database a&ccount" if contact is self.db.account else "&Contact"
         self.button_export_contact_chats.Label = "&Export %s chats" % category.split()[-1]
         self.button_export_contact_chats.Enabled = bool(contact.get("conversations", []))
         self.label_contact.Label = prefix + " %(name)s (%(identity)s):" % contact
@@ -6530,11 +6533,11 @@ class DatabasePage(wx.Panel):
             if img:
                 self.imagecache[imgkey] = img
                 avatar_size = tuple(img.GetSize())
-            defaultavatar = "avatar__default__large.png"
-            if defaultavatar not in self.memoryfs["files"]:
-                img = images.AvatarDefaultLarge.Image
-                self.memoryfs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
-                self.memoryfs["files"][defaultavatar] = 1
+        defaultavatar = "avatar__default__large.png"
+        if defaultavatar not in self.memoryfs["files"]:
+            img = images.AvatarDefaultLarge.Image
+            self.memoryfs["handler"].AddFile(defaultavatar, img, wx.BITMAP_TYPE_PNG)
+            self.memoryfs["files"][defaultavatar] = 1
 
         data = {"contact": contact, "avatar": avatar_path, "avatar_size": avatar_size,
                 "db": self.db, "sort_by": self.contact_sort_field}

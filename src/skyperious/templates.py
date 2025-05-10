@@ -8,7 +8,7 @@ Released under the MIT License.
 
 @author      Erki Suurjaak
 @created     09.05.2013
-@modified    29.04.2025
+@modified    10.05.2025
 ------------------------------------------------------------------------------
 """
 import re
@@ -1762,7 +1762,7 @@ str_cols = ", ".join(map(util.format_sql_name, columns))
 -- SQL: {{ sql }}
 %endif
 %if isdef("create_sql") and create_sql:
-{{ create_sql }}
+{{ create_sql.rstrip().rstrip(";") }};
 %endif
 
 %for row in rows:
